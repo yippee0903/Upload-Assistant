@@ -591,6 +591,17 @@ config = {
             # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
             "skip_nfo": True,
         },
+        "G3MINI": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Mon profil > Réglages > Clé API
+            "api_key": "",
+            # Mon profil > Réglages > Passkey
+            "announce_url": "https://gemini-tracker.org/announce/PasskeyHere",
+            "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
+        },
         "GPW": {
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.

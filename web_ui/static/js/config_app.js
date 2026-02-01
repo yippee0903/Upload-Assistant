@@ -206,6 +206,7 @@ const trackerNameMap = {
   'FL': 'FileList',
   'FRIKI': 'Friki',
   'FF': 'FunFile',
+  'G3MINI': 'GeminiTr4ck3r',
   'GPW': 'GreatPosterWall',
   'HUNO': 'hawke-uno',
   'HDB': 'HDBits',
