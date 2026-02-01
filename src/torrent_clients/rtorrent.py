@@ -162,6 +162,9 @@ class RtorrentClientMixin:
                                 # For directories, we need to link each file inside
                                 os.makedirs(dst, exist_ok=True)
 
+                                # Check if skip_nfo is enabled
+                                skip_nfo = meta.get('skip_nfo', False)
+
                                 for root, _, files in os.walk(src):
                                     # Get the relative path from source
                                     rel_path = os.path.relpath(root, src)
@@ -175,6 +178,9 @@ class RtorrentClientMixin:
 
                                     # Create hardlinks for each file
                                     for idx, file in enumerate(files):
+                                        # Skip .nfo files if skip_nfo is enabled
+                                        if skip_nfo and file.lower().endswith('.nfo'):
+                                            continue
                                         src_file = os.path.join(root, file)
                                         dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
                                         try:

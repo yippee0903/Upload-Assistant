@@ -706,7 +706,8 @@ class QbittorrentClientMixin:
                     src=src,
                     dst=dst,
                     use_hardlink=use_hardlink,
-                    debug=meta.get('debug', False)
+                    debug=meta.get('debug', False),
+                    skip_nfo=meta.get('skip_nfo', False)
                 )
 
             allow_fallback = client.get('allow_fallback', True)
@@ -2039,8 +2040,16 @@ async def create_cross_seed_links(meta: dict[str, Any], torrent: Torrent, tracke
 
         return None, None
 
+    skip_nfo = meta.get('skip_nfo', False)
     for torrent_file in torrent_files:
         relative_path = torrent_file['relative_path']
+
+        # Skip .nfo files if skip_nfo is enabled
+        if skip_nfo and relative_path.lower().endswith('.nfo'):
+            if debug:
+                console.print(f"[yellow]Skipping .nfo file in cross-seed due to skip_nfo: {relative_path}")
+            continue
+
         dest_file_path = os.path.join(tracker_dir, torrent_name, relative_path) if multi_file else os.path.join(tracker_dir, torrent_name)
         dest_file_path = os.path.normpath(dest_file_path)
         tracker_root = os.path.abspath(tracker_dir)
@@ -2067,7 +2076,7 @@ async def create_cross_seed_links(meta: dict[str, Any], torrent: Torrent, tracke
                 console.print(f"[yellow]Cross-seed link already exists, keeping: {dest_file_path}")
             continue
 
-        linked = await async_link_directory(source_file, dest_file_path, use_hardlink=use_hardlink, debug=debug)
+        linked = await async_link_directory(source_file, dest_file_path, use_hardlink=use_hardlink, debug=debug, skip_nfo=skip_nfo)
         if not linked:
             console.print(f"[bold red]Linking failed for cross-seed file: {relative_path}")
             return False
@@ -2077,7 +2086,7 @@ async def create_cross_seed_links(meta: dict[str, Any], torrent: Torrent, tracke
     return True
 
 
-async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, debug: bool = False) -> bool:
+async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, debug: bool = False, skip_nfo: bool = False) -> bool:
     try:
         # Create destination directory
         await asyncio.to_thread(os.makedirs, os.path.dirname(dst), exist_ok=True)
@@ -2120,16 +2129,19 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
                 await asyncio.to_thread(os.makedirs, dst, exist_ok=True)
 
                 # Get all files in the source directory
-                def _collect_files(src: str, dst: str) -> list[tuple[str, str, str]]:
+                def _collect_files(src: str, dst: str, skip_nfo: bool) -> list[tuple[str, str, str]]:
                     items: list[tuple[str, str, str]] = []
                     for root, _dirs, files in os.walk(src):
                         for file in files:
+                            # Skip .nfo files if skip_nfo is enabled
+                            if skip_nfo and file.lower().endswith('.nfo'):
+                                continue
                             src_path = os.path.join(root, file)
                             rel_path = os.path.relpath(src_path, src)
                             items.append((src_path, os.path.join(dst, rel_path), rel_path))
                     return items
 
-                all_items = await asyncio.to_thread(_collect_files, src, dst)
+                all_items = await asyncio.to_thread(_collect_files, src, dst, skip_nfo)
 
                 # Create subdirectories first (to avoid race conditions)
                 subdirs: set[str] = set()
