@@ -361,6 +361,8 @@ config = {
             "anon": False,
             # Send uploads to Aither modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
 
         "ACM": {
@@ -369,6 +371,8 @@ config = {
             "api_key": "",
             "announce_url": "https://eiga.moi/announce/customannounceurl",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "AITHER": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -379,6 +383,8 @@ config = {
             "anon": False,
             # Send uploads to Aither modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "ANT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -386,6 +392,8 @@ config = {
             "api_key": "",
             "announce_url": "https://anthelion.me/announce/customannounceurl",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "AR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -394,6 +402,8 @@ config = {
             "username": "",
             "password": "",
             "announce_url": "http://tracker.alpharatio.cc:2710/PASSKEY/announce",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "ASC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -407,7 +417,9 @@ config = {
             # anon is not an option when uploading to ASC
             # for ASC to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
             # cookies need to be in netscape format and need to be in data/cookies/ASC.txt
-            "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY"
+            "announce_url": "https://amigos-share.club/announce.php?passkey=PASSKEY",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "AZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -419,6 +431,8 @@ config = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "BHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -431,6 +445,8 @@ config = {
             # Send uploads to BHD drafts
             "draft_default": False,
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "BHDTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -440,6 +456,8 @@ config = {
             # passkey found under https://www.bit-hdtv.com/my.php
             "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "BJS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -450,6 +468,8 @@ config = {
             "anon": False,
             # Set to False if during an anonymous upload you want your release group to be hidden
             "show_group_if_anon": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "BLU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -458,6 +478,8 @@ config = {
             "useAPI": False,
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "BT": {
             "link_dir_name": "",
@@ -465,6 +487,8 @@ config = {
             # cookies need to be in netscape format and need to be in data/cookies/BT.txt
             "announce_url": "https://t.brasiltracker.org/<PASSKEY>/announce",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "CBR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -477,6 +501,8 @@ config = {
             # If set, the script will try to preserve the original group's name.
             # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
             "tag_for_custom_release": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -488,6 +514,8 @@ config = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "DC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -495,6 +523,8 @@ config = {
             # You can find your api key at Settings -> Security -> API Key -> Generate API Key
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "DP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -503,6 +533,8 @@ config = {
             "anon": False,
             # Send uploads to DP modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "DT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -517,6 +549,8 @@ config = {
             "anon": False,
             # Use Spanish title instead of English title, if available
             "use_spanish_title": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "FF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -529,6 +563,8 @@ config = {
             "check_requests": False,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "FL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -537,17 +573,23 @@ config = {
             "passkey": "",
             "uploader_name": "https://filelist.io/Custom_Announce_URL",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "FNP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "FRIKI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "GPW": {
             "link_dir_name": "",
@@ -558,6 +600,8 @@ config = {
             # Cookies must be in Netscape format and must be located in data/cookies/GPW.txt
             # You can find your announce URL at https://greatposterwall.com/upload.php
             "announce_url": "https://tracker.greatposterwall.com/<PASSKEY>/announce",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "HDB": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -571,6 +615,8 @@ config = {
             "passkey": "",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             "img_rehost": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "HDS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -581,6 +627,8 @@ config = {
             "anon": False,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "HDT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -600,12 +648,16 @@ config = {
             "announce_url": "https://hdts-announce.ru/announce.php?pid=<PASS_KEY/PID>",
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "HHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "HUNO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -613,12 +665,16 @@ config = {
             "useAPI": False,
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "IHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "IS": {
             # for IS to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -627,24 +683,32 @@ config = {
             "link_dir_name": "",
             "announce_url": "https://immortalseed.me/announce.php?passkey=<PASSKEY>",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "ITT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "LCD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "LDU": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "LST": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -657,6 +721,8 @@ config = {
             "modq": False,
             # Send uploads to LST drafts
             "draft": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "LT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -665,6 +731,8 @@ config = {
             "anon": False,
             # Send uploads to LT modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "LUME": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -673,6 +741,8 @@ config = {
             "anon": False,
             # Send uploads to LUME modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "MTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -688,12 +758,16 @@ config = {
             'skip_if_rehash': False,
             # Iterate over found torrents and prefer MTV suitable torrents if found.
             'prefer_mtv_torrent': False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "NBL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "https://tracker.nebulance.io/insertyourpasskeyhere/announce",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "OE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -702,6 +776,8 @@ config = {
             "useAPI": False,
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "OTW": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -710,6 +786,8 @@ config = {
             # Send uploads to OTW modq for staff approval
             "modq": False,
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -721,12 +799,16 @@ config = {
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PTER": {  # Does not appear to be working at all
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -737,6 +819,8 @@ config = {
             "password": "",
             "ptgen_api": "",
             "anon": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -749,6 +833,8 @@ config = {
             "username": "",
             "password": "",
             "announce_url": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -756,12 +842,16 @@ config = {
             # for PTS to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/PTS.txt
             "announce_url": "https://ptskit.kqbhek.com/announce.php?passkey=<PASSKEY>",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "PTT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "R4E": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -769,18 +859,24 @@ config = {
             "api_key": "",
             "announce_url": "https://racing4everyone.eu/announce/customannounceurl",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "RAS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "RF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "RTF": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -791,6 +887,8 @@ config = {
             "api_key": '',
             "announce_url": "get from upload page",
             "anon": True,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "SAM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -801,6 +899,8 @@ config = {
             # If set, the script will try to preserve the original group's name.
             # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
             "tag_for_custom_release": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "SHRI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -809,17 +909,23 @@ config = {
             "anon": False,
             # Use Italian title instead of English title, if available
             "use_italian_title": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "SN": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "https://tracker.swarmazon.club:8443/<YOUR_PASSKEY>/announce",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "SP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "SPD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -829,12 +935,16 @@ config = {
             # Select the upload channel, if you don't know what this is, leave it empty.
             # You can also set this manually using the args -ch or --channel, without '@'. Example: @spd -> '-ch spd'.
             "channel": "",
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "STC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "THR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -847,12 +957,16 @@ config = {
             "pronfo_theme": "pronfo theme code",
             "pronfo_rapi_id": "pronfo remote api id",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TIK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -869,12 +983,16 @@ config = {
             "img_rehost": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
             "full_mediainfo": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TLZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TOS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -886,6 +1004,8 @@ config = {
             "anon": False,
             # Upload with Exclusive flag (team of staff only)
             "exclusive": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TTG": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -897,6 +1017,8 @@ config = {
             "user_id": "",
             "announce_url": "https://totheglory.im/announce/",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TTR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -905,6 +1027,8 @@ config = {
             "anon": False,
             # Send to modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "TVC": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -914,6 +1038,8 @@ config = {
             "api_key": "",
             "announce_url": "https://tvchaosuk.com/announce/<PASSKEY>",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "ULCX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -924,24 +1050,32 @@ config = {
             "anon": False,
             # Send to modq for staff approval
             "modq": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "UTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "YOINK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "YUS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
+            # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
+            "skip_nfo": True,
         },
         "MANUAL": {
             # Replace link with filebrowser (https://github.com/filebrowser/filebrowser) link to the Upload-Assistant directory, this will link to your filebrowser instead of uploading to uguu.se

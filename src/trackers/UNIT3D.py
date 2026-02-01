@@ -437,6 +437,11 @@ class UNIT3D:
 
     async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
         files: dict[str, tuple[str, bytes, str]] = {}
+
+        # Check if skip_nfo is enabled in tracker config
+        if self.tracker_config.get('skip_nfo', False):
+            return files
+
         base_dir = meta["base_dir"]
         uuid = meta["uuid"]
         specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")

@@ -205,7 +205,7 @@ class QbittorrentClientMixin:
                                         console.print(f"[bold red]Validation failed for {torrent_file_path}")
                                     os.remove(torrent_file_path)  # Remove invalid file
                                 else:
-                                    await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'])
+                                    await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'], meta.get('path'), meta.get('skip_nfo', False))
                             except asyncio.TimeoutError:
                                 console.print(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
 
@@ -1608,12 +1608,16 @@ class QbittorrentClientMixin:
                                 else:
                                     # If piece preference is disabled, return first valid torrent
                                     try:
-                                        await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'])
-                                        if meta['debug']:
-                                            console.print(f"[green]Created BASE.torrent from first valid torrent: {torrent_hash}")
-                                        meta['base_torrent_created'] = True
-                                        meta['hash_used'] = torrent_hash
-                                        found_valid_torrent = True
+                                        reuse_success = await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta['base_dir'], meta['uuid'], meta.get('path'), meta.get('skip_nfo', False))
+                                        if reuse_success:
+                                            if meta['debug']:
+                                                console.print(f"[green]Created BASE.torrent from first valid torrent: {torrent_hash}")
+                                            meta['base_torrent_created'] = True
+                                            meta['hash_used'] = torrent_hash
+                                            found_valid_torrent = True
+                                        else:
+                                            if meta['debug']:
+                                                console.print(f"[yellow]Torrent {torrent_hash} files don't match content on disk or contains .nfo when skip_nfo is enabled, skipping")
                                     except Exception as e:
                                         console.print(f"[bold red]Error creating BASE.torrent: {e}")
                             else:
@@ -1720,14 +1724,18 @@ class QbittorrentClientMixin:
                                         else:
                                             # If piece preference is disabled, return first valid torrent
                                             try:
-                                                await TorrentCreator.create_base_from_existing_torrent(alt_torrent_file_path, meta['base_dir'], meta['uuid'])
-                                                if meta['debug']:
-                                                    console.print(f"[green]Created BASE.torrent from alternative torrent {alt_torrent_hash}")
-                                                meta['infohash'] = alt_torrent_hash
-                                                meta['base_torrent_created'] = True
-                                                meta['hash_used'] = alt_torrent_hash
-                                                found_valid_torrent = True
-                                                break
+                                                reuse_success = await TorrentCreator.create_base_from_existing_torrent(alt_torrent_file_path, meta['base_dir'], meta['uuid'], meta.get('path'), meta.get('skip_nfo', False))
+                                                if reuse_success:
+                                                    if meta['debug']:
+                                                        console.print(f"[green]Created BASE.torrent from alternative torrent {alt_torrent_hash}")
+                                                    meta['infohash'] = alt_torrent_hash
+                                                    meta['base_torrent_created'] = True
+                                                    meta['hash_used'] = alt_torrent_hash
+                                                    found_valid_torrent = True
+                                                    break
+                                                else:
+                                                    if meta['debug']:
+                                                        console.print(f"[yellow]Alternative torrent {alt_torrent_hash} files don't match content on disk or contains .nfo when skip_nfo is enabled, skipping")
                                             except Exception as e:
                                                 console.print(f"[bold red]Error creating BASE.torrent for alternative: {e}")
                                     else:
@@ -1746,24 +1754,25 @@ class QbittorrentClientMixin:
                             try:
                                 preference_type = "MTV preference" if prefer_small_pieces else "16 MiB piece limit"
                                 console.print(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
-                                await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match['torrent_path'], meta['base_dir'], meta['uuid'])
-                                if meta['debug']:
-                                    piece_size_mib = piece_size_best_match['piece_size'] / 1024 / 1024
-                                    console.print(f"[green]Created BASE.torrent from best match torrent: {piece_size_best_match['hash']} (piece size: {piece_size_mib:.1f} MiB)")
-                                meta['infohash'] = piece_size_best_match['hash']
-                                meta['base_torrent_created'] = True
-                                meta['hash_used'] = piece_size_best_match['hash']
-                                found_valid_torrent = True
+                                reuse_success = await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match['torrent_path'], meta['base_dir'], meta['uuid'], meta.get('path'), meta.get('skip_nfo', False))
+                                if reuse_success:
+                                    if meta['debug']:
+                                        piece_size_mib = piece_size_best_match['piece_size'] / 1024 / 1024
+                                        console.print(f"[green]Created BASE.torrent from best match torrent: {piece_size_best_match['hash']} (piece size: {piece_size_mib:.1f} MiB)")
+                                    meta['infohash'] = piece_size_best_match['hash']
+                                    meta['base_torrent_created'] = True
+                                    meta['hash_used'] = piece_size_best_match['hash']
+                                    found_valid_torrent = True
 
-                                # Check if the best match actually meets the piece size constraint
-                                piece_size = piece_size_best_match['piece_size']
-                                if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
-                                    meta['found_preferred_piece_size'] = 'MTV'
-                                elif piece_limit and piece_size <= 16777216:  # 16 MiB
-                                    meta['found_preferred_piece_size'] = '16MiB'
-                                else:
-                                    # Found a torrent but it doesn't meet the constraint
-                                    meta['found_preferred_piece_size'] = False
+                                    # Check if the best match actually meets the piece size constraint
+                                    piece_size = piece_size_best_match['piece_size']
+                                    if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
+                                        meta['found_preferred_piece_size'] = 'MTV'
+                                    elif piece_limit and piece_size <= 16777216:  # 16 MiB
+                                        meta['found_preferred_piece_size'] = '16MiB'
+                                    else:
+                                        # Found a torrent but it doesn't meet the constraint
+                                        meta['found_preferred_piece_size'] = False
                             except Exception as e:
                                 console.print(f"[bold red]Error creating BASE.torrent from best match: {e}")
                         elif use_piece_preference and not piece_size_best_match:

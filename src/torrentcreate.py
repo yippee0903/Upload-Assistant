@@ -478,31 +478,79 @@ class TorrentCreator:
             Torrent.copy(new_torrent).write(f"{base_dir}/tmp/{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
-        if os.path.exists(torrentpath):
-            base_torrent = Torrent.read(torrentpath)
-            base_torrent.trackers = ['https://fake.tracker']
-            base_torrent.comment = "Created by Upload Assistant"
-            base_torrent.created_by = "Created by Upload Assistant"
-            info_dict = base_torrent.metainfo['info']
-            valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
+    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, content_path: Optional[str] = None, skip_nfo: bool = False) -> bool:
+        """
+        Create BASE.torrent from an existing torrent file.
 
-            # Add the correct key based on single vs multi file torrent
-            if 'files' in info_dict:
-                valid_keys.append('files')
-            elif 'length' in info_dict:
-                valid_keys.append('length')
+        Args:
+            torrentpath: Path to the existing torrent file
+            base_dir: Base directory for tmp files
+            uuid: Unique identifier for this upload
+            content_path: Path to the actual content on disk (for file verification)
+            skip_nfo: If True, reject torrents that contain .nfo files
 
-            # Remove everything not in the whitelist
-            for each in list(info_dict):
-                if each not in valid_keys:
-                    info_dict.pop(each, None)  # type: ignore
-            for each in list(base_torrent.metainfo):
-                if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
-                    base_torrent.metainfo.pop(each, None)  # type: ignore
-            base_torrent.source = 'L4G'
-            base_torrent.private = True
-            Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
+        Returns:
+            True if successful, False if torrent files don't match content on disk or contains .nfo when skip_nfo is True
+        """
+        if not os.path.exists(torrentpath):
+            return False
+
+        base_torrent = Torrent.read(torrentpath)
+
+        # Check if torrent contains .nfo files when skip_nfo is enabled
+        if skip_nfo:
+            for torrent_file in base_torrent.files:
+                file_name = str(torrent_file).lower()
+                if file_name.endswith('.nfo'):
+                    console.print(f"[yellow]Existing torrent contains .nfo file but skip_nfo is enabled: {torrent_file}[/yellow]")
+                    console.print("[yellow]Cannot reuse this torrent, will find/create a new one.[/yellow]")
+                    return False
+
+        # Verify that all files in the torrent exist on disk
+        if content_path and os.path.exists(content_path):
+            torrent_files = set()
+            for f in base_torrent.files:
+                # Get the relative path within the torrent
+                torrent_files.add(str(f))
+
+            # Get the torrent name (root folder)
+            torrent_name = base_torrent.name
+
+            # Check each file in the torrent exists on disk
+            for torrent_file in base_torrent.files:
+                file_parts = list(torrent_file.parts)
+                relative_path = (os.path.join(*file_parts[1:]) if len(file_parts) > 1 else "") if file_parts and file_parts[0] == torrent_name else str(torrent_file)
+
+                full_path = os.path.join(content_path, relative_path) if os.path.isdir(content_path) else content_path
+
+                if not os.path.exists(full_path):
+                    console.print(f"[yellow]Existing torrent contains file not found on disk: {relative_path}[/yellow]")
+                    console.print("[yellow]Cannot reuse this torrent, will find/create a new one.[/yellow]")
+                    return False
+
+        base_torrent.trackers = ['https://fake.tracker']
+        base_torrent.comment = "Created by Upload Assistant"
+        base_torrent.created_by = "Created by Upload Assistant"
+        info_dict = base_torrent.metainfo['info']
+        valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
+
+        # Add the correct key based on single vs multi file torrent
+        if 'files' in info_dict:
+            valid_keys.append('files')
+        elif 'length' in info_dict:
+            valid_keys.append('length')
+
+        # Remove everything not in the whitelist
+        for each in list(info_dict):
+            if each not in valid_keys:
+                info_dict.pop(each, None)  # type: ignore
+        for each in list(base_torrent.metainfo):
+            if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
+                base_torrent.metainfo.pop(each, None)  # type: ignore
+        base_torrent.source = 'L4G'
+        base_torrent.private = True
+        Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
+        return True
 
     @staticmethod
     def get_mkbrr_path(meta: Mapping[str, Any]) -> str:
@@ -569,8 +617,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: Union[int, str], path:
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
-    await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
+async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, content_path: Optional[str] = None, skip_nfo: bool = False) -> bool:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid, content_path, skip_nfo)
 
 
 def get_mkbrr_path(meta: Mapping[str, Any]) -> str:

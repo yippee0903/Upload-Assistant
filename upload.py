@@ -1046,12 +1046,34 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         if meta.get('force_recheck', False):
             waiter = Wait(config)
             await waiter.select_and_recheck_best_torrent(meta, meta['path'], check_interval=5)
+
+        # Check if any target tracker has skip_nfo enabled and store in meta for reuse
+        if 'skip_nfo' not in meta:
+            skip_nfo = False
+            raw_trackers = meta.get('trackers')
+            if isinstance(raw_trackers, str):
+                target_trackers = [raw_trackers]
+            elif isinstance(raw_trackers, list):
+                target_trackers = [str(t) for t in cast(list[Any], raw_trackers) if str(t).strip()]
+            else:
+                target_trackers = []
+            for tracker in target_trackers:
+                tracker_config = config.get('TRACKERS', {}).get(tracker.upper(), {})
+                if tracker_config.get('skip_nfo', False):
+                    skip_nfo = True
+                    if meta.get('debug'):
+                        console.print(f"[cyan]skip_nfo is enabled for tracker {tracker}[/cyan]")
+                    break
+            meta['skip_nfo'] = skip_nfo
+
         if not os.path.exists(torrent_path):
             reuse_torrent = None
             if meta.get('rehash', False) is False and not meta['base_torrent_created'] and not meta['we_checked_them_all']:
                 reuse_torrent = await client.find_existing_torrent(meta)
                 if reuse_torrent is not None:
-                    await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'])
+                    reuse_success = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta['base_dir'], meta['uuid'], meta['path'], meta.get('skip_nfo', False))
+                    if not reuse_success:
+                        reuse_torrent = None  # Force creation of new torrent
 
             if meta['nohash'] is False and reuse_torrent is None:
                 await TorrentCreator.create_torrent(meta, Path(meta['path']), "BASE")
