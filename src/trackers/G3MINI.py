@@ -108,6 +108,16 @@ class G3MINI(UNIT3D):
             console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
+        # Generate NFO if enabled in tracker config
+        tracker_config = self.config.get('TRACKERS', {}).get(self.tracker, {})
+        if tracker_config.get('generate_nfo', False) and not meta.get('nfo') and not meta.get('auto_nfo'):
+            generator = SceneNfoGenerator(self.config)
+            nfo_path = await generator.generate_nfo(meta, self.tracker)
+            if nfo_path:
+                meta['nfo'] = nfo_path
+                meta['auto_nfo'] = True
+                console.print(f"[green]{self.tracker}: NFO file generated automatically[/green]")
+
         return True
 
     async def _build_audio_string(self, meta):

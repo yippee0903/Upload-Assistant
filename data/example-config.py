@@ -599,6 +599,8 @@ config = {
             # Mon profil > Réglages > Passkey
             "announce_url": "https://gemini-tracker.org/announce/PasskeyHere",
             "anon": False,
+            # Set to True to auto-generate a MediaInfo NFO file for uploads (in tracker interface, not in .torrent file)
+            "generate_nfo": False,
             # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
             "skip_nfo": True,
         },
