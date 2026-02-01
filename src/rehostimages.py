@@ -538,6 +538,11 @@ async def _handle_image_upload(
     if not meta.get('skip_imghost_upload', False):
         uploaded_images: list[dict[str, str]] = []
 
+        # Track hosts that have previously failed for this session
+        if 'failed_image_hosts' not in meta:
+            meta['failed_image_hosts'] = []
+        failed_hosts = meta['failed_image_hosts']
+
         # Add a max retry limit to prevent infinite loop
         max_retries = len(approved_image_hosts)
         while img_host_index <= max_retries:
@@ -549,16 +554,24 @@ async def _handle_image_upload(
                 return [], True, images_reuploaded
 
             if current_img_host not in approved_image_hosts:
-                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
+                if meta['debug']:
+                    console.print(f"[yellow]Image host '{current_img_host}' is not supported at {tracker}, trying next host.")
                 retry_mode = True
                 images_reuploaded = True
                 img_host_index += 1
                 continue
-            else:
-                meta['imghost'] = current_img_host
+
+            # Skip hosts that have previously failed in this session
+            if current_img_host in failed_hosts:
                 if meta['debug']:
-                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
-                break
+                    console.print(f"[yellow]Skipping '{current_img_host}' as it previously failed, trying next host.")
+                img_host_index += 1
+                continue
+
+            meta['imghost'] = current_img_host
+            if meta['debug']:
+                console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+            break
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
             meta, multi_screens, img_host_index, 0, multi_screens,

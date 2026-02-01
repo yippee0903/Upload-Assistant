@@ -837,6 +837,14 @@ async def _upload_screens(
             console.print(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
             console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta['image_list']={len(image_list)}, cutoff={meta.get('cutoff', 1)}[/blue]")
         if (len(successfully_uploaded) + len(image_list)) < images_needed and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+            # Mark this host as failed so we don't retry it for other trackers
+            if 'failed_image_hosts' not in meta:
+                meta['failed_image_hosts'] = []
+            if img_host not in meta['failed_image_hosts']:
+                meta['failed_image_hosts'].append(img_host)
+            if meta['debug']:
+                console.print(f"[yellow]Marked '{img_host}' as failed for this session.[/yellow]")
+
             img_host_num += 1
             next_host_key = f'img_host_{img_host_num}'
             if next_host_key in default_config:
