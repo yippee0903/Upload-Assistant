@@ -1315,6 +1315,9 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             if w_sar != 1 or h_sar != 1:
                 scaled_w = int(round(width * w_sar))
                 scaled_h = int(round(height * h_sar))
+                # Ensure dimensions are even for zscale compatibility
+                scaled_w = scaled_w + (scaled_w % 2)
+                scaled_h = scaled_h + (scaled_h % 2)
                 vf_filters.append(f"scale={scaled_w}:{scaled_h}")
                 if loglevel == 'verbose' or (meta and meta.get('debug', False)):
                     console.print(f"[cyan]Applied PAR scale -> {scaled_w}x{scaled_h}[/cyan]")
@@ -1687,7 +1690,12 @@ async def check_libplacebo_compatibility(w_sar: float, h_sar: float, width: floa
         output_map = "0:v"  # Default output mapping
 
         if w_sar != 1 or h_sar != 1:
-            filter_parts.append(f"{input_label}scale={int(round(width * w_sar))}:{int(round(height * h_sar))}[scaled]")
+            scaled_w = int(round(width * w_sar))
+            scaled_h = int(round(height * h_sar))
+            # Ensure dimensions are even for zscale compatibility
+            scaled_w = scaled_w + (scaled_w % 2)
+            scaled_h = scaled_h + (scaled_h % 2)
+            filter_parts.append(f"{input_label}scale={scaled_w}:{scaled_h}[scaled]")
             input_label = "[scaled]"
             output_map = "[scaled]"
 
