@@ -23,6 +23,16 @@ from src.uphelper import UploadHelper
 Meta: TypeAlias = MutableMapping[str, Any]
 
 
+def _normalize_dupes_for_comparison(dupes: list[Any]) -> list[str]:
+    """Normalize dupe entries to comparable list of names for duplicate comparison."""
+    names: list[str] = []
+    for entry in dupes:
+        name = str(entry.get('name', '')) if isinstance(entry, dict) else str(entry)
+        if name:
+            names.append(name)
+    return sorted(names)
+
+
 class TrackerStatusManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -126,36 +136,57 @@ class TrackerStatusManager:
                     if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped']:
                         dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
 
-                        # Run dupe check first so it can modify local_meta (e.g., set cross-seed values)
-                        is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name)
-                        if is_dupe:
-                            local_tracker_status['dupe'] = True
+                        # Normalize dupes for comparison (for double dupe check feature)
+                        normalized_dupes = _normalize_dupes_for_comparison(dupes)
 
-                        matched_episode_ids = local_meta.get(f'{tracker_name}_matched_episode_ids', [])
-                        trumpable_id = local_meta.get('trumpable_id')
-                        cross_seed_key = f'{tracker_name}_cross_seed'
-                        cross_seed_value = local_meta.get(cross_seed_key) if cross_seed_key in local_meta else None
+                        # Check if this is a double dupe check and results are identical to first pass
+                        first_pass_dupes_key = f'{tracker_name}_first_pass_dupes'
+                        is_double_dupe_check = local_meta.get('dupe_again', False)
+                        first_pass_dupes = shared_meta.get(first_pass_dupes_key)
+                        previous_upload_decision = shared_meta.get('tracker_status', {}).get(tracker_name, {}).get('upload')
 
-                        # Only shared-state writes go under the lock
-                        async with meta_lock:
-                            if matched_episode_ids:
-                                meta[f'{tracker_name}_matched_episode_ids'] = matched_episode_ids
-                            if trumpable_id:
-                                meta['trumpable_id'] = trumpable_id
-                            if cross_seed_key in local_meta and cross_seed_value:
-                                meta[cross_seed_key] = cross_seed_value
-
-                        if tracker_name in ["AITHER", "LST"]:
-                            were_trumping = local_meta.get('were_trumping', False)
-                            trump_reason = local_meta.get('trump_reason')
-                            trumpable_id_after_dupe_check = local_meta.get(f'{tracker_name}_trumpable_id')
+                        # If double dupe check with identical results and user already confirmed, skip re-asking
+                        if is_double_dupe_check and first_pass_dupes is not None and normalized_dupes == first_pass_dupes and previous_upload_decision is True:
+                            console.print(f"[green]{tracker_name}: Dupe check results identical to first pass, skipping re-confirmation.[/green]")
+                            local_tracker_status['upload'] = True
+                            successful_trackers += 1
+                            # Skip both dupe_check and the later confirmation prompt
+                            local_meta['we_asked'] = True
+                        else:
+                            # Store dupes for future double dupe check comparison
                             async with meta_lock:
-                                if were_trumping:
-                                    meta['were_trumping'] = were_trumping
-                                if trump_reason:
-                                    meta['trump_reason'] = trump_reason
-                                if trumpable_id_after_dupe_check:
-                                    meta[f'{tracker_name}_trumpable_id'] = trumpable_id_after_dupe_check
+                                meta[first_pass_dupes_key] = normalized_dupes
+
+                            # Run dupe check first so it can modify local_meta (e.g., set cross-seed values)
+                            is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name)
+                            if is_dupe:
+                                local_tracker_status['dupe'] = True
+
+                            matched_episode_ids = local_meta.get(f'{tracker_name}_matched_episode_ids', [])
+                            trumpable_id = local_meta.get('trumpable_id')
+                            cross_seed_key = f'{tracker_name}_cross_seed'
+                            cross_seed_value = local_meta.get(cross_seed_key) if cross_seed_key in local_meta else None
+
+                            # Only shared-state writes go under the lock
+                            async with meta_lock:
+                                if matched_episode_ids:
+                                    meta[f'{tracker_name}_matched_episode_ids'] = matched_episode_ids
+                                if trumpable_id:
+                                    meta['trumpable_id'] = trumpable_id
+                                if cross_seed_key in local_meta and cross_seed_value:
+                                    meta[cross_seed_key] = cross_seed_value
+
+                            if tracker_name in ["AITHER", "LST"]:
+                                were_trumping = local_meta.get('were_trumping', False)
+                                trump_reason = local_meta.get('trump_reason')
+                                trumpable_id_after_dupe_check = local_meta.get(f'{tracker_name}_trumpable_id')
+                                async with meta_lock:
+                                    if were_trumping:
+                                        meta['were_trumping'] = were_trumping
+                                    if trump_reason:
+                                        meta['trump_reason'] = trump_reason
+                                    if trumpable_id_after_dupe_check:
+                                        meta[f'{tracker_name}_trumpable_id'] = trumpable_id_after_dupe_check
 
                     elif 'skipping' in local_meta:
                         local_tracker_status['skipped'] = True
