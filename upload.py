@@ -1638,6 +1638,9 @@ async def do_the_thing(base_dir: str) -> None:
                             meta['tracker_status'] = tracker_status_map
                             continue
 
+                    # Update meta['trackers'] so process_all_trackers only checks the trackers we're uploading to
+                    meta['trackers'] = trackers_list
+
                     if trackers_list:
                         successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
                     else:
