@@ -806,7 +806,7 @@ class TRACKER_SETUP:
                             episode = True
                     if str(api_category) in [str(cid) for cid in category_ids]:
                         new_url = re.sub(r'/api/requests/filter$', f'/requests/{api_id}', url)
-                        if meta.get('category') == "MOVIE" and type_name and resolution and not api_claimed:
+                        if meta.get('category') == "MOVIE" and type_name and resolution and not api_claimed and str(api_status).lower() == "unfilled":
                             console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             console.print(f"[bold green]{api_name}:[/bold green] {new_url}")
@@ -828,7 +828,7 @@ class TRACKER_SETUP:
                                 }
                                 request_data.append(request_entry)
                                 existing_uuids.add(uuid_str)
-                        elif meta.get('category') == "TV" and season and episode and type_name and resolution and not api_claimed:
+                        elif meta.get('category') == "TV" and season and episode and type_name and resolution and not api_claimed and str(api_status).lower() == "unfilled":
                             console.print(f"[bold blue]Found exact request match on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             console.print(f"[bold yellow]{api_name}[/bold yellow] - [bold yellow]S{api_season:02d} E{api_episode:02d}:[/bold yellow] {new_url}")
@@ -850,7 +850,7 @@ class TRACKER_SETUP:
                                 }
                                 request_data.append(request_entry)
                                 existing_uuids.add(uuid_str)
-                        else:
+                        elif str(api_status).lower() == "unfilled":
                             console.print(f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{api_status}[/bold yellow][/bold blue]")
                             console.print(f"[bold blue]Claimed status:[/bold blue] [bold yellow]{api_claimed}[/bold yellow]")
                             if meta.get('category') == "MOVIE":
@@ -975,7 +975,7 @@ class TRACKER_SETUP:
                             }
                             request_data.append(request_entry)
                             existing_uuids.add(uuid_str)
-                    else:
+                    elif claimed_status == "Unfilled":
                         console.print(f"[bold blue]Found request on [bold yellow]{tracker_name}[/bold yellow] with bounty [bold yellow]{api_bounty}[/bold yellow] and with status [bold yellow]{claimed_status}[/bold yellow][/bold blue]")
                         if internal:
                             console.print("[bold red]Request is internal only[/bold red]")
