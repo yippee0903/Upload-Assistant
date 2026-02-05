@@ -148,7 +148,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-sat`, `--skip_auto_torrent`: Skip automated qBittorrent client torrent searching.
 - `-onlyID`, `--onlyID`: Only grab meta ids from tracker (tmdb/imdb/etc), not description text. NOTE: description images are controlled with `keep_images` set in config.py.
 - `-sdc`, `--skip-dupe-check`: Ignore dupes and upload anyway (skips dupe check). NOTE: know what you are doing!
-- `-sda`, `--skip-dupe-asking`: Don’t prompt about any dupes that Upload Assistant finds; just treat these dupes as actual dupes.
+- `-sda`, `--skip-dupe-asking`: Don't prompt about any dupes that Upload Assistant finds; just treat these dupes as actual dupes. Can also be configured in config with `skip_dupe_asking` (globally in DEFAULT or per-tracker in TRACKERS section).
 - `-ddc`, `--double-dupe-check`: Run a second dupe-check pass on trackers that previously passed checks, immediately before uploading. NOTE: mainly useful when racing as a preventive dupe upload catch.
 - `-dr`, `--draft`: Send to drafts (BHD, LST).
 - `-mq`, `--modq`: Send to modQ. NOTE: only for suppported UNIT3D type sites.

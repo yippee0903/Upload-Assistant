@@ -101,7 +101,16 @@ class UploadHelper:
                     if user_tag and not tag_matched:
                         console.print(f"[yellow]Note: No release found with matching tag '{meta.get('tag')}'. Selected release may be from a different group.[/yellow]")
 
-            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not meta.get('ask_dupe', False):
+            # Check for skip_dupe_asking from CLI args or config (tracker-specific takes precedence over global)
+            tracker_cfg = self.config.get("TRACKERS", {}).get(tracker_name, {})
+            skip_dupe_asking = meta.get('ask_dupe', False)
+            if not skip_dupe_asking:
+                if isinstance(tracker_cfg, dict) and "skip_dupe_asking" in tracker_cfg:
+                    skip_dupe_asking = bool(tracker_cfg.get("skip_dupe_asking", False))
+                else:
+                    skip_dupe_asking = bool(self.default_config.get("skip_dupe_asking", False))
+
+            if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not skip_dupe_asking:
                 dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
 
                 if trumpable_text and (meta.get('trumpable_id') or (meta.get('season_pack_contains_episode') and meta.get(f'{tracker_name}_matched_episode_ids', []))):

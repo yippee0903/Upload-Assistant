@@ -318,6 +318,10 @@ config = {
         # Can be overridden in a per-tracker setting by adding this same config
         "inject_delay": 0,
 
+        # Don't prompt about dupes, just treat dupes as actual dupes (same as -sda CLI argument)
+        # Can be overridden in a per-tracker setting by adding this same config
+        "skip_dupe_asking": False,
+
         # Whether or not to print how long the upload process took for each tracker
         # Useful for knowing which trackers are slowing down the overall upload process
         "show_upload_duration": True,
@@ -363,6 +367,9 @@ config = {
             "modq": False,
             # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
             "skip_nfo": True,
+            # Tracker-specific options like skip_dupe_asking and inject_delay can be set here to override global defaults
+            # "skip_dupe_asking": True,
+            # "inject_delay": 5,
         },
 
         "ACM": {
