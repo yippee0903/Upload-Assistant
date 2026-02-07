@@ -24,6 +24,12 @@ config = {
         # Set true to suppress config warnings on startup
         "suppress_warnings": False,
 
+        # If true, warn and ask for confirmation when no English audio or English subtitles are detected.
+        # Set false to disable this check globally (useful for non-English content uploaders).
+        # Can also be disabled per-tracker by adding "english_language_check": False in a tracker's config section.
+        # If all selected trackers have it disabled, the check is skipped entirely.
+        "english_language_check": True,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,

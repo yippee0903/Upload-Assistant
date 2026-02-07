@@ -438,6 +438,101 @@ class LanguagesManager:
             return False
         return any('english' in lang.lower() for lang in languages)
 
+    async def check_english_language_requirement(self, meta: dict[str, Any], config: dict[str, Any]) -> bool:
+        """
+        Check if the media has at least one English audio track OR one English subtitle track.
+        If neither is found, display a warning and ask for confirmation.
+
+        The check can be disabled globally via config DEFAULT.english_language_check = False,
+        or per-tracker by setting english_language_check = False in the tracker's config section.
+        If ALL selected trackers have the check disabled, it is skipped entirely.
+
+        :param meta: Dictionary containing media metadata (audio_languages, subtitle_languages).
+        :param config: Configuration dictionary.
+        :return: True if English is found or user confirms to proceed, False if user declines.
+        """
+        # Check if this feature is globally disabled in config (default: True)
+        global_check = config.get('DEFAULT', {}).get('english_language_check', True)
+        if not global_check:
+            return True
+
+        # Check per-tracker overrides: if ALL trackers have the check disabled, skip entirely
+        trackers: list[str] = meta.get('trackers', [])
+        tracker_configs = config.get('TRACKERS', {})
+        if trackers:
+            skipped_trackers: list[str] = []
+            checked_trackers: list[str] = []
+            for tracker in trackers:
+                tracker_cfg = tracker_configs.get(tracker, {})
+                if isinstance(tracker_cfg, dict) and not tracker_cfg.get('english_language_check', True):
+                    skipped_trackers.append(tracker)
+                else:
+                    checked_trackers.append(tracker)
+
+            if skipped_trackers and not checked_trackers:
+                # All trackers have the check disabled
+                if meta.get('debug'):
+                    console.print(f"[blue]Debug: English language check disabled for all trackers: {', '.join(skipped_trackers)}[/blue]")
+                return True
+
+            if skipped_trackers and checked_trackers and meta.get('debug'):
+                console.print(f"[blue]Debug: English language check disabled for: {', '.join(skipped_trackers)}[/blue]")
+                console.print(f"[blue]Debug: English language check active for: {', '.join(checked_trackers)}[/blue]")
+
+        # Skip check for disc releases (BDMV, DVD) - they may have multiple language options
+        if meta.get('is_disc') in ["BDMV", "DVD"]:
+            return True
+
+        # Get audio and subtitle languages
+        audio_languages: list[str] = meta.get('audio_languages') or []
+        subtitle_languages: list[str] = meta.get('subtitle_languages') or []
+
+        # Check if English is present in audio or subtitles
+        has_english_audio = await self.has_english_language(audio_languages)
+        has_english_subtitle = await self.has_english_language(subtitle_languages)
+
+        if meta.get('debug'):
+            console.print(f"[blue]Debug: English Audio Check: {has_english_audio}[/blue]")
+            console.print(f"[blue]Debug: English Subtitle Check: {has_english_subtitle}[/blue]")
+
+        # If English is found in either audio or subtitles, proceed
+        if has_english_audio or has_english_subtitle:
+            return True
+
+        # No English found - display warning
+        audio_display = ', '.join(audio_languages) if audio_languages else 'None'
+        subtitle_display = ', '.join(subtitle_languages) if subtitle_languages else 'None'
+
+        console.print()
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print("[bold yellow]⚠️  NO ENGLISH LANGUAGE DETECTED[/bold yellow]")
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print(f"[cyan]Audio languages found:[/cyan] [yellow]{audio_display}[/yellow]")
+        console.print(f"[cyan]Subtitle languages found:[/cyan] [yellow]{subtitle_display}[/yellow]")
+        console.print()
+        console.print("[bold white]This release does not contain English audio or English subtitles.[/bold white]")
+        console.print("[bold white]Some trackers may have language requirements or this may affect your upload's reach.[/bold white]")
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print()
+
+        # In unattended mode, skip confirmation
+        if meta.get('unattended', False) and not meta.get('unattended_confirm', False):
+            console.print("[yellow]Unattended mode: proceeding without English language confirmation.[/yellow]")
+            meta['no_english_warning'] = True
+            return True
+
+        # Ask for confirmation
+        try:
+            confirm = cli_ui.ask_yes_no("Do you want to proceed with the upload?", default=False)
+            if confirm:
+                meta['no_english_warning'] = True
+            return confirm
+        except EOFError:
+            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            await cleanup_manager.cleanup()
+            cleanup_manager.reset_terminal()
+            sys.exit(1)
+
     def extract_language_from_title(self, title: Optional[str]) -> Optional[str]:
         """Extract language from title field using langcodes library"""
         if not title:

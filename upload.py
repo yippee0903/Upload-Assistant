@@ -564,6 +564,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                     else:
                         meta['tracker_status'][tracker]['skip_upload'] = False
 
+        # General English language check - warns if no English audio or subtitle found
+        if not audio_prompted:
+            # Ensure language info is available even if no tracker triggered language processing
+            await languages_manager.process_desc_language(meta, tracker="")
+        if not await languages_manager.check_english_language_requirement(meta, config):
+            console.print("[red]Upload cancelled due to missing English language content.[/red]")
+            meta['we_are_uploading'] = False
+            return
+
         await asyncio.sleep(0.2)
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
             await f.write(json.dumps(meta, indent=4))
