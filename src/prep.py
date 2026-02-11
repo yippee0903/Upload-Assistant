@@ -1060,7 +1060,12 @@ class Prep:
 
             if meta.get('tvdb_series_name') and meta['category'] == "TV":
                 series_name = meta.get('tvdb_series_name')
-                if series_name and meta.get('title') != series_name:
+                current_title = meta.get('title', '')
+                # Only override TMDB title with TVDB series name if the current title is
+                # non-Latin (e.g. CJK characters) — if TMDB already gave a good English title,
+                # don't replace it with a potentially wrong TVDB alias.
+                current_title_is_latin = bool(current_title) and all(ord(c) < 0x3000 for c in current_title)
+                if series_name and meta.get('title') != series_name and not current_title_is_latin:
                     if meta['debug']:
                         console.print(f"[yellow]tvdb series name: {series_name}")
                     year_match = re.search(r'\b(19|20)\d{2}\b', series_name)
@@ -1071,6 +1076,8 @@ class Prep:
                     series_name = series_name.replace('(', '').replace(')', '').strip()
                     if series_name and year_match:  # Only set if not empty and year was found
                         meta['title'] = series_name
+                elif meta['debug'] and current_title_is_latin:
+                    console.print(f"[cyan]Skipping TVDB series name override: TMDB title '{current_title}' is already in Latin script[/cyan]")
 
         # bluray.com data if config
         get_bluray_info = self.config['DEFAULT'].get('get_bluray_info', False)
