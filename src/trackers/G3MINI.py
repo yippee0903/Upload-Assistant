@@ -121,76 +121,90 @@ class G3MINI(UNIT3D):
         return True
 
     async def _build_audio_string(self, meta):
-        def get_extra_audio_tag(audio_track):
-            vfq = None
-            vff = None
-            vf = None
+        """Build the language tag following French tracker conventions.
 
-            for item in audio_track:
-                item = item.get('Language').lower()
-                if item == "fr-ca":
-                    vfq = True
-                elif item == "fr-fr":
-                    vff = True
-                elif item == "fr":
-                    vf = True
-
-            if vff and vfq:
-                return 'VF2'
-            elif vfq:
-                return 'VFQ'
-            elif vff:
-                return 'VFF'
-            elif vf:
-                return 'VFI'
-            else:
-                return None
-
-#        Priority Order:
-#        1. MULYi: Exactly 2 audio tracks
-#        2. MULTI: 3 audio tracks
-#        3. VOSTFR: Single audio (original lang) + French subs + NO French audio
-#        4. VO: Single audio (original lang) + NO French subs + NO French audio
+        Tags: MUTE, MULTi [VFF|VFQ|VF2|VFn], FRENCH [VFQ], VOSTFR, VO
+        """
+        # No mediainfo available - can't determine language
+        if 'mediainfo' not in meta or 'media' not in meta.get('mediainfo', {}):
+            return ''
 
         audio_tracks = self._get_audio_tracks(meta)
+
+        # MUTE - mediainfo present but no audio tracks
         if not audio_tracks:
-            return ''
+            return 'MUTE'
 
         audio_langs = self._extract_audio_languages(audio_tracks, meta)
         if not audio_langs:
             return ''
 
-        extra_audio = get_extra_audio_tag(audio_tracks)
-        language = ""
-        original_lang = await self._get_original_language(meta)
         has_french_audio = 'FRA' in audio_langs
-        has_French_subs = self._has_french_subs(meta)
+        has_french_subs = self._has_french_subs(meta)
         num_audio_tracks = len(audio_tracks)
+        fr_suffix = self._get_french_dub_suffix(audio_tracks)
 
-        # DUAL - Exactly 2 audios
-        if num_audio_tracks == 2 and has_french_audio:
-            language = "MULTi"
+        # MULTi - 2+ audio tracks with at least 1 French
+        if num_audio_tracks >= 2 and has_french_audio:
+            if fr_suffix:
+                return f"MULTi {fr_suffix}"
+            return "MULTi"
 
-        # MULTI - 3+ audios
-        if num_audio_tracks >= 3 and has_french_audio:
-            language = "MULTi"
+        # FRENCH - 1 audio track, it's French
+        if num_audio_tracks == 1 and has_french_audio:
+            # Only append VFQ suffix; VFF or generic fr -> just FRENCH
+            if fr_suffix == 'VFQ':
+                return "FRENCH VFQ"
+            return "FRENCH"
 
-        # VOSTFR - Single audio (original) + French subs + NO French audio
-        if num_audio_tracks == 1 and original_lang and not has_french_audio and has_French_subs and audio_langs[0] == original_lang:
-            language = "VOSTFR"
+        # VOSTFR - No French audio but French subtitles present
+        if not has_french_audio and has_french_subs:
+            return "VOSTFR"
 
-        # VO - Single audio (original) + NO French subs + NO French audio
-        if num_audio_tracks == 1 and original_lang and not has_french_audio and not has_French_subs and audio_langs[0] == original_lang:
-            language = "VO"
+        # VO - No French content at all
+        if not has_french_audio and not has_french_subs:
+            return "VO"
 
-        # FRENCH. - Single audio FRENCH
-        if num_audio_tracks == 1 and has_french_audio and audio_langs[0] == original_lang:
-            language = "FRENCH"
+        return ''
 
-        if extra_audio:
-            language = language + " " + extra_audio
+    def _get_french_dub_suffix(self, audio_tracks):
+        """Determine French dub suffix from audio track languages.
 
-        return language
+        Returns: 'VFF', 'VFQ', 'VF2', 'VFn' (n>2), or None.
+        """
+        fr_variants = []
+
+        for track in audio_tracks:
+            lang = track.get('Language', '')
+            if isinstance(lang, str):
+                lang_lower = lang.lower().strip()
+                if lang_lower == 'fr-fr' and 'fr-fr' not in fr_variants:
+                    fr_variants.append('fr-fr')
+                elif lang_lower == 'fr-ca' and 'fr-ca' not in fr_variants:
+                    fr_variants.append('fr-ca')
+                elif lang_lower in ('fr', 'fre', 'fra', 'french', 'français', 'francais') and 'fr' not in fr_variants:
+                    fr_variants.append('fr')
+
+        num_fr_dubs = len(fr_variants)
+
+        if num_fr_dubs == 0:
+            return None
+
+        if num_fr_dubs > 2:
+            return f"VF{num_fr_dubs}"
+
+        has_vff = 'fr-fr' in fr_variants
+        has_vfq = 'fr-ca' in fr_variants
+
+        if has_vff and has_vfq:
+            return 'VF2'
+        elif has_vfq:
+            return 'VFQ'
+        elif has_vff:
+            return 'VFF'
+
+        # Generic 'fr' only - no suffix needed
+        return None
 
     def _get_audio_tracks(self, meta):
         """Extract audio tracks from mediainfo"""
@@ -249,28 +263,6 @@ class G3MINI(UNIT3D):
             return mapped
 
         return lang.upper()[:3] if len(lang) >= 3 else lang.upper()
-
-    async def _get_original_language(self, meta):
-        """Get the original language from existing metadata"""
-        original_lang = None
-
-        if meta.get('original_language'):
-            original_lang = meta['original_language']
-
-        if not original_lang:
-            imdb_info = meta.get('imdb_info') or {}
-            imdb_lang = imdb_info.get('language', '')
-
-            if isinstance(imdb_lang, list) and imdb_lang:
-                imdb_lang = imdb_lang[0]
-
-            if imdb_lang:
-                original_lang = imdb_lang.get('text', '') if isinstance(imdb_lang, dict) else str(imdb_lang).strip()
-
-        if original_lang:
-            return self._map_language(original_lang)
-
-        return None
 
     def _has_french_subs(self, meta):
         """Check if torrent has French subtitles"""
