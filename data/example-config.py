@@ -364,6 +364,12 @@ config = {
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
+        # Automatically add trackers when specific audio or subtitle languages are detected.
+        # Map language names (as they appear in MediaInfo) to a comma-separated list of trackers.
+        # These trackers will be appended to the active tracker list (duplicates are ignored).
+        # Example: {"French": "G3MINI, TOS", "German": "HDT"}
+        "language_based_trackers": {},
+
         "A4K": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",

@@ -573,6 +573,27 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             meta['we_are_uploading'] = False
             return
 
+        # Auto-add trackers based on detected audio/subtitle languages
+        language_based_trackers = config.get('TRACKERS', {}).get('language_based_trackers', {})
+        if language_based_trackers:
+            detected_langs = set()
+            for lang in (meta.get('audio_languages') or []):
+                detected_langs.add(lang.strip().lower())
+            for lang in (meta.get('subtitle_languages') or []):
+                detected_langs.add(lang.strip().lower())
+
+            added_trackers: list[str] = []
+            for lang_key, tracker_csv in language_based_trackers.items():
+                if lang_key.strip().lower() in detected_langs:
+                    lang_trackers = [t.strip().upper() for t in tracker_csv.split(',') if t.strip()]
+                    for t in lang_trackers:
+                        if t in tracker_class_map and t not in meta['trackers']:
+                            meta['trackers'].append(t)
+                            added_trackers.append(t)
+            if added_trackers:
+                trackers = meta['trackers']
+                console.print(f"[green]Auto-added trackers based on detected languages: {', '.join(added_trackers)}[/green]")
+
         await asyncio.sleep(0.2)
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", 'w', encoding='utf-8') as f:
             await f.write(json.dumps(meta, indent=4))
