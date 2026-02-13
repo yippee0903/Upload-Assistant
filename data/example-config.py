@@ -35,6 +35,10 @@ config = {
         # Can be overridden per-tracker by adding "accept_notag": True in a tracker's config section.
         # Detagged releases (group mismatch) are always blocked regardless of this setting.
         "accept_notag": False,
+        # When accept_notag is True, this label replaces the missing group tag in the torrent name.
+        # e.g. "NoGrP" turns "Movie.2024.1080p.WEB.H264" into "Movie.2024.1080p.WEB.H264-NoGrP"
+        # Can be overridden per-tracker. Leave empty to upload without any tag.
+        "notag_label": "",
 
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
@@ -628,6 +632,9 @@ config = {
             "generate_nfo": False,
             # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
             "skip_nfo": True,
+            # G3MINI accepts notag releases but requires them to be tagged -NoGrP
+            "accept_notag": True,
+            "notag_label": "NoGrP",
         },
         "GPW": {
             "link_dir_name": "",

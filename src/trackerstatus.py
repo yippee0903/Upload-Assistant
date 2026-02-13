@@ -127,6 +127,12 @@ class TrackerStatusManager:
                             accepts = t_cfg.get('accept_notag', global_accept) if isinstance(t_cfg, dict) else global_accept
                             if not accepts:
                                 local_tracker_status['skipped'] = True
+                            else:
+                                # Apply notag_label if configured (e.g. "-NoGrP")
+                                global_label = self.config.get('DEFAULT', {}).get('notag_label', '')
+                                label = t_cfg.get('notag_label', global_label) if isinstance(t_cfg, dict) else global_label
+                                if label:
+                                    local_meta['tag'] = f'-{label}'
                         else:
                             # detag: always skip
                             local_tracker_status['skipped'] = True

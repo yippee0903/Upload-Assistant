@@ -471,6 +471,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             # --- NOTAG: per-tracker accept_notag config ---
             tracker_configs = config.get('TRACKERS', {})
             global_accept = config.get('DEFAULT', {}).get('accept_notag', False)
+            global_accept_label = config.get('DEFAULT', {}).get('notag_label', '')
             accept_trackers: list[str] = []
             reject_trackers: list[str] = []
             for t in meta.get('trackers', []):
@@ -497,7 +498,18 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             if reject_trackers:
                 console.print(f"[red]Notag rejected:[/red] {', '.join(reject_trackers)}")
             if accept_trackers:
-                console.print(f"[green]Notag accepted:[/green] {', '.join(accept_trackers)}")
+                # Show notag_label info for trackers that will rename
+                labeled: list[str] = []
+                unlabeled: list[str] = []
+                for t in accept_trackers:
+                    t_cfg = tracker_configs.get(t, {})
+                    lbl = t_cfg.get('notag_label', global_accept_label) if isinstance(t_cfg, dict) else global_accept_label
+                    if lbl:
+                        labeled.append(f"{t} (→ -{lbl})")
+                    else:
+                        unlabeled.append(t)
+                display_parts = labeled + unlabeled
+                console.print(f"[green]Notag accepted:[/green] {', '.join(display_parts)}")
             console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
             console.print()
 
