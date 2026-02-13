@@ -487,12 +487,16 @@ class QbittorrentClientMixin:
                         if qbt_client is None:
                             console.print("[bold red]qBittorrent client not initialized")
                             continue
-                        torrent_file_content = await self.retry_qbt_operation(
-                            lambda qbt_client=qbt_client, torrent_hash=torrent_hash: asyncio.to_thread(
-                                qbt_client.torrents_export, torrent_hash=torrent_hash
-                            ),
-                            f"Export torrent {torrent_hash}"
-                        )
+                        try:
+                            torrent_file_content = await self.retry_qbt_operation(
+                                lambda qbt_client=qbt_client, torrent_hash=torrent_hash: asyncio.to_thread(
+                                    qbt_client.torrents_export, torrent_hash=torrent_hash
+                                ),
+                                f"Export torrent {torrent_hash}"
+                            )
+                        except (asyncio.TimeoutError, Exception) as e:
+                            console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
+                            torrent_file_content = None
 
                     if torrent_file_content is not None:
                         torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
@@ -1558,10 +1562,14 @@ class QbittorrentClientMixin:
                                 if qbt_client is None:
                                     console.print("[bold red]qBittorrent client not initialized")
                                     return []
-                                torrent_file_content = await self.retry_qbt_operation(
-                                    lambda: asyncio.to_thread(qbt_client.torrents_export, torrent_hash=torrent_hash),
-                                    f"Export torrent {torrent_hash}"
-                                )
+                                try:
+                                    torrent_file_content = await self.retry_qbt_operation(
+                                        lambda: asyncio.to_thread(qbt_client.torrents_export, torrent_hash=torrent_hash),
+                                        f"Export torrent {torrent_hash}"
+                                    )
+                                except (asyncio.TimeoutError, Exception) as e:
+                                    console.print(f"[bold red]Failed to export .torrent for {torrent_hash}: {e}")
+                                    torrent_file_content = None
                             if torrent_file_content is not None:
                                 torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
 
