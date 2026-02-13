@@ -18,6 +18,7 @@ from src.imdb import imdb_manager
 from src.torrentcreate import TorrentCreator
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
+from src.trackers.COMMON import COMMON
 from src.uphelper import UploadHelper
 
 Meta: TypeAlias = MutableMapping[str, Any]
@@ -108,6 +109,16 @@ class TrackerStatusManager:
                     local_tracker_status['skipped'] = True
                 elif 'skipped' not in local_meta:
                     local_tracker_status['skipped'] = False
+
+                if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
+                    # Check for detag (mismatched release group between torrent name and inner file)
+                    # Skip only if detag_info is still present (user did not override)
+                    if local_meta.get('detag_info'):
+                        local_tracker_status['skipped'] = True
+                    else:
+                        common = COMMON(self.config)
+                        if await common.check_detag(local_meta, tracker_name):
+                            local_tracker_status['skipped'] = True
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)

@@ -1207,3 +1207,110 @@ class COMMON:
         async with aiofiles.open(html_path, "w", encoding="utf-8") as f:
             await f.write(text)
         return html_path
+
+    async def check_detag(self, meta: dict[str, Any], tracker: str) -> bool:
+        """Detect detagged releases by comparing the release group in the torrent
+        name against the original filename found in mediainfo.
+
+        A "detag" is when a file originally released by one group is re-uploaded
+        under a different group name.
+
+        Returns True if a detag is detected (upload should be skipped).
+        """
+        torrent_tag = meta.get('tag', '')
+        if not torrent_tag:
+            return False
+
+        # Extract group name from torrent tag (strip leading hyphen)
+        torrent_group = torrent_tag.lstrip('-').strip()
+        if not torrent_group:
+            return False
+
+        # Get the original filename from MEDIAINFO_CLEANPATH.txt
+        mi_filename = await self._get_mediainfo_filename(meta)
+        if not mi_filename:
+            return False
+
+        # Extract release group from the mediainfo filename
+        mi_group = self._extract_group_from_filename(mi_filename)
+        if not mi_group:
+            return False
+
+        # Compare groups (case-insensitive)
+        if torrent_group.lower() != mi_group.lower():
+            # Store detag details in meta for display by the caller
+            meta['detag_info'] = {
+                'torrent_group': torrent_group,
+                'mi_group': mi_group,
+                'mi_filename': mi_filename,
+            }
+            return True
+
+        return False
+
+    async def _get_mediainfo_filename(self, meta: dict[str, Any]) -> str:
+        """Read the original release name from the 'Movie name' field in MEDIAINFO_CLEANPATH.txt.
+
+        The 'Movie name' field contains the MKV segment title, which often
+        retains the original release name when a file has been detagged.
+        Falls back to the 'Title' field if 'Movie name' is not present.
+        """
+        base_dir = meta.get('base_dir', '.')
+        uuid = meta.get('uuid', '')
+        if not uuid:
+            return ''
+
+        cleanpath = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO_CLEANPATH.txt')
+        if not os.path.isfile(cleanpath):
+            return ''
+
+        try:
+            async with aiofiles.open(cleanpath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+
+            # Only look in the General section (before the first blank-line separated section)
+            movie_name = ''
+            title = ''
+            in_general = False
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped == 'General':
+                    in_general = True
+                    continue
+                # A blank line after General means we've left the General section
+                if in_general and stripped == '':
+                    break
+                if in_general:
+                    if stripped.startswith('Movie name'):
+                        parts = line.split(':', 1)
+                        if len(parts) == 2:
+                            movie_name = parts[1].strip()
+                    elif stripped.startswith('Title') and not title:
+                        parts = line.split(':', 1)
+                        if len(parts) == 2:
+                            title = parts[1].strip()
+
+            return movie_name or title
+        except OSError:
+            pass
+
+        return ''
+
+    @staticmethod
+    def _extract_group_from_filename(filename: str) -> str:
+        """Extract the release group from a filename (text after last hyphen)."""
+        # Only strip known video file extensions
+        known_ext = ('.mkv', '.mp4', '.avi', '.ts', '.m2ts', '.wmv', '.mpg', '.mpeg', '.vob', '.iso')
+        name = filename
+        for ext in known_ext:
+            if name.lower().endswith(ext):
+                name = name[:-len(ext)]
+                break
+        # Match group after the last hyphen
+        match = re.search(r'-([A-Za-z][A-Za-z0-9]+)$', name)
+        if match:
+            group = match.group(1).strip()
+            # Filter out common non-group patterns
+            if group.lower() not in ('dl', 'dts', 'dd', 'aac', 'ma', 'hd', 'hr'):
+                return group
+        return ''
