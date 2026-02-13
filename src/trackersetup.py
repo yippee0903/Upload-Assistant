@@ -582,7 +582,7 @@ class TRACKER_SETUP:
             'Accept': 'application/json'
         }
         params = {
-            'tmdb': meta['tmdb'],
+            'tmdb': meta.get('tmdb', meta.get('tmdb_manual', 0)),
         }
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
