@@ -28,3 +28,4 @@ data/*.json
 venv/*
 .pyright
 web_ui/static/js/node_modules/
+tests/*

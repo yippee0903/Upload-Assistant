@@ -691,8 +691,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             return
 
         # Auto-add trackers based on detected audio/subtitle languages
+        # Skip when trackers were explicitly set via -tk / --trackers
         language_based_trackers = config.get('TRACKERS', {}).get('language_based_trackers', {})
-        if language_based_trackers:
+        if language_based_trackers and not meta.get('trackers_explicit', False):
             detected_langs = set()
             for lang in (meta.get('audio_languages') or []):
                 detected_langs.add(lang.strip().lower())

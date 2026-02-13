@@ -527,9 +527,11 @@ class Prep:
 
         if not meta.get('emby') and meta.get('trackers'):
             trackers = meta['trackers']
+            meta['trackers_explicit'] = True
         else:
             default_trackers = self.config['TRACKERS'].get('default_trackers', '')
             trackers = [tracker.strip() for tracker in default_trackers.split(',')]
+            meta['trackers_explicit'] = False
 
         if isinstance(trackers, str):
             trackers = [t.strip().upper() for t in trackers.split(',')] if "," in trackers else [trackers.strip().upper()]
