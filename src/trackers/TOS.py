@@ -125,6 +125,7 @@ class TOS(UNIT3D):
                 f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]"
             )
             return False
+
         return True
 
     async def _build_audio_string(self, meta):
