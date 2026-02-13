@@ -468,6 +468,19 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
 
         if detection_type == 'notag':
+            # --- NOTAG: per-tracker accept_notag config ---
+            tracker_configs = config.get('TRACKERS', {})
+            global_accept = config.get('DEFAULT', {}).get('accept_notag', False)
+            accept_trackers: list[str] = []
+            reject_trackers: list[str] = []
+            for t in meta.get('trackers', []):
+                t_cfg = tracker_configs.get(t, {})
+                accepts = t_cfg.get('accept_notag', global_accept) if isinstance(t_cfg, dict) else global_accept
+                if accepts:
+                    accept_trackers.append(t)
+                else:
+                    reject_trackers.append(t)
+
             console.print("[bold yellow]⚠️  NOTAG DETECTED[/bold yellow]")
             console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
             console.print("[cyan]Torrent release group:[/cyan] [yellow](none)[/yellow]")
@@ -480,8 +493,43 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             else:
                 console.print()
                 console.print("[bold white]This release has no group tag.[/bold white]")
-                console.print("[bold white]Notag releases are forbidden on many trackers.[/bold white]")
+
+            if reject_trackers:
+                console.print(f"[red]Notag rejected:[/red] {', '.join(reject_trackers)}")
+            if accept_trackers:
+                console.print(f"[green]Notag accepted:[/green] {', '.join(accept_trackers)}")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print()
+
+            if not reject_trackers:
+                # All trackers accept notag — just inform, continue
+                console.print("[green]All selected trackers accept notag, continuing.[/green]")
+                meta.pop('detag_info', None)
+            elif accept_trackers:
+                # Mixed: some accept, some reject — inform and continue
+                # detag_info stays so trackerstatus.py can skip per-tracker
+                console.print(f"[yellow]Trackers that reject notag will be skipped automatically.[/yellow]")
+            else:
+                # ALL trackers reject notag — ask confirmation
+                if meta.get('unattended', False):
+                    console.print("[yellow]Unattended mode: skipping notag release (all trackers reject it).[/yellow]")
+                    meta['we_are_uploading'] = False
+                    return
+                try:
+                    detag_confirm = cli_ui.ask_yes_no("All trackers reject notag. Proceed anyway?", default=False)
+                except EOFError:
+                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                    await cleanup_manager.cleanup()
+                    cleanup_manager.reset_terminal()
+                    sys.exit(1)
+                if not detag_confirm:
+                    console.print("[red]Upload cancelled due to notag detection.[/red]")
+                    meta['we_are_uploading'] = False
+                    return
+                # User overrides — clear so trackers won't skip
+                meta.pop('detag_info', None)
         else:
+            # --- DETAG: always block, ask confirmation ---
             torrent_grp = detag_info.get('torrent_group', '?')
             console.print("[bold yellow]⚠️  DETAG DETECTED[/bold yellow]")
             console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
@@ -490,28 +538,27 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             console.print(f"[cyan]Original filename:[/cyan] [yellow]{mi_file}[/yellow]")
             console.print()
             console.print("[bold white]The file's internal metadata indicates a different release group than the torrent name.[/bold white]")
+            console.print("[bold white]This release will be skipped on all trackers unless you override below.[/bold white]")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print()
 
-        console.print("[bold white]This release will be skipped on all trackers unless you override below.[/bold white]")
-        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
-        console.print()
-
-        if meta.get('unattended', False):
-            console.print(f"[yellow]Unattended mode: skipping {detection_type} release.[/yellow]")
-            meta['we_are_uploading'] = False
-            return
-        try:
-            detag_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=False)
-        except EOFError:
-            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
-            await cleanup_manager.cleanup()
-            cleanup_manager.reset_terminal()
-            sys.exit(1)
-        if not detag_confirm:
-            console.print(f"[red]Upload cancelled due to {detection_type} detection.[/red]")
-            meta['we_are_uploading'] = False
-            return
-        # User chose to proceed — clear detag flag so trackers won't skip
-        meta.pop('detag_info', None)
+            if meta.get('unattended', False):
+                console.print("[yellow]Unattended mode: skipping detagged release.[/yellow]")
+                meta['we_are_uploading'] = False
+                return
+            try:
+                detag_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=False)
+            except EOFError:
+                console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                await cleanup_manager.cleanup()
+                cleanup_manager.reset_terminal()
+                sys.exit(1)
+            if not detag_confirm:
+                console.print("[red]Upload cancelled due to detag detection.[/red]")
+                meta['we_are_uploading'] = False
+                return
+            # User chose to proceed — clear detag flag so trackers won't skip
+            meta.pop('detag_info', None)
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get('trackers', [])

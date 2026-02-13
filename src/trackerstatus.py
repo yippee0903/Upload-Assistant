@@ -112,12 +112,23 @@ class TrackerStatusManager:
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
                     # Check for detag/notag (mismatched or missing release group)
-                    # Skip only if detag_info is still present (user did not override)
-                    if local_meta.get('detag_info'):
-                        local_tracker_status['skipped'] = True
-                    else:
+                    detag_info = local_meta.get('detag_info')
+                    if not detag_info:
                         common = COMMON(self.config)
                         if await common.check_detag(local_meta, tracker_name):
+                            detag_info = local_meta.get('detag_info')
+
+                    if detag_info:
+                        if detag_info.get('type') == 'notag':
+                            # Per-tracker accept_notag config (default: global setting or False)
+                            tracker_configs = self.config.get('TRACKERS', {})
+                            global_accept = self.config.get('DEFAULT', {}).get('accept_notag', False)
+                            t_cfg = tracker_configs.get(tracker_name, {})
+                            accepts = t_cfg.get('accept_notag', global_accept) if isinstance(t_cfg, dict) else global_accept
+                            if not accepts:
+                                local_tracker_status['skipped'] = True
+                        else:
+                            # detag: always skip
                             local_tracker_status['skipped'] = True
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:

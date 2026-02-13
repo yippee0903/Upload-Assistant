@@ -30,6 +30,12 @@ config = {
         # If all selected trackers have it disabled, the check is skipped entirely.
         "english_language_check": True,
 
+        # Whether to allow uploads with no release group tag (notag).
+        # Default False: notag releases are blocked (most trackers ban them).
+        # Can be overridden per-tracker by adding "accept_notag": True in a tracker's config section.
+        # Detagged releases (group mismatch) are always blocked regardless of this setting.
+        "accept_notag": False,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,
