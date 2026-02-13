@@ -455,29 +455,48 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 meta['video'], meta, search_term, search_file_folder, meta['category'], only_id=meta['only_id']
             )
 
-    # Early detag check — visible warning before confirmation prompt
+    # Early detag/notag check — visible warning before confirmation prompt
     common_early = COMMON(config)
     detag_detected = await common_early.check_detag(meta, "DETAG-CHECK")
     if detag_detected:
         detag_info = meta.get('detag_info', {})
-        torrent_grp = detag_info.get('torrent_group', '?')
-        mi_grp = detag_info.get('mi_group', '?')
-        mi_file = detag_info.get('mi_filename', '?')
+        detection_type = detag_info.get('type', 'detag')
+        mi_grp = detag_info.get('mi_group', '')
+        mi_file = detag_info.get('mi_filename', '')
+
         console.print()
         console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
-        console.print("[bold yellow]⚠️  DETAG DETECTED[/bold yellow]")
-        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
-        console.print(f"[cyan]Torrent release group:[/cyan] [yellow]-{torrent_grp}[/yellow]")
-        console.print(f"[cyan]Original release group:[/cyan] [yellow]-{mi_grp}[/yellow]")
-        console.print(f"[cyan]Original filename:[/cyan] [yellow]{mi_file}[/yellow]")
-        console.print()
-        console.print("[bold white]The file's internal metadata indicates a different release group than the torrent name.[/bold white]")
+
+        if detection_type == 'notag':
+            console.print("[bold yellow]⚠️  NOTAG DETECTED[/bold yellow]")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print("[cyan]Torrent release group:[/cyan] [yellow](none)[/yellow]")
+            if mi_grp:
+                console.print(f"[cyan]Original release group:[/cyan] [yellow]-{mi_grp}[/yellow]")
+                console.print(f"[cyan]Original filename:[/cyan] [yellow]{mi_file}[/yellow]")
+                console.print()
+                console.print("[bold white]This release has no group tag, but the original file had one.[/bold white]")
+                console.print("[bold white]The tag appears to have been deliberately removed (notag).[/bold white]")
+            else:
+                console.print()
+                console.print("[bold white]This release has no group tag.[/bold white]")
+                console.print("[bold white]Notag releases are forbidden on many trackers.[/bold white]")
+        else:
+            torrent_grp = detag_info.get('torrent_group', '?')
+            console.print("[bold yellow]⚠️  DETAG DETECTED[/bold yellow]")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print(f"[cyan]Torrent release group:[/cyan] [yellow]-{torrent_grp}[/yellow]")
+            console.print(f"[cyan]Original release group:[/cyan] [yellow]-{mi_grp}[/yellow]")
+            console.print(f"[cyan]Original filename:[/cyan] [yellow]{mi_file}[/yellow]")
+            console.print()
+            console.print("[bold white]The file's internal metadata indicates a different release group than the torrent name.[/bold white]")
+
         console.print("[bold white]This release will be skipped on all trackers unless you override below.[/bold white]")
         console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
         console.print()
 
         if meta.get('unattended', False):
-            console.print("[yellow]Unattended mode: skipping detagged release.[/yellow]")
+            console.print(f"[yellow]Unattended mode: skipping {detection_type} release.[/yellow]")
             meta['we_are_uploading'] = False
             return
         try:
@@ -488,7 +507,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             cleanup_manager.reset_terminal()
             sys.exit(1)
         if not detag_confirm:
-            console.print("[red]Upload cancelled due to detag detection.[/red]")
+            console.print(f"[red]Upload cancelled due to {detection_type} detection.[/red]")
             meta['we_are_uploading'] = False
             return
         # User chose to proceed — clear detag flag so trackers won't skip

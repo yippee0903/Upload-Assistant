@@ -1209,42 +1209,43 @@ class COMMON:
         return html_path
 
     async def check_detag(self, meta: dict[str, Any], tracker: str) -> bool:
-        """Detect detagged releases by comparing the release group in the torrent
-        name against the original filename found in mediainfo.
+        """Detect detagged or notagged releases.
 
         A "detag" is when a file originally released by one group is re-uploaded
         under a different group name.
+        A "notag" is when the release has no group tag at all.
 
-        Returns True if a detag is detected (upload should be skipped).
+        Stores detection details in meta['detag_info'] with a 'type' key
+        ('detag' or 'notag') for the caller to display appropriately.
+
+        Returns True if a detag or notag is detected (upload should be skipped).
         """
         torrent_tag = meta.get('tag', '')
-        if not torrent_tag:
-            return False
-
-        # Extract group name from torrent tag (strip leading hyphen)
-        torrent_group = torrent_tag.lstrip('-').strip()
-        if not torrent_group:
-            return False
+        torrent_group = torrent_tag.lstrip('-').strip() if torrent_tag else ''
 
         # Get the original filename from MEDIAINFO_CLEANPATH.txt
         mi_filename = await self._get_mediainfo_filename(meta)
-        if not mi_filename:
-            return False
+        mi_group = self._extract_group_from_filename(mi_filename) if mi_filename else ''
 
-        # Extract release group from the mediainfo filename
-        mi_group = self._extract_group_from_filename(mi_filename)
-        if not mi_group:
-            return False
-
-        # Compare groups (case-insensitive)
-        if torrent_group.lower() != mi_group.lower():
-            # Store detag details in meta for display by the caller
+        if not torrent_group:
+            # NOTAG: torrent has no release group
             meta['detag_info'] = {
-                'torrent_group': torrent_group,
+                'type': 'notag',
                 'mi_group': mi_group,
                 'mi_filename': mi_filename,
             }
             return True
+
+        if mi_filename and mi_group:
+            # DETAG: torrent group differs from original file group
+            if torrent_group.lower() != mi_group.lower():
+                meta['detag_info'] = {
+                    'type': 'detag',
+                    'torrent_group': torrent_group,
+                    'mi_group': mi_group,
+                    'mi_filename': mi_filename,
+                }
+                return True
 
         return False
 

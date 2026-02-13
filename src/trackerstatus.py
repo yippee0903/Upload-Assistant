@@ -111,7 +111,7 @@ class TrackerStatusManager:
                     local_tracker_status['skipped'] = False
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
-                    # Check for detag (mismatched release group between torrent name and inner file)
+                    # Check for detag/notag (mismatched or missing release group)
                     # Skip only if detag_info is still present (user did not override)
                     if local_meta.get('detag_info'):
                         local_tracker_status['skipped'] = True
