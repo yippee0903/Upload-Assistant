@@ -308,53 +308,55 @@ class C411:
 
         name = ''
 
+        # ── C411 pattern: Nom.Année.Edition.Hybrid.Langue.Résolution.Source.HDR.CodecAudio.CodecVidéo-TAG ──
+
         # ── MOVIE ──
         if meta['category'] == 'MOVIE':
             if type_val == 'DISC':
                 if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
+                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
                 elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
+                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {edition} {repack} {source} REMUX {audio}"
+                name = f"{title} {year} {edition} {repack} {language} {source} REMUX {audio}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {source} {video_encode} DVDRip {audio}"
+                name = f"{title} {year} {language} {source} DVDRip {audio} {video_encode}"
 
         # ── TV ──
         elif meta['category'] == 'TV':
             if type_val == 'DISC':
                 if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
+                    name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {season}{episode} {three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {season}{episode} {three_d} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
                 elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
+                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {source} REMUX {audio}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {source} REMUX {audio}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {season} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {season} {language} {source} DVDRip {audio} {video_encode}"
 
         try:
             name = ' '.join(name.split())  # collapse whitespace
