@@ -72,21 +72,134 @@ class TOS(UNIT3D):
         return {"type_id": type_id}
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
+        """Build TOS-compliant dot-separated release name.
+
+        Convention:
+            Films:    TITRE.ANNEE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
+            Films 3D: TITRE.3D.3DTYPE.ANNEE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
+            TV:       TITRE.SAISON.EPISODE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
+        """
+        import re
+
         is_scene = meta.get("scene", False)
-        base_name: str = str(meta.get("scene_name") if is_scene else meta.get("uuid"))
+        if is_scene:
+            return {"name": str(meta.get("scene_name", ""))}
 
-        if is_scene is False:
-            replacements = {
-                ".mkv": "",
-                ".mp4": "",
-                ".torrent": "",
-                " ": ".",
-            }
+        type_val = meta.get('type', '').upper()
+        title = meta.get('title', '')
+        year = str(meta.get('year', ''))
+        manual_year = meta.get('manual_year')
+        if manual_year is not None and int(manual_year) > 0:
+            year = str(manual_year)
 
-            for old, new in replacements.items():
-                base_name = base_name.replace(old, new)
+        resolution = meta.get('resolution', '')
+        if resolution == 'OTHER':
+            resolution = ''
 
-        # Hook into this function for torrent file recreation if needed
+        language = await self._build_audio_string(meta)
+        service = meta.get('service', '')
+        season = meta.get('season', '')
+        episode = meta.get('episode', '')
+        part = meta.get('part', '')
+        repack = meta.get('repack', '')
+        three_d = meta.get('3D', '')
+        tag = meta.get('tag', '')
+        source = meta.get('source', '')
+        edition = meta.get('edition', '')
+        hybrid = 'CUSTOM' if meta.get('webdv', '') else ''
+        if 'hybrid' in edition.upper():
+            edition = edition.replace('Hybrid', '').strip()
+
+        video_codec = ''
+        video_encode = ''
+        region = ''
+        dvd_size = ''
+
+        if meta.get('is_disc') == 'BDMV':
+            video_codec = meta.get('video_codec', '')
+            region = meta.get('region', '') or ''
+        elif meta.get('is_disc') == 'DVD':
+            region = meta.get('region', '') or ''
+            dvd_size = meta.get('dvd_size', '')
+        else:
+            video_encode = meta.get('video_encode', '')
+
+        codec = video_codec or video_encode
+
+        if meta['category'] == 'TV':
+            year = meta['year'] if meta.get('search_year', '') != '' else ''
+            if meta.get('manual_date'):
+                season = ''
+                episode = ''
+        if meta.get('no_season', False) is True:
+            season = ''
+        if meta.get('no_year', False) is True:
+            year = ''
+
+        name = ''
+
+        # ── MOVIE ──
+        if meta['category'] == 'MOVIE':
+            if type_val == 'DISC':
+                if meta.get('is_disc') == 'BDMV':
+                    name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {region} {source} {video_codec}"
+                elif meta.get('is_disc') == 'DVD':
+                    name = f"{title} {year} {edition} {repack} {language} {region} {source} {dvd_size}"
+                elif meta.get('is_disc') == 'HDDVD':
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec}"
+            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
+                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {source} REMUX {codec}"
+            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
+                name = f"{title} {year} {edition} {repack} {language} {source} REMUX"
+            elif type_val == 'ENCODE':
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {source} {codec}"
+            elif type_val == 'WEBDL':
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {service} WEB-DL {codec}"
+            elif type_val == 'WEBRIP':
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {service} WEBRip {codec}"
+            elif type_val == 'HDTV':
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {codec}"
+            elif type_val == 'DVDRIP':
+                name = f"{title} {year} {language} {source} DVDRip {codec}"
+
+        # ── TV ──
+        elif meta['category'] == 'TV':
+            if type_val == 'DISC':
+                if meta.get('is_disc') == 'BDMV':
+                    name = f"{title} {year} {season}{episode} {edition} {repack} {language} {resolution} {region} {source} {video_codec}"
+                elif meta.get('is_disc') == 'DVD':
+                    name = f"{title} {year} {season}{episode} {edition} {repack} {language} {region} {source} {dvd_size}"
+                elif meta.get('is_disc') == 'HDDVD':
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec}"
+            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {source} REMUX {codec}"
+            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {source} REMUX"
+            elif type_val == 'ENCODE':
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {source} {codec}"
+            elif type_val == 'WEBDL':
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {service} WEB-DL {codec}"
+            elif type_val == 'WEBRIP':
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {service} WEBRip {codec}"
+            elif type_val == 'HDTV':
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {codec}"
+            elif type_val == 'DVDRIP':
+                name = f"{title} {year} {season} {language} {source} DVDRip {codec}"
+
+        if not name:
+            console.print("[bold red]TOS: Unable to generate release name.[/bold red]")
+            console.print(f"  category={meta.get('category')}  type={meta.get('type')}  source={meta.get('source')}")
+            return {'name': ''}
+
+        # Collapse whitespace, append tag, dotify, clean
+        name = ' '.join(name.split()) + tag
+        name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
+        name = name.replace(' ', '.')
+        name = re.sub(r'\.(-\.)+', '.', name)
+        name = re.sub(r'\.{2,}', '.', name)
+        name = name.strip('.')
+
+        # Recreate torrent if keep_nfo is set
         if meta.get('keep_nfo', False):
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
             tracker_url = str(tracker_config.get('announce_url', "https://fake.tracker")).strip()
@@ -96,11 +209,10 @@ class TOS(UNIT3D):
             except (ValueError, TypeError):
                 cooldown = 0
             if cooldown > 0:
-                await asyncio.sleep(cooldown)  # Small cooldown before rehashing
-
+                await asyncio.sleep(cooldown)
             await TorrentCreator.create_torrent(meta, str(meta['path']), torrent_create, tracker_url=tracker_url)
 
-        return {"name": base_name}
+        return {"name": name}
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         # Check language requirements: must be French audio OR original audio with French subtitles
