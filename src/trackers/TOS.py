@@ -128,8 +128,11 @@ class TOS(UNIT3D):
             video_codec = meta.get('video_codec', '')
             video_encode = meta.get('video_encode', '')
 
-        # Codec depends on type
-        if type_val in ('DISC', 'REMUX', 'WEBDL', 'HDTV'):
+        # Codec depends on type:
+        #   Disc/Remux        → video_codec (AVC, HEVC, MPEG-2, VC-1)
+        #   WEB-DL/HDTV       → video_encode (H.264, H.265, VP9, MPEG-2)
+        #   Encode/WEBRip     → video_encode (x264, x265)
+        if type_val in ('DISC', 'REMUX'):
             codec = video_codec
         else:
             codec = video_encode or video_codec
