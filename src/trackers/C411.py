@@ -10,15 +10,18 @@ Required fields:  torrent, nfo, title, description, categoryId, subcategoryId
 Optional fields:  options (JSON), uploaderNote, tmdbData, rawgData
 """
 
+import asyncio
 import glob
 import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from typing import Any, Union
 
 import aiofiles
 import httpx
+from unidecode import unidecode
 
 from src.console import console
 from src.nfo_generator import SceneNfoGenerator
@@ -171,12 +174,20 @@ class C411:
             return 'VFF'
         return None  # generic 'fr' — no suffix
 
-    def _get_audio_tracks(self, meta: Meta) -> list[dict[str, Any]]:
-        """Extract audio tracks from mediainfo."""
+    def _get_audio_tracks(self, meta: Meta, filter_commentary: bool = True) -> list[dict[str, Any]]:
+        """Extract audio tracks from mediainfo.
+
+        When filter_commentary is True (default), tracks whose Title
+        contains 'commentary' are excluded so they don't skew language
+        detection or audio-tag building.
+        """
         if 'mediainfo' not in meta or 'media' not in meta['mediainfo']:
             return []
         tracks = meta['mediainfo']['media'].get('track', [])
-        return [t for t in tracks if t.get('@type') == 'Audio']
+        audio = [t for t in tracks if t.get('@type') == 'Audio']
+        if filter_commentary:
+            audio = [t for t in audio if 'commentary' not in str(t.get('Title', '')).lower()]
+        return audio
 
     def _extract_audio_languages(self, audio_tracks: list[dict[str, Any]], meta: Meta) -> list[str]:
         """Extract and normalize audio language codes."""
@@ -234,6 +245,28 @@ class C411:
                     return True
         return False
 
+    async def _get_french_title(self, meta: Meta) -> str:
+        """Get French title from TMDB, cached in meta['frtitle'].
+
+        Uses the TMDB localized endpoint to fetch the French title.
+        Falls back to the original English title if unavailable.
+        """
+        if meta.get('frtitle'):
+            return meta['frtitle']
+
+        try:
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(
+                meta, data_type='main', language='fr', append_to_response=''
+            ) or {}
+            fr_title = str(fr_data.get('title', '') or fr_data.get('name', '')).strip()
+            if fr_title:
+                meta['frtitle'] = fr_title
+                return fr_title
+        except Exception:
+            pass
+
+        return meta.get('title', '')
+
     # ──────────────────────────────────────────────────────────
     #  Release naming   (dot-separated, C411 convention)
     #
@@ -249,12 +282,14 @@ class C411:
             return text.replace(' ', '.')
 
         def _clean(name: str) -> str:
+            # Strip accents (é→e, ç→c, etc.) for clean filenames
+            name = unidecode(name)
             for c in '<>:"/\\|?*':
-                name = name.replace(c, '-')
+                name = name.replace(c, '')
             return name
 
         type_val = meta.get('type', '').upper()
-        title = meta.get('title', '')
+        title = await self._get_french_title(meta)
         year = meta.get('year', '')
         manual_year = meta.get('manual_year')
         if manual_year is not None and int(manual_year) > 0:
@@ -275,7 +310,7 @@ class C411:
         tag = meta.get('tag', '')
         source = meta.get('source', '')
         uhd = meta.get('uhd', '')
-        hdr = meta.get('hdr', '')
+        hdr = meta.get('hdr', '').replace('HDR10+', 'HDR10PLUS')
         hybrid = 'Hybrid' if meta.get('webdv', '') else ''
         edition = meta.get('edition', '')
         if 'hybrid' in edition.upper():
@@ -287,14 +322,14 @@ class C411:
         dvd_size = ''
 
         if meta.get('is_disc') == 'BDMV':
-            video_codec = meta.get('video_codec', '')
+            video_codec = meta.get('video_codec', '').replace('H.264', 'H264').replace('H.265', 'H265')
             region = meta.get('region', '') or ''
         elif meta.get('is_disc') == 'DVD':
             region = meta.get('region', '') or ''
             dvd_size = meta.get('dvd_size', '')
         else:
-            video_codec = meta.get('video_codec', '')
-            video_encode = meta.get('video_encode', '')
+            video_codec = meta.get('video_codec', '').replace('H.264', 'H264').replace('H.265', 'H265')
+            video_encode = meta.get('video_encode', '').replace('H.264', 'H264').replace('H.265', 'H265')
 
         if meta['category'] == 'TV':
             year = meta['year'] if meta.get('search_year', '') != '' else ''
@@ -326,7 +361,7 @@ class C411:
             elif type_val == 'ENCODE':
                 name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
                 name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
@@ -350,7 +385,7 @@ class C411:
             elif type_val == 'ENCODE':
                 name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
                 name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
@@ -369,6 +404,14 @@ class C411:
         name = name_notag + tag
         clean_name = _clean(name)
         dot_name = _dots(clean_name)
+
+        # C411 forbids special characters in titles.
+        # Replace all hyphens with dots EXCEPT the last one (group tag separator).
+        last_dash = dot_name.rfind('-')
+        if last_dash > 0:
+            before_tag = dot_name[:last_dash].replace('-', '.')
+            dot_name = before_tag + dot_name[last_dash:]
+
         return {'name': dot_name}
 
     # ──────────────────────────────────────────────────────────
@@ -379,37 +422,98 @@ class C411:
         """Map meta category to C411 categoryId + subcategoryId.
 
         C411 categories (main):
-          categoryId 1 (Vidéos) → subcategoryId 6=Films, 7=Séries TV
+          categoryId 1 (Vidéos) → subcategoryId 1=Anime Film, 2=Anime TV,
+                                                   6=Films, 7=Séries TV
           categoryId 3 (Musique) → 18=Albums
           categoryId 5 (Jeux)    → 36=PC
         """
+        is_anime = bool(meta.get('mal_id'))
+
         if meta.get('category') == 'TV':
-            return (1, 7)   # Vidéos → Séries TV
-        return (1, 6)       # Vidéos → Films (default)
+            return (1, 2) if is_anime else (1, 7)
+        return (1, 1) if is_anime else (1, 6)
 
     def _get_quality_option_id(self, meta: Meta) -> Union[int, None]:
         """Map resolution + source + type to C411 quality option (Type 2).
 
-        Confirmed C411 quality option IDs:
-          10=BluRay 4K       12=BluRay Remux
-          16=HDRip 1080
-          25=WEB-DL 1080     26=WEB-DL 4K
+        C411 quality option IDs:
+          DISC:    10=BluRay 4K Full  11=BluRay Full  14=DVD
+          REMUX:   10=BluRay 4K Remux 12=BluRay Remux 15=DVD Remux
+          ENCODE:  17=4K  16=1080p  18=720p
+          WEBDL:   26=4K  25=1080p  27=720p  24=other
+          WEBRIP:  30=4K  29=1080p  31=720p  28=other
+          HDTV:    21=4K  20=1080p  22=720p  19=other
+          DVDRIP:  15
+          Special: 415=4KLight  413=HDLight 1080  414=HDLight other
         """
         type_val = meta.get('type', '').upper()
         res = meta.get('resolution', '')
+        source = meta.get('source', '')
         is_4k = res == '2160p'
+        uuid = meta.get('uuid', '').lower()
 
-        if type_val == 'REMUX':
-            return 12       # BluRay Remux (any resolution)
+        # ── Special tags override (detected from filename) ──
+        if '4klight' in uuid:
+            return 415
+        if 'hdlight' in uuid:
+            return 413 if '1080' in res else 414
 
+        # ── DISC ──
         if type_val == 'DISC':
-            return 10 if is_4k else 12  # BluRay 4K or BluRay Remux
+            if meta.get('is_disc') == 'DVD':
+                return 14
+            # BDMV / HDDVD
+            return 10 if is_4k else 11
 
-        if type_val in ('WEBDL', 'WEBRIP'):
-            return 26 if is_4k else 25  # WEB-DL 4K or WEB-DL 1080
+        # ── REMUX ──
+        if type_val == 'REMUX':
+            if source in ('PAL DVD', 'NTSC DVD', 'DVD'):
+                return 15
+            return 10 if is_4k else 12
 
-        if type_val in ('ENCODE', 'DVDRIP', 'HDTV'):
-            return 16       # HDRip 1080
+        # ── ENCODE ──
+        if type_val == 'ENCODE':
+            if is_4k:
+                return 17
+            if '1080' in res:
+                return 16
+            if '720' in res:
+                return 18
+            return 16  # fallback
+
+        # ── WEBDL ──
+        if type_val == 'WEBDL':
+            if is_4k:
+                return 26
+            if '1080' in res:
+                return 25
+            if '720' in res:
+                return 27
+            return 24
+
+        # ── WEBRIP ──
+        if type_val == 'WEBRIP':
+            if is_4k:
+                return 30
+            if '1080' in res:
+                return 29
+            if '720' in res:
+                return 31
+            return 28
+
+        # ── HDTV ──
+        if type_val == 'HDTV':
+            if is_4k:
+                return 21
+            if '1080' in res:
+                return 20
+            if '720' in res:
+                return 22
+            return 19
+
+        # ── DVDRIP ──
+        if type_val == 'DVDRIP':
+            return 15
 
         return None
 
@@ -499,187 +603,308 @@ class C411:
         return options
 
     # ──────────────────────────────────────────────────────────
-    #  Description builder   (BBCode)
+    #  Description builder   (BBCode — matches C411 site template)
     # ──────────────────────────────────────────────────────────
 
-    async def _build_description(self, meta: Meta) -> str:
-        """Build C411-compliant BBCode description using French template.
+    @staticmethod
+    def _format_french_date(date_str: str) -> str:
+        """Format YYYY-MM-DD to French full date, e.g. 'jeudi 15 juillet 2010'."""
+        try:
+            dt = datetime.strptime(date_str, '%Y-%m-%d')
+            days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+            months = [
+                '', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+            ]
+            return f"{days[dt.weekday()]} {dt.day} {months[dt.month]} {dt.year}"
+        except (ValueError, IndexError):
+            return date_str
 
-        Template:
-          (poster)
-          🎬 Informations — country, genres, date, runtime, directors, actors
-          📖 Synopsis — French overview from TMDB (fallback to English)
-          ⚙️ Détails Techniques — resolution, codec, bitrate from mediainfo
-          🔊 Langue(s) — audio languages
-          💬 Sous-titre(s) — subtitle languages
-          📥 Téléchargement — release name, team, total size
-          Captures d'écran
+    async def _build_description(self, meta: Meta) -> str:
+        """Build C411-compliant BBCode description matching site template.
+
+        Uses the C411 site template with [color=#3d85c6] section headers,
+        [font=Verdana][size=14] content blocks, French date formatting,
+        genre tag links, writers, and spectator rating with SVG badge.
         """
+        C = '#3d85c6'  # C411 accent colour
         parts: list[str] = []
 
-        # ── Poster ──
-        poster = meta.get('poster', '')
-        if poster:
-            parts.append(f"[center][img]{poster}[/img][/center]")
-            parts.append("")
-
-        # ── Fetch French TMDB data ──
-        fr_overview = ''
-        fr_title = ''
+        # ── Fetch French TMDB data (with credits) ──
+        fr_data: dict[str, Any] = {}
         try:
             fr_data = await self.tmdb_manager.get_tmdb_localized_data(
                 meta, data_type='main', language='fr', append_to_response='credits'
-            )
-            if fr_data:
-                fr_overview = str(fr_data.get('overview', '')).strip()
-                fr_title = str(fr_data.get('title', '')).strip()
+            ) or {}
         except Exception:
             pass
 
-        # ── 🎬 Informations ──
-        parts.append("[b]🎬 Informations[/b]")
+        fr_title = str(fr_data.get('title', '') or meta.get('title', '')).strip()
+        fr_overview = str(fr_data.get('overview', '')).strip()
+        year = meta.get('year', '')
+
+        # ── Header: Title + Year + Poster (centered) ──
+        poster = meta.get('poster', '') or ''
+        poster_w500 = poster
+        if 'image.tmdb.org/t/p/' in poster:
+            poster_w500 = re.sub(r'/t/p/[^/]+/', '/t/p/w500/', poster)
+
+        parts.append(f"[center][b][font=Verdana][color={C}][size=28]{fr_title}")
         parts.append("")
+        parts.append(f"[/color]({year})[/size][/font][/b]")
+        if poster_w500:
+            parts.append(f"[img]{poster_w500}[/img]")
+        parts.append("[/center]")
+        parts.append("")
+        parts.append("")
+
+        # ══════════════════════════════════════════════════════
+        #  Informations
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Informations[/color]")
+        parts.append("")
+        parts.append("")
+
+        info_lines: list[str] = []
+
+        # Original title (when different from French title)
+        original_title = str(meta.get('original_title', '') or meta.get('title', '')).strip()
+        if original_title and original_title != fr_title:
+            info_lines.append(f"[b][color={C}]Titre original :[/color][/b] [i]{original_title}[/i]")
 
         # Country
-        countries = meta.get('production_countries', [])
-        if countries:
-            country_names = [c.get('name', '') for c in countries if isinstance(c, dict) and c.get('name')]
-            if country_names:
-                parts.append(f"[b]Pays :[/b] {', '.join(country_names)}")
-        elif meta.get('origin_country'):
-            oc = meta['origin_country']
-            if isinstance(oc, list):
-                parts.append(f"[b]Pays :[/b] {', '.join(oc)}")
-            else:
-                parts.append(f"[b]Pays :[/b] {oc}")
+        countries = fr_data.get('production_countries', meta.get('production_countries', []))
+        if countries and isinstance(countries, list):
+            names = [c.get('name', '') for c in countries if isinstance(c, dict) and c.get('name')]
+            if names:
+                info_lines.append(f"[b][color={C}]Pays :[/color][/b] [i]{', '.join(names)}[/i]")
 
-        # Genres
-        genres = meta.get('genres', '')
-        if genres:
-            parts.append(f"[b]Genres :[/b] {genres}")
+        # Genres (French names with tag links)
+        genres_list = fr_data.get('genres', [])
+        if genres_list and isinstance(genres_list, list):
+            links = []
+            for g in genres_list:
+                if isinstance(g, dict) and g.get('name'):
+                    gn = g['name']
+                    links.append(f"[url=/torrents?tags={gn}]{gn}[/url]")
+            if links:
+                info_lines.append(f"[b][color={C}]Genres :[/color][/b] [i]{', '.join(links)}[/i]")
+        elif meta.get('genres'):
+            info_lines.append(f"[b][color={C}]Genres :[/color][/b] [i]{meta['genres']}[/i]")
 
-        # Release date
-        release_date = meta.get('release_date', '') or meta.get('first_air_date', '')
-        year = meta.get('year', '')
+        # Release date (French full format)
+        release_date = str(
+            fr_data.get('release_date', '')
+            or meta.get('release_date', '')
+            or meta.get('first_air_date', '')
+        ).strip()
         if release_date:
-            parts.append(f"[b]Date de sortie :[/b] {release_date}")
+            info_lines.append(
+                f"[b][color={C}]Date de sortie :[/color][/b] [i]{self._format_french_date(release_date)}[/i]"
+            )
         elif year:
-            parts.append(f"[b]Date de sortie :[/b] {year}")
+            info_lines.append(f"[b][color={C}]Date de sortie :[/color][/b] [i]{year}[/i]")
 
         # Runtime
-        runtime = meta.get('runtime', 0)
+        runtime = fr_data.get('runtime') or meta.get('runtime', 0)
         if runtime:
-            hours = int(runtime) // 60
-            mins = int(runtime) % 60
-            if hours > 0:
-                parts.append(f"[b]Durée :[/b] {hours}h {mins:02d}min")
-            else:
-                parts.append(f"[b]Durée :[/b] {mins}min")
+            h, m = divmod(int(runtime), 60)
+            dur = f"{h}h{m:02d}" if h > 0 else f"{m}min"
+            info_lines.append(f"[b][color={C}]Durée :[/color][/b] [i]{dur}[/i]")
+
+        # blank line before crew block
+        info_lines.append("")
+
+        # Credits from TMDB
+        credits = fr_data.get('credits', {})
+        crew = credits.get('crew', []) if isinstance(credits, dict) else []
+        cast = credits.get('cast', []) if isinstance(credits, dict) else []
 
         # Directors
-        directors = meta.get('tmdb_directors', [])
+        directors = [p['name'] for p in crew if isinstance(p, dict) and p.get('job') == 'Director' and p.get('name')]
+        if not directors:
+            meta_dirs = meta.get('tmdb_directors', [])
+            if isinstance(meta_dirs, list):
+                directors = [d.get('name', d) if isinstance(d, dict) else str(d) for d in meta_dirs]
         if directors:
-            if isinstance(directors, list):
-                dir_names = [d.get('name', d) if isinstance(d, dict) else str(d) for d in directors]
-                parts.append(f"[b]Réalisateur(s) :[/b] {', '.join(dir_names)}")
-            else:
-                parts.append(f"[b]Réalisateur(s) :[/b] {directors}")
+            label = 'Réalisateur' if len(directors) == 1 else 'Réalisateurs'
+            info_lines.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(directors)}[/i]")
+
+        # Writers / Scénaristes
+        seen_w: set[str] = set()
+        writers: list[str] = []
+        for p in crew:
+            if isinstance(p, dict) and p.get('job') in ('Screenplay', 'Writer', 'Story') and p.get('name') and p['name'] not in seen_w:
+                writers.append(p['name'])
+                seen_w.add(p['name'])
+        if writers:
+            label = 'Scénariste' if len(writers) == 1 else 'Scénaristes'
+            info_lines.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(writers)}[/i]")
 
         # Actors (top 5)
-        cast_list = meta.get('tmdb_cast', [])
-        if cast_list and isinstance(cast_list, list):
-            actor_names = []
-            for actor in cast_list[:5]:
-                if isinstance(actor, dict):
-                    actor_names.append(actor.get('name', ''))
-                else:
-                    actor_names.append(str(actor))
-            actor_names = [n for n in actor_names if n]
-            if actor_names:
-                parts.append(f"[b]Acteur(s) :[/b] {', '.join(actor_names)}")
+        actors = [p['name'] for p in cast[:5] if isinstance(p, dict) and p.get('name')]
+        if not actors:
+            meta_cast = meta.get('tmdb_cast', [])
+            if isinstance(meta_cast, list):
+                actors = [a.get('name', '') if isinstance(a, dict) else str(a) for a in meta_cast[:5]]
+                actors = [n for n in actors if n]
+        if actors:
+            info_lines.append(f"[b][color={C}]Acteurs :[/color][/b] [i]{', '.join(actors)}[/i]")
+
+        # blank line before rating
+        info_lines.append("")
+
+        # Spectator rating
+        vote_avg = fr_data.get('vote_average') or meta.get('vote_average')
+        vote_count = fr_data.get('vote_count') or meta.get('vote_count')
+        if vote_avg and vote_count:
+            score = round(float(vote_avg) * 10)
+            info_lines.append(
+                f"[b][color={C}]Note des spectateurs :[/color][/b] "
+                f"[img]https://img.streetprez.com/note/{score}.svg[/img] "
+                f"[i]{vote_avg} ({vote_count})[/i]"
+            )
+
+        # External links (IMDb, TMDB, TVDB, TVmaze, MAL)
+        ext_links: list[str] = []
+        imdb_id = meta.get('imdb_id', 0)
+        if imdb_id and int(imdb_id) > 0:
+            imdb_url = meta.get('imdb_info', {}).get('imdb_url', '') if isinstance(meta.get('imdb_info'), dict) else ''
+            if not imdb_url:
+                imdb_url = f"https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/"
+            ext_links.append(f"[url={imdb_url}]IMDb[/url]")
+        tmdb_id_val = meta.get('tmdb', '')
+        if tmdb_id_val:
+            tmdb_cat = 'movie' if meta.get('category', '').upper() != 'TV' else 'tv'
+            ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{tmdb_id_val}]TMDB[/url]")
+        if meta.get('tvdb_id'):
+            ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
+        if meta.get('tvmaze_id'):
+            ext_links.append(f"[url=https://www.tvmaze.com/shows/{meta['tvmaze_id']}]TVmaze[/url]")
+        if meta.get('mal_id'):
+            ext_links.append(f"[url=https://myanimelist.net/anime/{meta['mal_id']}]MAL[/url]")
+        if ext_links:
+            info_lines.append("")
+            info_lines.append(' | '.join(ext_links))
+
+        # Wrap info block in [font=Verdana][size=14] … [/size][/font]
+        if info_lines:
+            parts.append(f"    [font=Verdana][size=14]{info_lines[0]}")
+            for line in info_lines[1:]:
+                parts.append(line)
+            parts.append("")
+            parts.append("[/size][/font]")
 
         parts.append("")
-
-        # ── 📖 Synopsis ──
-        parts.append("[b]📖 Synopsis[/b]")
-        parts.append("")
-        synopsis = fr_overview or str(meta.get('overview', '')).strip()
-        if synopsis:
-            parts.append(synopsis)
-        else:
-            parts.append("Aucun synopsis disponible.")
         parts.append("")
 
-        # ── ⚙️ Détails Techniques ──
-        parts.append("[b]⚙️ Détails Techniques[/b]")
+        # ══════════════════════════════════════════════════════
+        #  Synopsis
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Synopsis[/color]")
+        parts.append("")
+        parts.append("")
+        synopsis = fr_overview or str(meta.get('overview', '')).strip() or 'Aucun synopsis disponible.'
+        parts.append(f"    [font=Verdana][size=14]{synopsis}[/size][/font]")
+        parts.append("")
         parts.append("")
 
-        resolution = meta.get('resolution', '')
-        if resolution:
-            parts.append(f"[b]Résolution :[/b] {resolution}")
+        # ══════════════════════════════════════════════════════
+        #  Informations techniques
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Informations techniques[/color]")
+        parts.append("")
+        parts.append("")
 
-        # Video codec from meta
-        video_codec = meta.get('video_codec', '') or meta.get('video_encode', '')
-        if video_codec:
-            parts.append(f"[b]Codec Vidéo :[/b] {video_codec}")
-
-        # Video bitrate from mediainfo
         mi_text = await self._get_mediainfo_text(meta)
+
+        tech_lines: list[str] = []
+
+        # Source
+        source = meta.get('source', '') or meta.get('type', '')
+        tech_lines.append(f"[b][color={C}]Source :[/color][/b] {source}" if source else f"[b][color={C}]Source :[/color][/b]")
+
+        # Resolution
+        resolution = meta.get('resolution', '')
+        tech_lines.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}" if resolution else f"[b][color={C}]Résolution :[/color][/b]")
+
+        # Video codec
+        video_codec = meta.get('video_codec', '') or meta.get('video_encode', '')
+        tech_lines.append(f"[b][color={C}]Codec vidéo :[/color][/b] {video_codec}" if video_codec else f"[b][color={C}]Codec vidéo :[/color][/b]")
+
+        # Video bitrate
+        vbr = ''
         if mi_text:
-            # Extract video bitrate
             vbr_match = re.search(r'(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
             if vbr_match:
-                parts.append(f"[b]Débit vidéo :[/b] {vbr_match.group(1).strip()}")
+                vbr = vbr_match.group(1).strip()
+        tech_lines.append(f"[b][color={C}]Débit vidéo :[/color][/b] {vbr}" if vbr else f"[b][color={C}]Débit vidéo :[/color][/b]")
+
+        # First line indented, rest flush
+        parts.append(f"    {tech_lines[0]}")
+        for line in tech_lines[1:]:
+            parts.append(line)
 
         parts.append("")
+        parts.append("")
 
-        # ── 🔊 Langue(s) ──
-        parts.append("[b]🔊 Langue(s)[/b]")
+        # ══════════════════════════════════════════════════════
+        #  Langue(s)
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Langue(s)[/color]")
+        parts.append("")
         parts.append("")
         audio_langs = self._parse_mi_audio_languages(mi_text)
-        if audio_langs:
-            parts.append(audio_langs)
-        else:
-            parts.append("Non spécifié")
+        parts.append(f"    [i]{audio_langs or 'Non spécifié'}[/i]")
+        parts.append("")
         parts.append("")
 
-        # ── 💬 Sous-titre(s) ──
-        parts.append("[b]💬 Sous-titre(s)[/b]")
+        # ══════════════════════════════════════════════════════
+        #  Sous-titre(s)
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Sous-titre(s)[/color]")
+        parts.append("")
         parts.append("")
         sub_langs = self._parse_mi_subtitle_languages(mi_text)
-        if sub_langs:
-            parts.append(sub_langs)
-        else:
-            parts.append("Aucun")
+        parts.append(f"    [i]{sub_langs or 'Aucun'}[/i]")
+        parts.append("")
         parts.append("")
 
-        # ── 📥 Téléchargement ──
-        parts.append("[b]📥 Téléchargement[/b]")
+        # ══════════════════════════════════════════════════════
+        #  Release
+        # ══════════════════════════════════════════════════════
+        parts.append(f"        [color={C}]Release[/color]")
         parts.append("")
+        parts.append("")
+
+        rel_lines: list[str] = []
 
         release_name = meta.get('uuid', '')
-        if release_name:
-            parts.append(f"[b]Release :[/b] {release_name}")
+        rel_lines.append(f"[b][color={C}]Release :[/color][/b] {release_name}" if release_name else f"[b][color={C}]Release :[/color][/b]")
 
-        # Team / release group
-        tag = meta.get('tag', '')
-        if tag:
-            # tag usually starts with '-'
-            team = tag.lstrip('-').strip()
-            if team:
-                parts.append(f"[b]Team :[/b] {team}")
+        # Total size
+        size_str = ''
+        if mi_text:
+            size_match = re.search(r'File size\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
+            if size_match:
+                size_str = size_match.group(1).strip()
+        rel_lines.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}" if size_str else f"[b][color={C}]Taille totale :[/color][/b]")
 
-        # Total size from mediainfo
-        size_match = re.search(r'File size\s*:\s*(.+?)\s*(?:\n|$)', mi_text) if mi_text else None
-        if size_match:
-            parts.append(f"[b]Poids Total :[/b] {size_match.group(1).strip()}")
+        # File count
+        file_count = self._count_files(meta)
+        rel_lines.append(f"[b][color={C}]Nombre de fichier(s) :[/color][/b] {file_count}" if file_count else f"[b][color={C}]Nombre de fichier(s) :[/color][/b]")
+
+        parts.append(f"    {rel_lines[0]}")
+        for line in rel_lines[1:]:
+            parts.append(line)
 
         parts.append("")
 
         # ── Captures d'écran ──
         image_list: list[dict[str, Any]] = meta.get('image_list', [])
         if image_list:
-            parts.append("[b]📸 Captures d'écran[/b]")
+            parts.append(f"        [color={C}]Captures d'écran[/color]")
+            parts.append("")
             img_lines: list[str] = []
             for img in image_list:
                 raw = img.get('raw_url', '')
@@ -700,6 +925,17 @@ class C411:
         parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
 
         return "\n".join(parts)
+
+    @staticmethod
+    def _count_files(meta: Meta) -> str:
+        """Count files in the release path."""
+        path = meta.get('path', '')
+        if not path or not os.path.exists(path):
+            return ''
+        if os.path.isfile(path):
+            return '1'
+        count = sum(1 for _, _, files in os.walk(path) for _ in files)
+        return str(count) if count else ''
 
     @staticmethod
     def _parse_mi_audio_languages(mi_text: str) -> str:
@@ -779,23 +1015,102 @@ class C411:
         return ''
 
     def _build_tmdb_data(self, meta: Meta) -> Union[str, None]:
-        """Build tmdbData JSON string from meta, or None if unavailable."""
+        """Build tmdbData JSON string for C411.
+
+        The format must match the C411 internal TMDB schema as returned
+        by ``/api/tmdb/search``.  Key differences from the raw TMDB API:
+          - ``type`` (not ``media_type``)
+          - ``posterUrl`` / ``backdropUrl`` (full URLs, not relative paths)
+          - ``releaseDate`` (camelCase, not ``release_date``)
+          - ``rating`` (not ``vote_average``)
+          - ``year`` as integer
+          - arrays for ``genres``, ``genreIds``, ``directors``, etc.
+        """
         tmdb_id = meta.get('tmdb')
         if not tmdb_id:
             return None
 
-        tmdb_data: dict[str, Any] = {'id': int(tmdb_id)}
+        media_type = 'tv' if meta.get('category', '').upper() == 'TV' else 'movie'
+        tmdb_data: dict[str, Any] = {
+            'id': int(tmdb_id),
+            'type': media_type,
+        }
 
         if meta.get('title'):
             tmdb_data['title'] = meta['title']
+        if meta.get('original_title'):
+            tmdb_data['originalTitle'] = meta['original_title']
         if meta.get('overview'):
             tmdb_data['overview'] = meta['overview']
-        if meta.get('poster'):
-            tmdb_data['poster_path'] = meta['poster']
-        if meta.get('year'):
-            tmdb_data['release_date'] = str(meta['year'])
-        if meta.get('original_language'):
-            tmdb_data['original_language'] = meta['original_language']
+
+        # posterUrl: C411 expects the full TMDB image URL (w342 size)
+        poster = meta.get('poster', '') or ''
+        if poster:
+            if poster.startswith('https://'):
+                # Replace any size with w342 for consistency
+                tmdb_data['posterUrl'] = poster
+            elif poster.startswith('/'):
+                tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w342{poster}'
+            else:
+                tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w342/{poster}'
+
+        # backdropUrl: full URL (w780 size), if available
+        backdrop = meta.get('backdrop_path', '') or ''
+        if backdrop:
+            if backdrop.startswith('https://'):
+                tmdb_data['backdropUrl'] = backdrop
+            elif backdrop.startswith('/'):
+                tmdb_data['backdropUrl'] = f'https://image.tmdb.org/t/p/w780{backdrop}'
+            else:
+                tmdb_data['backdropUrl'] = f'https://image.tmdb.org/t/p/w780/{backdrop}'
+        else:
+            tmdb_data['backdropUrl'] = None
+
+        # releaseDate (camelCase) + year (integer)
+        release_date = meta.get('release_date') or meta.get('first_air_date') or ''
+        if release_date:
+            tmdb_data['releaseDate'] = str(release_date)
+        elif meta.get('year'):
+            tmdb_data['releaseDate'] = f"{meta['year']}-01-01"
+
+        year = meta.get('year')
+        if year:
+            tmdb_data['year'] = int(year)
+        else:
+            tmdb_data['year'] = None
+
+        # Runtime (minutes) - may be None
+        runtime = meta.get('runtime', 0)
+        tmdb_data['runtime'] = int(runtime) if runtime else None
+
+        # rating (not voteAverage)
+        vote_avg = meta.get('vote_average')
+        tmdb_data['rating'] = float(vote_avg) if vote_avg else 0
+        tmdb_data['ratingCount'] = 0
+
+        # Genre IDs from TMDB
+        genre_ids = meta.get('genre_ids') or meta.get('genres', [])
+        if isinstance(genre_ids, list):
+            # May be list of ints or list of dicts with 'id'
+            ids = []
+            for g in genre_ids:
+                if isinstance(g, int):
+                    ids.append(g)
+                elif isinstance(g, dict) and 'id' in g:
+                    ids.append(g['id'])
+            tmdb_data['genreIds'] = ids
+        else:
+            tmdb_data['genreIds'] = []
+
+        # Empty arrays for fields not available from Upload-Assistant meta
+        tmdb_data['genres'] = []
+        tmdb_data['directors'] = []
+        tmdb_data['writers'] = []
+        tmdb_data['cast'] = []
+        tmdb_data['countries'] = []
+        tmdb_data['languages'] = []
+        tmdb_data['productionCompanies'] = []
+        tmdb_data['keywords'] = []
 
         return json.dumps(tmdb_data, ensure_ascii=False)
 
@@ -895,45 +1210,117 @@ class C411:
 
         try:
             if not meta['debug']:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.post(
-                        url=self.upload_url,
-                        files=files,
-                        data=data,
-                        headers=headers,
-                    )
-                    if response.status_code in (200, 201):
-                        try:
-                            response_data = response.json()
-                            # Extract torrent_id for the standard URL output
-                            torrent_id = None
-                            if isinstance(response_data, dict):
-                                data_block = response_data.get('data', {})
-                                if isinstance(data_block, dict):
-                                    torrent_id = data_block.get('id') or data_block.get('slug') or data_block.get('infoHash')
-                            if torrent_id:
-                                meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                            meta['tracker_status'][self.tracker]['status_message'] = response_data
-                            return True
-                        except json.JSONDecodeError:
-                            meta['tracker_status'][self.tracker]['status_message'] = (
-                                "data error: C411 JSON decode error"
+                max_retries = 2
+                retry_delay = 5
+                timeout = 40.0
+
+                for attempt in range(max_retries):
+                    try:
+                        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                            response = await client.post(
+                                url=self.upload_url,
+                                files=files,
+                                data=data,
+                                headers=headers,
                             )
+
+                        if response.status_code in (200, 201):
+                            try:
+                                response_data = response.json()
+
+                                # Check API-level success flag
+                                if isinstance(response_data, dict) and response_data.get('success') is False:
+                                    error_msg = response_data.get('message', 'Unknown error')
+                                    meta['tracker_status'][self.tracker]['status_message'] = f"API error: {error_msg}"
+                                    console.print(f"[yellow]C411 upload failed: {error_msg}[/yellow]")
+                                    return False
+
+                                # Extract torrent_id for the standard URL output
+                                torrent_id = None
+                                if isinstance(response_data, dict):
+                                    data_block = response_data.get('data', {})
+                                    if isinstance(data_block, dict):
+                                        torrent_id = (
+                                            data_block.get('id')
+                                            or data_block.get('slug')
+                                            or data_block.get('infoHash')
+                                        )
+                                if torrent_id:
+                                    meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
+                                meta['tracker_status'][self.tracker]['status_message'] = response_data
+                                return True
+                            except json.JSONDecodeError:
+                                meta['tracker_status'][self.tracker]['status_message'] = (
+                                    "data error: C411 JSON decode error"
+                                )
+                                return False
+
+                        # ── Non-retriable HTTP errors ──
+                        elif response.status_code in (401, 403, 404, 422):
+                            error_detail: Any = ''
+                            try:
+                                error_detail = response.json()
+                            except Exception:
+                                error_detail = response.text[:500]
+                            meta['tracker_status'][self.tracker]['status_message'] = {
+                                'error': f'HTTP {response.status_code}',
+                                'detail': error_detail,
+                            }
+                            console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
+                            if error_detail:
+                                console.print(f"[dim]{error_detail}[/dim]")
                             return False
-                    else:
-                        error_detail: Any = ''
-                        try:
-                            error_detail = response.json()
-                        except Exception:
-                            error_detail = response.text[:500]
-                        meta['tracker_status'][self.tracker]['status_message'] = {
-                            'error': f'HTTP {response.status_code}',
-                            'detail': error_detail,
-                        }
-                        console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
-                        if error_detail:
-                            console.print(f"[dim]{error_detail}[/dim]")
+
+                        # ── Retriable HTTP errors ──
+                        else:
+                            if attempt < max_retries - 1:
+                                console.print(
+                                    f"[yellow]C411: HTTP {response.status_code}, retrying in "
+                                    f"{retry_delay}s… (attempt {attempt + 1}/{max_retries})[/yellow]"
+                                )
+                                await asyncio.sleep(retry_delay)
+                                continue
+                            error_detail = ''
+                            try:
+                                error_detail = response.json()
+                            except Exception:
+                                error_detail = response.text[:500]
+                            meta['tracker_status'][self.tracker]['status_message'] = {
+                                'error': f'HTTP {response.status_code}',
+                                'detail': error_detail,
+                            }
+                            console.print(f"[red]C411 upload failed after {max_retries} attempts: HTTP {response.status_code}[/red]")
+                            return False
+
+                    except httpx.TimeoutException:
+                        if attempt < max_retries - 1:
+                            timeout = timeout * 1.5
+                            console.print(
+                                f"[yellow]C411: timeout, retrying in {retry_delay}s with "
+                                f"{timeout:.0f}s timeout… (attempt {attempt + 1}/{max_retries})[/yellow]"
+                            )
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        meta['tracker_status'][self.tracker]['status_message'] = (
+                            "data error: Request timed out after multiple attempts"
+                        )
                         return False
+
+                    except httpx.RequestError as e:
+                        if attempt < max_retries - 1:
+                            console.print(
+                                f"[yellow]C411: request error, retrying in {retry_delay}s… "
+                                f"(attempt {attempt + 1}/{max_retries})[/yellow]"
+                            )
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        meta['tracker_status'][self.tracker]['status_message'] = (
+                            f"data error: Upload failed: {e}"
+                        )
+                        console.print(f"[red]C411 upload error: {e}[/red]")
+                        return False
+
+                return False  # exhausted retries without explicit return
             else:
                 # ── Debug mode — save description & show summary ──
                 desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
@@ -962,7 +1349,9 @@ class C411:
         """Search for existing torrents on C411 via its Torznab API.
 
         Torznab endpoint: GET https://c411.org/api?t=search&q=QUERY&apikey=KEY
-        Also supports:    ?t=movie&imdbid=IMDBID  and  ?t=tvsearch&q=QUERY
+        Also supports:    ?t=search&tmdbid=ID
+                          ?t=movie&imdbid=IMDBID
+                          ?t=tvsearch&q=QUERY
         Response format:  RSS/XML with <item> elements.
         """
         dupes: list[dict[str, Any]] = []
@@ -971,21 +1360,27 @@ class C411:
             console.print("[yellow]C411: No API key configured, skipping dupe check.[/yellow]")
             return []
 
-        # Build search queries — use IMDB for movies, title+year for everything
+        # Build search queries — TMDB ID first, then IMDB, then text
         queries: list[dict[str, str]] = []
 
+        tmdb_id = meta.get('tmdb', '')
         imdb_id = meta.get('imdb_id', 0)
         title = meta.get('title', '')
         year = meta.get('year', '')
         category = meta.get('category', '')
 
-        # Primary: IMDB search for movies
+        # Primary: TMDB ID search (best match on C411)
+        if tmdb_id:
+            queries.append({'t': 'search', 'tmdbid': str(tmdb_id)})
+
+        # Secondary: IMDB search for movies
         if imdb_id and int(imdb_id) > 0 and category == 'MOVIE':
             imdb_str = f"tt{str(imdb_id).zfill(7)}"
             queries.append({'t': 'movie', 'imdbid': imdb_str})
 
-        # Secondary: text search with title + year
-        search_term = f"{title} {year}".strip()
+        # Tertiary: text search with French title (accent-stripped) + year
+        fr_title = meta.get('frtitle', '') or title
+        search_term = unidecode(f"{fr_title} {year}".strip()).replace(' ', '.')
         if search_term:
             if category == 'TV':
                 queries.append({'t': 'tvsearch', 'q': search_term})
