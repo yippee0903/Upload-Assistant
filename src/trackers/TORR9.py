@@ -6,7 +6,7 @@ Upload endpoint:  POST https://api.torr9.xyz/api/v1/torrents/upload
 Authentication:   Bearer token
 Content-Type:     multipart/form-data
 
-Required fields:  torrent_file, title, description, nfo, category, subcategory
+Required fields:  torrent_file, title, description, nfo, category_id
 Optional fields:  tags, is_exclusive, is_anonymous
 
 API docs reverse-engineered from:
@@ -428,28 +428,32 @@ class TORR9:
         return {'name': dot_name}
 
     # ──────────────────────────────────────────────────────────
-    #  Category / Subcategory  (string names for Torr9 API)
+    #  Category ID  (numeric ID for Torr9 API)
+    #
+    #  Discovered from existing torrents on the site:
+    #    51 = Films (movies)
+    #     5 = Séries (TV shows)
+    #     7 = Anime / Animation (TV or movie)
     # ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def _get_category_subcategory(meta: Meta) -> tuple[str, str]:
-        """Map meta category to Torr9 category + subcategory strings.
+    def _get_category_id(meta: Meta) -> int:
+        """Map meta category to Torr9 numeric category_id.
 
-        Torr9 uses plain-text category/subcategory names in its upload form.
-        Known categories from the ntt script: "Films", "Séries"
-        We use "Films" as both category and subcategory for movies,
-        and "Séries" for TV shows.
+        The API requires a numeric category_id field:
+          51 = Films
+           5 = Séries
+           7 = Anime / Animation
         """
         is_anime = bool(meta.get('mal_id'))
 
-        if meta.get('category') == 'TV':
-            if is_anime:
-                return ('Séries', 'Anime')
-            return ('Séries', 'Séries')
-
         if is_anime:
-            return ('Films', 'Anime')
-        return ('Films', 'Films')
+            return 7
+
+        if meta.get('category') == 'TV':
+            return 5
+
+        return 51
 
     # ──────────────────────────────────────────────────────────
     #  Tags  (comma-separated string inferred from release)
@@ -1008,7 +1012,7 @@ class TORR9:
           Authorization: Bearer <api_key>
           Content-Type:  multipart/form-data
 
-        Required fields: torrent_file, title, description, nfo, category, subcategory
+        Required fields: torrent_file, title, description, nfo, category_id
         Optional fields: tags, is_exclusive, is_anonymous
         """
         common = COMMON(config=self.config)
@@ -1038,8 +1042,8 @@ class TORR9:
         # ── Description (BBCode) ──
         description = await self._build_description(meta)
 
-        # ── Category / Subcategory (string names) ──
-        category, subcategory = self._get_category_subcategory(meta)
+        # ── Category ID (numeric) ──
+        category_id = self._get_category_id(meta)
 
         # ── Tags (comma-separated) ──
         tags = self._build_tags(meta, language_tag)
@@ -1056,8 +1060,7 @@ class TORR9:
             'title': title,
             'description': description,
             'nfo': nfo_bytes.decode('utf-8', errors='replace') if nfo_bytes else '',
-            'category': category,
-            'subcategory': subcategory,
+            'category_id': str(category_id),
             'tags': tags,
             'is_exclusive': 'false',
             'is_anonymous': str(anon).lower(),
@@ -1120,7 +1123,7 @@ class TORR9:
                                 )
                                 return False
 
-                        elif response.status_code in (401, 403, 404, 422):
+                        elif response.status_code in (400, 401, 403, 404, 422):
                             error_detail: Any = ''
                             try:
                                 error_detail = response.json()
@@ -1153,6 +1156,8 @@ class TORR9:
                                 'detail': error_detail,
                             }
                             console.print(f"[red]TORR9 upload failed after {max_retries} attempts: HTTP {response.status_code}[/red]")
+                            if error_detail:
+                                console.print(f"[dim]{error_detail}[/dim]")
                             return False
 
                     except httpx.TimeoutException:
@@ -1193,7 +1198,7 @@ class TORR9:
                 console.print(f"DEBUG: Saving final description to {desc_path}")
                 console.print("[cyan]TORR9 Debug — Request data:[/cyan]")
                 console.print(f"  Title:       {title}")
-                console.print(f"  Category:    {category} / Sub: {subcategory}")
+                console.print(f"  Category ID: {category_id}")
                 console.print(f"  Tags:        {tags}")
                 console.print(f"  Anonymous:   {anon}")
                 console.print(f"  Description: {description[:500]}…")
