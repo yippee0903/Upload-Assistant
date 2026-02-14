@@ -904,8 +904,9 @@ class C411:
 
         parts.append("")
 
-        # ── Captures d'écran ──
-        image_list: list[dict[str, Any]] = meta.get('image_list', [])
+        # ── Captures d'écran  (opt-in via config: include_screenshots) ──
+        include_screens = self.config['TRACKERS'].get(self.tracker, {}).get('include_screenshots', False)
+        image_list: list[dict[str, Any]] = meta.get('image_list', []) if include_screens else []
         if image_list:
             parts.append(f"        [color={C}]Captures d'écran[/color]")
             parts.append("")

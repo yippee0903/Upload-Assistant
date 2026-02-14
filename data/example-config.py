@@ -504,6 +504,8 @@ config = {
             "api_key": "",
             # Announce URL with your passkey — found on your c411.org profile page
             "announce_url": "https://c411.org/announce/YOUR_PASSKEY",
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -925,6 +927,8 @@ config = {
             "announce_url": "https://tracker.torr9.xyz/announce/YOUR_PASSKEY",
             # Upload anonymously
             "anon": False,
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
         },
         "TOS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

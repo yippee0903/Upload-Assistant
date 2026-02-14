@@ -785,9 +785,10 @@ class TORR9:
             parts.append('')
 
         # ══════════════════════════════════════════════════════
-        #  Captures d'écran
+        #  Captures d'écran  (opt-in via config: include_screenshots)
         # ══════════════════════════════════════════════════════
-        image_list: list[dict[str, Any]] = meta.get('image_list', [])
+        include_screens = self.config['TRACKERS'].get(self.tracker, {}).get('include_screenshots', False)
+        image_list: list[dict[str, Any]] = meta.get('image_list', []) if include_screens else []
         if image_list:
             parts.append(f'[b][color={C}][size=18]━━━ Captures d\'écran ━━━[/size][/color][/b]')
             parts.append('')
