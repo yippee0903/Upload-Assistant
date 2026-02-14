@@ -6,7 +6,7 @@ Upload endpoint:  POST https://api.torr9.xyz/api/v1/torrents/upload
 Authentication:   Bearer token
 Content-Type:     multipart/form-data
 
-Required fields:  torrent_file, title, description, nfo, category_id
+Required fields:  torrent_file, title, description, nfo, category, subcategory
 Optional fields:  tags, is_exclusive, is_anonymous
 
 API docs reverse-engineered from:
@@ -428,31 +428,32 @@ class TORR9:
         return {'name': dot_name}
 
     # ──────────────────────────────────────────────────────────
-    #  Category ID  (numeric ID for Torr9 API)
+    #  Category / Subcategory  (exact strings from the upload form)
     #
-    #  Discovered from existing torrents on the site:
-    #    51 = Films (movies)
-    #     5 = Séries (TV shows)
-    #     7 = Anime / Animation (TV or movie)
+    #  Categories:   Films, Séries
+    #  Subcategories (Films):  Films, Films d'animation, Documentaires,
+    #                          Concert, Spectacle, Sport, Vidéo-clips
+    #  Subcategories (Séries): Séries TV, Emission TV, Séries Animées,
+    #                          Mangas-Animes
     # ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def _get_category_id(meta: Meta) -> tuple[int, str]:
-        """Map meta category to Torr9 numeric category_id and subcategory string.
+    def _get_category(meta: Meta) -> tuple[str, str]:
+        """Return (category, subcategory) strings for the Torr9 upload form.
 
-        The API requires:
-          - category_id  (int):  51 = Films, 5 = Séries, 7 = Anime
-          - subcategory   (str): matching text label
+        Values must match the exact labels shown on the site's upload page.
         """
         is_anime = bool(meta.get('mal_id'))
 
-        if is_anime:
-            return (7, 'Anime')
-
         if meta.get('category') == 'TV':
-            return (5, 'Séries')
+            if is_anime:
+                return ('Séries', 'Mangas-Animes')
+            return ('Séries', 'Séries TV')
 
-        return (51, 'Films')
+        # Movie
+        if is_anime:
+            return ('Films', "Films d'animation")
+        return ('Films', 'Films')
 
     # ──────────────────────────────────────────────────────────
     #  Tags  (comma-separated string inferred from release)
@@ -1011,7 +1012,7 @@ class TORR9:
           Authorization: Bearer <api_key>
           Content-Type:  multipart/form-data
 
-        Required fields: torrent_file, title, description, nfo, category_id
+        Required fields: torrent_file, title, description, nfo, category, subcategory
         Optional fields: tags, is_exclusive, is_anonymous
         """
         common = COMMON(config=self.config)
@@ -1041,8 +1042,8 @@ class TORR9:
         # ── Description (BBCode) ──
         description = await self._build_description(meta)
 
-        # ── Category ID (numeric) + subcategory (string) ──
-        category_id, subcategory = self._get_category_id(meta)
+        # ── Category / Subcategory (exact strings from site form) ──
+        category, subcategory = self._get_category(meta)
 
         # ── Tags (comma-separated) ──
         tags = self._build_tags(meta, language_tag)
@@ -1059,7 +1060,7 @@ class TORR9:
             'title': title,
             'description': description,
             'nfo': nfo_bytes.decode('utf-8', errors='replace') if nfo_bytes else '',
-            'category_id': str(category_id),
+            'category': category,
             'subcategory': subcategory,
             'tags': tags,
             'is_exclusive': 'false',
@@ -1198,7 +1199,7 @@ class TORR9:
                 console.print(f"DEBUG: Saving final description to {desc_path}")
                 console.print("[cyan]TORR9 Debug — Request data:[/cyan]")
                 console.print(f"  Title:       {title}")
-                console.print(f"  Category ID: {category_id} / Sub: {subcategory}")
+                console.print(f"  Category:    {category} / Sub: {subcategory}")
                 console.print(f"  Tags:        {tags}")
                 console.print(f"  Anonymous:   {anon}")
                 console.print(f"  Description: {description[:500]}…")
