@@ -117,7 +117,6 @@ class G3MINI(UNIT3D):
             if nfo_path:
                 meta['nfo'] = nfo_path
                 meta['auto_nfo'] = True
-                console.print(f"[green]{self.tracker}: NFO file generated automatically[/green]")
 
         return True
 
