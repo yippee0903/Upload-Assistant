@@ -74,10 +74,10 @@ class TOS(UNIT3D):
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         """Build TOS-compliant dot-separated release name.
 
-        Convention:
-            Films:    TITRE.ANNEE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
-            Films 3D: TITRE.3D.3DTYPE.ANNEE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
-            TV:       TITRE.SAISON.EPISODE.LANGUE.RESOLUTION.SOURCE.CODEC-TEAM
+        Convention order:
+            TITRE.ANNEE[.S##E##][.Cut][.Custom][.REPACK][.PROPER][.RERip]
+            .Resolution[.Region].Source[.HDR][.VideoCodec]
+            .LANGUE.AudioCodec.Channels[.Object]-TEAM
         """
         import re
 
@@ -96,6 +96,7 @@ class TOS(UNIT3D):
         if resolution == 'OTHER':
             resolution = ''
 
+        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '')
         language = await self._build_audio_string(meta)
         service = meta.get('service', '')
         season = meta.get('season', '')
@@ -105,6 +106,8 @@ class TOS(UNIT3D):
         three_d = meta.get('3D', '')
         tag = meta.get('tag', '')
         source = meta.get('source', '')
+        uhd = meta.get('uhd', '')
+        hdr = meta.get('hdr', '')
         edition = meta.get('edition', '')
         hybrid = 'CUSTOM' if meta.get('webdv', '') else ''
         if 'hybrid' in edition.upper():
@@ -122,9 +125,14 @@ class TOS(UNIT3D):
             region = meta.get('region', '') or ''
             dvd_size = meta.get('dvd_size', '')
         else:
+            video_codec = meta.get('video_codec', '')
             video_encode = meta.get('video_encode', '')
 
-        codec = video_codec or video_encode
+        # Codec depends on type
+        if type_val in ('DISC', 'REMUX', 'WEBDL', 'HDTV'):
+            codec = video_codec
+        else:
+            codec = video_encode or video_codec
 
         if meta['category'] == 'TV':
             year = meta['year'] if meta.get('search_year', '') != '' else ''
@@ -139,52 +147,54 @@ class TOS(UNIT3D):
         name = ''
 
         # ── MOVIE ──
+        # TITRE ANNEE [3D] [Cut] [Custom] [REPACK] Resolution [Region] [UHD] Source [HDR] Codec LANGUE Audio -TAG
         if meta['category'] == 'MOVIE':
             if type_val == 'DISC':
                 if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {region} {source} {video_codec}"
+                    name = f"{title} {three_d} {year} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {language} {audio}"
                 elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {edition} {repack} {language} {region} {source} {dvd_size}"
+                    name = f"{title} {year} {edition} {repack} {region} {source} {dvd_size} {language} {audio}"
                 elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec}"
+                    name = f"{title} {year} {edition} {repack} {resolution} {source} {video_codec} {language} {audio}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {source} REMUX {codec}"
+                name = f"{title} {three_d} {year} {edition} {hybrid} {repack} {resolution} {uhd} {source} REMUX {hdr} {codec} {language} {audio}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {edition} {repack} {language} {source} REMUX"
+                name = f"{title} {year} {edition} {repack} {source} REMUX {language} {audio}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {source} {codec}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {source} {hdr} {codec} {language} {audio}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {service} WEB-DL {codec}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {resolution} {service} WEB-DL {hdr} {codec} {language} {audio}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {service} WEBRip {codec}"
+                name = f"{title} {year} {edition} {hybrid} {repack} {resolution} {service} WEBRip {hdr} {codec} {language} {audio}"
             elif type_val == 'HDTV':
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {codec}"
+                name = f"{title} {year} {edition} {repack} {resolution} {source} {codec} {language} {audio}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {language} {source} DVDRip {codec}"
+                name = f"{title} {year} {source} DVDRip {language} {audio}"
 
         # ── TV ──
+        # TITRE ANNEE S##E## [Part] [Cut] [Custom] [REPACK] Resolution [Region] [UHD] Source [HDR] Codec LANGUE Audio -TAG
         elif meta['category'] == 'TV':
             if type_val == 'DISC':
                 if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {season}{episode} {edition} {repack} {language} {resolution} {region} {source} {video_codec}"
+                    name = f"{title} {year} {season}{episode} {edition} {hybrid} {repack} {resolution} {region} {uhd} {source} {hdr} {video_codec} {language} {audio}"
                 elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {season}{episode} {edition} {repack} {language} {region} {source} {dvd_size}"
+                    name = f"{title} {year} {season}{episode} {edition} {repack} {region} {source} {dvd_size} {language} {audio}"
                 elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec}"
+                    name = f"{title} {year} {edition} {repack} {resolution} {source} {video_codec} {language} {audio}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {source} REMUX {codec}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {resolution} {uhd} {source} REMUX {hdr} {codec} {language} {audio}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {source} REMUX"
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {source} REMUX {language} {audio}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {source} {codec}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {resolution} {uhd} {source} {hdr} {codec} {language} {audio}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {service} WEB-DL {codec}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {resolution} {service} WEB-DL {hdr} {codec} {language} {audio}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {service} WEBRip {codec}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {resolution} {service} WEBRip {hdr} {codec} {language} {audio}"
             elif type_val == 'HDTV':
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {codec}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {resolution} {source} {codec} {language} {audio}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {season} {language} {source} DVDRip {codec}"
+                name = f"{title} {year} {season} {source} DVDRip {language} {audio}"
 
         if not name:
             console.print("[bold red]TOS: Unable to generate release name.[/bold red]")
@@ -193,7 +203,10 @@ class TOS(UNIT3D):
 
         # Collapse whitespace, append tag, dotify, clean
         name = ' '.join(name.split()) + tag
-        name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
+        # Normalise special codec notations before stripping
+        name = name.replace('DTS:X', 'DTS-X')
+        # Allow alphanumeric, spaces, dots, hyphens, colons, and + (for DD+, HDR10+)
+        name = re.sub(r'[^a-zA-Z0-9 .+\-]', '', name)
         name = name.replace(' ', '.')
         name = re.sub(r'\.(-\.)+', '.', name)
         name = re.sub(r'\.{2,}', '.', name)
