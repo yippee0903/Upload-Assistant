@@ -6,6 +6,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class FNP(UNIT3D):
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name='FNP')
         self.config = config
@@ -22,6 +23,9 @@ class FNP(UNIT3D):
             "MeGusta", "NeoNoir", "PSA", "RARBG", "YAWNiX", "YTS", "YIFY", "x0r"
         ]
         pass
+
+    async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_resolution_id(
         self,

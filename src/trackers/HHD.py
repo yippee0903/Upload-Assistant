@@ -11,6 +11,7 @@ Config = dict[str, Any]
 
 
 class HHD(UNIT3D):
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='HHD')
         self.config: Config = config
@@ -31,6 +32,9 @@ class HHD(UNIT3D):
             'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'x0r', 'YAWNiX', 'YIFY', 'YTS', 'PSA', ['EVO', 'WEB-DL only']
         ]
         pass
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

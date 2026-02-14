@@ -10,6 +10,7 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class G3MINI(UNIT3D):
+
     def __init__(self, config):
         super().__init__(config, tracker_name='G3MINI')
         self.config = config
@@ -108,9 +109,8 @@ class G3MINI(UNIT3D):
             console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
-        # Generate NFO if enabled in tracker config
-        tracker_config = self.config.get('TRACKERS', {}).get(self.tracker, {})
-        if tracker_config.get('generate_nfo', False) and not meta.get('nfo') and not meta.get('auto_nfo'):
+        # Always generate NFO for G3MINI
+        if not meta.get('nfo') and not meta.get('auto_nfo'):
             generator = SceneNfoGenerator(self.config)
             nfo_path = await generator.generate_nfo(meta, self.tracker)
             if nfo_path:

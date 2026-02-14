@@ -17,7 +17,7 @@ from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.torrentcreate import TorrentCreator
 from src.trackers.PTP import PTP
-from src.trackersetup import TRACKER_SETUP, tracker_class_map
+from src.trackersetup import TRACKER_SETUP, notag_labels, tracker_class_map
 from src.trackers.COMMON import COMMON
 from src.uphelper import UploadHelper
 
@@ -120,17 +120,13 @@ class TrackerStatusManager:
 
                     if detag_info:
                         if detag_info.get('type') == 'notag':
-                            # Per-tracker accept_notag config (default: global setting or False)
-                            tracker_configs = self.config.get('TRACKERS', {})
+                            # Check if tracker inherently accepts notag
                             global_accept = self.config.get('DEFAULT', {}).get('accept_notag', False)
-                            t_cfg = tracker_configs.get(tracker_name, {})
-                            accepts = t_cfg.get('accept_notag', global_accept) if isinstance(t_cfg, dict) else global_accept
-                            if not accepts:
+                            if tracker_name not in notag_labels and not global_accept:
                                 local_tracker_status['skipped'] = True
                             else:
-                                # Apply notag_label if configured (e.g. "-NoGrP")
-                                global_label = self.config.get('DEFAULT', {}).get('notag_label', '')
-                                label = t_cfg.get('notag_label', global_label) if isinstance(t_cfg, dict) else global_label
+                                # Apply notag_label if tracker defines one
+                                label = notag_labels.get(tracker_name, '')
                                 if label:
                                     local_meta['tag'] = f'-{label}'
                         else:

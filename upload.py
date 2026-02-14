@@ -48,7 +48,7 @@ from src.trackerhandle import process_trackers
 from src.trackers.AR import AR
 from src.trackers.COMMON import COMMON
 from src.trackers.PTP import PTP
-from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, other_api_trackers, tracker_class_map
+from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, nfo_skip_trackers, notag_labels, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
@@ -468,16 +468,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
 
         if detection_type == 'notag':
-            # --- NOTAG: per-tracker accept_notag config ---
-            tracker_configs = config.get('TRACKERS', {})
+            # --- NOTAG: check inherent tracker behavior + global config ---
             global_accept = config.get('DEFAULT', {}).get('accept_notag', False)
-            global_accept_label = config.get('DEFAULT', {}).get('notag_label', '')
             accept_trackers: list[str] = []
             reject_trackers: list[str] = []
             for t in meta.get('trackers', []):
-                t_cfg = tracker_configs.get(t, {})
-                accepts = t_cfg.get('accept_notag', global_accept) if isinstance(t_cfg, dict) else global_accept
-                if accepts:
+                # Tracker is in notag_labels → always accepts notag
+                # Otherwise fall back to global config
+                if t in notag_labels or global_accept:
                     accept_trackers.append(t)
                 else:
                     reject_trackers.append(t)
@@ -502,8 +500,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 labeled: list[str] = []
                 unlabeled: list[str] = []
                 for t in accept_trackers:
-                    t_cfg = tracker_configs.get(t, {})
-                    lbl = t_cfg.get('notag_label', global_accept_label) if isinstance(t_cfg, dict) else global_accept_label
+                    lbl = notag_labels.get(t, '')
                     if lbl:
                         labeled.append(f"{t} (→ -{lbl})")
                     else:
@@ -1195,7 +1192,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             waiter = Wait(config)
             await waiter.select_and_recheck_best_torrent(meta, meta['path'], check_interval=5)
 
-        # Check if any target tracker has skip_nfo enabled and store in meta for reuse
+        # Check if any target tracker has skip_nfo and store in meta for reuse
         if 'skip_nfo' not in meta:
             skip_nfo = False
             raw_trackers = meta.get('trackers')
@@ -1206,8 +1203,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             else:
                 target_trackers = []
             for tracker in target_trackers:
-                tracker_config = config.get('TRACKERS', {}).get(tracker.upper(), {})
-                if tracker_config.get('skip_nfo', False):
+                if tracker.upper() in nfo_skip_trackers:
                     skip_nfo = True
                     if meta.get('debug'):
                         console.print(f"[cyan]skip_nfo is enabled for tracker {tracker}[/cyan]")

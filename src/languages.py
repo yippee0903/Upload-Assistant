@@ -444,7 +444,7 @@ class LanguagesManager:
         If neither is found, display a warning and ask for confirmation.
 
         The check can be disabled globally via config DEFAULT.english_language_check = False,
-        or per-tracker by setting english_language_check = False in the tracker's config section.
+        or per-tracker for trackers listed in english_check_skip_trackers (e.g. C411, TORR9).
         If ALL selected trackers have the check disabled, it is skipped entirely.
 
         :param meta: Dictionary containing media metadata (audio_languages, subtitle_languages).
@@ -456,15 +456,15 @@ class LanguagesManager:
         if not global_check:
             return True
 
-        # Check per-tracker overrides: if ALL trackers have the check disabled, skip entirely
+        # Check per-tracker behavior: if ALL trackers skip the check, skip entirely
         trackers: list[str] = meta.get('trackers', [])
-        tracker_configs = config.get('TRACKERS', {})
         if trackers:
+            from src.trackersetup import english_check_skip_trackers
+
             skipped_trackers: list[str] = []
             checked_trackers: list[str] = []
             for tracker in trackers:
-                tracker_cfg = tracker_configs.get(tracker, {})
-                if isinstance(tracker_cfg, dict) and not tracker_cfg.get('english_language_check', True):
+                if tracker in english_check_skip_trackers:
                     skipped_trackers.append(tracker)
                 else:
                     checked_trackers.append(tracker)

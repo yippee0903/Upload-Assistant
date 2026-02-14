@@ -15,6 +15,7 @@ Config = dict[str, Any]
 
 
 class STC(UNIT3D):
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='STC')
         self.config: Config = config
@@ -29,6 +30,9 @@ class STC(UNIT3D):
         self.banned_groups = [""]
         self.approved_image_hosts = ['imgbox', 'imgbb']
         pass
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_type_id(
         self,

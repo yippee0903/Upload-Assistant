@@ -10,6 +10,7 @@ Config = dict[str, Any]
 
 
 class LST(UNIT3D):
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LST')
         self.config: Config = config
@@ -24,6 +25,9 @@ class LST(UNIT3D):
         self.trumping_url = f'{self.base_url}/api/reports/torrents/'
         self.banned_groups = []
         pass
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

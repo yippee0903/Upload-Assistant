@@ -21,6 +21,7 @@ ParamsList: TypeAlias = list[tuple[str, QueryValue]]
 
 
 class UNIT3D:
+
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
         self.tracker = tracker_name
@@ -437,10 +438,6 @@ class UNIT3D:
 
     async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
         files: dict[str, tuple[str, bytes, str]] = {}
-
-        # Check if skip_nfo is enabled in tracker config
-        if self.tracker_config.get('skip_nfo', False):
-            return files
 
         base_dir = meta["base_dir"]
         uuid = meta["uuid"]

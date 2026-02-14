@@ -12,6 +12,7 @@ Meta = dict[str, Any]
 
 
 class LUME(UNIT3D):
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="LUME")
         self.config = config
@@ -24,6 +25,9 @@ class LUME(UNIT3D):
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups: list[str] = []
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {

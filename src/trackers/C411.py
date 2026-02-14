@@ -44,7 +44,6 @@ class C411:
         self.api_key: str = str(self.config['TRACKERS'].get(self.tracker, {}).get('api_key', '')).strip()
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[str] = [""]
-
     # ──────────────────────────────────────────────────────────
     #  French language detection   (C411 conventions)
     #

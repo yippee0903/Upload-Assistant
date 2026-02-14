@@ -14,6 +14,7 @@ Config = dict[str, Any]
 
 
 class ULCX(UNIT3D):
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ULCX')
         self.config = config
@@ -31,6 +32,9 @@ class ULCX(UNIT3D):
             'TSPxL', 'VXT', 'Vyndros', 'Will1869', 'x0r', 'YIFY', 'Alcaide_Kira', 'PHOCiS', 'HDT', 'SPx', 'seedpool'
         ]
         pass
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
