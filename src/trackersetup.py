@@ -77,6 +77,7 @@ from src.trackers.THR import THR
 from src.trackers.TIK import TIK
 from src.trackers.TL import TL
 from src.trackers.TLZ import TLZ
+from src.trackers.TORR9 import TORR9
 from src.trackers.TOS import TOS
 from src.trackers.TTG import TTG
 from src.trackers.TTR import TTR
@@ -1343,7 +1344,7 @@ tracker_class_map: dict[str, type[Any]] = {
     'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'G3MINI': G3MINI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IS': IS, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
-    'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
+    'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TORR9': TORR9, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
 
 api_trackers = {
@@ -1352,7 +1353,7 @@ api_trackers = {
 }
 
 other_api_trackers = {
-    'ANT', 'BHDTV', 'C411', 'DC', 'GPW', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TVC'
+    'ANT', 'BHDTV', 'C411', 'DC', 'GPW', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TORR9', 'TVC'
 }
 
 http_trackers = {

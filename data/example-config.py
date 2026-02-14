@@ -370,7 +370,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, FNP, FRIKI, GPW, HDB, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TORR9, TOS, TTG, TTR, TVC, ULCX, UTP, YOINK, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -1051,6 +1051,20 @@ config = {
             "anon": False,
             # Set to True to skip including NFO files in uploads (scene NFO, BHD NFO, etc.)
             "skip_nfo": True,
+        },
+        "TORR9": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # torr9.xyz — French private tracker (custom REST API)
+            # Login credentials — used to obtain a Bearer JWT automatically
+            "username": "",
+            "password": "",
+            # Or supply a static Bearer token directly (alternative to username/password)
+            # "api_key": "",
+            # Announce URL with your passkey — found in your Torr9 profile
+            "announce_url": "https://tracker.torr9.xyz/announce/YOUR_PASSKEY",
+            # Upload anonymously
+            "anon": False,
         },
         "TOS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
