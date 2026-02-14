@@ -1014,60 +1014,69 @@ class C411:
 
         return ''
 
-    def _build_tmdb_data(self, meta: Meta) -> Union[str, None]:
+    async def _build_tmdb_data(self, meta: Meta) -> Union[str, None]:
         """Build tmdbData JSON string for C411.
 
         The format must match the C411 internal TMDB schema as returned
-        by ``/api/tmdb/search``.  Key differences from the raw TMDB API:
-          - ``type`` (not ``media_type``)
-          - ``posterUrl`` / ``backdropUrl`` (full URLs, not relative paths)
-          - ``releaseDate`` (camelCase, not ``release_date``)
-          - ``rating`` (not ``vote_average``)
-          - ``year`` as integer
-          - arrays for ``genres``, ``genreIds``, ``directors``, etc.
+        by ``/api/tmdb/search``.  We fetch full details from TMDB API
+        (with credits + keywords) in French to populate all fields.
+
+        Required keys:  id, type, title, originalTitle, overview,
+                        posterUrl, backdropUrl, releaseDate, year,
+                        runtime, rating, ratingCount, genreIds, genres,
+                        directors, writers, cast, countries, languages,
+                        productionCompanies, keywords, status, tagline,
+                        imdbId
         """
         tmdb_id = meta.get('tmdb')
         if not tmdb_id:
             return None
 
         media_type = 'tv' if meta.get('category', '').upper() == 'TV' else 'movie'
+
+        # Fetch full TMDB data with credits + keywords in French
+        tmdb_full = await self._fetch_tmdb_full(meta, media_type)
+
         tmdb_data: dict[str, Any] = {
             'id': int(tmdb_id),
             'type': media_type,
         }
 
-        if meta.get('title'):
-            tmdb_data['title'] = meta['title']
-        if meta.get('original_title'):
-            tmdb_data['originalTitle'] = meta['original_title']
-        if meta.get('overview'):
-            tmdb_data['overview'] = meta['overview']
+        # imdbId (tt-prefixed string)
+        imdb_id = tmdb_full.get('imdb_id') or ''
+        if imdb_id:
+            tmdb_data['imdbId'] = str(imdb_id)
+        elif meta.get('imdb_id'):
+            raw = meta['imdb_id']
+            tmdb_data['imdbId'] = f'tt{raw}' if not str(raw).startswith('tt') else str(raw)
 
-        # posterUrl: C411 expects the full TMDB image URL (w342 size)
-        poster = meta.get('poster', '') or ''
-        if poster:
+        # Title + original title
+        tmdb_data['title'] = tmdb_full.get('title') or tmdb_full.get('name') or meta.get('title', '')
+        tmdb_data['originalTitle'] = tmdb_full.get('original_title') or tmdb_full.get('original_name') or meta.get('original_title', tmdb_data['title'])
+
+        # Overview (prefer French from API)
+        tmdb_data['overview'] = tmdb_full.get('overview') or meta.get('overview', '')
+
+        # Poster URL (w500 like C411 uses)
+        poster_path = tmdb_full.get('poster_path') or ''
+        if poster_path:
+            tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w500{poster_path}'
+        else:
+            poster = meta.get('poster', '') or ''
             if poster.startswith('https://'):
-                # Replace any size with w342 for consistency
                 tmdb_data['posterUrl'] = poster
-            elif poster.startswith('/'):
-                tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w342{poster}'
-            else:
-                tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w342/{poster}'
+            elif poster:
+                tmdb_data['posterUrl'] = f'https://image.tmdb.org/t/p/w500{poster}' if poster.startswith('/') else f'https://image.tmdb.org/t/p/w500/{poster}'
 
-        # backdropUrl: full URL (w780 size), if available
-        backdrop = meta.get('backdrop_path', '') or ''
-        if backdrop:
-            if backdrop.startswith('https://'):
-                tmdb_data['backdropUrl'] = backdrop
-            elif backdrop.startswith('/'):
-                tmdb_data['backdropUrl'] = f'https://image.tmdb.org/t/p/w780{backdrop}'
-            else:
-                tmdb_data['backdropUrl'] = f'https://image.tmdb.org/t/p/w780/{backdrop}'
+        # Backdrop URL (w1280 like C411 uses)
+        backdrop_path = tmdb_full.get('backdrop_path') or ''
+        if backdrop_path:
+            tmdb_data['backdropUrl'] = f'https://image.tmdb.org/t/p/w1280{backdrop_path}'
         else:
             tmdb_data['backdropUrl'] = None
 
-        # releaseDate (camelCase) + year (integer)
-        release_date = meta.get('release_date') or meta.get('first_air_date') or ''
+        # Release date + year
+        release_date = tmdb_full.get('release_date') or tmdb_full.get('first_air_date') or meta.get('release_date') or ''
         if release_date:
             tmdb_data['releaseDate'] = str(release_date)
         elif meta.get('year'):
@@ -1076,43 +1085,88 @@ class C411:
         year = meta.get('year')
         if year:
             tmdb_data['year'] = int(year)
+        elif release_date and len(release_date) >= 4:
+            tmdb_data['year'] = int(release_date[:4])
         else:
             tmdb_data['year'] = None
 
-        # Runtime (minutes) - may be None
-        runtime = meta.get('runtime', 0)
+        # Runtime
+        runtime = tmdb_full.get('runtime') or meta.get('runtime', 0)
         tmdb_data['runtime'] = int(runtime) if runtime else None
 
-        # rating (not voteAverage)
-        vote_avg = meta.get('vote_average')
-        tmdb_data['rating'] = float(vote_avg) if vote_avg else 0
-        tmdb_data['ratingCount'] = 0
+        # Rating + ratingCount
+        tmdb_data['rating'] = float(tmdb_full.get('vote_average', 0) or 0)
+        tmdb_data['ratingCount'] = int(tmdb_full.get('vote_count', 0) or 0)
 
-        # Genre IDs from TMDB
-        genre_ids = meta.get('genre_ids') or meta.get('genres', [])
-        if isinstance(genre_ids, list):
-            # May be list of ints or list of dicts with 'id'
-            ids = []
-            for g in genre_ids:
-                if isinstance(g, int):
-                    ids.append(g)
-                elif isinstance(g, dict) and 'id' in g:
-                    ids.append(g['id'])
-            tmdb_data['genreIds'] = ids
-        else:
-            tmdb_data['genreIds'] = []
+        # Genres (names as strings) + genreIds
+        raw_genres = tmdb_full.get('genres', [])
+        tmdb_data['genres'] = [g['name'] for g in raw_genres if isinstance(g, dict) and 'name' in g]
+        tmdb_data['genreIds'] = [g['id'] for g in raw_genres if isinstance(g, dict) and 'id' in g]
 
-        # Empty arrays for fields not available from Upload-Assistant meta
-        tmdb_data['genres'] = []
-        tmdb_data['directors'] = []
-        tmdb_data['writers'] = []
-        tmdb_data['cast'] = []
-        tmdb_data['countries'] = []
-        tmdb_data['languages'] = []
-        tmdb_data['productionCompanies'] = []
-        tmdb_data['keywords'] = []
+        # Credits
+        credits = tmdb_full.get('credits', {})
+        crew = credits.get('crew', [])
+        cast_list = credits.get('cast', [])
+
+        tmdb_data['directors'] = [p['name'] for p in crew if p.get('job') == 'Director']
+        tmdb_data['writers'] = [p['name'] for p in crew if p.get('department') == 'Writing'][:5]
+        tmdb_data['cast'] = [
+            {'name': p['name'], 'character': p.get('character', '')}
+            for p in cast_list[:5]
+        ]
+
+        # Countries
+        countries = tmdb_full.get('production_countries', [])
+        tmdb_data['countries'] = [c['name'] for c in countries if isinstance(c, dict) and 'name' in c]
+
+        # Languages
+        languages = tmdb_full.get('spoken_languages', [])
+        tmdb_data['languages'] = [
+            lang.get('english_name') or lang.get('name', '')
+            for lang in languages if isinstance(lang, dict)
+        ]
+
+        # Production companies
+        companies = tmdb_full.get('production_companies', [])
+        tmdb_data['productionCompanies'] = [c['name'] for c in companies if isinstance(c, dict) and 'name' in c]
+
+        # Status + tagline
+        tmdb_data['status'] = tmdb_full.get('status', '')
+        tmdb_data['tagline'] = tmdb_full.get('tagline', '')
+
+        # Keywords
+        kw_container = tmdb_full.get('keywords', {})
+        # Movies use 'keywords', TV shows use 'results'
+        kw_list = kw_container.get('keywords', []) or kw_container.get('results', [])
+        tmdb_data['keywords'] = [kw['name'] for kw in kw_list if isinstance(kw, dict) and 'name' in kw]
 
         return json.dumps(tmdb_data, ensure_ascii=False)
+
+    async def _fetch_tmdb_full(self, meta: Meta, media_type: str) -> dict[str, Any]:
+        """Fetch full TMDB details with credits and keywords in French."""
+        tmdb_id = meta.get('tmdb')
+        if not tmdb_id:
+            return {}
+
+        endpoint = media_type  # 'movie' or 'tv'
+        url = f'https://api.themoviedb.org/3/{endpoint}/{tmdb_id}'
+        params = {
+            'api_key': self.config.get('DEFAULT', {}).get('tmdb_api', ''),
+            'language': 'fr-FR',
+            'append_to_response': 'credits,keywords',
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, params=params)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    console.print(f'[yellow]C411: TMDB API returned {response.status_code} for {endpoint}/{tmdb_id}[/yellow]')
+        except httpx.RequestError as e:
+            console.print(f'[yellow]C411: TMDB API request failed: {e}[/yellow]')
+
+        return {}
 
     # ──────────────────────────────────────────────────────────
     #  NFO generation
@@ -1184,7 +1238,7 @@ class C411:
         options_json = json.dumps(options, ensure_ascii=False)
 
         # ── TMDB data ──
-        tmdb_data = self._build_tmdb_data(meta)
+        tmdb_data = await self._build_tmdb_data(meta)
 
         # ── Multipart form ──
         files: dict[str, tuple[str, bytes, str]] = {
