@@ -281,10 +281,9 @@ class C411:
             return text.replace(' ', '.')
 
         def _clean(name: str) -> str:
-            # Strip accents (é→e, ç→c, etc.) for clean filenames
+            # Strip accents (é→e, ç→c, etc.) and non-alphanumeric chars for clean filenames
             name = unidecode(name)
-            for c in '<>:"/\\|?*':
-                name = name.replace(c, '')
+            name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
             return name
 
         type_val = meta.get('type', '').upper()
@@ -410,6 +409,12 @@ class C411:
         if last_dash > 0:
             before_tag = dot_name[:last_dash].replace('-', '.')
             dot_name = before_tag + dot_name[last_dash:]
+
+        # Remove isolated hyphens between dots (e.g. "Title.-.Subtitle" → "Title.Subtitle")
+        dot_name = re.sub(r'\.(-\.)+', '.', dot_name)
+        # Collapse consecutive dots and strip boundary dots
+        dot_name = re.sub(r'\.{2,}', '.', dot_name)
+        dot_name = dot_name.strip('.')
 
         return {'name': dot_name}
 

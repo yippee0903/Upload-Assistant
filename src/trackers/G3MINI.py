@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut &amp; wastaken7 — Licensed under UAPL v1.0
 #import aiofiles
 #import click
+import re
 from typing import Any
 
 from src.console import console
@@ -291,10 +292,8 @@ class G3MINI(UNIT3D):
         def replace_spaces_with_dots(text: str) -> str:
             return text.replace(" ", ".")
         def _clean_filename(name):
-            #[] () - ; : . # " ' +
-            invalid = '<>:"/\\|?*'
-            for char in invalid:
-                name = name.replace(char, '-')
+            # Strip all non-alphanumeric chars except spaces and hyphens
+            name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
             return name
 
         type = meta.get('type', "").upper()
@@ -417,4 +416,9 @@ class G3MINI(UNIT3D):
         name = name_notag + tag
         clean_name = _clean_filename(name)
         dot_name = replace_spaces_with_dots(clean_name)
+        # Remove isolated hyphens between dots (e.g. "Chainsaw.Man.-.The.Movie" → "Chainsaw.Man.The.Movie")
+        dot_name = re.sub(r'\.(-\.)+', '.', dot_name)
+        # Collapse consecutive dots and strip boundary dots
+        dot_name = re.sub(r'\.{2,}', '.', dot_name)
+        dot_name = dot_name.strip('.')
         return {'name': dot_name}
