@@ -437,23 +437,22 @@ class TORR9:
     # ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def _get_category_id(meta: Meta) -> int:
-        """Map meta category to Torr9 numeric category_id.
+    def _get_category_id(meta: Meta) -> tuple[int, str]:
+        """Map meta category to Torr9 numeric category_id and subcategory string.
 
-        The API requires a numeric category_id field:
-          51 = Films
-           5 = Séries
-           7 = Anime / Animation
+        The API requires:
+          - category_id  (int):  51 = Films, 5 = Séries, 7 = Anime
+          - subcategory   (str): matching text label
         """
         is_anime = bool(meta.get('mal_id'))
 
         if is_anime:
-            return 7
+            return (7, 'Anime')
 
         if meta.get('category') == 'TV':
-            return 5
+            return (5, 'Séries')
 
-        return 51
+        return (51, 'Films')
 
     # ──────────────────────────────────────────────────────────
     #  Tags  (comma-separated string inferred from release)
@@ -1042,8 +1041,8 @@ class TORR9:
         # ── Description (BBCode) ──
         description = await self._build_description(meta)
 
-        # ── Category ID (numeric) ──
-        category_id = self._get_category_id(meta)
+        # ── Category ID (numeric) + subcategory (string) ──
+        category_id, subcategory = self._get_category_id(meta)
 
         # ── Tags (comma-separated) ──
         tags = self._build_tags(meta, language_tag)
@@ -1061,6 +1060,7 @@ class TORR9:
             'description': description,
             'nfo': nfo_bytes.decode('utf-8', errors='replace') if nfo_bytes else '',
             'category_id': str(category_id),
+            'subcategory': subcategory,
             'tags': tags,
             'is_exclusive': 'false',
             'is_anonymous': str(anon).lower(),
@@ -1198,7 +1198,7 @@ class TORR9:
                 console.print(f"DEBUG: Saving final description to {desc_path}")
                 console.print("[cyan]TORR9 Debug — Request data:[/cyan]")
                 console.print(f"  Title:       {title}")
-                console.print(f"  Category ID: {category_id}")
+                console.print(f"  Category ID: {category_id} / Sub: {subcategory}")
                 console.print(f"  Tags:        {tags}")
                 console.print(f"  Anonymous:   {anon}")
                 console.print(f"  Description: {description[:500]}…")
