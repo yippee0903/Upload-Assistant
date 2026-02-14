@@ -104,7 +104,6 @@ class TORR9:
                 data = resp.json()
                 token = data.get('token', '')
                 if token:
-                    console.print("[green]TORR9: Login successful.[/green]")
                     return token
                 else:
                     console.print("[red]TORR9: Login response missing token.[/red]")
