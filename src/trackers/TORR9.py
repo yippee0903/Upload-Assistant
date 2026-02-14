@@ -296,7 +296,7 @@ class TORR9:
 
         def _clean(name: str) -> str:
             name = unidecode(name)
-            name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
+            name = re.sub(r'[^a-zA-Z0-9 .+\-]', '', name)
             return name
 
         type_val = meta.get('type', '').upper()
@@ -309,7 +309,7 @@ class TORR9:
         resolution = meta.get('resolution', '')
         if resolution == 'OTHER':
             resolution = ''
-        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '')
+        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '').replace('DD+', 'DDP')
         language = await self._build_audio_string(meta)
 
         service = meta.get('service', '')

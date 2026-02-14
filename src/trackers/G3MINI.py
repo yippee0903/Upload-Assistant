@@ -291,8 +291,8 @@ class G3MINI(UNIT3D):
         def replace_spaces_with_dots(text: str) -> str:
             return text.replace(" ", ".")
         def _clean_filename(name):
-            # Strip all non-alphanumeric chars except spaces and hyphens
-            name = re.sub(r'[^a-zA-Z0-9 .\-]', '', name)
+            # Strip all non-alphanumeric chars except spaces, dots, hyphens, and + (for DD+, HDR10+)
+            name = re.sub(r'[^a-zA-Z0-9 .+\-]', '', name)
             return name
 
         type = meta.get('type', "").upper()
