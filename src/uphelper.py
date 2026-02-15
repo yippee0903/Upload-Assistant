@@ -110,6 +110,12 @@ class UploadHelper:
                 else:
                     skip_dupe_asking = bool(self.default_config.get("skip_dupe_asking", False))
 
+            # Detect French language hierarchy supersede
+            french_supersede = any(
+                isinstance(d, dict) and 'french_lang_supersede' in (d.get('flags') or [])
+                for d in dupes_list
+            )
+
             if (not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False))) and not skip_dupe_asking:
                 dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
 
@@ -183,7 +189,11 @@ class UploadHelper:
                             console.print()
                             console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
                         else:
-                            console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
+                            if french_supersede:
+                                console.print(f"[bold yellow]{tracker_name}: A release with French audio (MULTI / VFF / VFQ) already exists.[/bold yellow]")
+                                console.print("[yellow]Uploading a VOSTFR/VO version is not recommended on French trackers.[/yellow]")
+                            else:
+                                console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
                             console.print()
                             console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
                         if meta.get('dupe', False) is False:
@@ -204,7 +214,12 @@ class UploadHelper:
                         upload = True
 
             else:
-                upload = meta.get('dupe', False) is not False
+                if french_supersede:
+                    # In unattended mode, auto-skip when a superior French audio version exists
+                    console.print(f"[bold yellow]{tracker_name}: Skipping — a release with French audio already exists (VOSTFR/VO superseded).[/bold yellow]")
+                    upload = False
+                else:
+                    upload = meta.get('dupe', False) is not False
 
             display_name = display_name if display_name is not None else str(meta.get('name', ''))
             display_name = str(display_name)

@@ -29,6 +29,7 @@ from src.console import console
 from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
+from src.trackers.FRENCH import FrenchTrackerMixin
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -53,7 +54,7 @@ FRENCH_MONTHS: list[str] = [
 ]
 
 
-class TORR9:
+class TORR9(FrenchTrackerMixin):
     """torr9.xyz tracker — French private tracker with custom REST API."""
 
     LOGIN_URL: str = 'https://api.torr9.xyz/api/v1/auth/login'
@@ -142,310 +143,9 @@ class TORR9:
         return self.api_key
 
     # ──────────────────────────────────────────────────────────
-    #  French language detection  (shared with C411 conventions)
+    #  Audio / naming / French title — inherited from FrenchTrackerMixin
     # ──────────────────────────────────────────────────────────
 
-    async def _build_audio_string(self, meta: Meta) -> str:
-        """Build language tag from MediaInfo audio tracks.
-
-        Returns one of: TRUEFRENCH, VOF, VFF, VFI, VFQ, VF2,
-                         MULTI.VOF, MULTI.TRUEFRENCH, MULTI.VFF, MULTI.VFQ, MULTI.VF2,
-                         VOSTFR, MUET, or '' (for English/other VO).
-        """
-        if 'mediainfo' not in meta or 'media' not in meta.get('mediainfo', {}):
-            return ''
-
-        audio_tracks = self._get_audio_tracks(meta)
-
-        if not audio_tracks:
-            has_french_subs = self._has_french_subs(meta)
-            return 'MUET.VOSTFR' if has_french_subs else 'MUET'
-
-        audio_langs = self._extract_audio_languages(audio_tracks, meta)
-        if not audio_langs:
-            return ''
-
-        has_french_audio = 'FRA' in audio_langs
-        has_french_subs = self._has_french_subs(meta)
-        num_audio_tracks = len(audio_tracks)
-        fr_suffix = self._get_french_dub_suffix(audio_tracks)
-        is_original_french = str(meta.get('original_language', '')).lower() == 'fr'
-        is_truefrench = self._detect_truefrench(meta)
-        is_vfi = self._detect_vfi(meta)
-
-        def _fr_precision() -> str:
-            if fr_suffix == 'VF2':
-                return 'VF2'
-            if is_truefrench:
-                return 'TRUEFRENCH'
-            if is_original_french:
-                return 'VOF'
-            if is_vfi:
-                return 'VFI'
-            if fr_suffix == 'VFQ':
-                return 'VFQ'
-            if fr_suffix == 'VFF':
-                return 'VFF'
-            return 'VFF'  # conservative default
-
-        if not has_french_audio:
-            return 'VOSTFR' if has_french_subs else ''
-
-        non_fr = [l for l in audio_langs if l != 'FRA']
-
-        if non_fr or num_audio_tracks > 1:
-            return f'MULTI.{_fr_precision()}'
-
-        if is_original_french:
-            return 'VOF'
-
-        return _fr_precision()
-
-    @staticmethod
-    def _get_audio_tracks(meta: Meta) -> list[dict[str, Any]]:
-        media = meta.get('mediainfo', {}).get('media', {})
-        tracks = media.get('track', [])
-        return [t for t in tracks if t.get('@type') == 'Audio']
-
-    @staticmethod
-    def _extract_audio_languages(audio_tracks: list[dict[str, Any]], meta: Meta) -> list[str]:
-        lang_map: dict[str, str] = {
-            'fre': 'FRA', 'fra': 'FRA', 'fr': 'FRA', 'french': 'FRA',
-            'français': 'FRA', 'francais': 'FRA', 'fr-fr': 'FRA', 'fr-ca': 'FRA',
-            'eng': 'ENG', 'en': 'ENG', 'english': 'ENG', 'en-us': 'ENG', 'en-gb': 'ENG',
-            'spa': 'SPA', 'es': 'SPA', 'spanish': 'SPA', 'español': 'SPA',
-            'ger': 'DEU', 'deu': 'DEU', 'de': 'DEU', 'german': 'DEU', 'deutsch': 'DEU',
-            'ita': 'ITA', 'it': 'ITA', 'italian': 'ITA', 'italiano': 'ITA',
-            'por': 'POR', 'pt': 'POR', 'portuguese': 'POR', 'português': 'POR',
-            'jpn': 'JPN', 'ja': 'JPN', 'japanese': 'JPN',
-            'kor': 'KOR', 'ko': 'KOR', 'korean': 'KOR',
-            'chi': 'ZHO', 'zho': 'ZHO', 'zh': 'ZHO', 'chinese': 'ZHO',
-            'rus': 'RUS', 'ru': 'RUS', 'russian': 'RUS',
-            'ara': 'ARA', 'ar': 'ARA', 'arabic': 'ARA',
-            'hin': 'HIN', 'hi': 'HIN', 'hindi': 'HIN',
-        }
-        langs: list[str] = []
-        for track in audio_tracks:
-            lang = str(track.get('Language', '')).strip().lower()
-            if not lang:
-                lang_title = str(track.get('Title', '')).strip().lower()
-                if any(k in lang_title for k in ('french', 'français', 'francais')):
-                    lang = 'french'
-                elif any(k in lang_title for k in ('english', 'anglais')):
-                    lang = 'english'
-            mapped = lang_map.get(lang, lang.upper()[:3] if lang else '')
-            if mapped and mapped not in langs:
-                langs.append(mapped)
-        return langs
-
-    @staticmethod
-    def _get_french_dub_suffix(audio_tracks: list[dict[str, Any]]) -> str:
-        for track in audio_tracks:
-            lang = str(track.get('Language', '')).strip().upper()
-            if lang in ('FR', 'FRA', 'FRE'):
-                title = str(track.get('Title', '')).upper()
-                if 'VF2' in title:
-                    return 'VF2'
-                if 'VFQ' in title:
-                    return 'VFQ'
-                if 'VFF' in title:
-                    return 'VFF'
-                if 'VFI' in title:
-                    return 'VFI'
-        return ''
-
-    def _detect_truefrench(self, meta: Meta) -> bool:
-        uuid = meta.get('uuid', '')
-        return bool(re.search(r'\bTRUEFRENCH\b', uuid, re.IGNORECASE))
-
-    def _detect_vfi(self, meta: Meta) -> bool:
-        uuid = meta.get('uuid', '')
-        return bool(re.search(r'\bVFI\b', uuid, re.IGNORECASE))
-
-    def _has_french_subs(self, meta: Meta) -> bool:
-        media = meta.get('mediainfo', {}).get('media', {})
-        tracks = media.get('track', [])
-        for track in tracks:
-            if track.get('@type') == 'Text':
-                lang = str(track.get('Language', '')).lower()
-                title = str(track.get('Title', '')).lower()
-                if lang in ('french', 'fre', 'fra', 'fr', 'français', 'francais', 'fr-fr', 'fr-ca'):
-                    return True
-                if 'french' in title or 'français' in title or 'francais' in title:
-                    return True
-        return False
-
-    # ──────────────────────────────────────────────────────────
-    #  French title from TMDB
-    # ──────────────────────────────────────────────────────────
-
-    async def _get_french_title(self, meta: Meta) -> str:
-        """Get French title from TMDB, cached in meta['frtitle'].
-
-        If TMDB returns the original-language title (no actual French translation),
-        falls back to the English title from meta['title'].
-        """
-        if meta.get('frtitle'):
-            return meta['frtitle']
-
-        try:
-            fr_data = await self.tmdb_manager.get_tmdb_localized_data(
-                meta, data_type='main', language='fr', append_to_response=''
-            ) or {}
-            fr_title = str(fr_data.get('title', '') or fr_data.get('name', '')).strip()
-            # If fr_title == original_title but the work is originally French, keep it.
-            original = str(fr_data.get('original_title', '') or fr_data.get('original_name', '')).strip()
-            orig_lang = str(fr_data.get('original_language', '')).strip().lower()
-            if fr_title and (fr_title != original or orig_lang == 'fr'):
-                meta['frtitle'] = fr_title
-                return fr_title
-        except Exception:
-            pass
-
-        return meta.get('title', '')
-
-    # ──────────────────────────────────────────────────────────
-    #  Release naming   (dot-separated, Torr9 convention)
-    # ──────────────────────────────────────────────────────────
-
-    async def get_name(self, meta: Meta) -> dict[str, str]:
-        """Build dot-separated release name for Torr9."""
-
-        def _dots(text: str) -> str:
-            return text.replace(' ', '.')
-
-        def _clean(name: str) -> str:
-            name = unidecode(name)
-            name = re.sub(r'[^a-zA-Z0-9 .+\-]', '', name)
-            return name
-
-        type_val = meta.get('type', '').upper()
-        title = await self._get_french_title(meta)
-        year = meta.get('year', '')
-        manual_year = meta.get('manual_year')
-        if manual_year is not None and int(manual_year) > 0:
-            year = manual_year
-
-        resolution = meta.get('resolution', '')
-        if resolution == 'OTHER':
-            resolution = ''
-        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '').replace('DD+', 'DDP')
-        language = await self._build_audio_string(meta)
-
-        service = meta.get('service', '')
-        season = meta.get('season', '')
-        episode = meta.get('episode', '')
-        part = meta.get('part', '')
-        repack = meta.get('repack', '')
-        three_d = meta.get('3D', '')
-        tag = meta.get('tag', '')
-        source = meta.get('source', '')
-        uhd = meta.get('uhd', '')
-        hdr = meta.get('hdr', '').replace('HDR10+', 'HDR10PLUS')
-        hybrid = 'Hybrid' if meta.get('webdv', '') else ''
-        edition = meta.get('edition', '')
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
-
-        video_codec = ''
-        video_encode = ''
-        region = ''
-        dvd_size = ''
-
-        if meta.get('is_disc') == 'BDMV':
-            video_codec = meta.get('video_codec', '').replace('H.264', 'H264').replace('H.265', 'H265')
-            region = meta.get('region', '') or ''
-        elif meta.get('is_disc') == 'DVD':
-            region = meta.get('region', '') or ''
-            dvd_size = meta.get('dvd_size', '')
-        else:
-            video_codec = meta.get('video_codec', '').replace('H.264', 'H264').replace('H.265', 'H265')
-            video_encode = meta.get('video_encode', '').replace('H.264', 'H264').replace('H.265', 'H265')
-
-        if meta['category'] == 'TV':
-            year = meta['year'] if meta.get('search_year', '') != '' else ''
-            if meta.get('manual_date'):
-                season = ''
-                episode = ''
-        if meta.get('no_season', False) is True:
-            season = ''
-        if meta.get('no_year', False) is True:
-            year = ''
-
-        name = ''
-
-        # ── MOVIE ──
-        if meta['category'] == 'MOVIE':
-            if type_val == 'DISC':
-                if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
-                elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
-                elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {edition} {repack} {language} {source} REMUX {audio}"
-            elif type_val == 'ENCODE':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
-            elif type_val == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB {hdr} {audio} {video_encode}"
-            elif type_val == 'WEBRIP':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
-            elif type_val == 'HDTV':
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif type_val == 'DVDRIP':
-                name = f"{title} {year} {language} {source} DVDRip {audio} {video_encode}"
-
-        # ── TV ──
-        elif meta['category'] == 'TV':
-            if type_val == 'DISC':
-                if meta.get('is_disc') == 'BDMV':
-                    name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
-                elif meta.get('is_disc') == 'DVD':
-                    name = f"{title} {year} {season}{episode} {three_d} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
-                elif meta.get('is_disc') == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {source} REMUX {audio}"
-            elif type_val == 'ENCODE':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
-            elif type_val == 'WEBDL':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB {hdr} {audio} {video_encode}"
-            elif type_val == 'WEBRIP':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
-            elif type_val == 'HDTV':
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif type_val == 'DVDRIP':
-                name = f"{title} {year} {season} {language} {source} DVDRip {audio} {video_encode}"
-
-        try:
-            name = ' '.join(name.split())
-        except Exception:
-            console.print("[bold red]TORR9: Unable to generate release name.[/bold red]")
-            return {'name': ''}
-
-        name_notag = name
-        name = name_notag + tag
-        clean_name = _clean(name)
-        dot_name = _dots(clean_name)
-
-        # Replace all hyphens with dots EXCEPT the last one (group tag separator)
-        last_dash = dot_name.rfind('-')
-        if last_dash > 0:
-            before_tag = dot_name[:last_dash].replace('-', '.')
-            dot_name = before_tag + dot_name[last_dash:]
-
-        # Remove isolated hyphens between dots (e.g. "Title.-.Subtitle" → "Title.Subtitle")
-        dot_name = re.sub(r'\.(-\.)+', '.', dot_name)
-        # Collapse consecutive dots and strip boundary dots
-        dot_name = re.sub(r'\.{2,}', '.', dot_name)
-        dot_name = dot_name.strip('.')
-
-        return {'name': dot_name}
 
     # ──────────────────────────────────────────────────────────
     #  Category / Subcategory  (exact strings from the upload form)
@@ -1326,7 +1026,7 @@ class TORR9:
         if meta.get('debug'):
             console.print(f"[cyan]TORR9 dupe search found {len(dupes)} result(s)[/cyan]")
 
-        return dupes
+        return await self._check_french_lang_dupes(dupes, meta)
 
     async def edit_desc(self, _meta: Meta) -> None:
         """No-op — TORR9 descriptions are built in upload()."""

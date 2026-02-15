@@ -273,6 +273,16 @@ class DupeChecker:
                 if entry.get('id'):
                     meta[matched_torrent_id] = entry.get('id')
 
+            # ── French tracker language hierarchy ──
+            # If a French tracker flagged this entry as having superior French
+            # audio (e.g., MULTI when the upload is VOSTFR), keep it as a
+            # dupe unconditionally — no other exclusion reason should drop it.
+            if 'french_lang_supersede' in flags:
+                if meta.get('debug'):
+                    console.log(f"[yellow]French language supersede — keeping as dupe: {each}")
+                remember_match('french_lang_supersede')
+                return False
+
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
             if tracker_name in ["AITHER", "LST"] and entry.get('trumpable', False) and res_id and target_resolution == res_id:
                 meta['trumpable_id'] = entry.get('id')
