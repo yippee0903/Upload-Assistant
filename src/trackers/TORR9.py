@@ -979,7 +979,6 @@ class TORR9(FrenchTrackerMixin):
                 async with aiofiles.open(torrent_path, 'wb') as f:
                     await f.write(torrent_bytes)
                 saved = True
-                console.print("[green]TORR9: saved tracker-generated torrent (base64).[/green]")
             except Exception as e:
                 console.print(f"[yellow]TORR9: base64 torrent decode failed: {e}[/yellow]")
 
@@ -1000,7 +999,6 @@ class TORR9(FrenchTrackerMixin):
                                 async for chunk in r.aiter_bytes():
                                     await f.write(chunk)
                     saved = True
-                    console.print("[green]TORR9: downloaded tracker-generated torrent.[/green]")
                 except Exception as e:
                     console.print(f"[yellow]TORR9: torrent download failed: {e}[/yellow]")
 
@@ -1014,7 +1012,7 @@ class TORR9(FrenchTrackerMixin):
     #  Dupe search
     # ──────────────────────────────────────────────────────────
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta, _: Any = None) -> list[dict[str, Any]]:
         """Search for existing torrents on Torr9.
 
         Torr9 API may support search — we try the standard path.
