@@ -209,20 +209,33 @@ class TORR9:
 
     @staticmethod
     def _extract_audio_languages(audio_tracks: list[dict[str, Any]], meta: Meta) -> list[str]:
+        lang_map: dict[str, str] = {
+            'fre': 'FRA', 'fra': 'FRA', 'fr': 'FRA', 'french': 'FRA',
+            'français': 'FRA', 'francais': 'FRA', 'fr-fr': 'FRA', 'fr-ca': 'FRA',
+            'eng': 'ENG', 'en': 'ENG', 'english': 'ENG', 'en-us': 'ENG', 'en-gb': 'ENG',
+            'spa': 'SPA', 'es': 'SPA', 'spanish': 'SPA', 'español': 'SPA',
+            'ger': 'DEU', 'deu': 'DEU', 'de': 'DEU', 'german': 'DEU', 'deutsch': 'DEU',
+            'ita': 'ITA', 'it': 'ITA', 'italian': 'ITA', 'italiano': 'ITA',
+            'por': 'POR', 'pt': 'POR', 'portuguese': 'POR', 'português': 'POR',
+            'jpn': 'JPN', 'ja': 'JPN', 'japanese': 'JPN',
+            'kor': 'KOR', 'ko': 'KOR', 'korean': 'KOR',
+            'chi': 'ZHO', 'zho': 'ZHO', 'zh': 'ZHO', 'chinese': 'ZHO',
+            'rus': 'RUS', 'ru': 'RUS', 'russian': 'RUS',
+            'ara': 'ARA', 'ar': 'ARA', 'arabic': 'ARA',
+            'hin': 'HIN', 'hi': 'HIN', 'hindi': 'HIN',
+        }
         langs: list[str] = []
         for track in audio_tracks:
-            lang = str(track.get('Language', '')).strip().upper()
+            lang = str(track.get('Language', '')).strip().lower()
             if not lang:
                 lang_title = str(track.get('Title', '')).strip().lower()
                 if any(k in lang_title for k in ('french', 'français', 'francais')):
-                    lang = 'FRA'
+                    lang = 'french'
                 elif any(k in lang_title for k in ('english', 'anglais')):
-                    lang = 'ENG'
-            if len(lang) == 2:
-                lang_map = {'FR': 'FRA', 'EN': 'ENG', 'JA': 'JPN', 'DE': 'DEU', 'ES': 'SPA', 'IT': 'ITA', 'PT': 'POR', 'RU': 'RUS', 'KO': 'KOR', 'ZH': 'ZHO'}
-                lang = lang_map.get(lang, lang)
-            if lang and lang not in langs:
-                langs.append(lang)
+                    lang = 'english'
+            mapped = lang_map.get(lang, lang.upper()[:3] if lang else '')
+            if mapped and mapped not in langs:
+                langs.append(mapped)
         return langs
 
     @staticmethod
