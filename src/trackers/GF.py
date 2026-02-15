@@ -4,6 +4,8 @@
 import re
 from typing import Any
 
+from unidecode import unidecode
+
 from src.console import console
 from src.nfo_generator import SceneNfoGenerator
 from src.trackers.COMMON import COMMON
@@ -129,10 +131,13 @@ class GF(FrenchTrackerMixin, UNIT3D):
 
         # Language-based types take priority
         language_tag = await self._build_audio_string(meta)
-        if language_tag == 'VOSTFR':
+        if 'VOSTFR' in language_tag:
             return {'type_id': '14'}
-        if language_tag == 'VO':
-            return {'type_id': '15'}
+        # VO: empty language tag but audio tracks present → no French content
+        if not language_tag:
+            audio_tracks = self._get_audio_tracks(meta)
+            if audio_tracks:
+                return {'type_id': '15'}
 
         # AV1 codec → dedicated type
         if 'AV1' in video_encode.upper():
@@ -224,193 +229,39 @@ class GF(FrenchTrackerMixin, UNIT3D):
         return True
 
     # ──────────────────────────────────────────────────────────
-    #  Audio tag (inherited pattern)
+    #  Cleaning override (GF forbids ALL special chars incl. +)
     # ──────────────────────────────────────────────────────────
 
-    async def _build_audio_string(self, meta: dict[str, Any]) -> str:
-        """Build the language tag following GF conventions.
+    @staticmethod
+    def _fr_clean(text: str) -> str:
+        """Strip accents and non-filename characters.
 
-        Tags: MUTE, MULTi [VFF|VFQ|VF2], FRENCH [VFQ], VOSTFR, VO
+        GF forbids *all* special characters including ``+``.
+        DD+ → DDP and HDR10+ → HDR10PLUS are handled upstream in
+        ``FrenchTrackerMixin.get_name`` before this function is called.
         """
-        if 'mediainfo' not in meta or 'media' not in meta.get('mediainfo', {}):
-            return ''
+        text = unidecode(text)
+        return re.sub(r'[^a-zA-Z0-9 .\-]', '', text)
 
-        audio_tracks = self._get_audio_tracks(meta)
+    def _format_name(self, raw_name: str) -> dict[str, str]:
+        """GF uses spaces as separators (not dots).
 
-        if not audio_tracks:
-            return 'MUTE'
-
-        audio_langs = self._extract_audio_languages(audio_tracks, meta)
-        if not audio_langs:
-            return ''
-
-        has_french_audio = 'FRA' in audio_langs
-        has_french_subs = self._has_french_subs(meta)
-        num_audio_tracks = len(audio_tracks)
-        fr_suffix = self._get_french_dub_suffix(audio_tracks)
-
-        # MULTi – 2+ audio tracks with at least 1 French
-        if num_audio_tracks >= 2 and has_french_audio:
-            if fr_suffix:
-                return f'MULTi {fr_suffix}'
-            return 'MULTi'
-
-        # FRENCH – 1 audio track, it's French
-        if num_audio_tracks == 1 and has_french_audio:
-            if fr_suffix == 'VFQ':
-                return 'FRENCH VFQ'
-            return 'FRENCH'
-
-        # VOSTFR – No French audio but French subtitles present
-        if not has_french_audio and has_french_subs:
-            return 'VOSTFR'
-
-        # VO – No French content at all
-        if not has_french_audio and not has_french_subs:
-            return 'VO'
-
-        return ''
-
-    # ──────────────────────────────────────────────────────────
-    #  Release name (GF naming conventions)
-    # ──────────────────────────────────────────────────────────
-
-    async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
-        """Build GF-compliant dot-separated release name.
-
-        Structure (films):
-            TITRE.ANNÉE.TAG.LANGUE.HDR.RÉSOLUTION.SOURCE.CODEC_VIDEO.CODEC_AUDIO-TEAM
-
-        Structure (series):
-            TITRE.ANNÉE?.SxxExx.TAG.LANGUE.HDR.RÉSOLUTION.SOURCE.CODEC_VIDEO.CODEC_AUDIO-TEAM
-
-        Rules from https://generation-free.org/forums/33:
-        - No accents, brackets, underscores, quotes
-        - LANGUE: FRENCH / VOSTFR / MULTi / SUBFRENCH (uppercase)
-        - SOURCE: WEBRiP, DVDRiP, BluRay, WEB…
-        - Codec video: x264 / x265
-        - Codec audio: AAC / AC3 / FLAC / DTS
-        - Team: -Name or -NoTag
+        Dots inside audio channel counts (e.g. ``5.1``, ``7.1``) are
+        preserved because they are flanked by digits.
         """
+        clean = self._fr_clean(raw_name)
 
-        def _clean(text: str) -> str:
-            """Strip non-alphanumeric chars except spaces, dots, hyphens, and +."""
-            return re.sub(r'[^a-zA-Z0-9 .+\-]', '', text)
+        # Replace dots NOT between digits (keep 5.1, 7.1, 2.0 …)
+        clean = re.sub(r'(?<!\d)\.(?!\d)', ' ', clean)
 
-        meta_type = meta.get('type', '').upper()
-        title = meta.get('title', '')
-        year = meta.get('year', '')
-        manual_year = meta.get('manual_year')
-        if manual_year is not None and int(manual_year) > 0:
-            year = manual_year
-        resolution = meta.get('resolution', '')
-        if resolution == 'OTHER':
-            resolution = ''
-        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '')
-        language = await self._build_audio_string(meta)
-        service = meta.get('service', '')
-        season = meta.get('season', '')
-        episode = meta.get('episode', '')
-        part = meta.get('part', '')
-        repack = meta.get('repack', '')
-        three_d = meta.get('3D', '')
-        tag = meta.get('tag', '')
-        source = meta.get('source', '')
-        uhd = meta.get('uhd', '')
-        hdr = meta.get('hdr', '')
-        hybrid = 'Hybrid' if meta.get('webdv', '') else ''
-        edition = meta.get('edition', '')
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
+        # Keep only the LAST hyphen (group-tag separator)
+        idx = clean.rfind('-')
+        if idx > 0:
+            clean = clean[:idx].replace('-', ' ') + clean[idx:]
 
-        video_codec = ''
-        video_encode = ''
-        region = ''
-        dvd_size = ''
+        # Remove isolated hyphens between spaces
+        clean = re.sub(r' (- )+', ' ', clean)
+        # Collapse multiple spaces
+        clean = re.sub(r' {2,}', ' ', clean).strip()
 
-        if meta.get('is_disc', '') == 'BDMV':
-            video_codec = meta.get('video_codec', '')
-            region = meta.get('region', '') or ''
-        elif meta.get('is_disc', '') == 'DVD':
-            region = meta.get('region', '') or ''
-            dvd_size = meta.get('dvd_size', '')
-        else:
-            video_codec = meta.get('video_codec', '')
-            video_encode = meta.get('video_encode', '')
-
-        # TV-specific year handling
-        if meta['category'] == 'TV':
-            year = meta['year'] if meta.get('search_year', '') != '' else ''
-            if meta.get('manual_date'):
-                season = ''
-                episode = ''
-        if meta.get('no_season', False) is True:
-            season = ''
-        if meta.get('no_year', False) is True:
-            year = ''
-
-        name = ''
-
-        if meta['category'] == 'MOVIE':
-            if meta_type == 'DISC':
-                if meta['is_disc'] == 'BDMV':
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-                elif meta['is_disc'] == 'DVD':
-                    name = f"{title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                elif meta['is_disc'] == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
-            elif meta_type == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
-            elif meta_type == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {edition} {repack} {source} REMUX {audio}"
-            elif meta_type == 'ENCODE':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-            elif meta_type == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} {self.WEB_LABEL} {audio} {hdr} {video_encode}"
-            elif meta_type == 'WEBRIP':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
-            elif meta_type == 'HDTV':
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif meta_type == 'DVDRIP':
-                name = f"{title} {year} {source} {video_encode} DVDRip {audio}"
-
-        elif meta['category'] == 'TV':
-            if meta_type == 'DISC':
-                if meta['is_disc'] == 'BDMV':
-                    name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
-                elif meta['is_disc'] == 'DVD':
-                    name = f"{title} {year} {season}{episode} {three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                elif meta['is_disc'] == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
-            elif meta_type == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
-            elif meta_type == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {source} REMUX {audio}"
-            elif meta_type == 'ENCODE':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-            elif meta_type == 'WEBDL':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} {self.WEB_LABEL} {audio} {hdr} {video_encode}"
-            elif meta_type == 'WEBRIP':
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
-            elif meta_type == 'HDTV':
-                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif meta_type == 'DVDRIP':
-                name = f"{title} {year} {season} {source} DVDRip {audio} {video_encode}"
-
-        if not name:
-            console.print('[bold red]Unable to generate name for GF. Check --category / --type / --source.[/bold red]')
-            return {'name': ''}
-
-        name = ' '.join(name.split())
-        name_notag = name
-        name = name_notag + tag
-
-        clean_name = _clean(name)
-        dot_name = clean_name.replace(' ', '.')
-        # Remove isolated hyphens between dots (e.g. "Chainsaw.Man.-.The.Movie")
-        dot_name = re.sub(r'\.(-\.)+', '.', dot_name)
-        # Collapse consecutive dots and strip boundary dots
-        dot_name = re.sub(r'\.{2,}', '.', dot_name)
-        dot_name = dot_name.strip('.')
-
-        return {'name': dot_name}
+        return {'name': clean}

@@ -574,11 +574,17 @@ class FrenchTrackerMixin:
 
         # ── Post-processing ──
         name = ' '.join(name.split())  # collapse whitespace
-        name_notag = name
-        name = name_notag + tag  # tag starts with '-', no space needed
+        name = name + tag              # tag starts with '-', no space needed
 
-        clean_name = self._fr_clean(name)
-        dot_name = clean_name.replace(' ', '.')
+        return self._format_name(name)
+
+    def _format_name(self, raw_name: str) -> dict[str, str]:
+        """Clean and format the release name (dot-separated by default).
+
+        Subclasses may override this to change the separator (e.g. spaces).
+        """
+        clean = self._fr_clean(raw_name)
+        dot_name = clean.replace(' ', '.')
 
         # Keep only the LAST hyphen (group-tag separator)
         idx = dot_name.rfind('-')
