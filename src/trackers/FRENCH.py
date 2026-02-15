@@ -128,6 +128,10 @@ class FrenchTrackerMixin:
     # e.g. "WEB" (C411/TORR9/LACALE) vs "WEB-DL" (G3MINI)
     WEB_LABEL: str = 'WEB'
 
+    # Whether to include the streaming service name (NF, AMZN, …) in the release name.
+    # Set to False for trackers that want the service only in the description.
+    INCLUDE_SERVICE_IN_NAME: bool = True
+
     # ──────────────────────────────────────────────────────────
     #  Audio-track helpers
     # ──────────────────────────────────────────────────────────
@@ -467,7 +471,7 @@ class FrenchTrackerMixin:
         if resolution == 'OTHER':
             resolution = ''
         audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '').replace('DD+', 'DDP')
-        service = meta.get('service', '')
+        service = meta.get('service', '') if self.INCLUDE_SERVICE_IN_NAME else ''
         season = meta.get('season', '')
         episode = meta.get('episode', '')
         part = meta.get('part', '')

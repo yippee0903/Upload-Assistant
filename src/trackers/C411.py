@@ -54,6 +54,10 @@ class C411(FrenchTrackerMixin):
     # _detect_truefrench, _detect_vfi, _get_french_title, get_name
     # ──────────────────────────────────────────────────────────
 
+    # C411 does not want the streaming service (NF, AMZN, …) in release names;
+    # it should appear in the description instead.
+    INCLUDE_SERVICE_IN_NAME: bool = False
+
 
     # ──────────────────────────────────────────────────────────
     #  C411 API field mapping
@@ -464,6 +468,11 @@ class C411(FrenchTrackerMixin):
         # Source
         source = meta.get('source', '') or meta.get('type', '')
         tech_lines.append(f"[b][color={C}]Source :[/color][/b] {source}" if source else f"[b][color={C}]Source :[/color][/b]")
+
+        # Streaming service (NF, AMZN, DSNP, …) — not in release name, shown here
+        service = meta.get('service', '')
+        if service:
+            tech_lines.append(f"[b][color={C}]Service :[/color][/b] {service}")
 
         # Resolution
         resolution = meta.get('resolution', '')
@@ -1041,7 +1050,7 @@ class C411(FrenchTrackerMixin):
             console.print(f"[red]C411 upload error: {e}[/red]")
             return False
 
-    async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta, _: Any = None) -> list[dict[str, Any]]:
         """Search for existing torrents on C411 via its Torznab API.
 
         Torznab endpoint: GET https://c411.org/api?t=search&q=QUERY&apikey=KEY
