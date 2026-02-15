@@ -39,6 +39,7 @@ from src.trackers.FL import FL
 from src.trackers.FNP import FNP
 from src.trackers.FRIKI import FRIKI
 from src.trackers.G3MINI import G3MINI
+from src.trackers.GF import GF
 from src.trackers.GPW import GPW
 from src.trackers.HDB import HDB
 from src.trackers.HDS import HDS
@@ -1341,14 +1342,14 @@ class TRACKER_SETUP:
 
 tracker_class_map: dict[str, type[Any]] = {
     'A4K': A4K, 'ACM': ACM, 'AITHER': AITHER, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'C411': C411, 'CBR': CBR,
-    'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'G3MINI': G3MINI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
+    'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'G3MINI': G3MINI, 'GF': GF, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
     'IHD': IHD, 'IS': IS, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TORR9': TORR9, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
 
 api_trackers = {
-    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'DP', 'DT', 'EMUW', 'FNP', 'FRIKI', 'HHD', 'G3MINI', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
+    'A4K', 'ACM', 'AITHER', 'BHD', 'BLU', 'CBR', 'DP', 'DT', 'EMUW', 'FNP', 'FRIKI', 'HHD', 'G3MINI', 'GF', 'HUNO', 'IHD', 'ITT', 'LCD', 'LDU', 'LST', 'LT', 'LUME',
     'OE', 'OTW', 'PT', 'PTT', 'RAS', 'RF', 'R4E', 'SAM', 'SHRI', 'SP', 'STC', 'TIK', 'TLZ', 'TOS', 'TTR', 'ULCX', 'UTP', 'YOINK', 'YUS'
 }
 
@@ -1365,7 +1366,7 @@ http_trackers = {
 nfo_skip_trackers = frozenset({'DP', 'FNP', 'HHD', 'LST', 'LUME', 'STC', 'ULCX'})
 
 # Trackers that accept releases without a group tag, mapped to their replacement label
-notag_labels: dict[str, str] = {'C411': 'NOTAG', 'FNP': 'NOGROUP', 'G3MINI': 'NoGrP'}
+notag_labels: dict[str, str] = {'C411': 'NOTAG', 'FNP': 'NOGROUP', 'G3MINI': 'NoGrP', 'GF': 'NoTag'}
 
 # Trackers that skip the English audio/subtitle requirement check
-english_check_skip_trackers = frozenset({'C411', 'G3MINI', 'TOS', 'TORR9'})
+english_check_skip_trackers = frozenset({'C411', 'G3MINI', 'GF', 'TOS', 'TORR9'})

@@ -366,7 +366,7 @@ config = {
         # Automatically add trackers when specific audio or subtitle languages are detected.
         # Map language names (as they appear in MediaInfo) to a comma-separated list of trackers.
         # These trackers will be appended to the active tracker list (duplicates are ignored).
-        # Example: {"French": "G3MINI, TOS", "German": "HDT"}
+        # Example: {"French": "G3MINI, GF, TOS", "German": "HDT"}
         "language_based_trackers": {},
 
         "A4K": {
@@ -585,6 +585,15 @@ config = {
             "api_key": "",
             # Mon profil > Réglages > Passkey
             "announce_url": "https://gemini-tracker.org/announce/PasskeyHere",
+            "anon": False,
+        },
+        "GF": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Mon profil > Réglages > Clé API
+            "api_key": "",
+            # Mon profil > Réglages > Passkey
+            "announce_url": "https://generation-free.org/announce/PasskeyHere",
             "anon": False,
         },
         "GPW": {
