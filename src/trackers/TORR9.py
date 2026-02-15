@@ -1015,8 +1015,10 @@ class TORR9(FrenchTrackerMixin):
     async def search_existing(self, meta: Meta, _: Any = None) -> list[dict[str, Any]]:
         """Search for existing torrents on Torr9.
 
-        Torr9 API may support search — we try the standard path.
-        If not available, we return an empty list (no dupe check).
+        Uses the dedicated ``/api/v1/torrents/search?q=…`` endpoint which
+        performs a title-based search.  The generic ``/api/v1/torrents``
+        listing endpoint ignores the ``q`` parameter and just returns
+        paginated results.
         """
         dupes: list[dict[str, Any]] = []
 
@@ -1037,11 +1039,11 @@ class TORR9(FrenchTrackerMixin):
                 'Authorization': f'Bearer {token}',
                 'Accept': 'application/json',
             }
-            params = {'q': search_term}
+            params: dict[str, str] = {'q': search_term}
 
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(
-                    'https://api.torr9.xyz/api/v1/torrents',
+                    'https://api.torr9.xyz/api/v1/torrents/search',
                     headers=headers,
                     params=params,
                 )
@@ -1056,8 +1058,9 @@ class TORR9(FrenchTrackerMixin):
             except json.JSONDecodeError:
                 return []
 
-            # Handle both list and paginated response formats
-            items = data if isinstance(data, list) else data.get('data', data.get('torrents', []))
+            items = data.get('torrents', data.get('data', []))
+            if items is None:
+                items = []
 
             # Normalize the search title for relevance filtering
             def _normalize(s: str) -> str:
@@ -1086,7 +1089,7 @@ class TORR9(FrenchTrackerMixin):
 
                 dupes.append({
                     'name': name,
-                    'size': item.get('size'),
+                    'size': item.get('size', item.get('file_size_bytes')),
                     'link': item.get('url', item.get('link')),
                     'id': item.get('id', item.get('torrent_id')),
                 })
