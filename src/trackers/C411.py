@@ -248,7 +248,8 @@ class C411:
         """Get French title from TMDB, cached in meta['frtitle'].
 
         Uses the TMDB localized endpoint to fetch the French title.
-        Falls back to the original English title if unavailable.
+        If TMDB returns the original-language title (no actual French translation),
+        falls back to the English title from meta['title'].
         """
         if meta.get('frtitle'):
             return meta['frtitle']
@@ -258,7 +259,13 @@ class C411:
                 meta, data_type='main', language='fr', append_to_response=''
             ) or {}
             fr_title = str(fr_data.get('title', '') or fr_data.get('name', '')).strip()
-            if fr_title:
+            # TMDB returns original_title/original_name when no translation exists;
+            # in that case the "French" title is really the original-language title,
+            # so we should fall back to the English title instead.
+            # Exception: if the work is originally French, original == fr is correct.
+            original = str(fr_data.get('original_title', '') or fr_data.get('original_name', '')).strip()
+            orig_lang = str(fr_data.get('original_language', '')).strip().lower()
+            if fr_title and (fr_title != original or orig_lang == 'fr'):
                 meta['frtitle'] = fr_title
                 return fr_title
         except Exception:

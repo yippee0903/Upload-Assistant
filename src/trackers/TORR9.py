@@ -267,7 +267,11 @@ class TORR9:
     # ──────────────────────────────────────────────────────────
 
     async def _get_french_title(self, meta: Meta) -> str:
-        """Get French title from TMDB, cached in meta['frtitle']."""
+        """Get French title from TMDB, cached in meta['frtitle'].
+
+        If TMDB returns the original-language title (no actual French translation),
+        falls back to the English title from meta['title'].
+        """
         if meta.get('frtitle'):
             return meta['frtitle']
 
@@ -276,7 +280,10 @@ class TORR9:
                 meta, data_type='main', language='fr', append_to_response=''
             ) or {}
             fr_title = str(fr_data.get('title', '') or fr_data.get('name', '')).strip()
-            if fr_title:
+            # If fr_title == original_title but the work is originally French, keep it.
+            original = str(fr_data.get('original_title', '') or fr_data.get('original_name', '')).strip()
+            orig_lang = str(fr_data.get('original_language', '')).strip().lower()
+            if fr_title and (fr_title != original or orig_lang == 'fr'):
                 meta['frtitle'] = fr_title
                 return fr_title
         except Exception:
