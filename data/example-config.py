@@ -672,6 +672,17 @@ config = {
             "api_key": "",
             "anon": False,
         },
+        "LACALE": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # la-cale.space — French private tracker (custom API)
+            # Get your API key from your la-cale.space account settings
+            "api_key": "",
+            # Announce URL with your passkey — found in your la-cale.space profile
+            "announce_url": "https://la-cale.space/announce/YOUR_PASSKEY",
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
+        },
         "LCD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",

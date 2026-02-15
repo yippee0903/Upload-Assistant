@@ -48,6 +48,7 @@ from src.trackers.HUNO import HUNO
 from src.trackers.IHD import IHD
 from src.trackers.IS import IS
 from src.trackers.ITT import ITT
+from src.trackers.LACALE import LACALE
 from src.trackers.LCD import LCD
 from src.trackers.LDU import LDU
 from src.trackers.LST import LST
@@ -1342,7 +1343,7 @@ class TRACKER_SETUP:
 tracker_class_map: dict[str, type[Any]] = {
     'A4K': A4K, 'ACM': ACM, 'AITHER': AITHER, 'ANT': ANT, 'AR': AR, 'ASC': ASC, 'AZ': AZ, 'BHD': BHD, 'BHDTV': BHDTV, 'BJS': BJS, 'BLU': BLU, 'BT': BT, 'C411': C411, 'CBR': CBR,
     'CZ': CZ, 'DC': DC, 'DP': DP, 'DT': DT, 'EMUW': EMUW, 'FNP': FNP, 'FF': FF, 'FL': FL, 'FRIKI': FRIKI, 'G3MINI': G3MINI, 'GPW': GPW, 'HDB': HDB, 'HDS': HDS, 'HDT': HDT, 'HHD': HHD, 'HUNO': HUNO, 'ITT': ITT,
-    'IHD': IHD, 'IS': IS, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
+    'IHD': IHD, 'IS': IS, 'LACALE': LACALE, 'LCD': LCD, 'LDU': LDU, 'LST': LST, 'LT': LT, 'LUME': LUME, 'MTV': MTV, 'NBL': NBL, 'OE': OE, 'OTW': OTW, 'PHD': PHD, 'PT': PT, 'PTP': PTP, 'PTER': PTER, 'PTS': PTS, 'PTT': PTT,
     'R4E': R4E, 'RAS': RAS, 'RF': RF, 'RTF': RTF, 'SAM': SAM, 'SHRI': SHRI, 'SN': SN, 'SP': SP, 'SPD': SPD, 'STC': STC, 'THR': THR,
     'TIK': TIK, 'TL': TL, 'TLZ': TLZ, 'TORR9': TORR9, 'TOS': TOS, 'TVC': TVC, 'TTG': TTG, 'TTR': TTR, 'ULCX': ULCX, 'UTP': UTP, 'YOINK': YOINK, 'YUS': YUS
 }
@@ -1353,7 +1354,7 @@ api_trackers = {
 }
 
 other_api_trackers = {
-    'ANT', 'BHDTV', 'C411', 'DC', 'GPW', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TORR9', 'TVC'
+    'ANT', 'BHDTV', 'C411', 'DC', 'GPW', 'LACALE', 'NBL', 'RTF', 'SN', 'SPD', 'TL', 'TORR9', 'TVC'
 }
 
 http_trackers = {
@@ -1368,4 +1369,4 @@ nfo_skip_trackers = frozenset({'DP', 'FNP', 'HHD', 'LST', 'LUME', 'STC', 'ULCX'}
 notag_labels: dict[str, str] = {'C411': 'NOTAG', 'FNP': 'NOGROUP', 'G3MINI': 'NoGrP'}
 
 # Trackers that skip the English audio/subtitle requirement check
-english_check_skip_trackers = frozenset({'C411', 'G3MINI', 'TOS', 'TORR9'})
+english_check_skip_trackers = frozenset({'C411', 'G3MINI', 'LACALE', 'TOS', 'TORR9'})
