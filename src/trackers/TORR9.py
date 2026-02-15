@@ -14,6 +14,7 @@ API docs reverse-engineered from:
 """
 
 import asyncio
+import base64
 import glob
 import json
 import os
@@ -838,6 +839,14 @@ class TORR9(FrenchTrackerMixin):
                                 if torrent_id:
                                     meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
                                 meta['tracker_status'][self.tracker]['status_message'] = response_data
+
+                                # Download the tracker-generated torrent file
+                                # (the site may randomise the infohash, so
+                                #  the locally-created .torrent is invalid)
+                                await self._save_tracker_torrent(
+                                    response_data, torrent_path, headers,
+                                )
+
                                 return True
                             except json.JSONDecodeError:
                                 meta['tracker_status'][self.tracker]['status_message'] = (
@@ -935,6 +944,71 @@ class TORR9(FrenchTrackerMixin):
             meta['tracker_status'][self.tracker]['status_message'] = f"data error: Upload failed: {e}"
             console.print(f"[red]TORR9 upload error: {e}[/red]")
             return False
+
+    # ──────────────────────────────────────────────────────────
+    #  Download tracker-generated torrent
+    # ──────────────────────────────────────────────────────────
+
+    async def _save_tracker_torrent(
+        self,
+        response_data: dict[str, Any],
+        torrent_path: str,
+        headers: dict[str, str],
+    ) -> None:
+        """Replace the local .torrent with the tracker-generated one.
+
+        TORR9 may randomise the infohash server-side, so the locally
+        created torrent file is no longer valid for client injection.
+
+        Strategy (mirrors the reference *ntt-torr9up* script):
+        1. Try base64-decoding ``response_data['torrent_file']``.
+        2. Fall back to downloading from ``response_data['download_url']``.
+        """
+        saved = False
+
+        # ── 1. base64-encoded torrent in the response ────────
+        b64 = response_data.get('torrent_file') or ''
+        if b64:
+            try:
+                raw = b64.strip()
+                # Pad to a multiple of 4 if necessary
+                pad = len(raw) % 4
+                if pad:
+                    raw += '=' * (4 - pad)
+                torrent_bytes = base64.b64decode(raw)
+                async with aiofiles.open(torrent_path, 'wb') as f:
+                    await f.write(torrent_bytes)
+                saved = True
+                console.print("[green]TORR9: saved tracker-generated torrent (base64).[/green]")
+            except Exception as e:
+                console.print(f"[yellow]TORR9: base64 torrent decode failed: {e}[/yellow]")
+
+        # ── 2. Fallback: download from URL ───────────────────
+        if not saved:
+            download_url = response_data.get('download_url') or ''
+            if download_url:
+                # Make absolute if the API returns a relative path
+                if download_url.startswith('/'):
+                    download_url = f"https://api.torr9.xyz{download_url}"
+                try:
+                    async with httpx.AsyncClient(
+                        headers=headers, timeout=30.0, follow_redirects=True,
+                    ) as client:
+                        async with client.stream('GET', download_url) as r:
+                            r.raise_for_status()
+                            async with aiofiles.open(torrent_path, 'wb') as f:
+                                async for chunk in r.aiter_bytes():
+                                    await f.write(chunk)
+                    saved = True
+                    console.print("[green]TORR9: downloaded tracker-generated torrent.[/green]")
+                except Exception as e:
+                    console.print(f"[yellow]TORR9: torrent download failed: {e}[/yellow]")
+
+        if not saved:
+            console.print(
+                "[yellow]TORR9: could not obtain tracker torrent — "
+                "client injection may use a stale infohash.[/yellow]"
+            )
 
     # ──────────────────────────────────────────────────────────
     #  Dupe search
