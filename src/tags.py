@@ -52,7 +52,7 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             release_group = non_anime_match.group(1).strip()
             if "Z0N3" in release_group:
                 release_group = release_group.replace("Z0N3", "D-Z0N3")
-            if not meta.get('scene', False) and release_group and len(release_group) > 12:
+            if not meta.get('scene', False) and release_group and len(release_group) > 25:
                 release_group = None
             if meta['debug']:
                 console.print(f"Non-anime regex match: {release_group}")
