@@ -268,8 +268,10 @@ class TORR9(FrenchTrackerMixin):
         year = meta.get('year', '')
         tagline = str(fr_data.get('tagline', '')).strip()
 
-        # Full-size poster (original)
+        # Full-size poster (w500)
         poster = meta.get('poster', '') or ''
+        if 'image.tmdb.org/t/p/' in poster:
+            poster = re.sub(r'/t/p/[^/]+/', '/t/p/w500/', poster)
 
         # MI text for technical parsing
         mi_text = await self._get_mediainfo_text(meta)
@@ -278,9 +280,7 @@ class TORR9(FrenchTrackerMixin):
         parts.append('[center]')
 
         # ── Title block ──
-        parts.append(f'[b][font=Verdana][color={C}][size=29]{fr_title}[/size]')
-        parts.append('')
-        parts.append(f'[size=18]({year})[/size][/color][/font][/b]')
+        parts.append(f'[b][font=Verdana][color={C}][size=29]{fr_title} ({year})[/size][/color][/font][/b]')
         parts.append('')
 
         # ── Poster (original size) ──
@@ -298,7 +298,6 @@ class TORR9(FrenchTrackerMixin):
         #  Informations
         # ══════════════════════════════════════════════════════
         parts.append(f'[b][font=Verdana][color={C}][size=18]━━━ Informations ━━━[/size][/color][/font][/b]')
-        parts.append('')
 
         # Open content wrapper
         parts.append('[font=Verdana][size=13]')
@@ -350,13 +349,31 @@ class TORR9(FrenchTrackerMixin):
         cast = credits.get('cast', []) if isinstance(credits, dict) else []
 
         directors = [p['name'] for p in crew if isinstance(p, dict) and p.get('job') == 'Director' and p.get('name')]
+        if not directors:
+            meta_dirs = meta.get('tmdb_directors', [])
+            if isinstance(meta_dirs, list):
+                directors = [d.get('name', d) if isinstance(d, dict) else str(d) for d in meta_dirs]
         if directors:
             label = 'Réalisateur' if len(directors) == 1 else 'Réalisateurs'
             parts.append(f'[b][color={C}]{label} :[/color][/b] [i]{", ".join(directors)}[/i]')
 
+        # Scénaristes
+        seen_w: set[str] = set()
+        writers: list[str] = []
+        for p in crew:
+            if isinstance(p, dict) and p.get('job') in ('Screenplay', 'Writer', 'Story') and p.get('name') and p['name'] not in seen_w:
+                writers.append(p['name'])
+                seen_w.add(p['name'])
+        if writers:
+            w_label = 'Scénariste' if len(writers) == 1 else 'Scénaristes'
+            parts.append(f'[b][color={C}]{w_label} :[/color][/b] [i]{", ".join(writers)}[/i]')
+
         actors = [p['name'] for p in cast[:5] if isinstance(p, dict) and p.get('name')]
         if actors:
             parts.append(f'[b][color={C}]Acteurs :[/color][/b] [i]{", ".join(actors)}[/i]')
+
+        # Blank line before rating/links
+        parts.append('')
 
         # Actor profile photos (w185 thumbnails)
         actor_photos = []
@@ -396,17 +413,19 @@ class TORR9(FrenchTrackerMixin):
         #  Synopsis
         # ══════════════════════════════════════════════════════
         parts.append(f'[b][color={C}][size=18]━━━ Synopsis ━━━[/size][/color][/b]')
-        parts.append('')
         synopsis = fr_overview or str(meta.get('overview', '')).strip() or 'Aucun synopsis disponible.'
         parts.append(synopsis)
-        parts.append('')
         parts.append('')
 
         # ══════════════════════════════════════════════════════
         #  Informations techniques
         # ══════════════════════════════════════════════════════
         parts.append(f'[b][color={C}][size=18]━━━ Informations techniques ━━━[/size][/color][/b]')
-        parts.append('')
+
+        # Type (Remux, Encode, WEB-DL, …)
+        type_label = self._get_type_label(meta)
+        if type_label:
+            parts.append(f'[b][color={C}]Type :[/color][/b] [i]{type_label}[/i]')
 
         # Source
         source_str = meta.get('source', '') or meta.get('type', '')
@@ -416,17 +435,22 @@ class TORR9(FrenchTrackerMixin):
         # Resolution
         resolution = meta.get('resolution', '')
         if resolution:
-            parts.append(f'[b][color={C}]Qualité vidéo :[/color][/b] [i]{resolution}[/i]')
+            parts.append(f'[b][color={C}]Résolution :[/color][/b] [i]{resolution}[/i]')
 
         # Container format from MI
-        container = self._parse_mi_container(mi_text)
-        if container:
-            parts.append(f'[b][color={C}]Format vidéo :[/color][/b] [i]{container.upper()}[/i]')
+        container_display = self._format_container(mi_text)
+        if container_display:
+            parts.append(f'[b][color={C}]Format vidéo :[/color][/b] [i]{container_display}[/i]')
 
         # Video codec
         video_codec = meta.get('video_codec', '') or meta.get('video_encode', '')
         if video_codec:
             parts.append(f'[b][color={C}]Codec vidéo :[/color][/b] [i]{video_codec}[/i]')
+
+        # HDR / Dolby Vision
+        hdr_dv_badge = self._format_hdr_dv_bbcode(meta)
+        if hdr_dv_badge:
+            parts.append(f'[b][color={C}]HDR :[/color][/b] {hdr_dv_badge}')
 
         # Video bitrate from MI
         if mi_text:
@@ -437,20 +461,24 @@ class TORR9(FrenchTrackerMixin):
         parts.append('')
 
         # ── Audio tracks ──
+        parts.append(f'[b][color={C}][size=18]━━━ Audio(s) ━━━[/size][/color][/b]')
         audio_lines = self._format_audio_bbcode(mi_text)
         if audio_lines:
-            parts.append(f'[b][color={C}]Audio(s) :[/color][/b]')
             for al in audio_lines:
                 parts.append(f' {al}')
-            parts.append('')
+        else:
+            parts.append(' [i]Non spécifié[/i]')
+        parts.append('')
 
         # ── Subtitles ──
+        parts.append(f'[b][color={C}][size=18]━━━ Sous-titre(s) ━━━[/size][/color][/b]')
         sub_lines = self._format_subtitle_bbcode(mi_text)
         if sub_lines:
-            parts.append(f'[b][color={C}]Sous-titres :[/color][/b]')
             for sl in sub_lines:
                 parts.append(f' {sl}')
-            parts.append('')
+        else:
+            parts.append(' [i]Aucun[/i]')
+        parts.append('')
 
         # ══════════════════════════════════════════════════════
         #  Captures d'écran  (opt-in via config: include_screenshots)
@@ -459,7 +487,6 @@ class TORR9(FrenchTrackerMixin):
         image_list: list[dict[str, Any]] = meta.get('image_list', []) if include_screens else []
         if image_list:
             parts.append(f'[b][color={C}][size=18]━━━ Captures d\'écran ━━━[/size][/color][/b]')
-            parts.append('')
             for img in image_list:
                 raw = img.get('raw_url', '')
                 web = img.get('web_url', '')
@@ -474,10 +501,9 @@ class TORR9(FrenchTrackerMixin):
         #  Release
         # ══════════════════════════════════════════════════════
         parts.append(f'[b][color={C}][size=18]━━━ Release ━━━[/size][/color][/b]')
-        parts.append('')
 
         release_name = meta.get('uuid', '')
-        parts.append(f'[b][color={C}]Release :[/color][/b] [i]{release_name}[/i]')
+        parts.append(f'[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]')
 
         # Total size
         if mi_text:
@@ -489,6 +515,11 @@ class TORR9(FrenchTrackerMixin):
         file_count = self._count_files(meta)
         if file_count:
             parts.append(f'[b][color={C}]Nombre de fichier :[/color][/b] {file_count}')
+
+        # Release group
+        group = self._get_release_group(meta)
+        if group:
+            parts.append(f'[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]')
 
         # Close content wrapper
         parts.append('[/size][/font]')
@@ -532,22 +563,6 @@ class TORR9(FrenchTrackerMixin):
             return f"{day_str} {FRENCH_MONTHS[dt.month]} {dt.year}"
         except (ValueError, IndexError):
             return date_str
-
-    @staticmethod
-    def _parse_mi_container(mi_text: str) -> str:
-        """Extract container format from MI General section."""
-        if not mi_text:
-            return ''
-        for line in mi_text.split('\n'):
-            stripped = line.strip()
-            if stripped.startswith('Format') and ':' in stripped and 'profile' not in stripped.lower():
-                match = re.search(r':\s*(.+)', stripped)
-                if match:
-                    return match.group(1).strip()
-            # Stop after General section
-            if stripped in ('Video', 'Audio', 'Text', 'Menu') or stripped.startswith('Video'):
-                break
-        return ''
 
     @staticmethod
     def _count_files(meta: Meta) -> str:

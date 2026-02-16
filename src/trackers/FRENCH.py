@@ -775,6 +775,98 @@ class FrenchTrackerMixin:
             return 'VobSub'
         return fmt
 
+    # ── Release type labels ───────────────────────────────────────────
+    TYPE_LABELS: dict[str, str] = {
+        'DISC':    'Disc',
+        'REMUX':   'Remux',
+        'ENCODE':  'Encode',
+        'WEBDL':   'WEB-DL',
+        'WEBRIP':  'WEBRip',
+        'HDTV':    'HDTV',
+        'DVDRIP':  'DVDRip',
+    }
+
+    @staticmethod
+    def _get_type_label(meta: dict) -> str:
+        """Return a human-readable release type label."""
+        raw = (meta.get('type') or '').upper()
+        return FrenchTrackerMixin.TYPE_LABELS.get(raw, raw)
+
+    # Container name → common file extension
+    CONTAINER_EXT: dict[str, str] = {
+        'MATROSKA':  'MKV',
+        'AVI':       'AVI',
+        'MPEG-4':    'MP4',
+        'MPEG-TS':   'TS',
+        'BDAV':      'M2TS',
+        'WEBM':      'WEBM',
+        'OGG':       'OGG',
+        'FLASH VIDEO': 'FLV',
+        'WINDOWS MEDIA': 'WMV',
+    }
+
+    @staticmethod
+    def _parse_mi_container(mi_text: str) -> str:
+        """Extract container format from the MI General section."""
+        if not mi_text:
+            return ''
+        for line in mi_text.split('\n'):
+            stripped = line.strip()
+            if stripped.startswith('Format') and ':' in stripped and 'profile' not in stripped.lower():
+                match = re.search(r':\s*(.+)', stripped)
+                if match:
+                    return match.group(1).strip()
+            # Stop after General section
+            if stripped in ('Video', 'Audio', 'Text', 'Menu') or stripped.startswith('Video'):
+                break
+        return ''
+
+    @classmethod
+    def _format_container(cls, mi_text: str) -> str:
+        """Return container with file extension, e.g. 'MATROSKA (MKV)'."""
+        raw = cls._parse_mi_container(mi_text)
+        if not raw:
+            return ''
+        upper = raw.upper()
+        ext = cls.CONTAINER_EXT.get(upper, '')
+        return f'{upper} ({ext})' if ext else upper
+
+    @staticmethod
+    def _get_release_group(meta: dict) -> str:
+        """Extract release group name from meta['tag'] (strip leading hyphen)."""
+        tag = (meta.get('tag') or '').strip()
+        return tag.lstrip('-') if tag else ''
+
+    # ── HDR / Dolby Vision display (plain text labels) ──────────────────
+    HDR_LABELS: dict[str, str] = {
+        'DV':      'Dolby Vision',
+        'HDR10+':  'HDR10+',
+        'HDR':     'HDR10',
+        'HLG':     'HLG',
+        'PQ10':    'PQ10',
+        'WCG':     'WCG',
+    }
+
+    def _format_hdr_dv_bbcode(self, meta: dict) -> str | None:
+        """Return a plain-text string listing HDR formats.
+
+        Returns *None* when there is nothing to display (SDR content).
+        """
+        hdr_raw: str = (meta.get('hdr') or '').strip()
+        if not hdr_raw:
+            return None
+
+        # Match longest tokens first so "HDR10+" is not consumed by "HDR".
+        ordered_keys = ['HDR10+', 'DV', 'HDR', 'HLG', 'PQ10', 'WCG']
+        remaining = hdr_raw
+        labels: list[str] = []
+        for key in ordered_keys:
+            if key in remaining:
+                labels.append(self.HDR_LABELS[key])
+                remaining = remaining.replace(key, '', 1).strip()
+
+        return ' + '.join(labels) if labels else None
+
     def _format_audio_bbcode(self, mi_text: str) -> list[str]:
         """Build pretty BBCode lines for audio tracks.
 

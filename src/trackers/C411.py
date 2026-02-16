@@ -294,21 +294,16 @@ class C411(FrenchTrackerMixin):
         if 'image.tmdb.org/t/p/' in poster:
             poster_w500 = re.sub(r'/t/p/[^/]+/', '/t/p/w500/', poster)
 
-        parts.append(f"[center][b][font=Verdana][color={C}][size=28]{fr_title}")
-        parts.append("")
-        parts.append(f"[/color]({year})[/size][/font][/b]")
+        parts.append(f"[center][b][font=Verdana][color={C}][size=28]{fr_title} ({year})[/size][/color][/font][/b]")
         if poster_w500:
             parts.append(f"[img]{poster_w500}[/img]")
         parts.append("[/center]")
-        parts.append("")
         parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Informations
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Informations[/color]")
-        parts.append("")
-        parts.append("")
 
         info_lines: list[str] = []
 
@@ -441,29 +436,28 @@ class C411(FrenchTrackerMixin):
             parts.append("[/size][/font]")
 
         parts.append("")
-        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Synopsis
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Synopsis[/color]")
-        parts.append("")
-        parts.append("")
         synopsis = fr_overview or str(meta.get('overview', '')).strip() or 'Aucun synopsis disponible.'
         parts.append(f"    [font=Verdana][size=14]{synopsis}[/size][/font]")
-        parts.append("")
         parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Informations techniques
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Informations techniques[/color]")
-        parts.append("")
-        parts.append("")
 
         mi_text = await self._get_mediainfo_text(meta)
 
         tech_lines: list[str] = []
+
+        # Type (Remux, Encode, WEB-DL, …)
+        type_label = self._get_type_label(meta)
+        if type_label:
+            tech_lines.append(f"[b][color={C}]Type :[/color][/b] {type_label}")
 
         # Source
         source = meta.get('source', '') or meta.get('type', '')
@@ -478,9 +472,19 @@ class C411(FrenchTrackerMixin):
         resolution = meta.get('resolution', '')
         tech_lines.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}" if resolution else f"[b][color={C}]Résolution :[/color][/b]")
 
+        # Container format (MKV, AVI, …)
+        container_display = self._format_container(mi_text)
+        if container_display:
+            tech_lines.append(f"[b][color={C}]Format vidéo :[/color][/b] {container_display}")
+
         # Video codec
         video_codec = meta.get('video_codec', '') or meta.get('video_encode', '')
         tech_lines.append(f"[b][color={C}]Codec vidéo :[/color][/b] {video_codec}" if video_codec else f"[b][color={C}]Codec vidéo :[/color][/b]")
+
+        # HDR / Dolby Vision
+        hdr_dv_badge = self._format_hdr_dv_bbcode(meta)
+        if hdr_dv_badge:
+            tech_lines.append(f"[b][color={C}]HDR :[/color][/b] {hdr_dv_badge}")
 
         # Video bitrate
         vbr = ''
@@ -496,14 +500,11 @@ class C411(FrenchTrackerMixin):
             parts.append(line)
 
         parts.append("")
-        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Audio(s)
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Audio(s)[/color]")
-        parts.append("")
-        parts.append("")
         audio_lines = self._format_audio_bbcode(mi_text)
         if audio_lines:
             for al in audio_lines:
@@ -511,14 +512,11 @@ class C411(FrenchTrackerMixin):
         else:
             parts.append(f"    [i]Non spécifié[/i]")
         parts.append("")
-        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Sous-titre(s)
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Sous-titre(s)[/color]")
-        parts.append("")
-        parts.append("")
         sub_lines = self._format_subtitle_bbcode(mi_text)
         if sub_lines:
             for sl in sub_lines:
@@ -526,19 +524,16 @@ class C411(FrenchTrackerMixin):
         else:
             parts.append(f"    [i]Aucun[/i]")
         parts.append("")
-        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Release
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Release[/color]")
-        parts.append("")
-        parts.append("")
 
         rel_lines: list[str] = []
 
         release_name = meta.get('uuid', '')
-        rel_lines.append(f"[b][color={C}]Release :[/color][/b] {release_name}" if release_name else f"[b][color={C}]Release :[/color][/b]")
+        rel_lines.append(f"[b][color={C}]Titre :[/color][/b] {release_name}" if release_name else f"[b][color={C}]Titre :[/color][/b]")
 
         # Total size
         size_str = ''
@@ -551,6 +546,11 @@ class C411(FrenchTrackerMixin):
         # File count
         file_count = self._count_files(meta)
         rel_lines.append(f"[b][color={C}]Nombre de fichier(s) :[/color][/b] {file_count}" if file_count else f"[b][color={C}]Nombre de fichier(s) :[/color][/b]")
+
+        # Release group
+        group = self._get_release_group(meta)
+        if group:
+            rel_lines.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
 
         parts.append(f"    {rel_lines[0]}")
         for line in rel_lines[1:]:
