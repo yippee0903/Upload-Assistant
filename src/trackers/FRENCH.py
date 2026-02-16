@@ -91,6 +91,38 @@ LANG_MAP: dict[str, str] = {
     'fa': 'FAS', 'fas': 'FAS', 'per': 'FAS', 'persian': 'FAS',
 }
 
+# ── Language → flag emoji mapping (for BBCode descriptions) ──
+LANG_FLAGS: dict[str, str] = {
+    'english': '🇺🇸', 'french': '🇫🇷', 'german': '🇩🇪', 'spanish': '🇪🇸',
+    'italian': '🇮🇹', 'portuguese': '🇵🇹', 'russian': '🇷🇺', 'japanese': '🇯🇵',
+    'korean': '🇰🇷', 'chinese': '🇨🇳', 'arabic': '🇸🇦', 'dutch': '🇳🇱',
+    'polish': '🇵🇱', 'turkish': '🇹🇷', 'thai': '🇹🇭', 'swedish': '🇸🇪',
+    'norwegian': '🇳🇴', 'danish': '🇩🇰', 'finnish': '🇫🇮', 'czech': '🇨🇿',
+    'hungarian': '🇭🇺', 'romanian': '🇷🇴', 'greek': '🇬🇷', 'hebrew': '🇮🇱',
+    'indonesian': '🇮🇩', 'bulgarian': '🇧🇬', 'croatian': '🇭🇷', 'serbian': '🇷🇸',
+    'slovenian': '🇸🇮', 'estonian': '🇪🇪', 'icelandic': '🇮🇸', 'lithuanian': '🇱🇹',
+    'latvian': '🇱🇻', 'ukrainian': '🇺🇦', 'hindi': '🇮🇳', 'tamil': '🇮🇳',
+    'telugu': '🇮🇳', 'malay': '🇲🇾', 'vietnamese': '🇻🇳', 'persian': '🇮🇷',
+}
+
+# ── Language → French display name ───────────────────────────
+LANG_NAMES_FR: dict[str, str] = {
+    'english': 'Anglais', 'french': 'Français', 'german': 'Allemand',
+    'spanish': 'Espagnol', 'italian': 'Italien', 'portuguese': 'Portugais',
+    'russian': 'Russe', 'japanese': 'Japonais', 'korean': 'Coréen',
+    'chinese': 'Chinois', 'arabic': 'Arabe', 'dutch': 'Néerlandais',
+    'polish': 'Polonais', 'turkish': 'Turc', 'thai': 'Thaï',
+    'swedish': 'Suédois', 'norwegian': 'Norvégien', 'danish': 'Danois',
+    'finnish': 'Finnois', 'czech': 'Tchèque', 'hungarian': 'Hongrois',
+    'romanian': 'Roumain', 'greek': 'Grec', 'hebrew': 'Hébreu',
+    'indonesian': 'Indonésien', 'bulgarian': 'Bulgare', 'croatian': 'Croate',
+    'serbian': 'Serbe', 'slovenian': 'Slovène', 'estonian': 'Estonien',
+    'icelandic': 'Islandais', 'lithuanian': 'Lituanien', 'latvian': 'Letton',
+    'ukrainian': 'Ukrainien', 'hindi': 'Hindi', 'tamil': 'Tamoul',
+    'telugu': 'Télougou', 'malay': 'Malais', 'vietnamese': 'Vietnamien',
+    'persian': 'Persan',
+}
+
 # Canonical list of French language values (for subtitle/audio detection)
 FRENCH_LANG_VALUES = frozenset({
     'french', 'fre', 'fra', 'fr', 'français', 'francais', 'fr-fr', 'fr-ca',
@@ -607,3 +639,210 @@ class FrenchTrackerMixin:
         """Strip accents and non-filename characters."""
         text = unidecode(text)
         return re.sub(r'[^a-zA-Z0-9 .+\-]', '', text)
+
+    # ──────────────────────────────────────────────────────────
+    #  MediaInfo parsing helpers (shared by description builders)
+    # ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _lang_to_flag(lang: str) -> str:
+        """Map a language name (from MediaInfo) to its flag emoji."""
+        key = lang.lower().split('(')[0].strip()
+        return LANG_FLAGS.get(key, '\U0001f3f3\ufe0f')
+
+    @staticmethod
+    def _lang_to_french_name(lang: str) -> str:
+        """Map a language name (from MediaInfo) to its French display name."""
+        key = lang.lower().split('(')[0].strip()
+        return LANG_NAMES_FR.get(key, lang)
+
+    @staticmethod
+    def _channels_to_layout(channels: str) -> str:
+        """Convert MI channel count to layout notation.
+
+        '6 channels' → '5.1', '8 channels' → '7.1', '2 channels' → '2.0', etc.
+        """
+        m = re.search(r'(\d+)', channels)
+        if not m:
+            return channels
+        n = int(m.group(1))
+        mapping = {1: '1.0', 2: '2.0', 3: '2.1', 6: '5.1', 8: '7.1'}
+        return mapping.get(n, str(n))
+
+    @staticmethod
+    def _parse_mi_audio_tracks(mi_text: str) -> list[dict[str, str]]:
+        """Parse audio tracks from MediaInfo text into structured dicts.
+
+        Each dict may contain: language, format, commercial_name, bitrate,
+        channels, channel_layout, title.
+        """
+        tracks: list[dict[str, str]] = []
+        if not mi_text:
+            return tracks
+        current: dict[str, str] | None = None
+
+        for line in mi_text.split('\n'):
+            stripped = line.strip()
+            if stripped == 'Audio' or stripped.startswith('Audio #'):
+                if current:
+                    tracks.append(current)
+                current = {}
+                continue
+            if current is not None and (
+                stripped.startswith('Text') or stripped.startswith('Menu')
+                or stripped == 'Video' or stripped.startswith('Video #')
+                or stripped == 'General'
+            ):
+                tracks.append(current)
+                current = None
+            if current is not None and ':' in stripped:
+                key, _, val = stripped.partition(':')
+                key = key.strip()
+                val = val.strip()
+                if key == 'Language':
+                    current['language'] = val
+                elif key == 'Format':
+                    current['format'] = val
+                elif key == 'Commercial name':
+                    current['commercial_name'] = val
+                elif key == 'Bit rate':
+                    current['bitrate'] = val
+                elif key == 'Channel(s)':
+                    current['channels'] = val
+                elif key == 'Channel layout':
+                    current['channel_layout'] = val
+                elif key == 'Title':
+                    current['title'] = val
+
+        if current:
+            tracks.append(current)
+        return tracks
+
+    @staticmethod
+    def _parse_mi_subtitle_tracks(mi_text: str) -> list[dict[str, str]]:
+        """Parse subtitle tracks from MediaInfo text into structured dicts.
+
+        Each dict may contain: language, format, title, forced, default.
+        """
+        tracks: list[dict[str, str]] = []
+        if not mi_text:
+            return tracks
+        current: dict[str, str] | None = None
+
+        for line in mi_text.split('\n'):
+            stripped = line.strip()
+            if stripped == 'Text' or stripped.startswith('Text #'):
+                if current:
+                    tracks.append(current)
+                current = {}
+                continue
+            if current is not None and (
+                stripped.startswith('Menu') or stripped.startswith('Audio')
+                or stripped == 'Video' or stripped == 'General'
+            ):
+                tracks.append(current)
+                current = None
+            if current is not None and ':' in stripped:
+                key, _, val = stripped.partition(':')
+                key = key.strip()
+                val = val.strip()
+                if key == 'Language':
+                    current['language'] = val
+                elif key == 'Format':
+                    current['format'] = val
+                elif key == 'Title':
+                    current['title'] = val
+                elif key == 'Forced':
+                    current['forced'] = val
+                elif key == 'Default':
+                    current['default'] = val
+
+        if current:
+            tracks.append(current)
+        return tracks
+
+    @staticmethod
+    def _sub_format_short(fmt: str) -> str:
+        """Return a short label for a subtitle format string."""
+        up = fmt.upper()
+        if 'PGS' in up:
+            return 'PGS'
+        if 'SRT' in up or 'UTF-8' in up:
+            return 'SRT'
+        if 'ASS' in up or 'SSA' in up:
+            return 'ASS'
+        if 'VOBSUB' in up:
+            return 'VobSub'
+        return fmt
+
+    def _format_audio_bbcode(self, mi_text: str) -> list[str]:
+        """Build pretty BBCode lines for audio tracks.
+
+        Returns a list like:
+          ['🇫🇷 Français [5.1] : Dolby Digital Plus @ 640 kb/s',
+           '🇺🇸 Anglais [5.1] : AC3 @ 384 kb/s']
+        """
+        tracks = self._parse_mi_audio_tracks(mi_text)
+        lines: list[str] = []
+        for at in tracks:
+            lang = at.get('language', 'Unknown')
+            flag = self._lang_to_flag(lang)
+            name = self._lang_to_french_name(lang)
+            channels = at.get('channels', '')
+            layout = self._channels_to_layout(channels) if channels else ''
+            commercial = at.get('commercial_name', '')
+            fmt = at.get('format', '')
+            bitrate = at.get('bitrate', '')
+
+            # Build: flag Name [layout] : Codec @ Bitrate
+            parts: list[str] = [f'{flag} {name}']
+            if layout:
+                parts.append(f' [{layout}]')
+            codec = commercial or fmt
+            if codec:
+                parts.append(f' : {codec}')
+            if bitrate:
+                parts.append(f' @ {bitrate}')
+            lines.append(''.join(parts))
+        return lines
+
+    def _format_subtitle_bbcode(self, mi_text: str) -> list[str]:
+        """Build pretty BBCode lines for subtitle tracks.
+
+        Returns a list like:
+          ['🇫🇷 Français : SRT (complets)',
+           '🇺🇸 Anglais : SRT (forcés)']
+        """
+        tracks = self._parse_mi_subtitle_tracks(mi_text)
+        lines: list[str] = []
+        for st in tracks:
+            lang = st.get('language', '') or 'Unknown'
+            flag = self._lang_to_flag(lang)
+            name = self._lang_to_french_name(lang)
+            fmt = st.get('format', '')
+            fmt_short = self._sub_format_short(fmt) if fmt else ''
+            forced = st.get('forced', '').lower() == 'yes'
+            title = st.get('title', '')
+
+            # Detect forced from title field too
+            if not forced and title and 'forced' in title.lower():
+                forced = True
+
+            # Detect SDH from title
+            sdh = bool(title and ('sdh' in title.lower() or 'hearing' in title.lower()))
+
+            # Build qualifier
+            if forced:
+                qualifier = 'forcés'
+            elif sdh:
+                qualifier = 'SDH'
+            else:
+                qualifier = 'complets'
+
+            parts: list[str] = [f'{flag} {name}']
+            if fmt_short:
+                parts.append(f' : {fmt_short} ({qualifier})')
+            else:
+                parts.append(f' ({qualifier})')
+            lines.append(''.join(parts))
+        return lines

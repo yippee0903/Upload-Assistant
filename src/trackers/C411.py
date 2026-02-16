@@ -499,13 +499,17 @@ class C411(FrenchTrackerMixin):
         parts.append("")
 
         # ══════════════════════════════════════════════════════
-        #  Langue(s)
+        #  Audio(s)
         # ══════════════════════════════════════════════════════
-        parts.append(f"        [color={C}]Langue(s)[/color]")
+        parts.append(f"        [color={C}]Audio(s)[/color]")
         parts.append("")
         parts.append("")
-        audio_langs = self._parse_mi_audio_languages(mi_text)
-        parts.append(f"    [i]{audio_langs or 'Non spécifié'}[/i]")
+        audio_lines = self._format_audio_bbcode(mi_text)
+        if audio_lines:
+            for al in audio_lines:
+                parts.append(f"    [i]{al}[/i]")
+        else:
+            parts.append(f"    [i]Non spécifié[/i]")
         parts.append("")
         parts.append("")
 
@@ -515,8 +519,12 @@ class C411(FrenchTrackerMixin):
         parts.append(f"        [color={C}]Sous-titre(s)[/color]")
         parts.append("")
         parts.append("")
-        sub_langs = self._parse_mi_subtitle_languages(mi_text)
-        parts.append(f"    [i]{sub_langs or 'Aucun'}[/i]")
+        sub_lines = self._format_subtitle_bbcode(mi_text)
+        if sub_lines:
+            for sl in sub_lines:
+                parts.append(f"    [i]{sl}[/i]")
+        else:
+            parts.append(f"    [i]Aucun[/i]")
         parts.append("")
         parts.append("")
 
@@ -587,61 +595,6 @@ class C411(FrenchTrackerMixin):
             return '1'
         count = sum(1 for _, _, files in os.walk(path) for _ in files)
         return str(count) if count else ''
-
-    @staticmethod
-    def _parse_mi_audio_languages(mi_text: str) -> str:
-        """Extract audio language(s) from MediaInfo text."""
-        if not mi_text:
-            return ''
-        langs: list[str] = []
-        # Split by sections and find Audio sections
-        in_audio = False
-        for line in mi_text.split('\n'):
-            stripped = line.strip()
-            if stripped.startswith('Audio') and not stripped.startswith('Audio #'):
-                in_audio = True
-                continue
-            if stripped.startswith('Audio #'):
-                in_audio = True
-                continue
-            if in_audio and (stripped.startswith('Text') or stripped.startswith('Menu') or stripped == ''):
-                if stripped.startswith('Text') or stripped.startswith('Menu'):
-                    in_audio = False
-            if in_audio and stripped.startswith('Language'):
-                lang_match = re.search(r':\s*(.+)', stripped)
-                if lang_match:
-                    lang = lang_match.group(1).strip()
-                    if lang not in langs:
-                        langs.append(lang)
-            if in_audio and stripped.startswith('Commercial name'):
-                # also grab format info
-                pass
-        return ', '.join(langs) if langs else ''
-
-    @staticmethod
-    def _parse_mi_subtitle_languages(mi_text: str) -> str:
-        """Extract subtitle language(s) from MediaInfo text."""
-        if not mi_text:
-            return ''
-        langs: list[str] = []
-        in_text = False
-        for line in mi_text.split('\n'):
-            stripped = line.strip()
-            if stripped.startswith('Text') and not stripped.startswith('Text #'):
-                in_text = True
-                continue
-            if stripped.startswith('Text #'):
-                in_text = True
-                continue
-            if in_text and (stripped.startswith('Menu') or (stripped.startswith('Audio') and not stripped.startswith('Audio '))):
-                in_text = False
-            if in_text and stripped.startswith('Language'):
-                lang_match = re.search(r':\s*(.+)', stripped)
-                if lang_match:
-                    lang = lang_match.group(1).strip()
-                    if lang not in langs:
-                        langs.append(lang)
-        return ', '.join(langs) if langs else ''
 
     async def _get_mediainfo_text(self, meta: Meta) -> str:
         """Read MediaInfo text from temp files."""

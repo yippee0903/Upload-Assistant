@@ -35,20 +35,6 @@ from src.trackers.FRENCH import FrenchTrackerMixin
 Meta = dict[str, Any]
 Config = dict[str, Any]
 
-# Language → flag emoji mapping
-LANG_FLAGS: dict[str, str] = {
-    'english': '🇺🇸', 'french': '🇫🇷', 'german': '🇩🇪', 'spanish': '🇪🇸',
-    'italian': '🇮🇹', 'portuguese': '🇵🇹', 'russian': '🇷🇺', 'japanese': '🇯🇵',
-    'korean': '🇰🇷', 'chinese': '🇨🇳', 'arabic': '🇸🇦', 'dutch': '🇳🇱',
-    'polish': '🇵🇱', 'turkish': '🇹🇷', 'thai': '🇹🇭', 'swedish': '🇸🇪',
-    'norwegian': '🇳🇴', 'danish': '🇩🇰', 'finnish': '🇫🇮', 'czech': '🇨🇿',
-    'hungarian': '🇭🇺', 'romanian': '🇷🇴', 'greek': '🇬🇷', 'hebrew': '🇮🇱',
-    'indonesian': '🇮🇩', 'bulgarian': '🇧🇬', 'croatian': '🇭🇷', 'serbian': '🇷🇸',
-    'slovenian': '🇸🇮', 'estonian': '🇪🇪', 'icelandic': '🇮🇸', 'lithuanian': '🇱🇹',
-    'latvian': '🇱🇻', 'ukrainian': '🇺🇦', 'hindi': '🇮🇳', 'tamil': '🇮🇳',
-    'telugu': '🇮🇳', 'malay': '🇲🇾', 'vietnamese': '🇻🇳', 'persian': '🇮🇷',
-}
-
 FRENCH_MONTHS: list[str] = [
     '', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
     'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
@@ -451,58 +437,19 @@ class TORR9(FrenchTrackerMixin):
         parts.append('')
 
         # ── Audio tracks ──
-        audio_tracks = self._parse_mi_audio_tracks(mi_text)
-        if audio_tracks:
+        audio_lines = self._format_audio_bbcode(mi_text)
+        if audio_lines:
             parts.append(f'[b][color={C}]Audio(s) :[/color][/b]')
-            for at in audio_tracks:
-                lang = at.get('language', 'Unknown')
-                flag = self._lang_to_flag(lang)
-                commercial = at.get('commercial_name', '')
-                fmt = at.get('format', '')
-                bitrate = at.get('bitrate', '')
-                channels = at.get('channels', '')
-                # Build display: flag Language — CommercialName @ Bitrate
-                display = f' {flag} {lang}'
-                codec_part = commercial or fmt
-                if codec_part:
-                    display += f' — {codec_part}'
-                if channels:
-                    display += f' ({channels})'
-                if bitrate:
-                    display += f' @ {bitrate}'
-                parts.append(display)
+            for al in audio_lines:
+                parts.append(f' {al}')
             parts.append('')
 
         # ── Subtitles ──
-        sub_tracks = self._parse_mi_subtitle_tracks(mi_text)
-        if sub_tracks:
+        sub_lines = self._format_subtitle_bbcode(mi_text)
+        if sub_lines:
             parts.append(f'[b][color={C}]Sous-titres :[/color][/b]')
-            # Handle duplicate languages with numbering
-            lang_count: dict[str, int] = {}
-            lang_total: dict[str, int] = {}
-            for st in sub_tracks:
-                key = st.get('title', '') or st.get('language', 'Unknown')
-                lang_total[key] = lang_total.get(key, 0) + 1
-            for st in sub_tracks:
-                title = st.get('title', '') or st.get('language', 'Unknown')
-                lang = st.get('language', title)
-                flag = self._lang_to_flag(lang)
-                fmt = st.get('format', '')
-                # Format short name
-                fmt_short = fmt
-                if 'PGS' in fmt.upper():
-                    fmt_short = 'PGS'
-                elif 'SRT' in fmt.upper() or 'UTF-8' in fmt.upper():
-                    fmt_short = 'SRT'
-                elif 'ASS' in fmt.upper() or 'SSA' in fmt.upper():
-                    fmt_short = 'ASS'
-                # Numbering for duplicates
-                suffix = ''
-                if lang_total.get(title, 0) > 1:
-                    lang_count[title] = lang_count.get(title, 0) + 1
-                    suffix = f' (#{lang_count[title]})'
-                line = f' {flag} {title} : {fmt_short}{suffix}' if fmt_short else f' {flag} {title}{suffix}'
-                parts.append(line)
+            for sl in sub_lines:
+                parts.append(f' {sl}')
             parts.append('')
 
         # ══════════════════════════════════════════════════════
@@ -587,12 +534,6 @@ class TORR9(FrenchTrackerMixin):
             return date_str
 
     @staticmethod
-    def _lang_to_flag(lang: str) -> str:
-        """Map a language name to its flag emoji."""
-        key = lang.lower().split('(')[0].strip()
-        return LANG_FLAGS.get(key, '\U0001f3f3\ufe0f')
-
-    @staticmethod
     def _parse_mi_container(mi_text: str) -> str:
         """Extract container format from MI General section."""
         if not mi_text:
@@ -607,91 +548,6 @@ class TORR9(FrenchTrackerMixin):
             if stripped in ('Video', 'Audio', 'Text', 'Menu') or stripped.startswith('Video'):
                 break
         return ''
-
-    @staticmethod
-    def _parse_mi_audio_tracks(mi_text: str) -> list[dict[str, str]]:
-        """Parse audio tracks from MediaInfo text into structured dicts.
-
-        Each dict may contain: language, format, commercial_name, bitrate, channels, title.
-        """
-        tracks: list[dict[str, str]] = []
-        if not mi_text:
-            return tracks
-        current: dict[str, str] | None = None
-
-        for line in mi_text.split('\n'):
-            stripped = line.strip()
-            if stripped == 'Audio' or stripped.startswith('Audio #'):
-                if current:
-                    tracks.append(current)
-                current = {}
-                continue
-            if current is not None and (
-                stripped.startswith('Text') or stripped.startswith('Menu')
-                or stripped == 'Video' or stripped.startswith('Video #')
-                or stripped == 'General'
-            ):
-                tracks.append(current)
-                current = None
-            if current is not None and ':' in stripped:
-                key, _, val = stripped.partition(':')
-                key = key.strip()
-                val = val.strip()
-                if key == 'Language':
-                    current['language'] = val
-                elif key == 'Format':
-                    current['format'] = val
-                elif key == 'Commercial name':
-                    current['commercial_name'] = val
-                elif key == 'Bit rate':
-                    current['bitrate'] = val
-                elif key == 'Channel(s)':
-                    current['channels'] = val
-                elif key == 'Title':
-                    current['title'] = val
-
-        if current:
-            tracks.append(current)
-        return tracks
-
-    @staticmethod
-    def _parse_mi_subtitle_tracks(mi_text: str) -> list[dict[str, str]]:
-        """Parse subtitle tracks from MediaInfo text into structured dicts.
-
-        Each dict may contain: language, format, title.
-        """
-        tracks: list[dict[str, str]] = []
-        if not mi_text:
-            return tracks
-        current: dict[str, str] | None = None
-
-        for line in mi_text.split('\n'):
-            stripped = line.strip()
-            if stripped == 'Text' or stripped.startswith('Text #'):
-                if current:
-                    tracks.append(current)
-                current = {}
-                continue
-            if current is not None and (
-                stripped.startswith('Menu') or stripped.startswith('Audio')
-                or stripped == 'Video' or stripped == 'General'
-            ):
-                tracks.append(current)
-                current = None
-            if current is not None and ':' in stripped:
-                key, _, val = stripped.partition(':')
-                key = key.strip()
-                val = val.strip()
-                if key == 'Language':
-                    current['language'] = val
-                elif key == 'Format':
-                    current['format'] = val
-                elif key == 'Title':
-                    current['title'] = val
-
-        if current:
-            tracks.append(current)
-        return tracks
 
     @staticmethod
     def _count_files(meta: Meta) -> str:
