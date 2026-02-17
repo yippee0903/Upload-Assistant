@@ -20,7 +20,7 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import aiofiles
 import httpx
@@ -64,7 +64,7 @@ class TORR9(FrenchTrackerMixin):
     #  Authentication — login to obtain Bearer JWT
     # ──────────────────────────────────────────────────────────
 
-    async def _login(self) -> str | None:
+    async def _login(self) -> Optional[str]:
         """Authenticate via the login API and return a Bearer token.
 
         POST https://api.torr9.xyz/api/v1/auth/login
@@ -462,7 +462,7 @@ class TORR9(FrenchTrackerMixin):
 
         # ── Audio tracks ──
         parts.append(f'[b][color={C}][size=18]━━━ Audio(s) ━━━[/size][/color][/b]')
-        audio_lines = self._format_audio_bbcode(mi_text)
+        audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
             for al in audio_lines:
                 parts.append(f' {al}')

@@ -679,7 +679,7 @@ class FrenchTrackerMixin:
         tracks: list[dict[str, str]] = []
         if not mi_text:
             return tracks
-        current: dict[str, str] | None = None
+        current: Optional[dict[str, str]] = None
 
         for line in mi_text.split('\n'):
             stripped = line.strip()
@@ -727,7 +727,7 @@ class FrenchTrackerMixin:
         tracks: list[dict[str, str]] = []
         if not mi_text:
             return tracks
-        current: dict[str, str] | None = None
+        current: Optional[dict[str, str]] = None
 
         for line in mi_text.split('\n'):
             stripped = line.strip()
@@ -847,7 +847,7 @@ class FrenchTrackerMixin:
         'WCG':     'WCG',
     }
 
-    def _format_hdr_dv_bbcode(self, meta: dict) -> str | None:
+    def _format_hdr_dv_bbcode(self, meta: dict) -> Optional[str]:
         """Return a plain-text string listing HDR formats.
 
         Returns *None* when there is nothing to display (SDR content).
