@@ -552,6 +552,11 @@ class LanguagesManager:
         :param config: Configuration dictionary.
         :return: True if French is found or user confirms, False if user cancels.
         """
+        # Check if the config option is enabled (default True)
+        default_config = config.get('DEFAULT', {}) if isinstance(config, dict) else {}
+        if not default_config.get('french_language_check', True):
+            return True
+
         # Only run when at least one French tracker is selected
         trackers: list[str] = meta.get('trackers', [])
         if not trackers:

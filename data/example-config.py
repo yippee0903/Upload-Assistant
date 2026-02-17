@@ -29,6 +29,11 @@ config = {
         # Trackers that don't require English (e.g. C411, TORR9) disable this check automatically.
         "english_language_check": True,
 
+        # If true, warn and ask for confirmation when uploading to French trackers (C411, TORR9, etc.)
+        # without any French audio or French subtitles detected.
+        # Set false to disable this check globally.
+        "french_language_check": True,
+
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,
