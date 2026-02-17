@@ -914,19 +914,32 @@ class C411(FrenchTrackerMixin):
                                 return False
 
                         # ── Non-retriable HTTP errors ──
-                        elif response.status_code in (401, 403, 404, 422):
+                        elif response.status_code in (400, 401, 403, 404, 422):
                             error_detail: Any = ''
+                            api_message: str = ''
                             try:
                                 error_detail = response.json()
+                                if isinstance(error_detail, dict):
+                                    api_message = error_detail.get('message', '')
                             except Exception:
                                 error_detail = response.text[:500]
-                            meta['tracker_status'][self.tracker]['status_message'] = {
-                                'error': f'HTTP {response.status_code}',
-                                'detail': error_detail,
-                            }
-                            console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
-                            if error_detail:
-                                console.print(f"[dim]{error_detail}[/dim]")
+
+                            # Build a clean status message for tracker_status
+                            if api_message:
+                                meta['tracker_status'][self.tracker]['status_message'] = f"C411: {api_message}"
+                            else:
+                                meta['tracker_status'][self.tracker]['status_message'] = {
+                                    'error': f'HTTP {response.status_code}',
+                                    'detail': error_detail,
+                                }
+
+                            # Pretty-print the error
+                            if api_message:
+                                console.print(f"[yellow]C411 — {api_message}[/yellow]")
+                            else:
+                                console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
+                                if error_detail:
+                                    console.print(f"[dim]{error_detail}[/dim]")
                             return False
 
                         # ── Retriable HTTP errors ──
