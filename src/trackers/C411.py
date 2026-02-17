@@ -505,7 +505,7 @@ class C411(FrenchTrackerMixin):
         #  Audio(s)
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Audio(s)[/color]")
-        audio_lines = self._format_audio_bbcode(mi_text)
+        audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
             for al in audio_lines:
                 parts.append(f"    [i]{al}[/i]")

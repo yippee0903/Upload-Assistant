@@ -867,16 +867,44 @@ class FrenchTrackerMixin:
 
         return ' + '.join(labels) if labels else None
 
-    def _format_audio_bbcode(self, mi_text: str) -> list[str]:
+    def _format_audio_bbcode(self, mi_text: str, meta: Optional[Meta] = None) -> list[str]:
         """Build pretty BBCode lines for audio tracks.
 
-        Returns a list like:
-          ['🇫🇷 Français [5.1] : Dolby Digital Plus @ 640 kb/s',
-           '🇺🇸 Anglais [5.1] : AC3 @ 384 kb/s']
+        When *meta* is provided, cross-references the JSON MediaInfo data
+        (which contains raw BCP-47 language codes like ``fr-CA``) with the
+        text-parsed tracks for accurate VFF/VFQ/VFB detection.
+
+        Detection priority:
+          1. JSON MediaInfo language code (``fr-FR`` → VFF, ``fr-CA`` → VFQ, ``fr-BE`` → VFB)
+          2. Explicit label in the track Title field (VFF, VFQ, VFB, VF2, VOF, VFI)
+          3. No variant suffix — just "Français"
+
+        Returns a list like::
+
+            ['🇫🇷 Français VFF [5.1] : DTS-HD @ 2 046 kb/s',
+             '🇨🇦 Français VFQ [5.1] : Dolby Digital Plus @ 1 024 kb/s',
+             '🇧🇪 Français VFB [5.1] : AC3 @ 448 kb/s',
+             '🇺🇸 Anglais [5.1] : AC3 @ 384 kb/s']
         """
         tracks = self._parse_mi_audio_tracks(mi_text)
         lines: list[str] = []
-        for at in tracks:
+
+        # ── Build a list of raw language codes from JSON MediaInfo ──
+        # This lets us detect fr-CA (VFQ) vs fr-FR (VFF) vs fr-BE (VFB)
+        # reliably, because MediaInfo text output only shows "French" for all.
+        json_audio_langs: list[str] = []
+        if meta:
+            try:
+                json_tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+                json_audio_langs = [
+                    str(t.get('Language', '')).lower().strip()
+                    for t in json_tracks
+                    if t.get('@type') == 'Audio'
+                ]
+            except (AttributeError, TypeError):
+                pass
+
+        for i, at in enumerate(tracks):
             lang = at.get('language', 'Unknown')
             flag = self._lang_to_flag(lang)
             name = self._lang_to_french_name(lang)
@@ -885,6 +913,38 @@ class FrenchTrackerMixin:
             commercial = at.get('commercial_name', '')
             fmt = at.get('format', '')
             bitrate = at.get('bitrate', '')
+            title = at.get('title', '').upper()
+
+            # For French tracks: detect VFQ/VFF/VFB/VF2 variant
+            if lang.lower().strip() in ('french', 'fre', 'fra', 'français', 'francais'):
+                variant_detected = False
+
+                # Priority 1: raw BCP-47 language code from JSON MediaInfo
+                if i < len(json_audio_langs):
+                    raw_code = json_audio_langs[i]
+                    if raw_code in ('fr-ca', 'fr-qc'):
+                        flag = '🇨🇦'
+                        name = 'Français VFQ'
+                        variant_detected = True
+                    elif raw_code == 'fr-be':
+                        flag = '🇧🇪'
+                        name = 'Français VFB'
+                        variant_detected = True
+                    elif raw_code in ('fr-fr', 'fr-ch'):
+                        # VFF / standard France French — "Français" suffices
+                        variant_detected = True
+
+                # Priority 2: explicit label in the track Title field
+                if not variant_detected:
+                    if 'VFQ' in title or 'QUÉB' in title or 'QUEB' in title:
+                        flag = '🇨🇦'
+                        name = 'Français VFQ'
+                    elif 'VFB' in title or 'BELG' in title:
+                        flag = '🇧🇪'
+                        name = 'Français VFB'
+                    elif 'VFI' in title:
+                        name = 'Français VFI'
+                    # VFF, TRUEFRENCH, VOF → just "Français" (default)
 
             # Build: flag Name [layout] : Codec @ Bitrate
             parts: list[str] = [f'{flag} {name}']
