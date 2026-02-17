@@ -2,7 +2,7 @@
 """MediaInfo-based NFO generator for trackers that require/support NFO files."""
 
 import os
-from typing import Any
+from typing import Any, Optional
 
 import aiofiles
 
@@ -19,8 +19,8 @@ class SceneNfoGenerator:
         self,
         meta: dict[str, Any],
         tracker: str,
-        output_dir: str | None = None,
-    ) -> str | None:
+        output_dir: Optional[str] = None,
+    ) -> Optional[str]:
         """
         Generate a MediaInfo-based NFO file.
 
@@ -67,7 +67,7 @@ class SceneNfoGenerator:
             console.print(f"[red]Failed to generate NFO: {e}[/red]")
             return None
 
-    async def _get_mediainfo_content(self, meta: dict[str, Any]) -> str | None:
+    async def _get_mediainfo_content(self, meta: dict[str, Any]) -> Optional[str]:
         """Get MediaInfo text content from meta or file."""
 
         # First try: Check for MEDIAINFO_CLEANPATH.txt (clean path version)
