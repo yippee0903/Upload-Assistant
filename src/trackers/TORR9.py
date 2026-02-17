@@ -899,8 +899,20 @@ class TORR9(FrenchTrackerMixin):
             return []
 
         title = meta.get('title', '')
+        # Ensure French title is resolved (may not be populated yet at dupe-check time)
+        fr_title = meta.get('frtitle', '')
+        if not fr_title:
+            fr_title = await self._get_french_title(meta)
         year = meta.get('year', '')
-        search_term = f"{title} {year}".strip()
+
+        # Normalize for relevance filtering
+        def _normalize(s: str) -> str:
+            return re.sub(r'[^a-z0-9]', '', unidecode(s).lower())
+
+        # Use the French title for search if available (TORR9 indexes French names),
+        # falling back to the English title.
+        search_title = fr_title or title
+        search_term = f"{search_title} {year}".strip()
 
         if not search_term:
             return []
@@ -919,6 +931,23 @@ class TORR9(FrenchTrackerMixin):
                     params=params,
                 )
 
+                # If the French title search returned nothing and we have an English
+                # title that differs, try again with the English title.
+                if response.status_code == 200:
+                    try:
+                        first_data = response.json()
+                        first_items = first_data.get('torrents', first_data.get('data', []))
+                    except Exception:
+                        first_items = []
+
+                    if not first_items and fr_title and title and _normalize(fr_title) != _normalize(title):
+                        alt_term = f"{title} {year}".strip()
+                        response = await client.get(
+                            'https://api.torr9.xyz/api/v1/torrents/search',
+                            headers=headers,
+                            params={'q': alt_term},
+                        )
+
             if response.status_code != 200:
                 if meta.get('debug'):
                     console.print(f"[yellow]TORR9 search returned HTTP {response.status_code}[/yellow]")
@@ -933,11 +962,8 @@ class TORR9(FrenchTrackerMixin):
             if items is None:
                 items = []
 
-            # Normalize the search title for relevance filtering
-            def _normalize(s: str) -> str:
-                return re.sub(r'[^a-z0-9]', '', unidecode(s).lower())
-
             title_norm = _normalize(title)
+            fr_title_norm = _normalize(fr_title) if fr_title else ''
             year_str = str(year).strip()
 
             for item in items:
@@ -947,9 +973,11 @@ class TORR9(FrenchTrackerMixin):
                 if not name:
                     continue
 
-                # Filter: the result must contain the title AND year to be relevant
+                # Filter: the result must contain the title (EN or FR) AND year to be relevant
                 name_norm = _normalize(name)
-                if title_norm not in name_norm:
+                title_match = title_norm and title_norm in name_norm
+                fr_title_match = fr_title_norm and fr_title_norm in name_norm
+                if not title_match and not fr_title_match:
                     if meta.get('debug'):
                         console.print(f"[dim]TORR9 dupe skip (title mismatch): {name}[/dim]")
                     continue

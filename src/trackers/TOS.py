@@ -3,11 +3,13 @@
 import asyncio
 from typing import Any, Optional
 
+import httpx
+
 from src.console import console
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
-from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D import UNIT3D, QueryValue
 
 
 class TOS(FrenchTrackerMixin, UNIT3D):
@@ -71,6 +73,118 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 "HDTV": "6",
             }.get(meta["type"], "0")
         return {"type_id": type_id}
+
+    async def search_existing(self, meta: dict[str, Any], _: Any = None) -> list[dict[str, Any]]:
+        """Search for existing torrents on TOS.
+
+        TOS uses separate categories for VOSTFR releases.  The default
+        UNIT3D search filters by category, so a VOSTFR upload would miss
+        MULTI releases in the normal category.  This override searches
+        across both category sets so ``_check_french_lang_dupes`` can
+        detect superior French-audio releases.
+        """
+        dupes: list[dict[str, Any]] = []
+
+        meta.setdefault("tracker_status", {})
+        meta["tracker_status"].setdefault(self.tracker, {})
+
+        if not self.api_key:
+            if not meta["debug"]:
+                console.print(
+                    f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]"
+                )
+            meta["skipping"] = f"{self.tracker}"
+            return dupes
+
+        should_continue = await self.get_additional_checks(meta)
+        if not should_continue:
+            meta["skipping"] = f"{self.tracker}"
+            return dupes
+
+        headers = {
+            "authorization": f"Bearer {self.api_key}",
+            "accept": "application/json",
+        }
+
+        # Determine all relevant category IDs
+        # Normal: MOVIE=1, TV=2, TV pack=8
+        # VOSTFR: MOVIE=6, TV=7, TV pack=9
+        cat = meta.get("category", "MOVIE")
+        is_pack = meta.get("tv_pack", False)
+        if cat == "TV" and is_pack:
+            category_ids = ["8", "9"]
+        elif cat == "TV":
+            category_ids = ["2", "7"]
+        else:
+            category_ids = ["1", "6"]
+
+        params: list[tuple[str, QueryValue]] = [
+            ("tmdbId", str(meta['tmdb'])),
+            ("name", ""),
+            ("perPage", "100"),
+        ]
+        params.extend(("categories[]", cid) for cid in category_ids)
+
+        # Add resolution filter(s)
+        resolutions = await self.get_resolution_id(meta)
+        resolution_id = str(resolutions["resolution_id"])
+        if resolution_id in ["3", "4"]:
+            params.append(("resolutions[]", "3"))
+            params.append(("resolutions[]", "4"))
+        else:
+            params.append(("resolutions[]", resolution_id))
+
+        # Add type filter (types are format-based, not language-based)
+        type_id = str((await self.get_type_id(meta))["type_id"])
+        params.append(("types[]", type_id))
+
+        if meta["category"] == "TV":
+            params = [
+                (k, (str(v) + f" {meta.get('season', '')}" if k == "name" else v))
+                for k, v in params
+            ]
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url=self.search_url, headers=headers, params=params)
+                response.raise_for_status()
+                if response.status_code == 200:
+                    data = response.json()
+                    for each in data["data"]:
+                        torrent_id = each.get("id", None)
+                        attributes = each.get("attributes", {})
+                        name = attributes.get("name", "")
+                        size = attributes.get("size", 0)
+                        result: dict[str, Any] = {
+                            "name": name,
+                            "size": size,
+                            "files": (
+                                [f["name"] for f in attributes.get("files", []) if isinstance(f, dict) and "name" in f]
+                                if not meta["is_disc"] else []
+                            ),
+                            "file_count": len(attributes.get("files", [])) if isinstance(attributes.get("files"), list) else 0,
+                            "trumpable": attributes.get("trumpable", False),
+                            "link": attributes.get("details_link", None),
+                            "download": attributes.get("download_link", None),
+                            "id": torrent_id,
+                            "type": attributes.get("type", None),
+                            "res": attributes.get("resolution", None),
+                            "internal": attributes.get("internal", False),
+                        }
+                        if meta["is_disc"]:
+                            result["bd_info"] = attributes.get("bd_info", "")
+                            result["description"] = attributes.get("description", "")
+                        dupes.append(result)
+                else:
+                    console.print(f"[bold red]Failed to search torrents on {self.tracker}. HTTP Status: {response.status_code}")
+        except httpx.HTTPStatusError as e:
+            meta["tracker_status"][self.tracker]["status_message"] = (
+                f"data error: HTTP {e.response.status_code}"
+            )
+        except Exception as e:
+            console.print(f"[bold red]{self.tracker}: Error searching for existing torrents — {e}[/bold red]")
+
+        return await self._check_french_lang_dupes(dupes, meta)
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         """Build TOS-compliant dot-separated release name.
