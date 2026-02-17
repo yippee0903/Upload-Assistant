@@ -533,6 +533,93 @@ class LanguagesManager:
             cleanup_manager.reset_terminal()
             sys.exit(1)
 
+    async def has_french_language(self, languages: Union[list[str], str]) -> bool:
+        """Check if any language in the list contains 'french'."""
+        if isinstance(languages, str):
+            languages = [languages]
+        if not languages:
+            return False
+        return any('french' in lang.lower() for lang in languages)
+
+    async def check_french_language_requirement(self, meta: dict[str, Any], config: dict[str, Any]) -> bool:
+        """Check if the media has at least one French audio track OR one French subtitle track.
+
+        Only applies when at least one selected tracker is a French tracker
+        (listed in ``french_check_trackers``).  If no French content is found,
+        display a warning and ask for confirmation.
+
+        :param meta: Dictionary containing media metadata.
+        :param config: Configuration dictionary.
+        :return: True if French is found or user confirms, False if user cancels.
+        """
+        # Only run when at least one French tracker is selected
+        trackers: list[str] = meta.get('trackers', [])
+        if not trackers:
+            return True
+
+        from src.trackersetup import french_check_trackers
+        active_french: list[str] = [t for t in trackers if t in french_check_trackers]
+        if not active_french:
+            return True
+
+        # Skip check for disc releases
+        if meta.get('is_disc') in ['BDMV', 'DVD']:
+            return True
+
+        # Get audio and subtitle languages
+        audio_languages: list[str] = meta.get('audio_languages') or []
+        subtitle_languages: list[str] = meta.get('subtitle_languages') or []
+
+        has_french_audio = await self.has_french_language(audio_languages)
+        has_french_subtitle = await self.has_french_language(subtitle_languages)
+
+        if meta.get('debug'):
+            console.print(f"[blue]Debug: French Audio Check: {has_french_audio}[/blue]")
+            console.print(f"[blue]Debug: French Subtitle Check: {has_french_subtitle}[/blue]")
+
+        # If French is found in either audio or subtitles, proceed
+        if has_french_audio or has_french_subtitle:
+            return True
+
+        # No French found — display warning
+        audio_display = ', '.join(audio_languages) if audio_languages else 'None'
+        subtitle_display = ', '.join(subtitle_languages) if subtitle_languages else 'None'
+        tracker_display = ', '.join(active_french)
+
+        console.print()
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print("[bold yellow]⚠️  AUCUN CONTENU FRANÇAIS DÉTECTÉ[/bold yellow]")
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print(f"[cyan]Pistes audio détectées :[/cyan] [yellow]{audio_display}[/yellow]")
+        console.print(f"[cyan]Sous-titres détectés :[/cyan] [yellow]{subtitle_display}[/yellow]")
+        console.print()
+        console.print(f"[bold white]Cette release ne contient ni audio français ni sous-titres français.[/bold white]")
+        console.print(f"[bold white]Les trackers suivants exigent du contenu français : {tracker_display}[/bold white]")
+        console.print("[bold white]L'upload sera probablement refusé par l'API du tracker.[/bold white]")
+        console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+        console.print()
+
+        # In unattended mode, skip the French trackers
+        if meta.get('unattended', False) and not meta.get('unattended_confirm', False):
+            console.print(f"[yellow]Mode automatique : les trackers français ({tracker_display}) seront ignorés.[/yellow]")
+            # Remove the French trackers from the upload list
+            meta['trackers'] = [t for t in meta.get('trackers', []) if t not in active_french]
+            return True
+
+        # Ask for confirmation
+        try:
+            confirm = cli_ui.ask_yes_no("Continuer l'upload vers les trackers français quand même ?", default=False)
+            if not confirm:
+                # Remove the French trackers from the upload list
+                meta['trackers'] = [t for t in meta.get('trackers', []) if t not in active_french]
+                console.print(f"[yellow]Les trackers français ({tracker_display}) ont été retirés de l'upload.[/yellow]")
+            return True  # Always return True — non-French trackers can still proceed
+        except EOFError:
+            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            await cleanup_manager.cleanup()
+            cleanup_manager.reset_terminal()
+            sys.exit(1)
+
     def extract_language_from_title(self, title: Optional[str]) -> Optional[str]:
         """Extract language from title field using langcodes library"""
         if not title:

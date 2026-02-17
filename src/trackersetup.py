@@ -1370,3 +1370,6 @@ notag_labels: dict[str, str] = {'C411': 'NOTAG', 'FNP': 'NOGROUP', 'G3MINI': 'No
 
 # Trackers that skip the English audio/subtitle requirement check
 english_check_skip_trackers = frozenset({'C411', 'G3MINI', 'GF', 'TOS', 'TORR9'})
+
+# Trackers that require French audio or subtitles (warn if neither is detected)
+french_check_trackers = frozenset({'C411', 'G3MINI', 'GF', 'TOS', 'TORR9'})

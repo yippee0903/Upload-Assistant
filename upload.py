@@ -740,6 +740,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
             meta['we_are_uploading'] = False
             return
 
+        # French language check — warns if uploading to French trackers without French content
+        await languages_manager.check_french_language_requirement(meta, config)
+
         # Auto-add trackers based on detected audio/subtitle languages
         # Skip when trackers were explicitly set via -tk / --trackers
         language_based_trackers = config.get('TRACKERS', {}).get('language_based_trackers', {})
