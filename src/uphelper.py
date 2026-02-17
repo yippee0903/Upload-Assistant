@@ -191,7 +191,7 @@ class UploadHelper:
                         else:
                             if french_supersede:
                                 console.print(f"[bold yellow]{tracker_name}: A release with French audio (MULTI / VFF / VFQ) already exists.[/bold yellow]")
-                                console.print("[yellow]Uploading a VOSTFR/VO version is not recommended on French trackers.[/yellow]")
+                                console.print("[yellow]So uploading a VOSTFR/VO version is not recommended.[/yellow]")
                             else:
                                 console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
                             console.print()
