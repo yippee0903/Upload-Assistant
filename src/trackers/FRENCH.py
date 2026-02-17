@@ -915,8 +915,14 @@ class FrenchTrackerMixin:
             bitrate = at.get('bitrate', '')
             title = at.get('title', '').upper()
 
-            # For French tracks: detect VFQ/VFF/VFB/VF2 variant
-            if lang.lower().strip() in ('french', 'fre', 'fra', 'français', 'francais'):
+            # Normalise language: "French (CA)" → base="french", region="ca"
+            lang_lower = lang.lower().strip()
+            region_match = re.search(r'\((\w+)\)', lang_lower)
+            lang_region = region_match.group(1) if region_match else ''
+            lang_base = lang_lower.split('(')[0].strip()
+
+            # For French tracks: detect VFQ/VFF/VFB variant
+            if lang_base in ('french', 'fre', 'fra', 'français', 'francais'):
                 variant_detected = False
 
                 # Priority 1: raw BCP-47 language code from JSON MediaInfo
@@ -934,7 +940,20 @@ class FrenchTrackerMixin:
                         # VFF / standard France French — "Français" suffices
                         variant_detected = True
 
-                # Priority 2: explicit label in the track Title field
+                # Priority 2: region from MI text, e.g. "French (CA)" → "ca"
+                if not variant_detected and lang_region:
+                    if lang_region == 'ca':
+                        flag = '🇨🇦'
+                        name = 'Français VFQ'
+                        variant_detected = True
+                    elif lang_region == 'be':
+                        flag = '🇧🇪'
+                        name = 'Français VFB'
+                        variant_detected = True
+                    elif lang_region in ('fr', 'ch'):
+                        variant_detected = True
+
+                # Priority 3: explicit label in the track Title field
                 if not variant_detected:
                     if 'VFQ' in title or 'QUÉB' in title or 'QUEB' in title:
                         flag = '🇨🇦'
