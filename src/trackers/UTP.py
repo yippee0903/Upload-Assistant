@@ -144,7 +144,7 @@ class UTP(UNIT3D):
         three_d = str(meta.get('3D', ''))
         uhd = str(meta.get('uhd', ''))
         edition = str(meta.get('edition', ''))
-        hybrid = 'Hybrid' if meta.get('webdv', "") else ''
+        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
         repack = str(meta.get('repack', ''))
         resolution = str(meta.get('resolution', ''))
         hdr = str(meta.get('hdr', ''))

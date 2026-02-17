@@ -108,7 +108,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         uhd = meta.get('uhd', '')
         hdr = meta.get('hdr', '')
         edition = meta.get('edition', '')
-        hybrid = 'Hybrid' if meta.get('webdv', '') else ''
+        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
         if 'hybrid' in edition.upper():
             edition = edition.replace('Hybrid', '').strip()
 

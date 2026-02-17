@@ -513,10 +513,10 @@ class FrenchTrackerMixin:
         source = meta.get('source', '')
         uhd = meta.get('uhd', '')
         hdr = meta.get('hdr', '').replace('HDR10+', 'HDR10PLUS')
-        hybrid = 'Hybrid' if meta.get('webdv', '') else ''
+        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
         edition = meta.get('edition', '')
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
+        if 'hybrid' in edition.upper() or 'custom' in edition.upper():
+            edition = re.sub(r'\b(?:Hybrid|CUSTOM|Custom)\b', '', edition, flags=re.IGNORECASE).strip()
 
         type_val = meta.get('type', '').upper()
         category = meta.get('category', 'MOVIE')

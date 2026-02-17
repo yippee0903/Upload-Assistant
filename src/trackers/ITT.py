@@ -109,8 +109,8 @@ class ITT(UNIT3D):
         elif meta.get('is_disc', "") == "DVD":
             region = str(meta.get('region', ""))
         edition = str(meta.get('edition', ""))
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
+        if 'hybrid' in edition.upper() or 'custom' in edition.upper():
+            edition = re.sub(r'\b(?:Hybrid|CUSTOM|Custom)\b', '', edition, flags=re.IGNORECASE).strip()
 
         if meta.get('category') == "TV":
             year = str(meta.get('year', '')) if meta.get('search_year', "") != "" else ""

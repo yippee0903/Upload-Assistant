@@ -204,7 +204,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         source = meta.get('source', "")
         uhd = meta.get('uhd', "")
         hdr = meta.get('hdr', "")
-        hybrid = 'Hybrid' if meta.get('webdv', "") else ""
+        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
         # Ensure the following variables are always defined
         name = ""
         video_codec = ""

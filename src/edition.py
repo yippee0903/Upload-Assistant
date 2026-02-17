@@ -16,7 +16,7 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: Union[str, list[str]], meta: dict[str, Any]) -> tuple[str, str, bool]:
+async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: Union[str, list[str]], meta: dict[str, Any]) -> tuple[str, str, str]:
     edition = ""
     imdb_info = cast(dict[str, Any], meta.get('imdb_info', {}))
     edition_details = cast(dict[str, dict[str, Any]], imdb_info.get('edition_details', {}))
@@ -349,11 +349,18 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
         edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
 
     if not meta.get('webdv', False):
-        hybrid = False
+        hybrid = ''
         if "HYBRID" in video.upper() or "HYBRID" in edition.upper():
-            hybrid = True
+            hybrid = 'Hybrid'
+        elif "CUSTOM" in video.upper() or "CUSTOM" in edition.upper():
+            hybrid = 'Custom'
     else:
-        hybrid = meta.get('webdv', False)
+        # -webdv CLI flag → always 'Hybrid'
+        hybrid = 'Hybrid'
+
+    # Strip Hybrid/Custom from edition — they are carried by the hybrid flag
+    if hybrid:
+        edition = re.sub(r'\b(?:Hybrid|Custom)\b', '', edition, flags=re.IGNORECASE).strip()
 
     # Handle distributor info
     if edition:

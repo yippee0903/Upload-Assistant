@@ -160,14 +160,15 @@ class SHRI(UNIT3D):
         if effective_type != "DISC":
             source = source.replace("Blu-ray", "BluRay")
 
-        # Detect Hybrid from filename if not in title
+        # Detect Hybrid/Custom from filename if not in title
         hybrid = ""
         if (
             not edition
             and (meta.get("webdv", False) or isinstance(meta.get("source", ""), list))
             and "HYBRID" not in title.upper()
+            and "CUSTOM" not in title.upper()
         ):
-            hybrid = "Hybrid"
+            hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else 'Hybrid'
 
         repack = meta.get("repack", "").strip()
 

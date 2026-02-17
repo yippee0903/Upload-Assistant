@@ -310,8 +310,9 @@ class PHD(AZTrackerBase):
             rule = 'Video must be at least 720p.'
             warnings.append(rule)
 
-        # Hybrid
-        if type in ('remux', 'encode') and 'hybrid' in str(meta.get('name', '')).lower():
+        # Hybrid / Custom
+        name_lower = str(meta.get('name', '')).lower()
+        if type in ('remux', 'encode') and ('hybrid' in name_lower or 'custom' in name_lower):
             warnings.append(
                 'Hybrid Remuxes and Encodes are subject to the following condition:\n\n'
                 'Hybrid user releases are permitted, but are treated similarly to regular '

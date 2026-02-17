@@ -73,7 +73,7 @@ class NameManager:
         source = str(meta.get('source', ""))
         uhd = str(meta.get('uhd', ""))
         hdr = str(meta.get('hdr', ""))
-        hybrid = 'Hybrid' if meta.get('webdv', "") else ""
+        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
         if meta.get('manual_episode_title'):
             episode_title = str(meta.get('manual_episode_title', ""))
         elif meta.get('daily_episode_title'):
@@ -94,8 +94,8 @@ class NameManager:
             video_codec = str(meta.get('video_codec', ""))
             video_encode = str(meta.get('video_encode', ""))
         edition = str(meta.get('edition', ""))
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
+        if 'hybrid' in edition.upper() or 'custom' in edition.upper():
+            edition = re.sub(r'\b(?:Hybrid|CUSTOM|Custom)\b', '', edition, flags=re.IGNORECASE).strip()
 
         if meta['category'] == "TV":
             year = meta['year'] if meta['search_year'] != "" else ""
