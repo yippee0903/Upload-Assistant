@@ -535,11 +535,7 @@ class C411(FrenchTrackerMixin):
         rel_lines.append(f"[b][color={C}]Titre :[/color][/b] {release_name}" if release_name else f"[b][color={C}]Titre :[/color][/b]")
 
         # Total size
-        size_str = ''
-        if mi_text:
-            size_match = re.search(r'File size\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
-            if size_match:
-                size_str = size_match.group(1).strip()
+        size_str = self._get_total_size(meta, mi_text)
         rel_lines.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}" if size_str else f"[b][color={C}]Taille totale :[/color][/b]")
 
         # File count
@@ -583,17 +579,6 @@ class C411(FrenchTrackerMixin):
         parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
 
         return "\n".join(parts)
-
-    @staticmethod
-    def _count_files(meta: Meta) -> str:
-        """Count files in the release path."""
-        path = meta.get('path', '')
-        if not path or not os.path.exists(path):
-            return ''
-        if os.path.isfile(path):
-            return '1'
-        count = sum(1 for _, _, files in os.walk(path) for _ in files)
-        return str(count) if count else ''
 
     @staticmethod
     def _patch_mi_filename(mi_text: str, new_name: str) -> str:

@@ -10,6 +10,7 @@ to share a single, canonical implementation of:
   · Release naming (dot-separated, French-tracker conventions)
 """
 
+import os
 import re
 from typing import Any, Optional, Union
 
@@ -861,6 +862,48 @@ class FrenchTrackerMixin:
         """Extract release group name from meta['tag'] (strip leading hyphen)."""
         tag = (meta.get('tag') or '').strip()
         return tag.lstrip('-') if tag else ''
+
+    # ── Total size / file count (season packs vs single files) ──────────
+
+    @staticmethod
+    def _get_total_size(meta: dict, mi_text: str) -> str:
+        """Return human-readable total size for the release.
+
+        For a single file, use the MediaInfo 'File size' line.
+        For a directory (season pack), sum every file on disk.
+        """
+        path = meta.get('path', '')
+        if path and os.path.isdir(path):
+            total = sum(
+                os.path.getsize(os.path.join(root, f))
+                for root, _dirs, files in os.walk(path)
+                for f in files
+            )
+            if total <= 0:
+                return ''
+            # Format to GiB / MiB like MediaInfo does
+            if total >= 1 << 30:  # >= 1 GiB
+                return f"{total / (1 << 30):.2f} GiB"
+            if total >= 1 << 20:  # >= 1 MiB
+                return f"{total / (1 << 20):.2f} MiB"
+            return f"{total / (1 << 10):.2f} KiB"
+        # Single file: use MediaInfo
+        if mi_text:
+            size_match = re.search(r'File size\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
+            if size_match:
+                return size_match.group(1).strip()
+        return ''
+
+    @staticmethod
+    def _count_files(meta: dict) -> str:
+        """Count files in the release path."""
+        path = meta.get('path', '')
+        if not path or not os.path.exists(path):
+            return ''
+        if os.path.isfile(path):
+            return '1'
+        count = sum(1 for _, _, files in os.walk(path) for _ in files)
+        return str(count) if count else ''
 
     # ── HDR / Dolby Vision display (plain text labels) ──────────────────
     HDR_LABELS: dict[str, str] = {

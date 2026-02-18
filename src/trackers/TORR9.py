@@ -511,10 +511,9 @@ class TORR9(FrenchTrackerMixin):
         parts.append(f'[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]')
 
         # Total size
-        if mi_text:
-            size_match = re.search(r'File size\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
-            if size_match:
-                parts.append(f'[b][color={C}]Taille totale :[/color][/b] {size_match.group(1).strip()}')
+        size_str = self._get_total_size(meta, mi_text)
+        if size_str:
+            parts.append(f'[b][color={C}]Taille totale :[/color][/b] {size_str}')
 
         # File count
         file_count = self._count_files(meta)
@@ -568,17 +567,6 @@ class TORR9(FrenchTrackerMixin):
             return f"{day_str} {FRENCH_MONTHS[dt.month]} {dt.year}"
         except (ValueError, IndexError):
             return date_str
-
-    @staticmethod
-    def _count_files(meta: Meta) -> str:
-        """Count files in the release path."""
-        path = meta.get('path', '')
-        if not path or not os.path.exists(path):
-            return ''
-        if os.path.isfile(path):
-            return '1'
-        count = sum(1 for _, _, files in os.walk(path) for _ in files)
-        return str(count) if count else ''
 
     # ──────────────────────────────────────────────────────────
     #  NFO file
