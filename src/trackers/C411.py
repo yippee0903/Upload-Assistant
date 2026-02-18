@@ -596,9 +596,41 @@ class C411(FrenchTrackerMixin):
         count = sum(1 for _, _, files in os.walk(path) for _ in files)
         return str(count) if count else ''
 
+    @staticmethod
+    def _patch_mi_filename(mi_text: str, new_name: str) -> str:
+        """Replace the ‘Complete name’ value in MediaInfo text with *new_name*.
+
+        C411’s API validates that the filename inside the uploaded MediaInfo
+        matches the release name.  Since we rename releases (language tags,
+        -NOTAG label, French title…) the original filename no longer matches.
+        This patches the ‘Complete name’ line while preserving the file extension.
+        """
+        if not mi_text or not new_name:
+            return mi_text
+
+        def _replace_complete_name(match: re.Match[str]) -> str:
+            prefix = match.group(1)   # "Complete name    : "
+            old_value = match.group(2)
+            ext_match = re.search(r'(\.[a-zA-Z0-9]{2,4})$', old_value)
+            ext = ext_match.group(1) if ext_match else ''
+            return f"{prefix}{new_name}{ext}"
+
+        return re.sub(
+            r'^(Complete name\s*:\s*)(.+)$',
+            _replace_complete_name,
+            mi_text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
     async def _get_mediainfo_text(self, meta: Meta) -> str:
-        """Read MediaInfo text from temp files."""
+        """Read MediaInfo text from temp files.
+
+        The ‘Complete name’ line is patched to match the C411-generated
+        release name so that the API filename-consistency check passes.
+        """
         base = os.path.join(meta.get('base_dir', ''), 'tmp', meta.get('uuid', ''))
+        content = ''
 
         # Prefer clean-path, then standard mediainfo
         for fname in ('MEDIAINFO_CLEANPATH.txt', 'MEDIAINFO.txt'):
@@ -607,16 +639,31 @@ class C411(FrenchTrackerMixin):
                 async with aiofiles.open(fpath, encoding='utf-8') as f:
                     content = await f.read()
                     if content.strip():
-                        return content
+                        break
+                    content = ''
 
         # BDInfo for disc releases
-        if meta.get('bdinfo') is not None:
+        if not content and meta.get('bdinfo') is not None:
             bd_path = os.path.join(base, 'BD_SUMMARY_00.txt')
             if os.path.exists(bd_path):
                 async with aiofiles.open(bd_path, encoding='utf-8') as f:
                     return await f.read()
 
-        return ''
+        if not content:
+            return ''
+
+        # Patch “Complete name” to match the tracker-generated release name
+        try:
+            name_result = await self.get_name(meta)
+            tracker_release_name = (
+                name_result.get('name', '') if isinstance(name_result, dict) else str(name_result)
+            )
+            if tracker_release_name:
+                content = self._patch_mi_filename(content, tracker_release_name)
+        except Exception:
+            pass  # If naming fails, return unpatched MI
+
+        return content
 
     async def _build_tmdb_data(self, meta: Meta) -> Union[str, None]:
         """Build tmdbData JSON string for C411.
@@ -828,6 +875,14 @@ class C411(FrenchTrackerMixin):
         if nfo_path and os.path.exists(nfo_path):
             async with aiofiles.open(nfo_path, 'rb') as f:
                 nfo_bytes = await f.read()
+            # Patch "Complete name" in NFO to match the tracker release name
+            if title and nfo_bytes:
+                try:
+                    nfo_text = nfo_bytes.decode('utf-8', errors='replace')
+                    nfo_text = self._patch_mi_filename(nfo_text, title)
+                    nfo_bytes = nfo_text.encode('utf-8')
+                except Exception:
+                    pass  # If patching fails, upload unpatched NFO
         else:
             console.print("[yellow]C411: No NFO available — upload may be rejected[/yellow]")
 
