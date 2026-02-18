@@ -335,6 +335,17 @@ class GF(FrenchTrackerMixin, UNIT3D):
         return await self._check_french_lang_dupes(dupes, meta)
 
     # ──────────────────────────────────────────────────────────
+    #  Title override — GF uses English title (except French works)
+    # ──────────────────────────────────────────────────────────
+
+    async def _get_french_title(self, meta):
+        """GF uses the English title unless the work is originally French."""
+        orig_lang = str(meta.get('original_language', '')).lower()
+        if orig_lang == 'fr':
+            return await super()._get_french_title(meta)
+        return meta.get('title', '')
+
+    # ──────────────────────────────────────────────────────────
     #  Cleaning override (GF forbids ALL special chars incl. +)
     # ──────────────────────────────────────────────────────────
 
