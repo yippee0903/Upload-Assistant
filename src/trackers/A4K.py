@@ -71,55 +71,49 @@ class A4K(UNIT3D):
                 console.print(f"[red]{self.tracker} only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
             return False
 
-        if not meta['is_disc'] and meta['type'] in ['ENCODE', 'WEBRIP', 'DVDRIP', 'HDTV']:
+        if not meta['is_disc'] and meta['type'] in ['ENCODE', 'WEBRIP', 'WEBDL', 'DVDRIP', 'HDTV']:
             tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+
+            # Try Video track BitRate first, then fall back to General OverallBitRate
+            bit_rate_num = None
+            bitrate_source = None
             for track in tracks:
                 if track.get('@type') == "Video":
-                    encoding_settings = track.get('Encoded_Library_Settings', {})
+                    raw = track.get('BitRate')
+                    if raw and not isinstance(raw, dict):
+                        try:
+                            bit_rate_num = int(raw)
+                            bitrate_source = 'video'
+                        except (ValueError, TypeError):
+                            pass
+                    break
 
-                    if encoding_settings:
-                        bit_rate = track.get('BitRate')
-                        if bit_rate:
-                            try:
-                                bit_rate_num = int(bit_rate)
-                            except (ValueError, TypeError):
-                                bit_rate_num = None
+            if bit_rate_num is None and tracks:
+                general = tracks[0] if tracks[0].get('@type') == 'General' else {}
+                raw = general.get('OverallBitRate')
+                if raw and not isinstance(raw, dict):
+                    try:
+                        bit_rate_num = int(raw)
+                        bitrate_source = 'overall'
+                    except (ValueError, TypeError):
+                        pass
 
-                            if bit_rate_num is not None:
-                                bit_rate_kbps = bit_rate_num / 1000
+            if bit_rate_num is not None:
+                bit_rate_kbps = bit_rate_num / 1000
+                min_kbps = 15000 if meta.get('category') == "MOVIE" else 10000
+                label = "movies" if meta.get('category') == "MOVIE" else "TV shows"
 
-                                if meta.get('category') == "MOVIE" and bit_rate_kbps < 15000:
-                                    if not meta.get('unattended', False):
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
-                                    return False
-                                elif meta.get('category') == "TV" and bit_rate_kbps < 10000:
-                                    if not meta.get('unattended', False):
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
-                                    return False
-                            else:
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                                    console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                    console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-                                    if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                        pass
-                                    else:
-                                        return False
-                        else:
-                            if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                                console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-                                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                    pass
-                                else:
-                                    return False
-                    else:
-                        if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
-                            console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                            console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-                            if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                pass
-                            else:
-                                return False
+                if bit_rate_kbps < min_kbps:
+                    source_label = "Overall" if bitrate_source == 'overall' else "Video"
+                    if not meta.get('unattended', False):
+                        console.print(f"[bold red]{source_label} bitrate too low: {bit_rate_kbps:.0f} kbps (minimum {min_kbps} kbps for {label}) for {self.tracker} upload.[/bold red]")
+                    return False
+            else:
+                if not meta.get('unattended') or meta.get('unattended_confirm', False):
+                    console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                    console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        return False
 
         return should_continue
 
