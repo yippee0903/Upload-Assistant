@@ -27,7 +27,7 @@ langcodes==3.5.1
 language-data==1.4.0
 lxml==6.0.2
 nest_asyncio==1.6.0
-packaging<25,>=21
+packaging<27,>=26
 Pillow==11.3.0
 psutil==7.2.2
 pycountry==24.6.1
