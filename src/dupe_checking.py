@@ -474,8 +474,10 @@ class DupeChecker:
                 if meta.get('debug'):
                     console.log(f"[debug] Season/Episode match result: {season_episode_match}")
                     console.log(f"[debug] is_season: {is_season}")
-                # Aither episode trumping logic
-                if is_season and tracker_name in ["AITHER", "LST"]:
+                # Aither episode trumping logic — only when uploading individual
+                # episodes, not season packs.  A season pack is never a "dupe" of
+                # single episodes (and vice-versa).
+                if is_season and tracker_name in ["AITHER", "LST"] and target_episode:
                     # Null-safe normalization for comparisons
                     target_source_lower = (target_source or "").lower()
                     type_id_lower = (type_id or "").lower()
@@ -538,8 +540,13 @@ class DupeChecker:
                                     remember_match('season_pack_contains_episode')
                                     # Don't exclude this entry - it's a valid trump target
                                     return False
-                                if already_exists and meta.get('debug'):
-                                    console.log(f"[debug] Skipping duplicate entry for episode ID {entry_id}")
+                                if already_exists:
+                                    if meta.get('debug'):
+                                        console.log(f"[debug] Skipping duplicate entry for episode ID {entry_id}")
+                                    # Still keep the entry as a dupe even though we
+                                    # already recorded it (avoids falling through to
+                                    # the season/episode exclusion on -ddc passes).
+                                    return False
 
                 # Normal season/episode matching
                 if not season_episode_match:
