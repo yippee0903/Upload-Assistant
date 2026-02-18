@@ -15,7 +15,6 @@ API docs reverse-engineered from:
 
 import asyncio
 import base64
-import glob
 import json
 import os
 import re
@@ -586,19 +585,16 @@ class TORR9(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
 
     async def _get_or_generate_nfo(self, meta: Meta) -> Union[str, None]:
-        """Get existing NFO path or generate one from MediaInfo.
+        """Generate a MediaInfo-based NFO for the upload.
 
-        Torr9 requires an NFO file for every upload.
+        TORR9 requires an NFO file for every upload.  The NFO field is the
+        only way to send MediaInfo to TORR9, so we **always** generate one
+        from MediaInfo — even when an original scene NFO is present.
+        Scene NFOs are only relevant for trackers that explicitly require
+        them (e.g. TOS).
         """
-        base = os.path.join(meta['base_dir'], 'tmp', meta['uuid'])
-
-        existing = glob.glob(os.path.join(base, '*.nfo'))
-        if existing:
-            return existing[0]
-
         nfo_gen = SceneNfoGenerator(self.config)
-        nfo_path = await nfo_gen.generate_nfo(meta, self.tracker)
-        return nfo_path
+        return await nfo_gen.generate_nfo(meta, self.tracker)
 
     # ──────────────────────────────────────────────────────────
     #  Upload
