@@ -243,6 +243,9 @@ class TrackerStatusManager:
                     if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
                         if not local_meta.get('unattended', False):
                             console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
+                        # Remind about bloat warning for this specific tracker
+                        if tracker_name in meta.get('bloated_trackers', set()):
+                            console.print(f"[bold red]⚠ Warning: This release may be considered bloated on {tracker_name}[/bold red]")
                         if (
                             not local_meta['unattended']
                             or (local_meta['unattended'] and local_meta.get('unattended_confirm', False))

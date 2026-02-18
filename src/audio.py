@@ -215,6 +215,7 @@ async def _get_audio_v2(
     dual = ""
     has_commentary = False
     meta['bloated'] = False
+    meta.setdefault('bloated_trackers', set())
     is_auro3d = False
     bd_mi = None
     additional: Any = ""
@@ -572,6 +573,7 @@ def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng
             # Remove these trackers from meta['trackers']
             meta['trackers'] = [t for t in meta.get('trackers', []) if t not in not_allowed_trackers]
             meta['bloated'] = True
+            meta.setdefault('bloated_trackers', set()).update(not_allowed_trackers)
             printed_not_allowed = True
             if meta['debug']:
                 console.print(f"[yellow]Removed trackers: {not_allowed_list}[/yellow]")
@@ -593,6 +595,7 @@ def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng
             console.print(warning_msg)
             printed_warning = True
             meta['bloated'] = True
+            meta.setdefault('bloated_trackers', set()).update(warning_trackers)
 
         # Early exit if we've printed both messages
         if printed_not_allowed and printed_warning:
