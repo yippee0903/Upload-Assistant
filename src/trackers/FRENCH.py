@@ -381,6 +381,24 @@ class FrenchTrackerMixin:
                 return True
         return False
 
+    @staticmethod
+    def _detect_vfq(meta: Meta) -> bool:
+        """Check if the release path/name indicates VFQ (Québec French)."""
+        for field in ('uuid', 'name', 'path'):
+            val = str(meta.get(field, '')).upper()
+            if re.search(r'(?:^|[\.\-_\s])VFQ(?:[\.\-_\s]|$)', val):
+                return True
+        return False
+
+    @staticmethod
+    def _detect_vff(meta: Meta) -> bool:
+        """Check if the release path/name indicates VFF (France French)."""
+        for field in ('uuid', 'name', 'path'):
+            val = str(meta.get(field, '')).upper()
+            if re.search(r'(?:^|[\.\-_\s])VFF(?:[\.\-_\s]|$)', val):
+                return True
+        return False
+
     # ──────────────────────────────────────────────────────────
     #  Build audio/language string
     # ──────────────────────────────────────────────────────────
@@ -415,6 +433,8 @@ class FrenchTrackerMixin:
         is_original_french = str(meta.get('original_language', '')).lower() == 'fr'
         is_truefrench = self._detect_truefrench(meta)
         is_vfi = self._detect_vfi(meta)
+        is_vfq_filename = self._detect_vfq(meta)
+        is_vff_filename = self._detect_vff(meta)
 
         def _fr_precision() -> str:
             """Determine the best French precision tag."""
@@ -429,6 +449,11 @@ class FrenchTrackerMixin:
             if fr_suffix == 'VFQ':
                 return 'VFQ'
             if fr_suffix == 'VFF':
+                return 'VFF'
+            # MediaInfo has generic 'fr' without region — check filename
+            if is_vfq_filename:
+                return 'VFQ'
+            if is_vff_filename:
                 return 'VFF'
             # Generic 'fr' without region — conservative default
             return 'VFF'
