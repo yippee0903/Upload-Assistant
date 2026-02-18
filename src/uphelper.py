@@ -195,6 +195,7 @@ class UploadHelper:
                             console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
                         else:
                             if french_supersede:
+                                console.print()
                                 console.print(f"[bold yellow]{tracker_name}: A release with French audio (MULTI / VFF / VFQ) already exists.[/bold yellow]")
                                 console.print("[yellow]So uploading a VOSTFR/VO version is not recommended.[/yellow]")
                             else:

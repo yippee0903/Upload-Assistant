@@ -276,12 +276,34 @@ class DupeChecker:
             # ── French tracker language hierarchy ──
             # If a French tracker flagged this entry as having superior French
             # audio (e.g., MULTI when the upload is VOSTFR), keep it as a
-            # dupe unconditionally — no other exclusion reason should drop it.
+            # dupe — but only when the season/episode and resolution actually
+            # match.  TMDB-based searches return *all* releases for a series,
+            # so a MULTI S01 1080p should never block a VOSTFR S04 2160p.
             if 'french_lang_supersede' in flags:
-                if meta.get('debug'):
-                    console.log(f"[yellow]French language supersede — keeping as dupe: {each}")
-                remember_match('french_lang_supersede')
-                return False
+                supersede_dominated = False
+
+                # Resolution must match (skip for DVD sources)
+                skip_res = bool(is_dvd or "DVD" in target_source or is_dvdrip)
+                if not skip_res and target_resolution and target_resolution not in each:
+                    supersede_dominated = True
+                    if meta.get('debug'):
+                        console.log(f"[yellow]French supersede skipped — resolution '{target_resolution}' mismatch: {each}")
+
+                # Season/episode must match for TV content
+                if not supersede_dominated and meta.get('category') == "TV":
+                    season_ep_match, _ = await DupeChecker.is_season_episode_match(
+                        normalized, target_season, target_episode,
+                    )
+                    if not season_ep_match:
+                        supersede_dominated = True
+                        if meta.get('debug'):
+                            console.log(f"[yellow]French supersede skipped — season/episode mismatch: {each}")
+
+                if not supersede_dominated:
+                    if meta.get('debug'):
+                        console.log(f"[yellow]French language supersede — keeping as dupe: {each}")
+                    remember_match('french_lang_supersede')
+                    return False
 
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
             if tracker_name in ["AITHER", "LST"] and entry.get('trumpable', False) and res_id and target_resolution == res_id:
