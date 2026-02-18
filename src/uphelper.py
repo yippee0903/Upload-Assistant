@@ -110,6 +110,11 @@ class UploadHelper:
                 else:
                     skip_dupe_asking = bool(self.default_config.get("skip_dupe_asking", False))
 
+            # When only a single tracker is selected via -tk, bypass skip_dupe_asking
+            # so the user always gets prompted about dupes instead of auto-blocking.
+            if skip_dupe_asking and len(meta.get('trackers', [])) == 1:
+                skip_dupe_asking = False
+
             # Detect French language hierarchy supersede
             french_supersede = any(
                 isinstance(d, dict) and 'french_lang_supersede' in (d.get('flags') or [])
