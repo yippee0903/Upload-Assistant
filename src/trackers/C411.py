@@ -580,7 +580,7 @@ class C411(FrenchTrackerMixin):
         # ── UA Signature ──
         ua_sig = meta.get('ua_signature', 'Created by Upload Assistant')
         parts.append("")
-        parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
+        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
 
         return "\n".join(parts)
 

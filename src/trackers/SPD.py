@@ -231,7 +231,7 @@ class SPD:
 
         # Signature
         desc_parts.append(
-            f"[url=https://github.com/Audionut/Upload-Assistant]{meta.get('ua_signature', '')}[/url]"
+            f"[url=https://github.com/yippee0903/Upload-Assistant]{meta.get('ua_signature', '')}[/url]"
         )
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())

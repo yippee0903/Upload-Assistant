@@ -520,7 +520,7 @@ class ASC:
         if custom_description_header:
             description_parts.append(custom_description_header + '\n')
 
-        description_parts.append(f"[center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
+        description_parts.append(f"[center][url=https://github.com/yippee0903/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/center]")
 
         final_desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, 'w', encoding='utf-8') as descfile:

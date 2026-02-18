@@ -141,7 +141,7 @@ class HDS:
 
         # Signature
         desc_parts.append(
-            f"[center][url=https://github.com/Audionut/Upload-Assistant][size=2]{meta.get('ua_signature', '')}[/size][/url][/center]"
+            f"[center][url=https://github.com/yippee0903/Upload-Assistant][size=2]{meta.get('ua_signature', '')}[/size][/url][/center]"
         )
 
         description = '\n\n'.join(part for part in desc_parts if part.strip())

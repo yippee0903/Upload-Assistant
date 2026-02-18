@@ -1,3 +1,11 @@
+> **⚠️ This is a fork of [Upload Assistant](https://github.com/Audionut/Upload-Assistant), originally created by [Audionut](https://github.com/Audionut) and [L4G](https://github.com/L4GSP1KE).**
+>
+> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers** (C411, TORR9, GF, G3MINI, TOS, etc.).
+>
+> For the original project, please refer to the [upstream repository](https://github.com/Audionut/Upload-Assistant).
+
+---
+
 ### NOTE:
 - This project is in development freeze. Only critical bugs will be addressed moving forward.
 - More details on the future of Upload Assistant will be available at a later date.
