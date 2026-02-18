@@ -336,14 +336,44 @@ class GF(FrenchTrackerMixin, UNIT3D):
 
     # ──────────────────────────────────────────────────────────
     #  Title override — GF uses English title (except French works)
+    #  + GF title-case convention (capitalize words > 2 chars)
     # ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _title_case(text: str) -> str:
+        """Apply GF title capitalisation convention.
+
+        Every word is capitalised except words of 2 characters or fewer,
+        which stay lowercase — unless they are the first word.
+
+        Examples:
+            "le seigneur des anneaux"  → "Le Seigneur des Anneaux"
+            "a day in the life"        → "A Day in The Life"
+        """
+        if not text or not text.strip():
+            return text
+        words = text.split()
+        result: list[str] = []
+        for i, word in enumerate(words):
+            if i == 0:
+                result.append(word.capitalize())
+            elif len(word) <= 2:
+                result.append(word.lower())
+            else:
+                result.append(word.capitalize())
+        return ' '.join(result)
+
     async def _get_french_title(self, meta):
-        """GF uses the English title unless the work is originally French."""
+        """GF uses the English title unless the work is originally French.
+
+        In both cases the GF title-case convention is applied.
+        """
         orig_lang = str(meta.get('original_language', '')).lower()
         if orig_lang == 'fr':
-            return await super()._get_french_title(meta)
-        return meta.get('title', '')
+            title = await super()._get_french_title(meta)
+        else:
+            title = meta.get('title', '')
+        return self._title_case(title)
 
     # ──────────────────────────────────────────────────────────
     #  Cleaning override (GF forbids ALL special chars incl. +)
