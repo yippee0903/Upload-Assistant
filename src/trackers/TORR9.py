@@ -403,6 +403,12 @@ class TORR9(FrenchTrackerMixin):
         if tmdb_id_val:
             tmdb_cat = 'movie' if meta.get('category', '').upper() != 'TV' else 'tv'
             ext_links.append(f'[url=https://www.themoviedb.org/{tmdb_cat}/{tmdb_id_val}]TMDB[/url]')
+        if meta.get('tvdb_id'):
+            ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
+        if meta.get('tvmaze_id'):
+            ext_links.append(f"[url=https://www.tvmaze.com/shows/{meta['tvmaze_id']}]TVmaze[/url]")
+        if meta.get('mal_id'):
+            ext_links.append(f"[url=https://myanimelist.net/anime/{meta['mal_id']}]MAL[/url]")
         if ext_links:
             parts.append('')
             parts.append(' │ '.join(ext_links))
