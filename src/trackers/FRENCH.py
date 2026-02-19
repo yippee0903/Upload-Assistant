@@ -918,6 +918,9 @@ class FrenchTrackerMixin:
     def _format_hdr_dv_bbcode(self, meta: dict) -> Optional[str]:
         """Return a plain-text string listing HDR formats.
 
+        When Dolby Vision is detected, the DV profile (e.g. "Profile 8.1")
+        is appended if available in the MediaInfo JSON data.
+
         Returns *None* when there is nothing to display (SDR content).
         """
         hdr_raw: str = (meta.get('hdr') or '').strip()
@@ -930,10 +933,54 @@ class FrenchTrackerMixin:
         labels: list[str] = []
         for key in ordered_keys:
             if key in remaining:
-                labels.append(self.HDR_LABELS[key])
+                label = self.HDR_LABELS[key]
+                # Enrich "Dolby Vision" with the DV profile from MediaInfo JSON
+                if key == 'DV':
+                    dv_profile = self._get_dv_profile(meta)
+                    if dv_profile:
+                        label = f"{label} ({dv_profile})"
+                labels.append(label)
                 remaining = remaining.replace(key, '', 1).strip()
 
         return ' + '.join(labels) if labels else None
+
+    @staticmethod
+    def _get_dv_profile(meta: dict) -> str:
+        """Extract a human-readable Dolby Vision profile from MediaInfo JSON.
+
+        ``HDR_Format_Profile`` typically looks like ``dvhe.08.06`` (Profile 8,
+        Level 6) or ``dvhe.05.06``.  We parse it into ``Profile 8.6`` etc.
+        Returns an empty string when unavailable.
+        """
+        tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+        for track in tracks:
+            if track.get('@type') != 'Video':
+                continue
+            raw = track.get('HDR_Format_Profile', '')
+            if not raw or isinstance(raw, dict):
+                # Also try HDR_Format_String which may contain "Profile X.Y"
+                hdr_str = track.get('HDR_Format_String', '')
+                if isinstance(hdr_str, str) and 'Profile' in hdr_str:
+                    import re as _re
+                    m = _re.search(r'Profile\s+(\d+(?:\.\d+)?)', hdr_str)
+                    if m:
+                        return f"Profile {m.group(1)}"
+                return ''
+            # Parse "dvhe.08.06" → Profile 8.6
+            # Format: dvhe.PP.LL or dvav.PP.LL (PP=profile, LL=level)
+            if isinstance(raw, str):
+                import re as _re
+                m = _re.search(r'(?:dvhe|dvav)\.(\d+)\.(\d+)', raw)
+                if m:
+                    profile = int(m.group(1))
+                    level = int(m.group(2))
+                    return f"Profile {profile}.{level}"
+                # Fallback: sometimes it's just "dvhe.08"
+                m = _re.search(r'(?:dvhe|dvav)\.(\d+)', raw)
+                if m:
+                    return f"Profile {int(m.group(1))}"
+            break
+        return ''
 
     def _format_audio_bbcode(self, mi_text: str, meta: Optional[Meta] = None) -> list[str]:
         """Build pretty BBCode lines for audio tracks.
