@@ -2,6 +2,7 @@
 """MediaInfo-based NFO generator for trackers that require/support NFO files."""
 
 import os
+import re
 from typing import Any, Optional
 
 import aiofiles
@@ -52,7 +53,10 @@ class SceneNfoGenerator:
                 return None
 
             # Save NFO file
-            nfo_filename = f"{release_name}.nfo"
+            # Sanitize release name for use as filename (remove characters
+            # forbidden on Windows: : * ? " < > |, and other problematic chars)
+            safe_name = re.sub(r'[<>:"/\\|?*]', '-', release_name)
+            nfo_filename = f"{safe_name}.nfo"
             nfo_path = os.path.join(output_dir, nfo_filename)
 
             async with aiofiles.open(nfo_path, 'w', encoding='utf-8') as f:
