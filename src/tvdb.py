@@ -153,6 +153,7 @@ class tvdb_data:
         episode: Optional[Union[int, str]] = None,
         absolute_number: Optional[Union[int, str]] = None,
         aired_date: Optional[str] = None,
+        original_language: Optional[str] = None,
     ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
         # Backward compat: older call sites used (series_id, debug)
         if isinstance(base_dir, bool) and debug is False:
@@ -271,6 +272,8 @@ class tvdb_data:
                                         specific_alias = eng_aliases[-1]
                                         if debug:
                                             console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
+                            if original_language and original_language == 'en':
+                                specific_alias = None
 
                             return episodes_data, specific_alias
             except Exception as cache_error:
@@ -415,6 +418,8 @@ class tvdb_data:
                     specific_alias = eng_aliases[-1]
                     if debug:
                         console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
+                if original_language and original_language == 'en':
+                    specific_alias = None
 
             return episodes_data, specific_alias
 
