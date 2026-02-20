@@ -516,7 +516,7 @@ class C411(FrenchTrackerMixin):
         #  Sous-titre(s)
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Sous-titre(s)[/color]")
-        sub_lines = self._format_subtitle_bbcode(mi_text)
+        sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
             for sl in sub_lines:
                 parts.append(f"    [i]{sl}[/i]")

@@ -1092,16 +1092,40 @@ class FrenchTrackerMixin:
             lines.append(''.join(parts))
         return lines
 
-    def _format_subtitle_bbcode(self, mi_text: str) -> list[str]:
+    def _format_subtitle_bbcode(self, mi_text: str, meta: Optional[Meta] = None) -> list[str]:
         """Build pretty BBCode lines for subtitle tracks.
 
+        When *meta* is provided, cross-references the JSON MediaInfo data
+        (which contains raw BCP-47 language codes like ``fr-CA``) with the
+        text-parsed tracks for accurate region flag detection.
+
+        Detection priority (same as audio):
+          1. JSON MediaInfo language code (``fr-FR`` → 🇫🇷, ``fr-CA`` → 🇨🇦, ``es-419`` → 🌎)
+          2. Region from MI text, e.g. ``French (CA)``
+          3. Explicit label in the track Title field
+
         Returns a list like:
-          ['🇫🇷 Français : SRT (complets)',
-           '🇺🇸 Anglais : SRT (forcés)']
+          ['🇫🇷 Français : PGS (complets)',
+           '🇨🇦 Français : PGS (forcés)',
+           '🇺🇸 Anglais : PGS (SDH)']
         """
         tracks = self._parse_mi_subtitle_tracks(mi_text)
         lines: list[str] = []
-        for st in tracks:
+
+        # ── Build a list of raw language codes from JSON MediaInfo ──
+        json_text_langs: list[str] = []
+        if meta:
+            try:
+                json_tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+                json_text_langs = [
+                    str(t.get('Language', '')).lower().strip()
+                    for t in json_tracks
+                    if t.get('@type') == 'Text'
+                ]
+            except (AttributeError, TypeError):
+                pass
+
+        for i, st in enumerate(tracks):
             lang = st.get('language', '') or 'Unknown'
             flag = self._lang_to_flag(lang)
             name = self._lang_to_french_name(lang)
@@ -1116,6 +1140,92 @@ class FrenchTrackerMixin:
 
             # Detect SDH from title
             sdh = bool(title and ('sdh' in title.lower() or 'hearing' in title.lower()))
+
+            # Normalise language: "French (CA)" → base="french", region="ca"
+            lang_lower = lang.lower().strip()
+            region_match = re.search(r'\((\w+)\)', lang_lower)
+            lang_region = region_match.group(1) if region_match else ''
+            lang_base = lang_lower.split('(')[0].strip()
+
+            # ── French region detection (VFQ / VFB) ──
+            if lang_base in ('french', 'fre', 'fra', 'français', 'francais'):
+                variant_detected = False
+
+                # Priority 1: raw BCP-47 language code from JSON MediaInfo
+                if i < len(json_text_langs):
+                    raw_code = json_text_langs[i]
+                    if raw_code in ('fr-ca', 'fr-qc'):
+                        flag = '🇨🇦'
+                        variant_detected = True
+                    elif raw_code == 'fr-be':
+                        flag = '🇧🇪'
+                        variant_detected = True
+                    elif raw_code in ('fr-fr', 'fr-ch'):
+                        variant_detected = True
+
+                # Priority 2: region from MI text, e.g. "French (CA)" → "ca"
+                if not variant_detected and lang_region:
+                    if lang_region == 'ca':
+                        flag = '🇨🇦'
+                        variant_detected = True
+                    elif lang_region == 'be':
+                        flag = '🇧🇪'
+                        variant_detected = True
+                    elif lang_region in ('fr', 'ch'):
+                        variant_detected = True
+
+                # Priority 3: explicit label in the track Title field
+                if not variant_detected and title:
+                    title_upper = title.upper()
+                    if 'CANADA' in title_upper or 'VFQ' in title_upper or 'QUÉB' in title_upper or 'QUEB' in title_upper:
+                        flag = '🇨🇦'
+                    elif 'BELG' in title_upper or 'VFB' in title_upper:
+                        flag = '🇧🇪'
+
+            # ── Spanish region detection ──
+            elif lang_base in ('spanish', 'spa', 'español', 'espanol'):
+                variant_detected = False
+
+                if i < len(json_text_langs):
+                    raw_code = json_text_langs[i]
+                    if raw_code == 'es-es':
+                        flag = '🇪🇸'
+                        variant_detected = True
+                    elif raw_code.startswith('es-') and raw_code != 'es-es':
+                        # Latin American variant (es-419, es-MX, etc.)
+                        flag = '🌎'
+                        variant_detected = True
+
+                if not variant_detected and lang_region:
+                    if lang_region == 'es':
+                        flag = '🇪🇸'
+                    elif lang_region in ('419', 'mx', 'ar', 'co', 'cl', 'pe', 've'):
+                        flag = '🌎'
+                    elif 'latin' in lang_lower:
+                        flag = '🌎'
+
+                if not variant_detected and not lang_region and title:
+                    title_lower = title.lower()
+                    if 'latin' in title_lower or 'latino' in title_lower:
+                        flag = '🌎'
+                    elif 'spain' in title_lower or 'españa' in title_lower or 'castill' in title_lower:
+                        flag = '🇪🇸'
+
+            # ── Portuguese region detection ──
+            elif lang_base in ('portuguese', 'por', 'português', 'portugues'):
+                if i < len(json_text_langs):
+                    raw_code = json_text_langs[i]
+                    if raw_code in ('pt-br',):
+                        flag = '🇧🇷'
+                    elif raw_code in ('pt-pt', 'pt'):
+                        flag = '🇵🇹'
+                elif lang_region:
+                    if lang_region == 'br':
+                        flag = '🇧🇷'
+                elif title:
+                    title_lower = title.lower()
+                    if 'brazil' in title_lower or 'brasil' in title_lower:
+                        flag = '🇧🇷'
 
             # Build qualifier
             if forced:

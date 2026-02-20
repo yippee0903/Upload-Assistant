@@ -477,7 +477,7 @@ class TORR9(FrenchTrackerMixin):
 
         # ── Subtitles ──
         parts.append(f'[b][color={C}][size=18]━━━ Sous-titre(s) ━━━[/size][/color][/b]')
-        sub_lines = self._format_subtitle_bbcode(mi_text)
+        sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
             for sl in sub_lines:
                 parts.append(f' {sl}')
