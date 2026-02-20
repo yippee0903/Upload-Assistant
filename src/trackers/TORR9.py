@@ -59,6 +59,10 @@ class TORR9(FrenchTrackerMixin):
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[str] = [""]
 
+    # TORR9 accepts both French and English titles in release names;
+    # the original title is preferred.
+    PREFER_ORIGINAL_TITLE: bool = True
+
     # ──────────────────────────────────────────────────────────
     #  Authentication — login to obtain Bearer JWT
     # ──────────────────────────────────────────────────────────
@@ -877,9 +881,11 @@ class TORR9(FrenchTrackerMixin):
         """Search for existing torrents on Torr9.
 
         Uses the dedicated ``/api/v1/torrents/search?q=…`` endpoint which
-        performs a title-based search.  The generic ``/api/v1/torrents``
-        listing endpoint ignores the ``q`` parameter and just returns
-        paginated results.
+        performs a title-based search.
+
+        TORR9 releases may be listed under the French *or* the English title,
+        so we **always** search both (when they differ) and merge the results.
+        The original title is searched first; the other serves as complement.
         """
         dupes: list[dict[str, Any]] = []
 
@@ -899,94 +905,98 @@ class TORR9(FrenchTrackerMixin):
         def _normalize(s: str) -> str:
             return re.sub(r'[^a-z0-9]', '', unidecode(s).lower())
 
-        # Use the French title for search if available (TORR9 indexes French names),
-        # falling back to the English title.
-        search_title = fr_title or title
-        search_term = f"{search_title} {year}".strip()
+        # Build the list of search queries — original-language title first
+        search_queries: list[str] = []
+        is_original_french = str(meta.get('original_language', '')).lower() == 'fr'
 
-        if not search_term:
+        if is_original_french:
+            # Original is French → search FR first, then EN as complement
+            if fr_title:
+                search_queries.append(f"{fr_title} {year}".strip())
+            if title and _normalize(title) != _normalize(fr_title or ''):
+                search_queries.append(f"{title} {year}".strip())
+        else:
+            # Original is not French → search EN first, then FR as complement
+            if title:
+                search_queries.append(f"{title} {year}".strip())
+            if fr_title and _normalize(fr_title) != _normalize(title or ''):
+                search_queries.append(f"{fr_title} {year}".strip())
+
+        if not search_queries:
             return []
+
+        title_norm = _normalize(title)
+        fr_title_norm = _normalize(fr_title) if fr_title else ''
+        year_str = str(year).strip()
+        seen_names: set[str] = set()
 
         try:
             headers = {
                 'Authorization': f'Bearer {token}',
                 'Accept': 'application/json',
             }
-            params: dict[str, str] = {'q': search_term}
 
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(
-                    'https://api.torr9.xyz/api/v1/torrents/search',
-                    headers=headers,
-                    params=params,
-                )
-
-                # If the French title search returned nothing and we have an English
-                # title that differs, try again with the English title.
-                if response.status_code == 200:
+                for search_term in search_queries:
                     try:
-                        first_data = response.json()
-                        first_items = first_data.get('torrents', first_data.get('data', []))
-                    except Exception:
-                        first_items = []
-
-                    if not first_items and fr_title and title and _normalize(fr_title) != _normalize(title):
-                        alt_term = f"{title} {year}".strip()
                         response = await client.get(
                             'https://api.torr9.xyz/api/v1/torrents/search',
                             headers=headers,
-                            params={'q': alt_term},
+                            params={'q': search_term},
                         )
+                    except Exception:
+                        continue
 
-            if response.status_code != 200:
-                if meta.get('debug'):
-                    console.print(f"[yellow]TORR9 search returned HTTP {response.status_code}[/yellow]")
-                return []
+                    if response.status_code != 200:
+                        if meta.get('debug'):
+                            console.print(f"[yellow]TORR9 search returned HTTP {response.status_code} for '{search_term}'[/yellow]")
+                        continue
 
-            try:
-                data = response.json()
-            except json.JSONDecodeError:
-                return []
+                    try:
+                        data = response.json()
+                    except json.JSONDecodeError:
+                        continue
 
-            items = data.get('torrents', data.get('data', []))
-            if items is None:
-                items = []
+                    items = data.get('torrents', data.get('data', []))
+                    if not items:
+                        continue
 
-            title_norm = _normalize(title)
-            fr_title_norm = _normalize(fr_title) if fr_title else ''
-            year_str = str(year).strip()
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        name = item.get('title', item.get('name', ''))
+                        if not name:
+                            continue
 
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                name = item.get('title', item.get('name', ''))
-                if not name:
-                    continue
+                        # De-duplicate across queries
+                        name_norm = _normalize(name)
+                        if name_norm in seen_names:
+                            continue
 
-                # Filter: the result must contain the title (EN or FR) AND year to be relevant
-                name_norm = _normalize(name)
-                title_match = title_norm and title_norm in name_norm
-                fr_title_match = fr_title_norm and fr_title_norm in name_norm
-                if not title_match and not fr_title_match:
-                    if meta.get('debug'):
-                        console.print(f"[dim]TORR9 dupe skip (title mismatch): {name}[/dim]")
-                    continue
-                if year_str and year_str not in name:
-                    if meta.get('debug'):
-                        console.print(f"[dim]TORR9 dupe skip (year mismatch): {name}[/dim]")
-                    continue
+                        # Filter: the result must contain the title (EN or FR) AND year to be relevant
+                        title_match = title_norm and title_norm in name_norm
+                        fr_title_match = fr_title_norm and fr_title_norm in name_norm
+                        if not title_match and not fr_title_match:
+                            if meta.get('debug'):
+                                console.print(f"[dim]TORR9 dupe skip (title mismatch): {name}[/dim]")
+                            continue
+                        if year_str and year_str not in name:
+                            if meta.get('debug'):
+                                console.print(f"[dim]TORR9 dupe skip (year mismatch): {name}[/dim]")
+                            continue
 
-                dupes.append({
-                    'name': name,
-                    'size': item.get('size', item.get('file_size_bytes')),
-                    'link': (
-                        item.get('url')
-                        or item.get('link')
-                        or (f"{self.torrent_url}{item['slug']}" if item.get('slug') else None)
-                        or (f"{self.torrent_url}{item['id']}" if item.get('id') else None)
-                    ),
-                    'id': item.get('id', item.get('torrent_id')),
-                })
+                        seen_names.add(name_norm)
+                        dupes.append({
+                            'name': name,
+                            'size': item.get('size', item.get('file_size_bytes')),
+                            'link': (
+                                item.get('url')
+                                or item.get('link')
+                                or (f"{self.torrent_url}{item['slug']}" if item.get('slug') else None)
+                                or (f"{self.torrent_url}{item['id']}" if item.get('id') else None)
+                            ),
+                            'id': item.get('id', item.get('torrent_id')),
+                        })
 
         except Exception as e:
             if meta.get('debug'):

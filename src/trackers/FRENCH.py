@@ -175,6 +175,12 @@ class FrenchTrackerMixin:
     # Set to False for trackers that want the service only in the description.
     INCLUDE_SERVICE_IN_NAME: bool = True
 
+    # Whether to prefer the original-language title in release names.
+    # When True and the movie is not originally French, the English/original
+    # title is used instead of the French TMDB translation.
+    # Set to True for trackers that accept both title languages (e.g. TORR9).
+    PREFER_ORIGINAL_TITLE: bool = False
+
     # ──────────────────────────────────────────────────────────
     #  Audio-track helpers
     # ──────────────────────────────────────────────────────────
@@ -527,7 +533,15 @@ class FrenchTrackerMixin:
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """Build the dot-separated release name (French-tracker conventions)."""
 
-        title = await self._get_french_title(meta)
+        # When PREFER_ORIGINAL_TITLE is set and the movie is not originally
+        # French, use the original (English) title instead of the TMDB French
+        # translation.  For originally-French works the French title *is* the
+        # original, so we always fetch it.
+        is_original_french = str(meta.get('original_language', '')).lower() == 'fr'
+        if self.PREFER_ORIGINAL_TITLE and not is_original_french:
+            title = meta.get('title', '')
+        else:
+            title = await self._get_french_title(meta)
         language = await self._build_audio_string(meta)
 
         year = meta.get('year', '')
