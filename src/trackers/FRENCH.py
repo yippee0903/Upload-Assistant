@@ -672,8 +672,21 @@ class FrenchTrackerMixin:
 
     @staticmethod
     def _fr_clean(text: str) -> str:
-        """Strip accents and non-filename characters."""
+        """Strip accents and non-filename characters.
+
+        French elided articles (l', d', qu', etc.) are expanded so that
+        ``l'Ordre`` becomes ``L Ordre`` (→ ``L.Ordre`` after dot-formatting),
+        matching French-tracker naming conventions.
+        """
         text = unidecode(text)
+        # Replace apostrophes / RIGHT SINGLE QUOTATION MARK / backticks
+        # that follow a French elided article with a space, and uppercase
+        # the article letter:  l'Ordre → L Ordre,  d'Artagnan → D Artagnan
+        text = re.sub(
+            r"\b([lLdDnNsScCjJmM]|[Qq]u|[Jj]usqu|[Ll]orsqu|[Pp]uisqu)['\u2019`]",
+            lambda m: m.group(1).capitalize() + ' ',
+            text,
+        )
         return re.sub(r'[^a-zA-Z0-9 .+\-]', '', text)
 
     # ──────────────────────────────────────────────────────────

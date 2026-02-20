@@ -57,6 +57,40 @@ class C411(FrenchTrackerMixin):
     # it should appear in the description instead.
     INCLUDE_SERVICE_IN_NAME: bool = False
 
+    def _format_name(self, raw_name: str) -> dict[str, str]:
+        """C411 override: title-case only the movie/show title portion.
+
+        C411 convention capitalises every word in the title while leaving
+        technical tokens (codec, resolution, language, etc.) untouched.
+
+        The title is everything before the first 4-digit year or season
+        marker (S01…).  Everything after is left as-is.
+
+        Examples:
+          ``L.Age.De.Glace``  instead of ``L.Age.de.glace``
+          ``Hier.J.Arrete``   instead of ``Hier.J.arrete``
+        """
+        result = super()._format_name(raw_name)
+        dot_name = result['name']
+
+        # Find where the title ends: first 4-digit year or SXX pattern
+        parts = dot_name.split('.')
+        title_end = 0
+        for j, part in enumerate(parts):
+            if re.match(r'^\d{4}$', part) or re.match(r'^S\d{2}', part, re.IGNORECASE):
+                title_end = j
+                break
+        else:
+            # No year/season found — title-case everything except group tag
+            title_end = len(parts)
+
+        # Title-case only the title segments
+        for k in range(title_end):
+            parts[k] = parts[k].capitalize()
+
+        result['name'] = '.'.join(parts)
+        return result
+
 
     # ──────────────────────────────────────────────────────────
     #  C411 API field mapping
