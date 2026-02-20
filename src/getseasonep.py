@@ -321,10 +321,11 @@ class SeasonEpisodeManager:
 
     async def check_season_pack_completeness(self, meta: Meta) -> None:
         completeness = cast(Mapping[str, Any], await self.check_season_pack_detail(meta))
+        unattended = meta.get('unattended', False)
+        unattended_confirm = meta.get('unattended_confirm', False)
+
         if not completeness['complete']:
             just_go = False
-            unattended = meta.get('unattended', False)
-            unattended_confirm = meta.get('unattended_confirm', False)
             try:
                 missing_list = [f"S{s:02d}E{e:02d}" for s, e in completeness['missing_episodes']]
             except ValueError:
@@ -391,12 +392,129 @@ class SeasonEpisodeManager:
             if meta.get('debug', False):
                 console.print("[green]Season pack completeness verified")
 
-        if not completeness['consistent_tags']:
-            console.print("[yellow]Warning: Multiple group tags detected in season pack!")
-            for tag, files in completeness['tags_found'].items():
-                console.print(f"[cyan]Tag: {tag} found in files:")
-                for file in files:
-                    console.print(f"[cyan]  - {file}")
+        # --- Pack homogeneity check (group tag + specs) ---
+        homogeneity = await self.check_pack_homogeneity(meta)
+        has_tag_issues = not completeness['consistent_tags']
+        has_spec_issues = not homogeneity['homogeneous']
+
+        if has_tag_issues or has_spec_issues:
+            console.print("\n[bold red]Warning: Pack homogeneity issues detected!")
+            console.print("[yellow]All files in a pack should share the same specs "
+                          "(resolution, codec, source, language, group).")
+
+            if has_tag_issues:
+                console.print("\n[bold yellow]Release Group mismatch:")
+                for tag, tag_files in completeness['tags_found'].items():
+                    label = tag if tag else '(none)'
+                    console.print(f"  [cyan]{label}[/cyan] ({len(tag_files)} file{'s' if len(tag_files) != 1 else ''})")
+                    for fn in tag_files[:5]:
+                        console.print(f"    [dim]- {fn}[/dim]")
+                    if len(tag_files) > 5:
+                        console.print(f"    [dim]... and {len(tag_files) - 5} more[/dim]")
+
+            if has_spec_issues:
+                for spec_name, values in homogeneity['issues'].items():
+                    console.print(f"\n[bold yellow]{spec_name} mismatch:")
+                    for value, spec_files in values.items():
+                        console.print(f"  [cyan]{value}[/cyan] ({len(spec_files)} file{'s' if len(spec_files) != 1 else ''})")
+                        for fn in spec_files[:5]:
+                            console.print(f"    [dim]- {fn}[/dim]")
+                        if len(spec_files) > 5:
+                            console.print(f"    [dim]... and {len(spec_files) - 5} more[/dim]")
+
+            if not unattended or unattended_confirm:
+                response = await asyncio.to_thread(
+                    input, "\nContinue despite pack homogeneity issues? (y/N): "
+                )
+                if response.lower() != 'y':
+                    console.print("[red]Aborting due to pack homogeneity issues.")
+                    sys.exit(1)
+            else:
+                console.print("[yellow]Unattended mode: continuing despite pack homogeneity issues.")
+        else:
+            if meta.get('debug', False):
+                console.print("[green]Pack homogeneity verified")
+
+    async def check_pack_homogeneity(self, meta: Meta) -> dict[str, Any]:
+        """
+        Check that all video files in a TV pack have consistent specs:
+        resolution, video codec, source, audio codec, and language tags.
+        Returns {'homogeneous': bool, 'issues': dict}.
+        """
+        VIDEO_EXTENSIONS = {'.mkv', '.mp4', '.avi', '.ts', '.m2ts', '.wmv', '.mov', '.flv', '.webm'}
+        LANG_PATTERN = re.compile(
+            r'\b(MULTI|MULTi|DUAL|FRENCH|TRUEFRENCH|VFF|VFI|VFQ|VF2|VFA|'
+            r'VO|VOST|VOSTFR|SUBFRENCH|ENGLISH|GERMAN|SPANISH|ITALIAN|'
+            r'PORTUGUESE|JAPANESE|KOREAN|CHINESE|ARABIC|HINDI|RUSSIAN|'
+            r'POLISH|CZECH|DUTCH|SWEDISH|NORWEGIAN|DANISH|FINNISH|'
+            r'HUNGARIAN|ROMANIAN|TURKISH|GREEK)\b',
+            re.IGNORECASE,
+        )
+
+        files = cast(list[str], meta.get('filelist', []))
+        video_files = [f for f in files if os.path.splitext(f)[1].lower() in VIDEO_EXTENSIONS]
+
+        if len(video_files) < 2:
+            return {'homogeneous': True, 'issues': {}}
+
+        specs: dict[str, dict[str, list[str]]] = {
+            'Resolution': {},
+            'Video Codec': {},
+            'Source': {},
+            'Audio Codec': {},
+            'Language': {},
+        }
+
+        for file_path in video_files:
+            filename = os.path.basename(file_path)
+            parsed = _guessit_data(filename)
+
+            # Resolution
+            res = str(parsed.get('screen_size', ''))
+            if res:
+                specs['Resolution'].setdefault(res, []).append(filename)
+
+            # Video codec
+            codec = str(parsed.get('video_codec', ''))
+            if codec:
+                specs['Video Codec'].setdefault(codec, []).append(filename)
+
+            # Source — guessit may return a list
+            source_raw = parsed.get('source', '')
+            if isinstance(source_raw, list):
+                source = ' '.join(sorted(str(s) for s in source_raw))
+            else:
+                source = str(source_raw) if source_raw else ''
+            if source:
+                specs['Source'].setdefault(source, []).append(filename)
+
+            # Audio codec
+            audio = str(parsed.get('audio_codec', ''))
+            if audio:
+                specs['Audio Codec'].setdefault(audio, []).append(filename)
+
+            # Language tags from filename
+            lang_matches = LANG_PATTERN.findall(filename)
+            if lang_matches:
+                lang_tag = ' '.join(sorted(set(m.upper() for m in lang_matches)))
+                specs['Language'].setdefault(lang_tag, []).append(filename)
+
+        issues: dict[str, dict[str, list[str]]] = {}
+        for spec_name, values in specs.items():
+            # Flag only when 2+ distinct detected values exist
+            if len(values) > 1:
+                issues[spec_name] = values
+
+        if meta.get('debug', False):
+            for spec_name, values in specs.items():
+                if values:
+                    keys = list(values.keys())
+                    console.print(f"[cyan]Pack {spec_name}: {keys}")
+
+        return {
+            'homogeneous': len(issues) == 0,
+            'issues': issues,
+        }
 
     async def check_season_pack_detail(self, meta: Meta) -> dict[str, Any]:
         if not meta.get('tv_pack'):
