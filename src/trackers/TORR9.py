@@ -979,7 +979,12 @@ class TORR9(FrenchTrackerMixin):
                 dupes.append({
                     'name': name,
                     'size': item.get('size', item.get('file_size_bytes')),
-                    'link': item.get('url', item.get('link')),
+                    'link': (
+                        item.get('url')
+                        or item.get('link')
+                        or (f"{self.torrent_url}{item['slug']}" if item.get('slug') else None)
+                        or (f"{self.torrent_url}{item['id']}" if item.get('id') else None)
+                    ),
                     'id': item.get('id', item.get('torrent_id')),
                 })
 
