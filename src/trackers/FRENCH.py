@@ -1161,10 +1161,41 @@ class FrenchTrackerMixin:
             # ── Audio Description detection ──
             is_audio_desc = bool(title and 'AUDIO DESCRIPTION' in title)
 
+            # ── Commentary detection ──
+            commentary_tag = ''
+            title_original = at.get('title', '')
+            if title and 'COMMENTARY' in title:
+                # Extract short descriptor from title patterns:
+                #   "English [Philosopher Commentary]" → "Philosopher"
+                #   "Cast and Crew Commentary" → "Cast and Crew"
+                #   "Composer Commentary/Music-Only Track" → "Composer"
+                #   "Commentary by Director ..." → too long, just [Commentaire]
+                label = ''
+                # Pattern: "Language [Descriptor Commentary...]"
+                bracket_match = re.search(r'\[([^\]]*commentary[^\]]*)\]', title_original, re.IGNORECASE)
+                if bracket_match:
+                    inner = bracket_match.group(1).strip()
+                    # Remove "Commentary" and anything after "/" from inner text
+                    inner = re.sub(r'\s*Commentary.*', '', inner, flags=re.IGNORECASE).strip()
+                    if inner and inner.lower() != lang_base:
+                        label = inner
+                else:
+                    # Pattern: "Descriptor Commentary" (no brackets)
+                    comm_match = re.match(r'^(.+?)\s+Commentary', title_original, re.IGNORECASE)
+                    if comm_match:
+                        label = comm_match.group(1).strip()
+
+                if label and len(label) <= 40:
+                    commentary_tag = f'Commentaire : {label}'
+                else:
+                    commentary_tag = 'Commentaire'
+
             # Build: flag Name [layout] : Codec @ Bitrate
             parts: list[str] = [f'{flag} {name}']
             if is_audio_desc:
                 parts.append(' [AD]')
+            if commentary_tag:
+                parts.append(f' [{commentary_tag}]')
             if layout:
                 parts.append(f' [{layout}]')
             codec = commercial or fmt
@@ -1330,6 +1361,9 @@ class FrenchTrackerMixin:
                     flag = '🇨🇳'
                     name = 'Cantonais (simplifié)'
 
+            # ── Commentary detection ──
+            is_commentary = bool(title and 'commentary' in title.lower())
+
             # Build qualifier
             if forced:
                 qualifier = 'forcés'
@@ -1337,6 +1371,9 @@ class FrenchTrackerMixin:
                 qualifier = 'SDH'
             else:
                 qualifier = 'complets'
+
+            if is_commentary:
+                qualifier += ', commentaire'
 
             parts: list[str] = [f'{flag} {name}']
             if fmt_short:
