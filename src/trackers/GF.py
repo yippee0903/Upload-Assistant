@@ -69,7 +69,10 @@ class GF(FrenchTrackerMixin, UNIT3D):
         self.requests_url = f'{self.base_url}/api/requests/filter'
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = ['']
+        self.banned_groups = [
+            'Akebono', 'Dread-Team', 'EXTREME', 'FL3ER', 'KyX-LazerTeam',
+            'RARBG', 'STVFRV', 'SUNS3T', 'TireXo', 'Zone80',
+        ]
         self.source_flag = 'GF'
 
     WEB_LABEL: str = 'WEB'
