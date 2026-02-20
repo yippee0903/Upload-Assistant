@@ -104,7 +104,7 @@ LANG_FLAGS: dict[str, str] = {
     'slovenian': '🇸🇮', 'estonian': '🇪🇪', 'icelandic': '🇮🇸', 'lithuanian': '🇱🇹',
     'latvian': '🇱🇻', 'ukrainian': '🇺🇦', 'hindi': '🇮🇳', 'tamil': '🇮🇳',
     'telugu': '🇮🇳', 'malay': '🇲🇾', 'vietnamese': '🇻🇳', 'persian': '🇮🇷',
-    'cantonese': '🇭🇰', 'mandarin': '🇨🇳', 'slovak': '🇸🇰',
+    'cantonese': '�🇳', 'mandarin': '🇨🇳', 'slovak': '🇸🇰',
     'catalan': '🇪🇸', 'basque': '🇪🇸', 'galician': '🇪🇸',
     'bengali': '🇧🇩', 'urdu': '🇵🇰', 'tagalog': '🇵🇭', 'filipino': '🇵🇭',
     'khmer': '🇰🇭', 'mongolian': '🇲🇳', 'georgian': '🇬🇪', 'albanian': '🇦🇱',
@@ -1113,20 +1113,20 @@ class FrenchTrackerMixin:
                         flag = '🇪🇸'
                         variant_detected = True
                     elif raw_code.startswith('es-') and raw_code != 'es-es':
-                        flag = '🌎'
+                        flag = '�🇽'
                         variant_detected = True
 
                 if not variant_detected and lang_region:
                     if lang_region == 'es':
                         flag = '🇪🇸'
                     elif lang_region in ('419', 'mx', 'ar', 'co', 'cl', 'pe', 've'):
-                        flag = '🌎'
+                        flag = '🇲🇽'
                     elif 'latin' in lang_lower:
-                        flag = '🌎'
+                        flag = '🇲🇽'
 
                 if not variant_detected and not lang_region and title:
                     if 'LATIN' in title or 'LATINO' in title:
-                        flag = '🌎'
+                        flag = '🇲🇽'
                     elif 'SPAIN' in title or 'ESPAÑA' in title or 'CASTILL' in title:
                         flag = '🇪🇸'
 
@@ -1155,20 +1155,18 @@ class FrenchTrackerMixin:
 
             # ── Mandarin script variant detection ──
             elif lang_base in ('mandarin',):
+                flag = '🇨🇳'
                 if lang_region == 'hant':
-                    flag = '🇹🇼'
                     name = 'Mandarin (traditionnel)'
                 elif lang_region == 'hans':
-                    flag = '🇨🇳'
                     name = 'Mandarin (simplifié)'
 
             # ── Cantonese script variant detection ──
             elif lang_base in ('cantonese',):
+                flag = '🇨🇳'
                 if lang_region == 'hant':
-                    flag = '🇭🇰'
                     name = 'Cantonais (traditionnel)'
                 elif lang_region == 'hans':
-                    flag = '🇨🇳'
                     name = 'Cantonais (simplifié)'
 
             # ── Audio Description detection ──
@@ -1320,21 +1318,21 @@ class FrenchTrackerMixin:
                         variant_detected = True
                     elif raw_code.startswith('es-') and raw_code != 'es-es':
                         # Latin American variant (es-419, es-MX, etc.)
-                        flag = '🌎'
+                        flag = '�🇽'
                         variant_detected = True
 
                 if not variant_detected and lang_region:
                     if lang_region == 'es':
                         flag = '🇪🇸'
                     elif lang_region in ('419', 'mx', 'ar', 'co', 'cl', 'pe', 've'):
-                        flag = '🌎'
+                        flag = '🇲🇽'
                     elif 'latin' in lang_lower:
-                        flag = '🌎'
+                        flag = '🇲🇽'
 
                 if not variant_detected and not lang_region and title:
                     title_lower = title.lower()
                     if 'latin' in title_lower or 'latino' in title_lower:
-                        flag = '🌎'
+                        flag = '🇲🇽'
                     elif 'spain' in title_lower or 'españa' in title_lower or 'castill' in title_lower:
                         flag = '🇪🇸'
 
@@ -1356,22 +1354,18 @@ class FrenchTrackerMixin:
 
             # ── Mandarin script variant detection ──
             elif lang_base in ('mandarin',):
-                # (Hant) = Traditional Chinese → Taiwan, (Hans) = Simplified → China
+                flag = '🇨🇳'
                 if lang_region == 'hant':
-                    flag = '🇹🇼'
                     name = 'Mandarin (traditionnel)'
                 elif lang_region == 'hans':
-                    flag = '🇨🇳'
                     name = 'Mandarin (simplifié)'
 
             # ── Cantonese script variant detection ──
             elif lang_base in ('cantonese',):
-                # Cantonese is primarily spoken in Hong Kong (Hant) and Guangdong (Hans)
+                flag = '🇨🇳'
                 if lang_region == 'hant':
-                    flag = '🇭🇰'
                     name = 'Cantonais (traditionnel)'
                 elif lang_region == 'hans':
-                    flag = '🇨🇳'
                     name = 'Cantonais (simplifié)'
 
             # ── Commentary detection ──
