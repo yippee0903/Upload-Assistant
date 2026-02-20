@@ -104,6 +104,11 @@ LANG_FLAGS: dict[str, str] = {
     'slovenian': '🇸🇮', 'estonian': '🇪🇪', 'icelandic': '🇮🇸', 'lithuanian': '🇱🇹',
     'latvian': '🇱🇻', 'ukrainian': '🇺🇦', 'hindi': '🇮🇳', 'tamil': '🇮🇳',
     'telugu': '🇮🇳', 'malay': '🇲🇾', 'vietnamese': '🇻🇳', 'persian': '🇮🇷',
+    'cantonese': '🇭🇰', 'mandarin': '🇨🇳', 'slovak': '🇸🇰',
+    'catalan': '🇪🇸', 'basque': '🇪🇸', 'galician': '🇪🇸',
+    'bengali': '🇧🇩', 'urdu': '🇵🇰', 'tagalog': '🇵🇭', 'filipino': '🇵🇭',
+    'khmer': '🇰🇭', 'mongolian': '🇲🇳', 'georgian': '🇬🇪', 'albanian': '🇦🇱',
+    'macedonian': '🇲🇰', 'bosnian': '🇧🇦', 'swahili': '🇰🇪',
 }
 
 # ── Language → French display name ───────────────────────────
@@ -121,7 +126,12 @@ LANG_NAMES_FR: dict[str, str] = {
     'icelandic': 'Islandais', 'lithuanian': 'Lituanien', 'latvian': 'Letton',
     'ukrainian': 'Ukrainien', 'hindi': 'Hindi', 'tamil': 'Tamoul',
     'telugu': 'Télougou', 'malay': 'Malais', 'vietnamese': 'Vietnamien',
-    'persian': 'Persan',
+    'persian': 'Persan', 'cantonese': 'Cantonais', 'mandarin': 'Mandarin',
+    'slovak': 'Slovaque', 'catalan': 'Catalan', 'basque': 'Basque',
+    'galician': 'Galicien', 'bengali': 'Bengali', 'urdu': 'Ourdou',
+    'tagalog': 'Tagalog', 'filipino': 'Filipino', 'khmer': 'Khmer',
+    'mongolian': 'Mongol', 'georgian': 'Géorgien', 'albanian': 'Albanais',
+    'macedonian': 'Macédonien', 'bosnian': 'Bosniaque', 'swahili': 'Swahili',
 }
 
 # Canonical list of French language values (for subtitle/audio detection)
@@ -1080,8 +1090,81 @@ class FrenchTrackerMixin:
                         name = 'Français VFI'
                     # VFF, TRUEFRENCH, VOF → just "Français" (default)
 
+            # ── Spanish region detection ──
+            elif lang_base in ('spanish', 'spa', 'español', 'espanol'):
+                variant_detected = False
+
+                if i < len(json_audio_langs):
+                    raw_code = json_audio_langs[i]
+                    if raw_code == 'es-es':
+                        flag = '🇪🇸'
+                        variant_detected = True
+                    elif raw_code.startswith('es-') and raw_code != 'es-es':
+                        flag = '🌎'
+                        variant_detected = True
+
+                if not variant_detected and lang_region:
+                    if lang_region == 'es':
+                        flag = '🇪🇸'
+                    elif lang_region in ('419', 'mx', 'ar', 'co', 'cl', 'pe', 've'):
+                        flag = '🌎'
+                    elif 'latin' in lang_lower:
+                        flag = '🌎'
+
+                if not variant_detected and not lang_region and title:
+                    if 'LATIN' in title or 'LATINO' in title:
+                        flag = '🌎'
+                    elif 'SPAIN' in title or 'ESPAÑA' in title or 'CASTILL' in title:
+                        flag = '🇪🇸'
+
+            # ── Portuguese region detection ──
+            elif lang_base in ('portuguese', 'por', 'português', 'portugues'):
+                variant_detected = False
+
+                if i < len(json_audio_langs):
+                    raw_code = json_audio_langs[i]
+                    if raw_code in ('pt-br',):
+                        flag = '🇧🇷'
+                        variant_detected = True
+                    elif raw_code in ('pt-pt', 'pt'):
+                        flag = '🇵🇹'
+                        variant_detected = True
+
+                if not variant_detected and lang_region:
+                    if lang_region == 'br':
+                        flag = '🇧🇷'
+                    elif lang_region in ('pt',):
+                        flag = '🇵🇹'
+
+                if not variant_detected and not lang_region and title:
+                    if 'BRAZIL' in title or 'BRASIL' in title:
+                        flag = '🇧🇷'
+
+            # ── Mandarin script variant detection ──
+            elif lang_base in ('mandarin',):
+                if lang_region == 'hant':
+                    flag = '🇹🇼'
+                    name = 'Mandarin (traditionnel)'
+                elif lang_region == 'hans':
+                    flag = '🇨🇳'
+                    name = 'Mandarin (simplifié)'
+
+            # ── Cantonese script variant detection ──
+            elif lang_base in ('cantonese',):
+                if lang_region == 'hant':
+                    flag = '🇭🇰'
+                    name = 'Cantonais (traditionnel)'
+                elif lang_region == 'hans':
+                    flag = '🇨🇳'
+                    name = 'Cantonais (simplifié)'
+
+            # ── Audio Description detection ──
+            is_audio_desc = bool(title and 'AUDIO DESCRIPTION' in title)
+
             # Build: flag Name [layout] : Codec @ Bitrate
             parts: list[str] = [f'{flag} {name}']
+            if is_audio_desc:
+                parts.append(' [AD]')
             if layout:
                 parts.append(f' [{layout}]')
             codec = commercial or fmt
@@ -1226,6 +1309,26 @@ class FrenchTrackerMixin:
                     title_lower = title.lower()
                     if 'brazil' in title_lower or 'brasil' in title_lower:
                         flag = '🇧🇷'
+
+            # ── Mandarin script variant detection ──
+            elif lang_base in ('mandarin',):
+                # (Hant) = Traditional Chinese → Taiwan, (Hans) = Simplified → China
+                if lang_region == 'hant':
+                    flag = '🇹🇼'
+                    name = 'Mandarin (traditionnel)'
+                elif lang_region == 'hans':
+                    flag = '🇨🇳'
+                    name = 'Mandarin (simplifié)'
+
+            # ── Cantonese script variant detection ──
+            elif lang_base in ('cantonese',):
+                # Cantonese is primarily spoken in Hong Kong (Hant) and Guangdong (Hans)
+                if lang_region == 'hant':
+                    flag = '🇭🇰'
+                    name = 'Cantonais (traditionnel)'
+                elif lang_region == 'hans':
+                    flag = '🇨🇳'
+                    name = 'Cantonais (simplifié)'
 
             # Build qualifier
             if forced:
