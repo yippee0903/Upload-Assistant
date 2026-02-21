@@ -510,8 +510,10 @@ class C411(FrenchTrackerMixin):
         if container_display:
             tech_lines.append(f"[b][color={C}]Format vidéo :[/color][/b] {container_display}")
 
-        # Video codec
-        video_codec = meta.get('video_codec', '') or meta.get('video_encode', '')
+        # Video codec – prefer the encode label (H264/x264/…) which matches the release name,
+        # falling back to the raw MediaInfo format (AVC/HEVC) for REMUX/DISC types.
+        video_codec = (meta.get('video_encode', '') or meta.get('video_codec', '')).strip()
+        video_codec = video_codec.replace('H.264', 'H264').replace('H.265', 'H265')
         tech_lines.append(f"[b][color={C}]Codec vidéo :[/color][/b] {video_codec}" if video_codec else f"[b][color={C}]Codec vidéo :[/color][/b]")
 
         # HDR / Dolby Vision
