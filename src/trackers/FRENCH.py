@@ -338,34 +338,58 @@ class FrenchTrackerMixin:
     async def _check_french_lang_dupes(
         self, dupes: list[dict[str, Any]], meta: Meta,
     ) -> list[dict[str, Any]]:
-        """Flag existing releases that supersede the upload by French language.
+        """Filter and flag dupes based on French language hierarchy.
 
-        On French trackers a release **with** French audio (MULTI, VFF, …)
-        always supersedes a release **without** (VOSTFR, VO).  When the
-        upload has no French audio and an existing dupe *does*, the dupe
-        entry gets ``'french_lang_supersede'`` appended to its ``flags``
-        list so that :func:`~src.dupe_checking.DupeChecker.filter_dupes`
-        keeps it as a dupe regardless of other exclusion criteria.
+        On French trackers:
+
+        1. **Upload has French audio** (MULTI, VFF, …): existing releases
+           that *lack* French audio (VOSTFR, VO) are **removed** from the
+           dupe list — they are inferior and do not block the upload.
+
+        2. **Upload lacks French audio** (VOSTFR, VO): existing releases
+           that *have* French audio are **flagged** with
+           ``'french_lang_supersede'`` so the dupe checker keeps them as
+           blocking dupes regardless of other exclusion criteria.
         """
-        # Determine the upload's French language tag
         upload_audio = await self._build_audio_string(meta)
 
-        # Only flag when the upload LACKS French audio: VOSTFR or VO (empty).
-        # Uploads with French audio (MULTI.*, VFF, …) and silent films (MUET)
-        # are not subject to this check.
-        if upload_audio not in ('VOSTFR', ''):
+        # MUET (silent film) — special category, not subject to French lang checks
+        if upload_audio.startswith('MUET'):
             return dupes
 
-        # Upload is VOSTFR, VO (empty), or MUET — check existing releases
-        for dupe in dupes:
-            name = dupe.get('name', '') if isinstance(dupe, dict) else str(dupe)
-            _, existing_level = self._extract_french_lang_tag(name)
-            if existing_level >= _FRENCH_AUDIO_THRESHOLD:
-                # Existing release has French audio, upload does not
-                if isinstance(dupe, dict):
-                    flags: list[str] = dupe.setdefault('flags', [])
-                    if 'french_lang_supersede' not in flags:
-                        flags.append('french_lang_supersede')
+        # Determine the upload's French language level
+        upload_tag, upload_level = self._extract_french_lang_tag(upload_audio)
+        if not upload_tag:
+            # No recognised tag in the audio string — try the raw string
+            # e.g. "MULTI.VFF" → extract "MULTI"
+            for part in upload_audio.split('.'):
+                t, lv = self._extract_french_lang_tag(part)
+                if lv > upload_level:
+                    upload_tag, upload_level = t, lv
+
+        # ── Case 1: Upload HAS French audio → drop inferior dupes ──
+        if upload_level >= _FRENCH_AUDIO_THRESHOLD:
+            filtered: list[dict[str, Any]] = []
+            for dupe in dupes:
+                name = dupe.get('name', '') if isinstance(dupe, dict) else str(dupe)
+                _, existing_level = self._extract_french_lang_tag(name)
+                # Keep the dupe only if it also has French audio (or no tag at all,
+                # meaning we can't tell — safer to show it)
+                if existing_level >= _FRENCH_AUDIO_THRESHOLD or existing_level == 0:
+                    filtered.append(dupe)
+                # else: existing is VOSTFR/VO — inferior, silently drop
+            return filtered
+
+        # ── Case 2: Upload LACKS French audio → flag superior dupes ──
+        if upload_audio in ('VOSTFR', '') or upload_level < _FRENCH_AUDIO_THRESHOLD:
+            for dupe in dupes:
+                name = dupe.get('name', '') if isinstance(dupe, dict) else str(dupe)
+                _, existing_level = self._extract_french_lang_tag(name)
+                if existing_level >= _FRENCH_AUDIO_THRESHOLD:
+                    if isinstance(dupe, dict):
+                        flags: list[str] = dupe.setdefault('flags', [])
+                        if 'french_lang_supersede' not in flags:
+                            flags.append('french_lang_supersede')
 
         return dupes
 
