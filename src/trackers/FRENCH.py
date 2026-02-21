@@ -105,7 +105,7 @@ LANG_FLAGS: dict[str, str] = {
     'slovenian': '🇸🇮', 'estonian': '🇪🇪', 'icelandic': '🇮🇸', 'lithuanian': '🇱🇹',
     'latvian': '🇱🇻', 'ukrainian': '🇺🇦', 'hindi': '🇮🇳', 'tamil': '🇮🇳',
     'telugu': '🇮🇳', 'malay': '🇲🇾', 'vietnamese': '🇻🇳', 'persian': '🇮🇷',
-    'cantonese': '�🇳', 'mandarin': '🇨🇳', 'slovak': '🇸🇰',
+    'cantonese': '🇨🇳', 'mandarin': '🇨🇳', 'slovak': '🇸🇰',
     'catalan': '🇪🇸', 'basque': '🇪🇸', 'galician': '🇪🇸',
     'bengali': '🇧🇩', 'urdu': '🇵🇰', 'tagalog': '🇵🇭', 'filipino': '🇵🇭',
     'khmer': '🇰🇭', 'mongolian': '🇲🇳', 'georgian': '🇬🇪', 'albanian': '🇦🇱',
@@ -1154,7 +1154,7 @@ class FrenchTrackerMixin:
                         flag = '🇪🇸'
                         variant_detected = True
                     elif raw_code.startswith('es-') and raw_code != 'es-es':
-                        flag = '�🇽'
+                        flag = '🇲🇽'
                         variant_detected = True
 
                 if not variant_detected and lang_region:
@@ -1359,7 +1359,7 @@ class FrenchTrackerMixin:
                         variant_detected = True
                     elif raw_code.startswith('es-') and raw_code != 'es-es':
                         # Latin American variant (es-419, es-MX, etc.)
-                        flag = '�🇽'
+                        flag = '🇲🇽'
                         variant_detected = True
 
                 if not variant_detected and lang_region:
