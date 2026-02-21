@@ -1152,6 +1152,13 @@ class Prep:
             else:
                 meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await video_manager.get_video_encode(mi_data, meta['type'], bdinfo)
 
+                # If type was detected as WEBDL but MediaInfo reveals encode
+                # settings, it is actually a WEBRip (re-encoded from a WEB-DL
+                # source).  Correct the type and re-derive the codec label.
+                if meta['type'] == 'WEBDL' and meta.get('has_encode_settings'):
+                    meta['type'] = 'WEBRIP'
+                    meta['video_encode'], meta['video_codec'], meta['has_encode_settings'], meta['bit_depth'] = await video_manager.get_video_encode(mi_data, meta['type'], bdinfo)
+
             if meta['region'] is None:
                 meta['region'] = ""
 

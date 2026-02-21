@@ -299,10 +299,19 @@ class VideoManager:
             filename = os.path.basename(video).lower()
             if "remux" in filename:
                 type = "REMUX"
-            elif any(word in filename for word in [" web ", ".web.", "web-dl", "webdl"]):
+            elif "web-dl" in filename or "webdl" in filename:
                 type = "WEBDL"
             elif "webrip" in filename:
                 type = "WEBRIP"
+            elif any(word in filename for word in [" web ", ".web."]):
+                # Bare "WEB" tag without explicit WEB-DL/WEBRip qualifier.
+                # Use video codec hint in the filename to differentiate:
+                #   x264/x265 → re-encoded → WEBRIP
+                #   H264/H265 or no codec hint → stream → WEBDL
+                if re.search(r'[.\s-]x26[45](?:[.\s-]|$)', filename):
+                    type = "WEBRIP"
+                else:
+                    type = "WEBDL"
             # elif scene == True:
                 # type = "ENCODE"
             elif "hdtv" in filename:
