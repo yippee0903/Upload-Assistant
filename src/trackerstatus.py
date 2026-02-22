@@ -294,6 +294,7 @@ class TrackerStatusManager:
         if meta.get('unattended', False):
             searching_trackers: list[str] = [name for name in meta['trackers'] if name in tracker_class_map]
             if searching_trackers:
+                console.print()
                 console.print(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
             tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta['trackers']]
             results = await asyncio.gather(*tasks)
@@ -322,6 +323,7 @@ class TrackerStatusManager:
             passed_trackers: list[str] = []
             for tracker_name in meta['trackers']:
                 if tracker_name in tracker_class_map:
+                    console.print()
                     console.print(f"[yellow]Searching for existing torrents on {tracker_name}...")
                 tracker_name, status = await process_single_tracker(tracker_name, meta)
                 tracker_status[tracker_name] = status
