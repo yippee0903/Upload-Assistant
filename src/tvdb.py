@@ -50,6 +50,49 @@ def _as_dict_list(value: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _extract_year_from_slug(slug: Any) -> Optional[str]:
+    if not isinstance(slug, str) or not slug:
+        return None
+
+    match = re.search(r'(19|20)\d{2}(?!\d)', slug)
+    if not match:
+        return None
+    return match.group(0)
+
+
+def _pick_specific_eng_alias(
+    aliases: list[dict[str, Any]],
+    slug: Any = None,
+    debug: bool = False,
+) -> Optional[str]:
+    if not aliases:
+        return None
+
+    year_pattern = re.compile(r'\((\d{4})\)')
+    eng_aliases = [
+        str(alias.get('name', '')) for alias in aliases
+        if alias.get('language') == 'eng' and str(alias.get('name', '')).strip()
+    ]
+    if not eng_aliases:
+        return None
+
+    eng_aliases_with_year = [name for name in eng_aliases if year_pattern.search(name)]
+    if eng_aliases_with_year:
+        specific_alias = eng_aliases_with_year[-1]
+        if debug:
+            console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
+        return specific_alias
+
+    slug_year = _extract_year_from_slug(slug)
+    if slug_year:
+        specific_alias = f"{eng_aliases[-1]} ({slug_year})"
+        if debug:
+            console.print(f"[blue]English alias with slug year fallback: {specific_alias}[/blue]")
+        return specific_alias
+
+    return None
+
+
 try:
     tvdb = TVDB(_get_tvdb_k())
 except (ssl.SSLError, URLError) as e:
@@ -240,38 +283,15 @@ class tvdb_data:
                             episodes_data: dict[str, Any] = {
                                 'episodes': cached_episodes,
                                 'aliases': cached_dict.get('aliases', []) if isinstance(cached_dict.get('aliases', []), list) else [],
-                                'series_name': cached_dict.get('series_name', ''),
-                                'first_aired': cached_dict.get('first_aired', '')
+                                'slug': cached_dict.get('slug') if isinstance(cached_dict.get('slug'), str) else None,
                             }
 
-                            specific_alias = None
-                            year_pattern = re.compile(r'\(\d{4}\)')
-
-                            # Prefer main series name if it's in Latin script
-                            main_name = episodes_data.get('series_name', '')
-                            if main_name and all(ord(c) < 0x3000 for c in main_name):
-                                if not year_pattern.search(main_name):
-                                    first_aired = episodes_data.get('first_aired', '')
-                                    year_match = re.search(r'(\d{4})', str(first_aired))
-                                    if year_match:
-                                        main_name = f"{main_name} ({year_match.group(1)})"
-                                if year_pattern.search(main_name):
-                                    specific_alias = main_name
-                                    if debug:
-                                        console.print(f"[blue]Using cached main TVDB series name: {specific_alias}[/blue]")
-
-                            # Fall back to English aliases only if main name wasn't suitable
-                            if specific_alias is None:
-                                aliases_list = _as_dict_list(episodes_data.get('aliases'))
-                                if aliases_list:
-                                    eng_aliases = [
-                                        alias['name'] for alias in aliases_list
-                                        if alias.get('language') == 'eng' and year_pattern.search(alias.get('name', ''))
-                                    ]
-                                    if eng_aliases:
-                                        specific_alias = eng_aliases[-1]
-                                        if debug:
-                                            console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
+                            aliases_list = _as_dict_list(episodes_data.get('aliases'))
+                            specific_alias = _pick_specific_eng_alias(
+                                aliases_list,
+                                slug=episodes_data.get('slug'),
+                                debug=debug,
+                            )
                             if original_language and original_language == 'en':
                                 specific_alias = None
 
@@ -290,6 +310,7 @@ class tvdb_data:
             page = 0
             max_pages = 20  # Safety limit to prevent infinite loops
             pages_fetched = 0
+            series_slug: Optional[str] = None
 
             while page < max_pages:
                 if debug and page > 0:
@@ -306,6 +327,10 @@ class tvdb_data:
                     # Handle both dict response and direct episodes list
                     if isinstance(episodes_response, dict):
                         episodes_response_dict = cast(dict[str, Any], episodes_response)
+                        if page == 0:
+                            slug_value = episodes_response_dict.get('slug')
+                            if isinstance(slug_value, str):
+                                series_slug = slug_value
                         current_episodes = _as_dict_list(episodes_response_dict.get('episodes', []))
                     else:
                         # Fallback for direct list response
@@ -346,7 +371,8 @@ class tvdb_data:
             # Create the response structure
             episodes_data: dict[str, Any] = {
                 'episodes': all_episodes,
-                'aliases': []  # Will be populated if available from first response
+                'aliases': [],  # Will be populated if available from first response
+                'slug': series_slug,
             }
 
             # Try to get aliases and main series name from series info (may need separate call)
@@ -391,33 +417,13 @@ class tvdb_data:
 
             # Extract series name: prefer main TVDB series name over aliases
             specific_alias = None
-            year_pattern = re.compile(r'\(\d{4}\)')
-
-            # Prefer the main series name if it's in Latin script
-            main_name = episodes_data.get('series_name', '')
-            if main_name and all(ord(c) < 0x3000 for c in main_name):
-                # If name doesn't already include a year, append from firstAired
-                if not year_pattern.search(main_name):
-                    first_aired = episodes_data.get('first_aired', '')
-                    year_match = re.search(r'(\d{4})', str(first_aired))
-                    if year_match:
-                        main_name = f"{main_name} ({year_match.group(1)})"
-                if year_pattern.search(main_name):
-                    specific_alias = main_name
-                    if debug:
-                        console.print(f"[blue]Using main TVDB series name: {specific_alias}[/blue]")
-
-            # Fall back to English aliases only if main name wasn't suitable
-            if specific_alias is None and 'aliases' in episodes_data and episodes_data['aliases']:
+            if 'aliases' in episodes_data and episodes_data['aliases']:
                 aliases_list = _as_dict_list(episodes_data['aliases'])
-                eng_aliases = [
-                    alias['name'] for alias in aliases_list
-                    if alias.get('language') == 'eng' and year_pattern.search(alias['name'])
-                ]
-                if eng_aliases:
-                    specific_alias = eng_aliases[-1]
-                    if debug:
-                        console.print(f"[blue]English alias with year: {specific_alias}[/blue]")
+                specific_alias = _pick_specific_eng_alias(
+                    aliases_list,
+                    slug=episodes_data.get('slug'),
+                    debug=debug,
+                )
                 if original_language and original_language == 'en':
                     specific_alias = None
 
