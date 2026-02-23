@@ -195,8 +195,14 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         import re
 
         is_scene = meta.get("scene", False)
-        if is_scene:
+        if is_scene and not meta.get('tv_pack'):
             return {"name": str(meta.get("scene_name", ""))}
+        if is_scene and meta.get('tv_pack'):
+            # For scene packs, scene_name is the first episode name (e.g. S01E01);
+            # use the folder basename which is the actual pack name (e.g. S01).
+            import os
+            return {"name": os.path.basename(str(meta.get("path", meta.get("scene_name", ""))))}
+
 
         type_val = meta.get('type', '').upper()
         title = meta.get('title', '')
@@ -246,6 +252,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             if meta.get('manual_date'):
                 season = ''
                 episode = ''
+        if meta.get('tv_pack'):
+            episode = ''
         if meta.get('no_season', False) is True:
             season = ''
         if meta.get('no_year', False) is True:
