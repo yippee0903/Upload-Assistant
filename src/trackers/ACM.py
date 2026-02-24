@@ -11,10 +11,68 @@ import httpx
 
 from src.bbcode import BBCODE
 from src.console import console
+from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 
 class ACM:
+    # ISO 3166-1 alpha-2 codes for Asian countries
+    # Reference: https://en.wikipedia.org/wiki/List_of_Asian_countries_by_area
+    ASIAN_COUNTRIES: frozenset[str] = frozenset({
+        'AF',  # Afghanistan
+        'AE',  # United Arab Emirates
+        'AM',  # Armenia
+        'AZ',  # Azerbaijan
+        'BD',  # Bangladesh
+        'BH',  # Bahrain
+        'BN',  # Brunei
+        'BT',  # Bhutan
+        'CN',  # China
+        'CY',  # Cyprus
+        'GE',  # Georgia
+        'HK',  # Hong Kong
+        'ID',  # Indonesia
+        'IL',  # Israel
+        'IN',  # India
+        'IQ',  # Iraq
+        'IR',  # Iran
+        'JO',  # Jordan
+        'JP',  # Japan
+        'KG',  # Kyrgyzstan
+        'KH',  # Cambodia
+        'KP',  # North Korea
+        'KR',  # South Korea
+        'KW',  # Kuwait
+        'KZ',  # Kazakhstan
+        'LA',  # Laos
+        'LB',  # Lebanon
+        'LK',  # Sri Lanka
+        'MM',  # Myanmar
+        'MN',  # Mongolia
+        'MO',  # Macao
+        'MV',  # Maldives
+        'MY',  # Malaysia
+        'NP',  # Nepal
+        'OM',  # Oman
+        'PH',  # Philippines
+        'PK',  # Pakistan
+        'PS',  # Palestine
+        'QA',  # Qatar
+        'RU',  # Russia
+        'SA',  # Saudi Arabia
+        'SG',  # Singapore
+        'SY',  # Syria
+        'TH',  # Thailand
+        'TJ',  # Tajikistan
+        'TL',  # East Timor
+        'TM',  # Turkmenistan
+        'TR',  # Turkey
+        'TW',  # Taiwan
+        'UZ',  # Uzbekistan
+        'VN',  # Vietnam
+        'YE',  # Yemen
+    })
+
     def __init__(self, config: dict[str, Any]):
         self.config = config
         self.common = COMMON(config)
@@ -25,6 +83,8 @@ class ACM:
         self.upload_url = f'{self.base_url}/api/torrents/upload'
         self.search_url = f'{self.base_url}/api/torrents/filter'
         self.torrent_url = f'{self.base_url}/torrents/'
+        self.approved_image_hosts = ['imgbox', 'imgbb', 'postimg', 'pixhost', 'ptpimg', 'imagebam']
+        self.rehost_images_manager = RehostImagesManager(config)
         self.banned_groups: list[str] = []
 
     async def get_type_id(self, meta: dict[str, Any]) -> str:
@@ -181,7 +241,56 @@ class ACM:
             return ' [No Eng subs]'
         return f" [{subs[0]} subs only]"
 
+    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
+        url_host_mapping = {
+            'ibb.co': 'imgbb',
+            'imgbox.com': 'imgbox',
+            'postimg.cc': 'postimg',
+            'pixhost.to': 'pixhost',
+            'ptpimg.me': 'ptpimg',
+            'imagebam.com': 'imagebam',
+        }
+        await self.rehost_images_manager.check_hosts(
+            meta,
+            self.tracker,
+            url_host_mapping=url_host_mapping,
+            img_host_index=1,
+            approved_image_hosts=self.approved_image_hosts,
+        )
+
+    def check_asian_origin(self, meta: dict[str, Any]) -> bool:
+        """Return True if the media originates from at least one Asian country.
+
+        Checks both TMDB ``origin_country`` (list of ISO codes) and
+        ``production_countries`` (list of dicts with ``iso_3166_1`` key).
+        """
+        origin_codes: list[str] = meta.get('origin_country', []) or []
+        if any(code.upper() in self.ASIAN_COUNTRIES for code in origin_codes):
+            return True
+
+        production_countries: list[dict[str, str]] = meta.get('production_countries', []) or []
+        return any(pc.get('iso_3166_1', '').upper() in self.ASIAN_COUNTRIES for pc in production_countries)
+
+    async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+        """Check ACM-specific requirements before searching/uploading."""
+        if not self.check_asian_origin(meta):
+            origin = meta.get('origin_country', [])
+            prod = [pc.get('iso_3166_1', '') for pc in (meta.get('production_countries', []) or [])]
+            countries = ', '.join(filter(None, dict.fromkeys(origin + prod))) or 'Unknown'
+            if not bool(meta.get('unattended')):
+                console.print(
+                    f"[bold red]Only media produced in Asian countries is allowed at {self.tracker}.[/bold red]\n"
+                    f"[red]Detected production countries: {countries}[/red]"
+                )
+            return False
+        return True
+
     async def upload(self, meta: dict[str, Any], _) -> bool:
+        # Safety net: Asian origin should already be checked in search_existing
+        if not self.check_asian_origin(meta):
+            meta['tracker_status'][self.tracker]['status_message'] = "Skipped: non-Asian origin"
+            return False
+
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta['category'])
         type_id = await self.get_type_id(meta)
@@ -281,30 +390,59 @@ class ACM:
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
 
-    async def search_existing(self, meta: dict[str, Any], _) -> list[str]:
-        dupes: list[str] = []
+    async def search_existing(self, meta: dict[str, Any], _) -> list[dict[str, Any]]:
+        dupes: list[dict[str, Any]] = []
+
+        # Check Asian origin requirement before searching
+        should_continue = await self.get_additional_checks(meta)
+        if not should_continue:
+            meta['skipping'] = self.tracker
+            return dupes
+
         params: dict[str, Any] = {
             'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
-            'tmdb': meta['tmdb'],
+            'tmdbId': str(meta['tmdb']),
             'categories[]': (await self.get_cat_id(meta['category'])),
             'types[]': (await self.get_type_id(meta)),
             # A majority of the ACM library doesn't contain resolution information
-            # 'resolutions[]' : await self.get_res_id(meta['resolution']),
-            # 'name' : ""
+            # 'resolutions[]': await self.get_resolution_id(meta),
+            'name': '',
+            'perPage': '100',
         }
-        # Adding Name to search seems to override tmdb
+        if meta['category'] == 'TV':
+            params['name'] = meta.get('season', '')
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=self.search_url, params=params)
                 if response.status_code == 200:
                     data = response.json()
                     for each in data['data']:
-                        result = each['attributes']['name']
+                        torrent_id = each.get('id', None)
+                        attributes = each.get('attributes', {})
+                        result: dict[str, Any] = {
+                            'name': attributes.get('name', ''),
+                            'size': attributes.get('size', 0),
+                            'files': (
+                                [f['name'] for f in attributes.get('files', []) if isinstance(f, dict) and 'name' in f]
+                                if not meta['is_disc'] else []
+                            ),
+                            'file_count': len(attributes.get('files', [])) if isinstance(attributes.get('files'), list) else 0,
+                            'trumpable': attributes.get('trumpable', False),
+                            'link': attributes.get('details_link', None),
+                            'download': attributes.get('download_link', None),
+                            'id': torrent_id,
+                            'type': attributes.get('type', None),
+                            'res': attributes.get('resolution', None),
+                            'internal': attributes.get('internal', False),
+                        }
+                        if meta['is_disc']:
+                            result['bd_info'] = attributes.get('bd_info', '')
+                            result['description'] = attributes.get('description', '')
                         dupes.append(result)
                 else:
                     console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
         except httpx.TimeoutException:
-            console.print("[bold red]Request timed out after 5 seconds")
+            console.print("[bold red]Request timed out after 10 seconds")
         except httpx.RequestError as e:
             console.print(f"[bold red]Unable to search for existing torrents: {e}")
         except Exception as e:
@@ -320,23 +458,37 @@ class ACM:
         audio: str = meta.get('audio', '')
         source: str = meta.get('source', '')
         is_disc: str = meta.get('is_disc', '')
+        release_type: str = meta.get('type', '')
         subs = self.get_subtitles(meta)
         resolution: str = meta.get('resolution', '')
+
+        # Handle AKA title format: "Title AKA Alt" -> "Title / OriginalTitle"
         if aka != '':
-            # ugly fix to remove the extra space in the title
-            aka = aka + ' '
-            name = name.replace(aka, f' / {original_title} {chr(int("202A", 16))}')
+            aka_stripped = aka.strip()
+            name = name.replace(f' {aka_stripped} ', f' / {original_title} {chr(int("202A", 16))}')
         elif aka == '':
             if meta.get('title') != original_title:
-                # name = f'{name[:name.find(year)]}/ {original_title} {chr(int("202A", 16))}{name[name.find(year):]}'
                 name = name.replace(meta['title'], f"{meta['title']} / {original_title} {chr(int('202A', 16))}")
-        if 'AAC' in audio:
-            name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
-        name = name.replace("DD+ ", "DD+")
+
+        # ACM stream naming: no space after audio codec (AAC2.0, DD+5.1)
+        # ACM physical media: space after audio codec (AAC 2.0, DD 5.1)
+        is_stream = release_type in ('WEBDL', 'WEBRIP', 'HDTV')
+        if is_stream:
+            if 'AAC' in audio:
+                name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
+            name = name.replace("DD+ ", "DD+")
+
+        # Remux format: remove BluRay prefix
         name = name.replace("UHD BluRay REMUX", "Remux")
         name = name.replace("BluRay REMUX", "Remux")
+
+        # ACM uses HEVC instead of H.265
         name = name.replace("H.265", "HEVC")
+
+        # Remove Atmos suffix (integrated into audio codec)
         name = name.replace(" Atmos", "")
+
+        # DVD format adjustments
         if is_disc == 'DVD':
             name = name.replace(f'{source} DVD5', f'{resolution} DVD {source}')
             name = name.replace(f'{source} DVD9', f'{resolution} DVD {source}')
@@ -389,7 +541,7 @@ class ACM:
 
             await descfile.write(desc)
 
-            images = meta.get('image_list', [])
+            images = meta.get('ACM_images_key', meta.get('image_list', []))
 
             if images:
                 await descfile.write('[center]\n')
