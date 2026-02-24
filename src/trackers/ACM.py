@@ -461,6 +461,12 @@ class ACM:
         release_type: str = meta.get('type', '')
         subs = self.get_subtitles(meta)
         resolution: str = meta.get('resolution', '')
+        video_encode: str = meta.get('video_encode', '')
+        video_codec: str = meta.get('video_codec', '')
+        hdr: str = meta.get('hdr', '')
+        category: str = meta.get('category', '')
+        year: str = str(meta.get('year', ''))
+        season: str = meta.get('season', '')
 
         # Handle AKA title format: "Title AKA Alt" -> "Title / OriginalTitle"
         if aka != '':
@@ -470,9 +476,36 @@ class ACM:
             if meta.get('title') != original_title:
                 name = name.replace(meta['title'], f"{meta['title']} / {original_title} {chr(int('202A', 16))}")
 
+        # ACM naming convention: [year|season] - for TV use season only, for movies use year only
+        # Account for special RTL embedding character \u202A that may be between title and year
+        if category == 'TV' and year and season:
+            # Remove year for TV releases, keep only season
+            # Pattern handles optional special characters before year
+            name = re.sub(rf'(\u202A?)({re.escape(year)}) ({re.escape(season)})', rf'\1\3', name)
+
+        # ACM naming convention: video_codec comes BEFORE audio_codec
+        # Base format is: ... WEB-DL {audio} {hdr} {video_encode}
+        # ACM wants:      ... WEB-DL {video_encode} {hdr} {audio}
+        is_stream = release_type in ('WEBDL', 'WEBRIP', 'HDTV', 'ENCODE')
+        video_tag = video_encode if video_encode else video_codec
+        if is_stream and audio and video_tag:
+            # Find and swap audio/video order
+            # Current: "... WEB-DL AAC 2.0 HDR H.264-GROUP" or "... WEB-DL AAC 2.0 H.264-GROUP"
+            # Target:  "... WEB-DL H.264 HDR AAC2.0-GROUP" or "... WEB-DL H.264 AAC2.0-GROUP"
+            audio_stripped = audio.strip()
+            if hdr:
+                # Pattern: {audio} {hdr} {video}
+                old_pattern = f'{audio_stripped} {hdr} {video_tag}'
+                new_pattern = f'{video_tag} {hdr} {audio_stripped}'
+                name = name.replace(old_pattern, new_pattern)
+            else:
+                # Pattern: {audio} {video}
+                old_pattern = f'{audio_stripped} {video_tag}'
+                new_pattern = f'{video_tag} {audio_stripped}'
+                name = name.replace(old_pattern, new_pattern)
+
         # ACM stream naming: no space after audio codec (AAC2.0, DD+5.1)
         # ACM physical media: space after audio codec (AAC 2.0, DD 5.1)
-        is_stream = release_type in ('WEBDL', 'WEBRIP', 'HDTV')
         if is_stream:
             if 'AAC' in audio:
                 name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
@@ -507,7 +540,7 @@ class ACM:
         async with aiofiles.open(output_path, 'w', encoding='utf-8') as descfile:
             if meta.get('type') == 'WEBDL' and meta.get('service_longname', ''):
                 await descfile.write(
-                    f'[center][b][color=#ff00ff][size=18]This release is sourced from {meta["service_longname"]} and is not transcoded,'
+                    f'[center][b][color=#ff00ff][size=18]This release is sourced from {meta["service_longname"]} and is not transcoded, '
                     f'just remuxed from the direct {meta["service_longname"]} stream[/size][/color][/b][/center]\n'
                 )
 
