@@ -451,11 +451,13 @@ class FrenchTrackerMixin:
         """Build the French language tag from MediaInfo audio tracks.
 
         Returns one of:
-            Single:  VOF · TRUEFRENCH · VFF · VFI · VFQ
-            Multi:   MULTI.VOF · MULTI.TRUEFRENCH · MULTI.VFF · MULTI.VFQ · MULTI.VF2
+            Single:  VOF · VFF · VFI · VFQ
+            Multi:   MULTI.VOF · MULTI.VFF · MULTI.VFQ · MULTI.VF2
             Subs:    VOSTFR
             Silent:  MUET  (or MUET.VOSTFR)
             VO:      '' (empty — English or other VO)
+
+        Note: TRUEFRENCH in source filenames is converted to VFF (modern equivalent).
         """
         if 'mediainfo' not in meta or 'media' not in meta.get('mediainfo', {}):
             return ''
@@ -484,8 +486,6 @@ class FrenchTrackerMixin:
             """Determine the best French precision tag."""
             if fr_suffix == 'VF2':
                 return 'VF2'
-            if is_truefrench:
-                return 'TRUEFRENCH'
             if is_original_french:
                 return 'VOF'
             if is_vfi:
@@ -497,7 +497,7 @@ class FrenchTrackerMixin:
             # MediaInfo has generic 'fr' without region — check filename
             if is_vfq_filename:
                 return 'VFQ'
-            if is_vff_filename:
+            if is_vff_filename or is_truefrench:
                 return 'VFF'
             # Generic 'fr' without region — conservative default
             return 'VFF'
@@ -632,27 +632,27 @@ class FrenchTrackerMixin:
             if type_val == 'DISC':
                 disc = meta.get('is_disc', '')
                 if disc == 'BDMV':
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
+                    name = f"{title} {year} {three_d} {edition} {hybrid} {language} {repack} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif disc == 'DVD':
-                    name = f"{title} {year} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {edition} {language} {repack} {region} {source} {dvd_size} {audio}"
                 elif disc == 'HDDVD':
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
+                    name = f"{title} {year} {edition} {language} {repack} {resolution} {source} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {three_d} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {edition} {repack} {language} {source} REMUX {audio}"
+                name = f"{title} {year} {edition} {language} {repack} {source} REMUX {audio}"
             elif type_val == 'REMUX':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {language} {repack} {resolution} {source} {audio} {video_encode}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {language} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {language} {repack} {source} DVDRip {audio} {video_encode}"
 
         # ── TV ──
         elif category == 'TV':
@@ -660,27 +660,27 @@ class FrenchTrackerMixin:
             if type_val == 'DISC':
                 disc = meta.get('is_disc', '')
                 if disc == 'BDMV':
-                    name = f"{title} {year} {se} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
+                    name = f"{title} {year} {se} {three_d} {edition} {hybrid} {language} {repack} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif disc == 'DVD':
-                    name = f"{title} {year} {se} {three_d} {repack} {edition} {language} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {se} {three_d} {edition} {language} {repack} {region} {source} {dvd_size} {audio}"
                 elif disc == 'HDDVD':
-                    name = f"{title} {year} {se} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
+                    name = f"{title} {year} {se} {edition} {language} {repack} {resolution} {source} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
-                name = f"{title} {year} {se} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {se} {part} {three_d} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
-                name = f"{title} {year} {se} {part} {edition} {repack} {language} {source} REMUX {audio}"
+                name = f"{title} {year} {se} {part} {edition} {language} {repack} {source} REMUX {audio}"
             elif type_val == 'REMUX':
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == 'ENCODE':
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBDL':
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
             elif type_val == 'WEBRIP':
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == 'HDTV':
-                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {language} {repack} {resolution} {source} {audio} {video_encode}"
             elif type_val == 'DVDRIP':
-                name = f"{title} {year} {se} {language} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {se} {language} {repack} {source} DVDRip {audio} {video_encode}"
 
         if not name:
             name = f"{title} {year} {language} {resolution} {type_val} {audio} {video_encode}"
@@ -958,15 +958,26 @@ class FrenchTrackerMixin:
                 return size_match.group(1).strip()
         return ''
 
+    # Extensions included in the torrent (video files only).
+    _TORRENT_EXTENSIONS: frozenset[str] = frozenset(('.mkv', '.mp4', '.ts', '.m2ts', '.vob', '.avi'))
+
     @staticmethod
     def _count_files(meta: dict) -> str:
-        """Count files in the release path."""
+        """Count files actually included in the torrent.
+
+        Only video extensions are counted (matching torrent creation logic
+        which excludes .nfo, .jpg, .srt, etc.).
+        """
         path = meta.get('path', '')
         if not path or not os.path.exists(path):
             return ''
         if os.path.isfile(path):
             return '1'
-        count = sum(1 for _, _, files in os.walk(path) for _ in files)
+        exts = FrenchTrackerMixin._TORRENT_EXTENSIONS
+        count = sum(
+            1 for _, _, files in os.walk(path)
+            for f in files if os.path.splitext(f)[1].lower() in exts
+        )
         return str(count) if count else ''
 
     # ── HDR / Dolby Vision display (plain text labels) ──────────────────

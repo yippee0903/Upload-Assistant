@@ -66,12 +66,30 @@ class C411(FrenchTrackerMixin):
         The title is everything before the first 4-digit year or season
         marker (S01…).  Everything after is left as-is.
 
+        Also normalizes audio codecs to C411 conventions:
+          DD → AC3, TrueHD → TRUEHD, DTS-HD MA → DTS.HD.MA, DTS:X → DTSX
+
         Examples:
           ``L.Age.De.Glace``  instead of ``L.Age.de.glace``
           ``Hier.J.Arrete``   instead of ``Hier.J.arrete``
         """
         result = super()._format_name(raw_name)
         dot_name = result['name']
+
+        # ── C411 audio codec normalization ──
+        # DD → AC3 (but not DDP which stays as-is)
+        dot_name = re.sub(r'\.DD\.', '.AC3.', dot_name)
+        # TrueHD → TRUEHD (case normalization)
+        dot_name = re.sub(r'\.TrueHD\.', '.TRUEHD.', dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r'\.TrueHD$', '.TRUEHD', dot_name, flags=re.IGNORECASE)
+        # DTS-HD.MA → DTS.HD.MA (dash to dot)
+        dot_name = dot_name.replace('.DTS-HD.MA.', '.DTS.HD.MA.')
+        dot_name = dot_name.replace('.DTS-HD.HRA.', '.DTS.HD.HRA.')
+        # DTS:X → DTSX (remove colon)
+        dot_name = dot_name.replace('.DTS:X.', '.DTSX.')
+        # Atmos capitalization
+        dot_name = re.sub(r'\.Atmos\.', '.ATMOS.', dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r'\.Atmos$', '.ATMOS', dot_name, flags=re.IGNORECASE)
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split('.')

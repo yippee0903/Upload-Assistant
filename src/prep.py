@@ -1276,6 +1276,11 @@ class Prep:
         meta['tvdb'] = meta.get('tvdb_id')
         meta['tvmaze'] = meta.get('tvmaze_id')
 
+        # skip_nfo: when reusing existing torrents, reject any containing .nfo files
+        # Exception: Scene releases MUST include the original .nfo per tracker rules
+        # Also respects --keep-nfo flag
+        meta['skip_nfo'] = not (meta.get('keep_nfo', False) or meta.get('scene', False))
+
         # we finished the metadata, time it
         if meta['debug']:
             meta_finish_time = time.time()
