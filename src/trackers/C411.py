@@ -513,7 +513,7 @@ class C411(FrenchTrackerMixin):
         # Video codec – prefer the encode label (H264/x264/…) which matches the release name,
         # falling back to the raw MediaInfo format (AVC/HEVC) for REMUX/DISC types.
         # When both exist and differ, append the raw format in parentheses: "H265 (HEVC)".
-        video_codec = (meta.get('video_encode', '') or meta.get('video_codec', '')).strip()
+        video_codec = (meta.get('video_encode', '').strip() or meta.get('video_codec', '')).strip()
         video_codec = video_codec.replace('H.264', 'H264').replace('H.265', 'H265')
         raw_codec = meta.get('video_codec', '').strip()
         if video_codec and raw_codec and raw_codec != video_codec:
