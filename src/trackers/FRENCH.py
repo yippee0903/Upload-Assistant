@@ -264,12 +264,12 @@ class FrenchTrackerMixin:
                 if 'fr-fr' not in fr_variants:
                     fr_variants.append('fr-fr')  # Belgium/Switzerland → treat as VFF
             elif ll in ('fr', 'fre', 'fra', 'french', 'français', 'francais'):
-                # Generic French — check Title for explicit VFF/VFQ
+                # Generic French — check Title for explicit VFF/VFQ or region keywords
                 title = str(track.get('Title', '')).upper()
-                if 'VFQ' in title:
+                if 'VFQ' in title or 'CANADA' in title or 'CANADIEN' in title or 'QUÉB' in title or 'QUEB' in title or '(CA)' in title:
                     if 'fr-ca' not in fr_variants:
                         fr_variants.append('fr-ca')
-                elif 'VFF' in title:
+                elif 'VFF' in title or '(FR)' in title or 'FRANCE' in title:
                     if 'fr-fr' not in fr_variants:
                         fr_variants.append('fr-fr')
                 elif 'VF2' in title:
@@ -286,8 +286,13 @@ class FrenchTrackerMixin:
 
         has_vff = 'fr-fr' in fr_variants
         has_vfq = 'fr-ca' in fr_variants
+        has_generic_fr = 'fr' in fr_variants
 
+        # VF2 = two distinct French variants (France + Canada)
         if has_vff and has_vfq:
+            return 'VF2'
+        # Generic French + Canadian = 2 distinct versions → VF2
+        if has_generic_fr and has_vfq:
             return 'VF2'
         if has_vfq:
             return 'VFQ'
