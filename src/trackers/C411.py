@@ -90,10 +90,18 @@ class C411(FrenchTrackerMixin):
         # Atmos capitalization
         dot_name = re.sub(r'\.Atmos\.', '.ATMOS.', dot_name, flags=re.IGNORECASE)
         dot_name = re.sub(r'\.Atmos$', '.ATMOS', dot_name, flags=re.IGNORECASE)
-        # ATMOS must appear BEFORE channels, not after: DDP.5.1.ATMOS → DDP.ATMOS.5.1
+        # ATMOS must appear BEFORE the audio codec entirely: DDP.5.1.ATMOS → ATMOS.DDP.5.1
+        # Pattern 1: codec.channels.ATMOS → ATMOS.codec.channels
         dot_name = re.sub(
             r'\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.(\d\.\d)\.ATMOS([.-])',
-            r'.\1.ATMOS.\2\3',
+            r'.ATMOS.\1.\2\3',
+            dot_name,
+            flags=re.IGNORECASE
+        )
+        # Pattern 2: codec.ATMOS.channels → ATMOS.codec.channels (in case already partially moved)
+        dot_name = re.sub(
+            r'\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.ATMOS\.(\d\.\d)([.-])',
+            r'.ATMOS.\1.\2\3',
             dot_name,
             flags=re.IGNORECASE
         )
