@@ -273,6 +273,7 @@ class ACM:
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         """Check ACM-specific requirements before searching/uploading."""
+        # Check Asian origin
         if not self.check_asian_origin(meta):
             origin = meta.get('origin_country', [])
             prod = [pc.get('iso_3166_1', '') for pc in (meta.get('production_countries', []) or [])]
@@ -283,12 +284,30 @@ class ACM:
                     f"[red]Detected production countries: {countries}[/red]"
                 )
             return False
+
+        # Encodes are not allowed on ACM (ENCODE, WEBRIP, HDTV are all re-encoded content)
+        # Only REMUX, WEBDL, and full discs are allowed
+        release_type = str(meta.get('type', '')).upper()
+        if release_type in ('ENCODE', 'WEBRIP', 'HDTV'):
+            if not bool(meta.get('unattended')):
+                console.print(
+                    f"[bold red]Encodes are not allowed at {self.tracker}.[/bold red]\n"
+                    f"[red]Detected type: {release_type}. Only REMUX, WEB-DL, and full discs are allowed.[/red]"
+                )
+            return False
+
         return True
 
     async def upload(self, meta: dict[str, Any], _) -> bool:
         # Safety net: Asian origin should already be checked in search_existing
         if not self.check_asian_origin(meta):
             meta['tracker_status'][self.tracker]['status_message'] = "Skipped: non-Asian origin"
+            return False
+
+        # Safety net: Encodes should already be blocked in get_additional_checks
+        release_type = str(meta.get('type', '')).upper()
+        if release_type in ('ENCODE', 'WEBRIP', 'HDTV'):
+            meta['tracker_status'][self.tracker]['status_message'] = f"Skipped: {release_type} not allowed"
             return False
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
