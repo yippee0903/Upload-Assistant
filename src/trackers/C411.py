@@ -90,6 +90,13 @@ class C411(FrenchTrackerMixin):
         # Atmos capitalization
         dot_name = re.sub(r'\.Atmos\.', '.ATMOS.', dot_name, flags=re.IGNORECASE)
         dot_name = re.sub(r'\.Atmos$', '.ATMOS', dot_name, flags=re.IGNORECASE)
+        # ATMOS must appear BEFORE channels, not after: DDP.5.1.ATMOS → DDP.ATMOS.5.1
+        dot_name = re.sub(
+            r'\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.(\d\.\d)\.ATMOS([.-])',
+            r'.\1.ATMOS.\2\3',
+            dot_name,
+            flags=re.IGNORECASE
+        )
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split('.')
