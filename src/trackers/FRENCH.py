@@ -266,7 +266,13 @@ class FrenchTrackerMixin:
             elif ll in ('fr', 'fre', 'fra', 'french', 'français', 'francais'):
                 # Generic French — check Title for explicit VFF/VFQ or region keywords
                 title = str(track.get('Title', '')).upper()
-                if 'VFQ' in title or 'CANADA' in title or 'CANADIEN' in title or 'QUÉB' in title or 'QUEB' in title or '(CA)' in title:
+                # Canadian French indicators: VFQ, CANADA, CANADIEN, QUÉBEC, (CA), or standalone "CA"
+                is_canadian = (
+                    'VFQ' in title or 'CANADA' in title or 'CANADIEN' in title or
+                    'QUÉB' in title or 'QUEB' in title or '(CA)' in title or
+                    re.search(r'\bCA\b', title)  # "FR CA 5.1" → matches CA as word
+                )
+                if is_canadian:
                     if 'fr-ca' not in fr_variants:
                         fr_variants.append('fr-ca')
                 elif 'VFF' in title or '(FR)' in title or 'FRANCE' in title:
@@ -448,6 +454,15 @@ class FrenchTrackerMixin:
                 return True
         return False
 
+    @staticmethod
+    def _detect_vf2(meta: Meta) -> bool:
+        """Check if the release path/name indicates VF2 (dual French: VFF + VFQ)."""
+        for field in ('uuid', 'name', 'path'):
+            val = str(meta.get(field, '')).upper()
+            if re.search(r'(?:^|[\.\-_\s])VF2(?:[\.\-_\s]|$)', val):
+                return True
+        return False
+
     # ──────────────────────────────────────────────────────────
     #  Build audio/language string
     # ──────────────────────────────────────────────────────────
@@ -486,10 +501,14 @@ class FrenchTrackerMixin:
         is_vfi = self._detect_vfi(meta)
         is_vfq_filename = self._detect_vfq(meta)
         is_vff_filename = self._detect_vff(meta)
+        is_vf2_filename = self._detect_vf2(meta)
 
         def _fr_precision() -> str:
             """Determine the best French precision tag."""
             if fr_suffix == 'VF2':
+                return 'VF2'
+            # VF2 from filename when MediaInfo doesn't have region codes
+            if is_vf2_filename:
                 return 'VF2'
             if is_original_french:
                 return 'VOF'
