@@ -153,15 +153,18 @@ class TORR9(FrenchTrackerMixin):
 
         Values must match the exact labels shown on the site's upload page.
         """
-        is_anime = bool(meta.get('mal_id'))
+        # Detect animation: anime flag, mal_id, or animation genre
+        is_anime = bool(meta.get('anime')) or bool(meta.get('mal_id'))
+        genres = str(meta.get('genres', '')).lower()
+        is_animation = is_anime or 'animation' in genres
 
         if meta.get('category') == 'TV':
-            if is_anime:
+            if is_animation:
                 return ('Séries', 'Mangas-Animes')
             return ('Séries', 'Séries TV')
 
         # Movie
-        if is_anime:
+        if is_animation:
             return ('Films', "Films d'animation")
         return ('Films', 'Films')
 

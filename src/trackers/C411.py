@@ -138,11 +138,14 @@ class C411(FrenchTrackerMixin):
           categoryId 3 (Musique) → 18=Albums
           categoryId 5 (Jeux)    → 36=PC
         """
-        is_anime = bool(meta.get('mal_id'))
+        # Detect animation: anime flag, mal_id, or animation genre
+        is_anime = bool(meta.get('anime')) or bool(meta.get('mal_id'))
+        genres = str(meta.get('genres', '')).lower()
+        is_animation = is_anime or 'animation' in genres
 
         if meta.get('category') == 'TV':
-            return (1, 2) if is_anime else (1, 7)
-        return (1, 1) if is_anime else (1, 6)
+            return (1, 2) if is_animation else (1, 7)
+        return (1, 1) if is_animation else (1, 6)
 
     def _get_quality_option_id(self, meta: Meta) -> Union[int, None]:
         """Map resolution + source + type to C411 quality option (Type 2).
