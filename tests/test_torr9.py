@@ -106,7 +106,7 @@ def _mi(audio: list[dict[str, Any]], subs: list[dict[str, Any]] | None = None) -
 
 def _run(coro):
     """Helper to run an async coroutine in sync tests."""
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ─── Constructor ─────────────────────────────────────────────
