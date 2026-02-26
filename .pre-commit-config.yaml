@@ -40,7 +40,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: python -m pytest tests/ -x -q --tb=short
+        entry: bash -c 'source venv/bin/activate && python -m pytest tests/ -x -q --tb=short'
         language: system
         pass_filenames: false
         always_run: true
