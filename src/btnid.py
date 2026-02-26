@@ -21,19 +21,10 @@ class BtnIdManager:
     async def get_btn_torrents(btn_api: str, btn_id: str, meta: Meta) -> tuple[int, int]:
         imdb_id = 0
         tvdb_id = 0
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print("Fetching BTN data...", markup=False)
         post_query_url = "https://api.broadcasthe.net/"
-        post_data = {
-            "jsonrpc": "2.0",
-            "id": (await BtnIdManager.generate_guid())[:8],
-            "method": "getTorrentsSearch",
-            "params": [
-                btn_api,
-                {"id": btn_id},
-                50
-            ]
-        }
+        post_data = {"jsonrpc": "2.0", "id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentsSearch", "params": [btn_api, {"id": btn_id}, 50]}
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -54,24 +45,24 @@ class BtnIdManager:
             console.print("[ERROR] BTN API response is empty or invalid.", markup=False)
             return 0, 0
 
-        error = data.get('error')
+        error = data.get("error")
         if isinstance(error, dict):
             error_map = cast(dict[str, Any], error)
-            code = error_map.get('code', 'unknown')
-            message = str(error_map.get('message', 'Unknown BTN API error'))
-            if 'unauthorized ip' in message.lower():
+            code = error_map.get("code", "unknown")
+            message = str(error_map.get("message", "Unknown BTN API error"))
+            if "unauthorized ip" in message.lower():
                 console.print(f"[red]BTN API error: Unauthorized IP address (code {code}).[/red]")
                 console.print("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
             else:
                 console.print(f"[red]BTN API error (code {code}): {message}[/red]")
-            if meta.get('debug'):
+            if meta.get("debug"):
                 console.print(data)
             return 0, 0
 
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
-        result = data.get('result')
+        result = data.get("result")
         if isinstance(result, dict) and "torrents" in result:
             torrents = cast(dict[str, dict[str, Any]], result["torrents"])
             first_torrent = next(iter(torrents.values()), None)
@@ -81,7 +72,7 @@ class BtnIdManager:
 
                 if imdb_id or tvdb_id:
                     return int(imdb_id or 0), int(tvdb_id or 0)
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print("[red]No IMDb or TVDb ID found.")
         return 0, 0
 
@@ -98,7 +89,7 @@ class BtnIdManager:
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print("Fetching BHD data...", markup=False)
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
@@ -190,7 +181,7 @@ class BtnIdManager:
             meta["category"], parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.get("category"))
             tmdb = int(parsed_tmdb_id)
 
-        if only_id and not meta.get('keep_images'):
+        if only_id and not meta.get("keep_images"):
             return imdb, tmdb
 
         bbcode = BBCODE()
@@ -203,13 +194,13 @@ class BtnIdManager:
         if not only_id:
             meta["description"] = description
             meta["image_list"] = imagelist
-        elif meta.get('keep_images'):
+        elif meta.get("keep_images"):
             meta["description"] = ""
             meta["image_list"] = imagelist
 
         if (imdb and int(imdb) != 0) or (tmdb and int(tmdb) != 0):
             console.print(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
-        elif meta.get('debug'):
+        elif meta.get("debug"):
             console.print(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
 
         return imdb, tmdb
@@ -219,12 +210,12 @@ class BtnIdManager:
         """Parses TMDb ID, ensures correct formatting, and assigns category."""
         tmdb_id_str = str(tmdb_id).strip().lower()
 
-        if tmdb_id_str.startswith('tv/'):
-            tmdb_id_str = tmdb_id_str.split('/')[1].split('-')[0]
-            category = 'TV'
-        elif tmdb_id_str.startswith('movie/'):
-            tmdb_id_str = tmdb_id_str.split('/')[1].split('-')[0]
-            category = 'MOVIE'
+        if tmdb_id_str.startswith("tv/"):
+            tmdb_id_str = tmdb_id_str.split("/")[1].split("-")[0]
+            category = "TV"
+        elif tmdb_id_str.startswith("movie/"):
+            tmdb_id_str = tmdb_id_str.split("/")[1].split("-")[0]
+            category = "MOVIE"
 
         parsed_id = int(tmdb_id_str) if tmdb_id_str.isdigit() else 0
         return category, parsed_id

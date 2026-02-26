@@ -38,19 +38,19 @@ class DiscParse:
         - Duration: 20% (longer is typically main feature)
         - File concentration: 10% (high ratio = fewer large files = likely main feature)
         """
-        if not playlist.get('items'):
+        if not playlist.get("items"):
             return 0.0
 
         # Get metrics
-        file_sizes = [item['size'] for item in playlist['items']]
+        file_sizes = [item["size"] for item in playlist["items"]]
         largest_file = max(file_sizes) if file_sizes else 0
         total_size = sum(file_sizes)
-        duration = playlist.get('duration', 0.0)
+        duration = playlist.get("duration", 0.0)
 
         # File concentration: ratio of unique files to total references
         # Higher concentration means fewer duplicates (better)
-        total_files = len(playlist['items'])
-        unique_files = len({item['file'] for item in playlist['items']})
+        total_files = len(playlist["items"])
+        unique_files = len({item["file"] for item in playlist["items"]})
         file_concentration = unique_files / total_files if total_files > 0 else 0.0
 
         score = 0.0
@@ -79,8 +79,8 @@ class DiscParse:
                 return None
             self.mediainfo_config = setup_mediainfo_library(base_dir, debug)
 
-        if self.mediainfo_config and self.mediainfo_config['cli']:
-            return self.mediainfo_config['cli']
+        if self.mediainfo_config and self.mediainfo_config["cli"]:
+            return self.mediainfo_config["cli"]
         return None
 
     """
@@ -95,21 +95,21 @@ class DiscParse:
         base_dir: str,
         meta_discs: list[dict[str, Any]],
     ) -> tuple[list[dict[str, Any]], Any]:
-        use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
+        use_largest = int(self.config["DEFAULT"].get("use_largest_playlist", False))
         save_dir = f"{base_dir}/tmp/{folder_id}"
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
 
-        if meta.get('emby', False):
+        if meta.get("emby", False):
             return discs, meta_discs
 
         for i in range(len(discs)):
             bdinfo_text = None
-            path = os.path.abspath(discs[i]['path'])
+            path = os.path.abspath(discs[i]["path"])
             if discs[i]["type"] == "BDMV":
                 parent_path = os.path.dirname(path)
                 if not os.path.exists(os.path.join(parent_path, "CERTIFICATE")):
-                    meta.setdefault("discs_missing_certificate", []).append(discs[i]['path'])
+                    meta.setdefault("discs_missing_certificate", []).append(discs[i]["path"])
             for file in os.listdir(save_dir):
                 if file == f"BD_SUMMARY_{str(i).zfill(2)}.txt":
                     bdinfo_text = save_dir + "/" + file
@@ -121,7 +121,7 @@ class DiscParse:
                     console.print(f"[bold red]PLAYLIST directory not found for disc {path}")
                     continue
 
-                if meta.get('debug'):
+                if meta.get("debug"):
                     console.print(f"[cyan]Parsing playlists from: {playlists_path}")
 
                 def _load_mpls(mpls_path: str) -> tuple[Any, Any]:
@@ -139,7 +139,7 @@ class DiscParse:
                         continue
 
                     mpls_path = os.path.join(playlists_path, file_name)
-                    if meta.get('debug'):
+                    if meta.get("debug"):
                         console.print(f"[cyan]Processing playlist: {file_name}")
 
                     try:
@@ -151,11 +151,11 @@ class DiscParse:
 
                         play_items = getattr(playlist_data, "play_items", None)
                         if not play_items:
-                            if meta.get('debug'):
+                            if meta.get("debug"):
                                 console.print(f"[yellow]  No play_items found in {file_name}")
                             continue
 
-                        if meta.get('debug'):
+                        if meta.get("debug"):
                             console.print(f"[cyan]  Found {len(play_items)} play items in {file_name}")
 
                         for item in play_items:
@@ -176,29 +176,26 @@ class DiscParse:
                                     size = os.path.getsize(m2ts_file)
                                     file_counts[m2ts_file] += 1
                                     file_sizes[m2ts_file] = size
-                                elif meta.get('debug'):
+                                elif meta.get("debug"):
                                     console.print(f"[yellow]    Missing m2ts file: {clip_name}.m2ts")
                             except AttributeError as e:
                                 console.print(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
 
                         if not file_sizes:
-                            if meta.get('debug'):
+                            if meta.get("debug"):
                                 console.print(f"[yellow]  No m2ts files found for {file_name}")
                             continue
 
                         items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
                         total_size = sum(file_sizes.values())
-                        valid_playlists.append({
-                            "file": file_name,
-                            "duration": duration,
-                            "path": mpls_path,
-                            "items": items
-                        })
+                        valid_playlists.append({"file": file_name, "duration": duration, "path": mpls_path, "items": items})
 
-                        if meta.get('debug'):
+                        if meta.get("debug"):
                             duplicates = [f for f, c in file_counts.items() if c > 1]
                             if duplicates:
-                                console.print(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(file_sizes)} unique files ({len(duplicates)} files repeated), {total_size // (1024 * 1024)} MB total")
+                                console.print(
+                                    f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(file_sizes)} unique files ({len(duplicates)} files repeated), {total_size // (1024 * 1024)} MB total"
+                                )
                             else:
                                 console.print(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(items)} unique files, {total_size // (1024 * 1024)} MB total")
                     except Exception as e:
@@ -212,7 +209,7 @@ class DiscParse:
                 scored_playlists.sort(key=lambda x: x[1], reverse=True)
                 top_playlists = [p for p, _score in scored_playlists[:5]]
 
-                if use_largest or (meta['unattended'] and not meta.get('unattended_confirm', False)):
+                if use_largest or (meta["unattended"] and not meta.get("unattended_confirm", False)):
                     best_playlist, best_score = scored_playlists[0]
                     console.print(f"[yellow]Auto-selecting best playlist using weighted scoring: {best_playlist['file']} ({best_score:.2f})")
                     selected_playlists = [best_playlist]
@@ -225,7 +222,7 @@ class DiscParse:
                             console.print("[bold green]Available top playlists (by score):")
                             for idx, playlist in enumerate(top_playlists):
                                 duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
-                                items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
+                                items_str = ", ".join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist["items"])
                                 score = self._calculate_playlist_score(playlist)
                                 console.print(f"[{idx}] {playlist['file']} - {duration_str} - score {score:.2f} - {items_str}")
 
@@ -241,7 +238,7 @@ class DiscParse:
                                 break
                             else:
                                 try:
-                                    selected_indices = [int(x) for x in user_input.split(',')]
+                                    selected_indices = [int(x) for x in user_input.split(",")]
                                     selected_playlists = [top_playlists[idx] for idx in selected_indices if 0 <= idx < len(top_playlists)]
                                     if selected_playlists:
                                         break
@@ -250,8 +247,10 @@ class DiscParse:
                                     console.print("[bold red]Invalid input. Please try again.")
 
                 for idx, playlist in enumerate(selected_playlists):
-                    console.print(f"[bold green]Scanning playlist {playlist['file']} with duration {int(playlist['duration'] // 3600)} hours {int((playlist['duration'] % 3600) // 60)} minutes {int(playlist['duration'] % 60)} seconds")
-                    playlist_number = playlist['file'].replace(".mpls", "")
+                    console.print(
+                        f"[bold green]Scanning playlist {playlist['file']} with duration {int(playlist['duration'] // 3600)} hours {int((playlist['duration'] % 3600) // 60)} minutes {int(playlist['duration'] % 60)} seconds"
+                    )
+                    playlist_number = playlist["file"].replace(".mpls", "")
                     playlist_report_path = os.path.join(save_dir, f"Disc{i + 1}_{playlist_number}_FULL.txt")
 
                     if os.path.exists(playlist_report_path):
@@ -271,32 +270,32 @@ class DiscParse:
                                     folder = "linux/arm"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if os.path.exists(bdinfo_path):
-                                    bdinfo_executable = [bdinfo_path, path, '-m', playlist['file'], save_dir]
+                                    bdinfo_executable = [bdinfo_path, path, "-m", playlist["file"], save_dir]
                             elif system == "darwin":
                                 folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if os.path.exists(bdinfo_path):
-                                    bdinfo_executable = [bdinfo_path, path, '-m', playlist['file'], save_dir]
+                                    bdinfo_executable = [bdinfo_path, path, "-m", playlist["file"], save_dir]
                             elif system == "windows":
                                 # Windows builds are provided as x64
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
                                 if os.path.exists(bdinfo_path):
-                                    bdinfo_executable = [bdinfo_path, '-m', playlist['file'], path, save_dir]
+                                    bdinfo_executable = [bdinfo_path, "-m", playlist["file"], path, save_dir]
 
                             # Fallback to system-installed commands if bundled binary not present
                             if bdinfo_executable is None:
                                 if shutil.which("bdinfo"):
-                                    bdinfo_executable = ["bdinfo", path, '-m', playlist['file'], save_dir]
+                                    bdinfo_executable = ["bdinfo", path, "-m", playlist["file"], save_dir]
                                 elif shutil.which("BDInfo"):
-                                    bdinfo_executable = ["BDInfo", path, '-m', playlist['file'], save_dir]
+                                    bdinfo_executable = ["BDInfo", path, "-m", playlist["file"], save_dir]
                                 else:
-                                    console.print(f"[bold red]BDInfo not found. Please download bdinfo and place it under {base_dir}/bin/bdinfo/ or install a system bdinfo/BDInfo binary[/bold red]")
+                                    console.print(
+                                        f"[bold red]BDInfo not found. Please download bdinfo and place it under {base_dir}/bin/bdinfo/ or install a system bdinfo/BDInfo binary[/bold red]"
+                                    )
                                     continue
 
                             if bdinfo_executable:
-                                proc = await asyncio.create_subprocess_exec(
-                                    *bdinfo_executable
-                                )
+                                proc = await asyncio.create_subprocess_exec(*bdinfo_executable)
                                 await proc.wait()
 
                                 if proc.returncode != 0:
@@ -342,8 +341,8 @@ class DiscParse:
                                 extended_summary_file = f"{save_dir}/BD_SUMMARY_EXT_{str(i).zfill(2)}_{idx}.txt"
 
                             # Strip multiple spaces to single spaces before saving
-                            bd_summary_cleaned = re.sub(r' +', ' ', bd_summary.strip())
-                            ext_bd_summary_cleaned = re.sub(r' +', ' ', ext_bd_summary.strip())
+                            bd_summary_cleaned = re.sub(r" +", " ", bd_summary.strip())
+                            ext_bd_summary_cleaned = re.sub(r" +", " ", ext_bd_summary.strip())
 
                             await asyncio.to_thread(Path(summary_file).write_text, bd_summary_cleaned, encoding="utf-8", errors="replace")
                             await asyncio.to_thread(Path(extended_summary_file).write_text, ext_bd_summary_cleaned, encoding="utf-8", errors="replace")
@@ -352,26 +351,28 @@ class DiscParse:
 
                             # Prompt user for custom edition if conditions are met
                             if len(selected_playlists) > 1:
-                                current_label = bdinfo.get('label', f"Playlist {idx}")
+                                current_label = bdinfo.get("label", f"Playlist {idx}")
                                 console.print(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
 
-                                if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                                if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                                     console.print("[bold green]You can create a custom Edition for this playlist.")
-                                    user_input_raw = cli_ui.ask_string(f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): ")
+                                    user_input_raw = cli_ui.ask_string(
+                                        f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): "
+                                    )
                                     user_input = (user_input_raw or "").strip()
                                     if user_input:
-                                        bdinfo['edition'] = user_input
-                                        selected_playlists[idx]['edition'] = user_input
+                                        bdinfo["edition"] = user_input
+                                        selected_playlists[idx]["edition"] = user_input
                                         console.print(f"[bold green]Edition updated to: {bdinfo['edition']}")
                                 else:
                                     console.print("[bold yellow]Unattended mode: Custom edition not added.")
 
                             # Save to discs array
                             if idx == 0:
-                                discs[i]['summary'] = bd_summary_cleaned
-                                discs[i]['bdinfo'] = bdinfo
-                                discs[i]['playlists'] = selected_playlists
-                                if valid_playlists and meta['unattended'] and not meta.get('unattended_confirm', False):
+                                discs[i]["summary"] = bd_summary_cleaned
+                                discs[i]["bdinfo"] = bdinfo
+                                discs[i]["playlists"] = selected_playlists
+                                if valid_playlists and meta["unattended"] and not meta.get("unattended_confirm", False):
                                     simplified_playlists: list[dict[str, Any]] = [{"file": p["file"], "duration": p["duration"]} for p in valid_playlists]
                                     duration_map: dict[int, dict[str, Any]] = {}
 
@@ -381,20 +382,17 @@ class DiscParse:
                                         if rounded_duration in duration_map:
                                             continue
 
-                                        duration_map[rounded_duration] = {
-                                            "file": playlist["file"],
-                                            "duration": playlist["duration"]
-                                        }
+                                        duration_map[rounded_duration] = {"file": playlist["file"], "duration": playlist["duration"]}
 
                                     simplified_playlists = list(duration_map.values())
                                     simplified_playlists.sort(key=lambda x: float(x["duration"]), reverse=True)
-                                    discs[i]['all_valid_playlists'] = simplified_playlists
+                                    discs[i]["all_valid_playlists"] = simplified_playlists
 
-                                    if meta['debug']:
+                                    if meta["debug"]:
                                         console.print(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
                             else:
-                                discs[i][f'summary_{idx}'] = bd_summary_cleaned
-                                discs[i][f'bdinfo_{idx}'] = bdinfo
+                                discs[i][f"summary_{idx}"] = bd_summary_cleaned
+                                discs[i][f"bdinfo_{idx}"] = bdinfo
 
                         except Exception:
                             console.print(traceback.format_exc())
@@ -405,7 +403,7 @@ class DiscParse:
             else:
                 discs = meta_discs
 
-        return discs, discs[0]['bdinfo']
+        return discs, discs[0]["bdinfo"]
 
     def parse_bdinfo_files(self, files: str) -> list[dict[str, str]]:
         """
@@ -447,10 +445,10 @@ class DiscParse:
         audio_tracks: list[dict[str, Any]] = []
         subtitles: list[str] = []
         bdinfo: dict[str, Any] = {
-            'video': video_tracks,
-            'audio': audio_tracks,
-            'subtitles': subtitles,
-            'path': path,
+            "video": video_tracks,
+            "audio": audio_tracks,
+            "subtitles": subtitles,
+            "path": path,
         }
         lines = bdinfo_input.splitlines()
         for l in lines:  # noqa E741
@@ -458,19 +456,19 @@ class DiscParse:
             if line.startswith("*"):
                 line = l.replace("*", "").strip().lower()
             if line.startswith("playlist:"):
-                playlist = l.split(':', 1)[1]
-                bdinfo['playlist'] = playlist.split('.', 1)[0].strip()
+                playlist = l.split(":", 1)[1]
+                bdinfo["playlist"] = playlist.split(".", 1)[0].strip()
             if line.startswith("disc size:"):
-                size = l.split(':', 1)[1]
-                size = size.split('bytes', 1)[0].replace(',', '')
+                size = l.split(":", 1)[1]
+                size = size.split("bytes", 1)[0].replace(",", "")
                 size = float(size) / float(1 << 30)
-                bdinfo['size'] = size
+                bdinfo["size"] = size
             if line.startswith("length:"):
-                length = l.split(':', 1)[1]
-                bdinfo['length'] = length.split('.', 1)[0].strip()
+                length = l.split(":", 1)[1]
+                bdinfo["length"] = length.split(".", 1)[0].strip()
             if line.startswith("video:"):
-                split1 = l.split(':', 1)[1]
-                split2 = split1.split('/', 12)
+                split1 = l.split(":", 1)[1]
+                split2 = split1.split("/", 12)
                 while len(split2) != 9:
                     split2.append("")
                 n = 0
@@ -487,24 +485,26 @@ class DiscParse:
                     bit_depth = ""
                     hdr_dv = ""
                     color = ""
-                bdinfo['video'].append({
-                    'codec': split2[0].strip(),
-                    'bitrate': split2[1].strip(),
-                    'res': split2[n + 2].strip(),
-                    'fps': split2[n + 3].strip(),
-                    'aspect_ratio': split2[n + 4].strip(),
-                    'profile': split2[n + 5].strip(),
-                    'bit_depth': bit_depth,
-                    'hdr_dv': hdr_dv,
-                    'color': color,
-                    '3d': three_dim,
-                })
+                bdinfo["video"].append(
+                    {
+                        "codec": split2[0].strip(),
+                        "bitrate": split2[1].strip(),
+                        "res": split2[n + 2].strip(),
+                        "fps": split2[n + 3].strip(),
+                        "aspect_ratio": split2[n + 4].strip(),
+                        "profile": split2[n + 5].strip(),
+                        "bit_depth": bit_depth,
+                        "hdr_dv": hdr_dv,
+                        "color": color,
+                        "3d": three_dim,
+                    }
+                )
             elif line.startswith("audio:"):
                 if "(" in l:
                     l = l.split("(")[0]  # noqa E741
                 l = l.strip()  # noqa E741
-                split1 = l.split(':', 1)[1]
-                split2 = split1.split('/')
+                split1 = l.split(":", 1)[1]
+                split2 = split1.split("/")
                 n = 0
                 if "Atmos" in split2[2].strip():
                     n = 1
@@ -515,27 +515,29 @@ class DiscParse:
                     bit_depth = split2[n + 5].strip()
                 except Exception:
                     bit_depth = ""
-                bdinfo['audio'].append({
-                    'language': split2[0].strip(),
-                    'codec': split2[1].strip(),
-                    'channels': split2[n + 2].strip(),
-                    'sample_rate': split2[n + 3].strip(),
-                    'bitrate': split2[n + 4].strip(),
-                    'bit_depth': bit_depth,  # Also DialNorm, but is not in use anywhere yet
-                    'atmos_why_you_be_like_this': fuckatmos,
-                })
+                bdinfo["audio"].append(
+                    {
+                        "language": split2[0].strip(),
+                        "codec": split2[1].strip(),
+                        "channels": split2[n + 2].strip(),
+                        "sample_rate": split2[n + 3].strip(),
+                        "bitrate": split2[n + 4].strip(),
+                        "bit_depth": bit_depth,  # Also DialNorm, but is not in use anywhere yet
+                        "atmos_why_you_be_like_this": fuckatmos,
+                    }
+                )
             elif line.startswith("disc title:"):
-                title = l.split(':', 1)[1]
-                bdinfo['title'] = title
+                title = l.split(":", 1)[1]
+                bdinfo["title"] = title
             elif line.startswith("disc label:"):
-                label = l.split(':', 1)[1]
-                bdinfo['label'] = label
-            elif line.startswith('subtitle:'):
-                split1 = l.split(':', 1)[1]
-                split2 = split1.split('/')
-                bdinfo['subtitles'].append(split2[0].strip())
+                label = l.split(":", 1)[1]
+                bdinfo["label"] = label
+            elif line.startswith("subtitle:"):
+                split1 = l.split(":", 1)[1]
+                split2 = split1.split("/")
+                bdinfo["subtitles"].append(split2[0].strip())
         parsed_files = self.parse_bdinfo_files(files)
-        bdinfo['files'] = parsed_files
+        bdinfo["files"] = parsed_files
         return bdinfo
 
     """
@@ -546,7 +548,7 @@ class DiscParse:
         mediainfo_binary = self.setup_mediainfo_for_dvd(base_dir, debug=debug)
 
         for each in discs:
-            path = each.get('path')
+            path = each.get("path")
             if not isinstance(path, str) or not path:
                 continue
             os.chdir(path)
@@ -568,9 +570,7 @@ class DiscParse:
                     try:
                         if mediainfo_binary:
                             process = await asyncio.create_subprocess_exec(
-                                mediainfo_binary, "--Output=JSON", ifo_file,
-                                stdout=asyncio.subprocess.PIPE,
-                                stderr=asyncio.subprocess.PIPE
+                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
                             )
                             stdout, stderr = await process.communicate()
 
@@ -580,20 +580,20 @@ class DiscParse:
                                 console.print(f"[yellow]Specialized MediaInfo failed for {ifo_file}, falling back to standard[/yellow]")
                                 if stderr:
                                     console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                                vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
+                                vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
                         else:
-                            vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
+                            vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
 
                     except Exception as e:
                         console.print(f"[yellow]Error with DVD MediaInfo binary for JSON: {str(e)}")
                         # Fall back to standard MediaInfo
-                        vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
+                        vob_set_mi = MediaInfo.parse(ifo_file, output="JSON")
 
                     vob_set_mi = json.loads(vob_set_mi)
-                    tracks = vob_set_mi.get('media', {}).get('track', [])
+                    tracks = vob_set_mi.get("media", {}).get("track", [])
 
                     if len(tracks) > 1:
-                        vob_set_duration = tracks[1].get('Duration', "Unknown")
+                        vob_set_duration = tracks[1].get("Duration", "Unknown")
                     else:
                         console.print("Warning: Expected track[1] is missing.")
                         vob_set_duration = "Unknown"
@@ -602,7 +602,7 @@ class DiscParse:
                     console.print(f"Error processing VOB set: {e}")
                     vob_set_duration = "Unknown"
 
-                if vob_set_duration == "Unknown" or not vob_set_duration.replace('.', '', 1).isdigit():
+                if vob_set_duration == "Unknown" or not vob_set_duration.replace(".", "", 1).isdigit():
                     console.print(f"Skipping VOB set due to invalid duration: {vob_set_duration}")
                     continue
 
@@ -613,10 +613,10 @@ class DiscParse:
                     main_set = vob_set
                     main_set_duration = vob_set_duration_float
 
-            each['main_set'] = main_set
+            each["main_set"] = main_set
             set = main_set[0][:2]
-            each['vob'] = vob = f"{path}/VTS_{set}_1.VOB"
-            each['ifo'] = ifo = f"{path}/VTS_{set}_0.IFO"
+            each["vob"] = vob = f"{path}/VTS_{set}_1.VOB"
+            each["ifo"] = ifo = f"{path}/VTS_{set}_0.IFO"
 
             # Use basenames for mediainfo processing to avoid full paths in output
             vob_basename = os.path.basename(vob)
@@ -626,87 +626,79 @@ class DiscParse:
                 # Process VOB file
                 try:
                     if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, vob_basename,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
-                        )
+                        process = await asyncio.create_subprocess_exec(mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         stdout, stderr = await process.communicate()
 
                         if process.returncode == 0 and stdout:
-                            vob_mi_output = stdout.decode().replace('\r\n', '\n')
+                            vob_mi_output = stdout.decode().replace("\r\n", "\n")
                         else:
                             console.print("[yellow]Specialized MediaInfo failed for VOB, falling back[/yellow]")
                             if stderr:
                                 console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
+                            vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
                     else:
-                        vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
+                        vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for VOB: {str(e)}")
-                    vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
+                    vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
 
                 # Store VOB mediainfo (same output for both keys)
-                each['vob_mi'] = vob_mi_output
-                each['vob_mi_full'] = vob_mi_output
+                each["vob_mi"] = vob_mi_output
+                each["vob_mi_full"] = vob_mi_output
 
                 # Process IFO file
                 try:
                     if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(
-                            mediainfo_binary, ifo_basename,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE
-                        )
+                        process = await asyncio.create_subprocess_exec(mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         stdout, stderr = await process.communicate()
 
                         if process.returncode == 0 and stdout:
-                            ifo_mi_output = stdout.decode().replace('\r\n', '\n')
+                            ifo_mi_output = stdout.decode().replace("\r\n", "\n")
                         else:
                             console.print("[yellow]Specialized MediaInfo failed for IFO, falling back[/yellow]")
                             if stderr:
                                 console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
-                            ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
+                            ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
                     else:
-                        ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
+                        ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
                 except Exception as e:
                     console.print(f"[yellow]Error with DVD MediaInfo binary for IFO: {str(e)}")
-                    ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
+                    ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
 
-                each['ifo_mi'] = ifo_mi_output
-                each['ifo_mi_full'] = ifo_mi_output
+                each["ifo_mi"] = ifo_mi_output
+                each["ifo_mi_full"] = ifo_mi_output
 
             except Exception as e:
                 console.print(f"[yellow]Error using DVD MediaInfo binary, falling back to standard: {e}")
                 # Fallback to standard MediaInfo using basenames
-                vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
-                ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
-                each['vob_mi'] = vob_mi_output
-                each['ifo_mi'] = ifo_mi_output
-                each['vob_mi_full'] = vob_mi_output
-                each['ifo_mi_full'] = ifo_mi_output
+                vob_mi_output = MediaInfo.parse(vob_basename, output="STRING", full=False).replace("\r\n", "\n")
+                ifo_mi_output = MediaInfo.parse(ifo_basename, output="STRING", full=False).replace("\r\n", "\n")
+                each["vob_mi"] = vob_mi_output
+                each["ifo_mi"] = ifo_mi_output
+                each["vob_mi_full"] = vob_mi_output
+                each["ifo_mi_full"] = ifo_mi_output
 
-            size = sum(os.path.getsize(f) for f in os.listdir('.') if os.path.isfile(f)) / float(1 << 30)
-            each['disc_size'] = round(size, 2)
+            size = sum(os.path.getsize(f) for f in os.listdir(".") if os.path.isfile(f)) / float(1 << 30)
+            each["disc_size"] = round(size, 2)
             dvd_size = "DVD9"
             if size <= 4.37:
                 dvd_size = "DVD5"
-            each['size'] = dvd_size
+            each["size"] = dvd_size
         return discs
 
     async def get_hddvd_info(self, discs: list[dict[str, Any]], meta: dict[str, Any]):
-        use_largest = int(self.config['DEFAULT'].get('use_largest_playlist', False))
+        use_largest = int(self.config["DEFAULT"].get("use_largest_playlist", False))
         for each in discs:
-            path = each.get('path')
+            path = each.get("path")
             if not isinstance(path, str) or not path:
                 continue
             os.chdir(path)
 
             try:
                 # Define the playlist path
-                playlist_path = os.path.join(meta['path'], "ADV_OBJ")
+                playlist_path = os.path.join(meta["path"], "ADV_OBJ")
                 xpl_files = glob(f"{playlist_path}/*.xpl")
-                if meta['debug']:
+                if meta["debug"]:
                     console.print(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
@@ -721,12 +713,7 @@ class DiscParse:
                 for playlist in playlist_info:
                     playlist_dict = playlist
                     primary_clips = cast(list[dict[str, Any]], playlist_dict.get("primaryClips", []))
-                    evo_files = [
-                        os.path.abspath(
-                            f"{path}/{os.path.basename(str(clip.get('src', '')).replace('.MAP', '.EVO'))}"
-                        )
-                        for clip in primary_clips
-                    ]
+                    evo_files = [os.path.abspath(f"{path}/{os.path.basename(str(clip.get('src', '')).replace('.MAP', '.EVO'))}") for clip in primary_clips]
                     total_size = sum(os.path.getsize(evo) for evo in evo_files if os.path.exists(evo))
                     if total_size > 0:
                         playlist_dict["totalSize"] = total_size
@@ -739,20 +726,10 @@ class DiscParse:
                 selected_playlists: list[dict[str, Any]] = []
                 if use_largest:
                     console.print("[yellow]Auto-selecting the largest playlist based on size.")
-                    selected_playlists = [
-                        max(
-                            valid_playlists,
-                            key=lambda p: p["totalSize"]
-                        )
-                    ]
-                elif meta['unattended'] and not meta.get('unattended_confirm', False):
+                    selected_playlists = [max(valid_playlists, key=lambda p: p["totalSize"])]
+                elif meta["unattended"] and not meta.get("unattended_confirm", False):
                     console.print("[yellow]Unattended mode: Auto-selecting the largest playlist.")
-                    selected_playlists = [
-                        max(
-                            valid_playlists,
-                            key=lambda p: p["totalSize"]
-                        )
-                    ]
+                    selected_playlists = [max(valid_playlists, key=lambda p: p["totalSize"])]
                 else:
                     # Allow user to select playlists
                     while True:
@@ -814,27 +791,19 @@ class DiscParse:
                     # Filter out non-existent files
                     existing_evo_files = [evo for evo in evo_files if os.path.exists(evo)]
 
-                    selected_evo_path = (
-                        existing_evo_files[1]
-                        if len(existing_evo_files) >= 2
-                        else max(existing_evo_files, key=os.path.getsize)
-                    )
+                    selected_evo_path = existing_evo_files[1] if len(existing_evo_files) >= 2 else max(existing_evo_files, key=os.path.getsize)
 
                     if not os.path.exists(selected_evo_path):
                         raise FileNotFoundError(f"Selected .EVO file {selected_evo_path} does not exist.")
 
                     # Parse MediaInfo for the largest .EVO file
-                    original_mediainfo = MediaInfo.parse(selected_evo_path, output='STRING', full=False)
+                    original_mediainfo = MediaInfo.parse(selected_evo_path, output="STRING", full=False)
 
-                    modified_mediainfo = re.sub(
-                        r"File size\s+:\s+[^\r\n]+",
-                        f"File size                                : {total_size / (1024 ** 3):.2f} GiB",
-                        original_mediainfo
-                    )
+                    modified_mediainfo = re.sub(r"File size\s+:\s+[^\r\n]+", f"File size                                : {total_size / (1024**3):.2f} GiB", original_mediainfo)
                     modified_mediainfo = re.sub(
                         r"Duration\s+:\s+[^\r\n]+",
                         f"Duration                                 : {self.format_duration(str(selected_playlist.get('titleDuration', '')))}",
-                        modified_mediainfo
+                        modified_mediainfo,
                     )
 
                     # Split MediaInfo into blocks for easier manipulation
@@ -941,8 +910,8 @@ class DiscParse:
                     modified_mediainfo = "\n\n".join(mediainfo_blocks)
 
                     # Update the dictionary with the modified MediaInfo and file path
-                    each['evo_mi'] = modified_mediainfo
-                    each['largest_evo'] = selected_evo_path
+                    each["evo_mi"] = modified_mediainfo
+                    each["largest_evo"] = selected_evo_path
 
                 # Save playlist information in meta under HDDVD_PLAYLIST
                 meta["HDDVD_PLAYLIST"] = selected_playlist
@@ -967,8 +936,8 @@ class DiscParse:
                         size = file_size
 
                 # Generate MediaInfo for the largest EVO file
-                each['evo_mi'] = MediaInfo.parse(os.path.basename(largest), output='STRING', full=False)
-                each['largest_evo'] = os.path.abspath(f"{path}/{largest}")
+                each["evo_mi"] = MediaInfo.parse(os.path.basename(largest), output="STRING", full=False)
+                each["largest_evo"] = os.path.abspath(f"{path}/{largest}")
 
         return discs
 
@@ -995,7 +964,7 @@ class DiscParse:
                 return titles
 
             # Extract namespace
-            namespace = {'ns': 'http://www.dvdforum.org/2005/HDDVDVideo/Playlist'}
+            namespace = {"ns": "http://www.dvdforum.org/2005/HDDVDVideo/Playlist"}
 
             for title in root.findall(".//ns:Title", namespaces=namespace):
                 title_duration = title.get("titleDuration", "00:00:00:00")
@@ -1033,30 +1002,36 @@ class DiscParse:
 
                     # Extract Audio tracks within PrimaryAudioVideoClip
                     for audio in clip.findall(".//ns:Audio", namespaces=namespace):
-                        cast(list[dict[str, Any]], clip_data["audioTracks"]).append({
-                            "track": audio.get("track"),
-                            "streamNumber": audio.get("streamNumber"),
-                            "mediaAttr": audio.get("mediaAttr"),
-                            "description": audio.get("description"),
-                        })
+                        cast(list[dict[str, Any]], clip_data["audioTracks"]).append(
+                            {
+                                "track": audio.get("track"),
+                                "streamNumber": audio.get("streamNumber"),
+                                "mediaAttr": audio.get("mediaAttr"),
+                                "description": audio.get("description"),
+                            }
+                        )
 
                     # Extract Subtitle tracks within PrimaryAudioVideoClip
                     for subtitle in clip.findall(".//ns:Subtitle", namespaces=namespace):
-                        cast(list[dict[str, Any]], clip_data["subtitleTracks"]).append({
-                            "track": subtitle.get("track"),
-                            "streamNumber": subtitle.get("streamNumber"),
-                            "mediaAttr": subtitle.get("mediaAttr"),
-                            "description": subtitle.get("description"),
-                        })
+                        cast(list[dict[str, Any]], clip_data["subtitleTracks"]).append(
+                            {
+                                "track": subtitle.get("track"),
+                                "streamNumber": subtitle.get("streamNumber"),
+                                "mediaAttr": subtitle.get("mediaAttr"),
+                                "description": subtitle.get("description"),
+                            }
+                        )
 
                     cast(list[dict[str, Any]], title_data["primaryClips"]).append(clip_data)
 
                 # Extract ChapterList details
                 for chapter in title.findall(".//ns:ChapterList/ns:Chapter", namespaces=namespace):
-                    cast(list[dict[str, Any]], title_data["chapters"]).append({
-                        "displayName": chapter.get("displayName"),
-                        "titleTimeBegin": chapter.get("titleTimeBegin"),
-                    })
+                    cast(list[dict[str, Any]], title_data["chapters"]).append(
+                        {
+                            "displayName": chapter.get("displayName"),
+                            "titleTimeBegin": chapter.get("titleTimeBegin"),
+                        }
+                    )
 
                 # Extract TrackNavigationList details (AudioTracks and SubtitleTracks)
                 for audio_track in title.findall(".//ns:TrackNavigationList/ns:AudioTrack", namespaces=namespace):
@@ -1066,13 +1041,15 @@ class DiscParse:
                     # Convert the short language code to the full language name
                     language_name = Language.get(langcode_short).display_name()
 
-                    cast(list[dict[str, Any]], title_data["audioTracks"]).append({
-                        "track": audio_track.get("track"),
-                        "langcode": langcode_short,
-                        "language": language_name,
-                        "description": audio_track.get("description"),
-                        "selectable": audio_track.get("selectable"),
-                    })
+                    cast(list[dict[str, Any]], title_data["audioTracks"]).append(
+                        {
+                            "track": audio_track.get("track"),
+                            "langcode": langcode_short,
+                            "language": language_name,
+                            "description": audio_track.get("description"),
+                            "selectable": audio_track.get("selectable"),
+                        }
+                    )
 
                 for subtitle_track in title.findall(".//ns:TrackNavigationList/ns:SubtitleTrack", namespaces=namespace):
                     langcode = subtitle_track.get("langcode", "")
@@ -1081,12 +1058,14 @@ class DiscParse:
                     # Convert the short language code to the full language name
                     language_name = Language.get(langcode_short).display_name()
 
-                    cast(list[dict[str, Any]], title_data["subtitleTracks"]).append({
-                        "track": subtitle_track.get("track"),
-                        "langcode": langcode_short,
-                        "language": language_name,
-                        "selectable": subtitle_track.get("selectable"),
-                    })
+                    cast(list[dict[str, Any]], title_data["subtitleTracks"]).append(
+                        {
+                            "track": subtitle_track.get("track"),
+                            "langcode": langcode_short,
+                            "language": language_name,
+                            "selectable": subtitle_track.get("selectable"),
+                        }
+                    )
 
                 # Extract ApplicationSegment details
                 for app_segment in title.findall(".//ns:ApplicationSegment", namespaces=namespace):
@@ -1101,12 +1080,14 @@ class DiscParse:
 
                     # Extract ApplicationResource details
                     for resource in app_segment.findall(".//ns:ApplicationResource", namespaces=namespace):
-                        cast(list[dict[str, Any]], app_data["resources"]).append({
-                            "src": resource.get("src"),
-                            "size": resource.get("size"),
-                            "priority": resource.get("priority"),
-                            "multiplexed": resource.get("multiplexed"),
-                        })
+                        cast(list[dict[str, Any]], app_data["resources"]).append(
+                            {
+                                "src": resource.get("src"),
+                                "size": resource.get("size"),
+                                "priority": resource.get("priority"),
+                                "multiplexed": resource.get("multiplexed"),
+                            }
+                        )
 
                     cast(list[dict[str, Any]], title_data["applicationSegments"]).append(app_data)
 

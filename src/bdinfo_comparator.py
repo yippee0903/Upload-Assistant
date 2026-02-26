@@ -103,7 +103,6 @@ def compare_bdinfo(meta: dict[str, Any], entry: dict[str, Any], tracker_name: st
         if prefix in stats:
             stats[prefix] += 1
 
-
     console.print(f"\n[bold yellow]RELEASE:[/bold yellow] {release_name}", soft_wrap=True)
     console.print("[dim]Comparison Details:[/dim]\n", soft_wrap=True)
 

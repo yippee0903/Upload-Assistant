@@ -57,7 +57,7 @@ class SAM(UNIT3D):
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
-        if not meta.get('is_disc'):
+        if not meta.get("is_disc"):
             audio_tag = ""
             if meta.get("audio_languages"):
                 audio_languages_value = meta.get("audio_languages", [])
@@ -89,9 +89,7 @@ class SAM(UNIT3D):
                     else:
                         sam_name += audio_tag
 
-        if tag_value == "" or any(
-            invalid_tag in tag_lower for invalid_tag in invalid_tags
-        ):
+        if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
                 sam_name = re.sub(f"-{invalid_tag}", "", sam_name, flags=re.IGNORECASE)
             sam_name = f"{sam_name}-NoGroup"
@@ -106,6 +104,4 @@ class SAM(UNIT3D):
         return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        return await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
-        )
+        return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)

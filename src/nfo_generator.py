@@ -36,14 +36,14 @@ class SceneNfoGenerator:
         try:
             # Determine output directory
             if output_dir is None:
-                output_dir = os.path.join(meta['base_dir'], "tmp", meta['uuid'])
+                output_dir = os.path.join(meta["base_dir"], "tmp", meta["uuid"])
 
             os.makedirs(output_dir, exist_ok=True)
 
             # Get release name
-            release_name = meta.get('name', meta.get('uuid', 'Unknown'))
+            release_name = meta.get("name", meta.get("uuid", "Unknown"))
             if isinstance(release_name, dict):
-                release_name = release_name.get('name', meta.get('uuid', 'Unknown'))
+                release_name = release_name.get("name", meta.get("uuid", "Unknown"))
 
             # Get MediaInfo content
             nfo_content = await self._get_mediainfo_content(meta)
@@ -55,14 +55,14 @@ class SceneNfoGenerator:
             # Save NFO file
             # Sanitize release name for use as filename (remove characters
             # forbidden on Windows: : * ? " < > |, and other problematic chars)
-            safe_name = re.sub(r'[<>:"/\\|?*]', '-', release_name)
+            safe_name = re.sub(r'[<>:"/\\|?*]', "-", release_name)
             nfo_filename = f"{safe_name}.nfo"
             nfo_path = os.path.join(output_dir, nfo_filename)
 
-            async with aiofiles.open(nfo_path, 'w', encoding='utf-8') as f:
+            async with aiofiles.open(nfo_path, "w", encoding="utf-8") as f:
                 await f.write(nfo_content)
 
-            if meta.get('debug'):
+            if meta.get("debug"):
                 console.print(f"[green]NFO generated: {nfo_path}[/green]")
 
             return nfo_path
@@ -75,33 +75,23 @@ class SceneNfoGenerator:
         """Get MediaInfo text content from meta or file."""
 
         # First try: Check for MEDIAINFO_CLEANPATH.txt (clean path version)
-        cleanpath_file = os.path.join(
-            meta.get('base_dir', ''),
-            "tmp",
-            meta.get('uuid', ''),
-            "MEDIAINFO_CLEANPATH.txt"
-        )
+        cleanpath_file = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""), "MEDIAINFO_CLEANPATH.txt")
         if os.path.exists(cleanpath_file):
-            async with aiofiles.open(cleanpath_file, encoding='utf-8') as f:
+            async with aiofiles.open(cleanpath_file, encoding="utf-8") as f:
                 content = await f.read()
                 if content.strip():
                     return content
 
         # Second try: Check for MEDIAINFO.txt
-        mediainfo_file = os.path.join(
-            meta.get('base_dir', ''),
-            "tmp",
-            meta.get('uuid', ''),
-            "MEDIAINFO.txt"
-        )
+        mediainfo_file = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""), "MEDIAINFO.txt")
         if os.path.exists(mediainfo_file):
-            async with aiofiles.open(mediainfo_file, encoding='utf-8') as f:
+            async with aiofiles.open(mediainfo_file, encoding="utf-8") as f:
                 content = await f.read()
                 if content.strip():
                     return content
 
         # Third try: Get from meta['mediainfo_text'] if available
-        if meta.get('mediainfo_text'):
-            return meta['mediainfo_text']
+        if meta.get("mediainfo_text"):
+            return meta["mediainfo_text"]
 
         return None

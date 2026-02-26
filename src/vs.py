@@ -36,12 +36,14 @@ def CustomFrameInfo(clip: Any, _text: str) -> Any:
 
 def optimize_images(image: str, config: dict[str, Any]) -> None:
     import platform  # Ensure platform is imported here
-    if config.get('optimize_images', True) and os.path.exists(image):
+
+    if config.get("optimize_images", True) and os.path.exists(image):
         oxipng: Any | None
         try:
             pyver = platform.python_version_tuple()
             if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
                 import oxipng  # pyright: ignore[reportMissingImports]
+
                 oxipng = oxipng
             else:
                 oxipng = None
@@ -58,7 +60,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
 
 def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None) -> None:
     if config is None:
-        config = {'optimize_images': True}  # Default configuration
+        config = {"optimize_images": True}  # Default configuration
 
     screens_file = os.path.join(dir, "screens.txt")
 

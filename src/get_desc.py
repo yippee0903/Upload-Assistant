@@ -28,17 +28,17 @@ def html_to_bbcode(text: str) -> str:
 
     # Define HTML to BBCode tag mappings
     html_bbcode_map = [
-        (r'<b>(.*?)</b>', r'[b]\1[/b]'),
-        (r'<i>(.*?)</i>', r'[i]\1[/i]'),
-        (r'<u>(.*?)</u>', r'[u]\1[/u]'),
-        (r'<s>(.*?)</s>', r'[s]\1[/s]'),
-        (r'<em>(.*?)</em>', r'[i]\1[/i]'),
-        (r'<strong>(.*?)</strong>', r'[b]\1[/b]'),
-        (r'<strike>(.*?)</strike>', r'[s]\1[/s]'),
-        (r'<del>(.*?)</del>', r'[s]\1[/s]'),
-        (r'<br\s*/?>', r'\n'),
-        (r'<br>', r'\n'),
-        (r'<p>(.*?)</p>', r'\1\n'),
+        (r"<b>(.*?)</b>", r"[b]\1[/b]"),
+        (r"<i>(.*?)</i>", r"[i]\1[/i]"),
+        (r"<u>(.*?)</u>", r"[u]\1[/u]"),
+        (r"<s>(.*?)</s>", r"[s]\1[/s]"),
+        (r"<em>(.*?)</em>", r"[i]\1[/i]"),
+        (r"<strong>(.*?)</strong>", r"[b]\1[/b]"),
+        (r"<strike>(.*?)</strike>", r"[s]\1[/s]"),
+        (r"<del>(.*?)</del>", r"[s]\1[/s]"),
+        (r"<br\s*/?>", r"\n"),
+        (r"<br>", r"\n"),
+        (r"<p>(.*?)</p>", r"\1\n"),
     ]
 
     converted_text = text
@@ -125,13 +125,9 @@ async def gen_desc(
 
             if not content_written:
                 if scene_nfo is True:
-                    description_lines.append(
-                        f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]"
-                    )
+                    description_lines.append(f"[center][spoiler=Scene NFO:][code]{nfo_content}[/code][/spoiler][/center]")
                 elif bhd_nfo is True:
-                    description_lines.append(
-                        f"[center][spoiler=FraMeSToR NFO:][code]{nfo_content}[/code][/spoiler][/center]"
-                    )
+                    description_lines.append(f"[center][spoiler=FraMeSToR NFO:][code]{nfo_content}[/code][/spoiler][/center]")
                 else:
                     description_lines.append(f"[code]{nfo_content}[/code]")
 
@@ -144,9 +140,7 @@ async def gen_desc(
         try:
             parsed: ParseResult = urllib.parse.urlparse(description_link.replace("/raw/", "/") or "")
             split = os.path.split(parsed.path)
-            raw = parsed._replace(
-                path=f"{split[0]}/raw/{split[1]}" if split[0] != "/" else f"/raw{parsed.path}"
-            )
+            raw = parsed._replace(path=f"{split[0]}/raw/{split[1]}" if split[0] != "/" else f"/raw{parsed.path}")
             raw_url = urllib.parse.urlunparse(raw)
             async with httpx.AsyncClient(timeout=20.0) as client:
                 response = await client.get(raw_url)
@@ -204,7 +198,7 @@ class DescriptionBuilder:
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
 
-        trackers_config = self.config.get('TRACKERS')
+        trackers_config = self.config.get("TRACKERS")
         if not isinstance(trackers_config, dict):
             raise KeyError("Missing 'TRACKERS' section in config")
         trackers_config_map = cast(dict[str, Any], trackers_config)
@@ -220,9 +214,7 @@ class DescriptionBuilder:
     async def get_custom_header(self) -> str:
         """Returns a custom header if configured."""
         try:
-            custom_description_header = str(self.tracker_config.get(
-                "custom_description_header", self.config["DEFAULT"].get("custom_description_header", "")
-            ))
+            custom_description_header = str(self.tracker_config.get("custom_description_header", self.config["DEFAULT"].get("custom_description_header", "")))
             if custom_description_header:
                 return custom_description_header
         except Exception as e:
@@ -232,9 +224,7 @@ class DescriptionBuilder:
 
     async def get_tonemapped_header(self, meta: dict[str, Any]) -> str:
         try:
-            tonemapped_description_header = str(self.tracker_config.get(
-                "tonemapped_header", self.config["DEFAULT"].get("tonemapped_header", "")
-            ))
+            tonemapped_description_header = str(self.tracker_config.get("tonemapped_header", self.config["DEFAULT"].get("tonemapped_header", "")))
             if tonemapped_description_header and meta.get("tonemapped", False):
                 return tonemapped_description_header
         except Exception as e:
@@ -245,9 +235,7 @@ class DescriptionBuilder:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
         try:
-            if not self.tracker_config.get(
-                "add_logo", self.config["DEFAULT"].get("add_logo", False)
-            ):
+            if not self.tracker_config.get("add_logo", self.config["DEFAULT"].get("add_logo", False)):
                 return logo, logo_size
 
             logo = meta.get("logo", "")
@@ -265,12 +253,7 @@ class DescriptionBuilder:
         image: str = ""
         overview: str = ""
         try:
-            if (
-                not self.tracker_config.get(
-                    "episode_overview", self.config["DEFAULT"].get("episode_overview", False)
-                )
-                or meta["category"] != "TV"
-            ):
+            if not self.tracker_config.get("episode_overview", self.config["DEFAULT"].get("episode_overview", False)) or meta["category"] != "TV":
                 return title, image, overview
 
             tvmaze_episode_data = meta.get("tvmaze_episode_data", {})
@@ -285,14 +268,7 @@ class DescriptionBuilder:
                 overview = html_to_bbcode(overview)
 
             episode_name = tvmaze_episode_data.get("episode_name", "")
-            episode_title = meta.get("auto_episode_title") or (
-                episode_name
-                if (
-                    not episode_name.lower().startswith("episode")
-                    and "tba" not in episode_name.lower()
-                )
-                else ""
-            )
+            episode_title = meta.get("auto_episode_title") or (episode_name if (not episode_name.lower().startswith("episode") and "tba" not in episode_name.lower()) else "")
 
             image = ""
             if meta.get("tv_pack", False):
@@ -325,9 +301,7 @@ class DescriptionBuilder:
         if meta.get("is_disc") == "BDMV":
             return ""
 
-        if self.tracker_config.get(
-            "full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)
-        ):
+        if self.tracker_config.get("full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)):
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
@@ -408,9 +382,7 @@ class DescriptionBuilder:
     async def screenshot_header(self) -> str:
         """Returns the screenshot header if applicable."""
         try:
-            screenheader = self.tracker_config.get(
-                "screenshot_header", self.config["DEFAULT"].get("screenshot_header", None)
-            )
+            screenheader = self.tracker_config.get("screenshot_header", self.config["DEFAULT"].get("screenshot_header", None))
             if screenheader:
                 return str(screenheader)
         except Exception as e:
@@ -421,10 +393,8 @@ class DescriptionBuilder:
     async def menu_screenshot_header(self, meta: dict[str, Any]) -> str:
         """Returns the screenshot header for menus if applicable."""
         try:
-            if meta.get("is_disc", "") and meta.get('menu_images', []):
-                disc_menu_header = self.tracker_config.get(
-                    "disc_menu_header", self.config["DEFAULT"].get("disc_menu_header", None)
-                )
+            if meta.get("is_disc", "") and meta.get("menu_images", []):
+                disc_menu_header = self.tracker_config.get("disc_menu_header", self.config["DEFAULT"].get("disc_menu_header", None))
                 if disc_menu_header:
                     return str(disc_menu_header)
         except Exception as e:
@@ -451,9 +421,7 @@ class DescriptionBuilder:
     async def get_custom_signature(self) -> str:
         custom_signature: str = ""
         try:
-            raw_signature = self.tracker_config.get(
-                "custom_signature", self.config["DEFAULT"].get("custom_signature", "")
-            )
+            raw_signature = self.tracker_config.get("custom_signature", self.config["DEFAULT"].get("custom_signature", ""))
             custom_signature = raw_signature or ""
         except Exception as e:
             console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
@@ -476,14 +444,8 @@ class DescriptionBuilder:
             if await self.common.path_exists(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json"):
                 covers = True
 
-            if (
-                meta.get("is_disc") in ["BDMV", "DVD"]
-                and self.config["DEFAULT"].get("use_bluray_images", False)
-                and covers
-            ):
-                async with aiofiles.open(
-                    f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json", encoding="utf-8"
-                ) as f:
+            if meta.get("is_disc") in ["BDMV", "DVD"] and self.config["DEFAULT"].get("use_bluray_images", False) and covers:
+                async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/covers.json", encoding="utf-8") as f:
                     cover_data: list[dict[str, str]] = json.loads(await f.read())
 
                     for img_data in cover_data:
@@ -491,17 +453,11 @@ class DescriptionBuilder:
                         raw_url = img_data.get("raw_url", "")
 
                         if self.tracker == "TL":
-                            cover_list.append(
-                                f"""<a href="{web_url}"><img src="{raw_url}" style="max-width: {cover_size}px;"></a>  """
-                            )
+                            cover_list.append(f"""<a href="{web_url}"><img src="{raw_url}" style="max-width: {cover_size}px;"></a>  """)
                         elif self.tracker == "HDT":
-                            cover_list.append(
-                                f"<a href='{raw_url}'><img src='{web_url}' height=137></a> "
-                            )
+                            cover_list.append(f"<a href='{raw_url}'><img src='{web_url}' height=137></a> ")
                         else:
-                            cover_list.append(
-                                f"[url={web_url}][img={cover_size}]{raw_url}[/img][/url]"
-                            )
+                            cover_list.append(f"[url={web_url}][img={cover_size}]{raw_url}[/img][/url]")
 
             if cover_list:
                 cover_images = "".join(cover_list)
@@ -549,13 +505,9 @@ class DescriptionBuilder:
                 desc_parts.append(f"[code]Audio Language/s: {', '.join(meta['audio_languages'])}[/code]")
 
             if meta["subtitle_languages"] and meta["write_subtitle_languages"]:
-                desc_parts.append(
-                    f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
+                desc_parts.append(f"[code]Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
             if meta["subtitle_languages"] and meta["write_hc_languages"]:
-                desc_parts.append(
-                    f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]"
-                )
+                desc_parts.append(f"[code]Hardcoded Subtitle Language/s: {', '.join(meta['subtitle_languages'])}[/code]")
         except Exception as e:
             console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
 
@@ -619,9 +571,7 @@ class DescriptionBuilder:
         desc_parts.append(await self.get_tonemapped_header(meta))
 
         # Discs and Screenshots
-        discs_and_screenshots = await self._handle_discs_and_screenshots(
-            meta, approved_image_hosts, images, multi_screens
-        )
+        discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens)
         desc_parts.append(discs_and_screenshots)
 
         # Custom Signature
@@ -634,10 +584,7 @@ class DescriptionBuilder:
                 signature = signature.replace("[size=4]", "[size=8]")
         desc_parts.append(signature)
 
-        description: str = "\n".join(
-            part for part in desc_parts
-            if str(part).strip()
-        )
+        description: str = "\n".join(part for part in desc_parts if str(part).strip())
 
         # Formatting
         bbcode = BBCODE()
@@ -650,7 +597,7 @@ class DescriptionBuilder:
         if comparison is False:
             description = bbcode.convert_comparison_to_collapse(description, 1000)
 
-        if meta['debug']:
+        if meta["debug"]:
             desc_file = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
             console.print(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
@@ -691,9 +638,7 @@ class DescriptionBuilder:
                                 if host_approved:
                                     images_to_keep.append(img)
                                 elif meta["debug"]:
-                                    console.print(
-                                        f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]"
-                                    )
+                                    console.print(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
                                 if meta["debug"]:
@@ -712,27 +657,19 @@ class DescriptionBuilder:
                     for key_name in keys_to_remove:
                         del pack_images_data["keys"][key_name]
                         if meta["debug"]:
-                            console.print(
-                                f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]"
-                            )
+                            console.print(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
-                    pack_images_data["total_count"] = sum(
-                        key_data["count"] for key_data in pack_images_data.get("keys", {}).values()
-                    )
+                    pack_images_data["total_count"] = sum(key_data["count"] for key_data in pack_images_data.get("keys", {}).values())
 
                     if pack_images_data.get("total_count", 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
                         if meta["debug"]:
-                            console.print(
-                                "[yellow]Invalidating pack images - less than 3 approved images total[/yellow]"
-                            )
+                            console.print("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
                         if meta["debug"]:
                             console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                            console.print(
-                                f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]"
-                            )
+                            console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
         return pack_images_data
@@ -760,9 +697,7 @@ class DescriptionBuilder:
             each = discs[0]
             if each["type"] == "DVD":
                 desc_parts.append("[center]")
-                desc_parts.append(
-                    f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]\n\n"
-                )
+                desc_parts.append(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]\n\n")
                 desc_parts.append("[/center]")
             if screenheader is not None:
                 desc_parts.append(screenheader + "\n")
@@ -770,9 +705,7 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -792,17 +725,11 @@ class DescriptionBuilder:
                         summary = each.get(summary_key, "No summary available")
 
                         # Check for saved images first
-                        if (
-                            pack_images_data
-                            and "keys" in pack_images_data
-                            and new_images_key in pack_images_data["keys"]
-                        ):
+                        if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
                                 if meta["debug"]:
-                                    console.print(
-                                        f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                    )
+                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -817,9 +744,7 @@ class DescriptionBuilder:
                         if new_images_key in meta and meta[new_images_key]:
                             desc_parts.append("[center]\n\n")
                             # Use the summary corresponding to the current bdinfo
-                            desc_parts.append(
-                                f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n"
-                            )
+                            desc_parts.append(f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n")
                             if meta["debug"]:
                                 console.print("[yellow]Using original uploaded images for first disc")
                             desc_parts.append("[center]")
@@ -832,15 +757,11 @@ class DescriptionBuilder:
                         else:
                             desc_parts.append("[center]\n\n")
                             # Use the summary corresponding to the current bdinfo
-                            desc_parts.append(
-                                f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n"
-                            )
+                            desc_parts.append(f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n")
                             desc_parts.append("[/center]\n\n")
                             meta["retry_count"] += 1
                             meta[new_images_key] = []
-                            new_screens = [os.path.basename(f) for f in glob.glob(
-                                os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
-                            )]
+                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png"))]
                             if not new_screens:
                                 use_vs = meta.get("vapoursynth", False)
                                 try:
@@ -858,9 +779,7 @@ class DescriptionBuilder:
                                     )
                                 except Exception as e:
                                     console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
-                                new_screens = [os.path.basename(f) for f in glob.glob(
-                                    os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png")
-                                )]
+                                new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"PLAYLIST_{i}-*.png"))]
                             if new_screens and not meta.get("skip_imghost_upload", False):
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                     meta,
@@ -917,12 +836,8 @@ class DescriptionBuilder:
                         desc_parts.append(f"{each.get('name', 'BDINFO')}\n\n")
                     elif each["type"] == "DVD":
                         desc_parts.append(f"{each['name']}:\n")
-                        desc_parts.append(
-                            f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]"
-                        )
-                        desc_parts.append(
-                            f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n"
-                        )
+                        desc_parts.append(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler]")
+                        desc_parts.append(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
                     # For the first disc, use images from `meta['image_list']` and add screenheader if applicable
                     if meta["debug"]:
                         console.print("[yellow]Using original uploaded images for first disc")
@@ -949,17 +864,11 @@ class DescriptionBuilder:
                         )
                         # Check if screenshots exist for the current disc key
                         # Check for saved images first
-                        if (
-                            pack_images_data
-                            and "keys" in pack_images_data
-                            and new_images_key in pack_images_data["keys"]
-                        ):
+                        if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
                                 if meta["debug"]:
-                                    console.print(
-                                        f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                    )
+                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -975,17 +884,11 @@ class DescriptionBuilder:
                                 console.print(f"[yellow]Found needed image URLs for {new_images_key}")
                             desc_parts.append("[center]")
                             if each["type"] == "BDMV":
-                                desc_parts.append(
-                                    f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n"
-                                )
+                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
                             elif each["type"] == "DVD":
                                 desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(
-                                    f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] "
-                                )
-                                desc_parts.append(
-                                    f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n"
-                                )
+                                desc_parts.append(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                desc_parts.append(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
                             desc_parts.append("[/center]\n\n")
                             # Use existing URLs from meta to write to descfile
                             desc_parts.append("[center]")
@@ -1001,33 +904,23 @@ class DescriptionBuilder:
                             meta[new_images_key] = []
                             desc_parts.append("[center]")
                             if each["type"] == "BDMV":
-                                desc_parts.append(
-                                    f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n"
-                                )
+                                desc_parts.append(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
                             elif each["type"] == "DVD":
                                 desc_parts.append(f"{each['name']}:\n")
-                                desc_parts.append(
-                                    f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] "
-                                )
-                                desc_parts.append(
-                                    f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n"
-                                )
+                                desc_parts.append(f"[spoiler={os.path.basename(each['vob'])}][code]{each['vob_mi']}[/code][/spoiler] ")
+                                desc_parts.append(f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n")
                             desc_parts.append("[/center]\n\n")
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens: list[str] = []
                             if each["type"] == "BDMV":
-                                new_screens = [os.path.basename(f) for f in glob.glob(
-                                    os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                                )]
+                                new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png"))]
                             elif each["type"] == "DVD":
-                                new_screens = [os.path.basename(f) for f in glob.glob(
-                                    os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
-                                )]
+                                new_screens = [
+                                    os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png"))
+                                ]
                             if not new_screens:
                                 if meta["debug"]:
-                                    console.print(
-                                        f"[yellow]No new screens for {new_images_key}; creating new screenshots"
-                                    )
+                                    console.print(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
                                 if each["type"] == "BDMV":
                                     use_vs = meta.get("vapoursynth", False)
@@ -1046,17 +939,15 @@ class DescriptionBuilder:
                                         )
                                     except Exception as e:
                                         console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
-                                    new_screens = [os.path.basename(f) for f in glob.glob(
-                                        os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png")
-                                    )]
+                                    new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"FILE_{i}-*.png"))]
                                 if each["type"] == "DVD":
                                     try:
                                         await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                     except Exception as e:
                                         console.print(f"Error during DVD screenshot capture: {e}", markup=False)
-                                    new_screens = [os.path.basename(f) for f in glob.glob(
-                                        os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png")
-                                    )]
+                                    new_screens = [
+                                        os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}", f"{meta['discs'][i]['name']}-*.png"))
+                                    ]
 
                             if new_screens and not meta.get("skip_imghost_upload", False):
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1113,9 +1004,7 @@ class DescriptionBuilder:
                 sources_string = ", ".join(comp_sources)
                 desc_parts.append(f"[comparison={sources_string}]\n")
 
-                images_per_group = min(
-                    [len(comparison_groups[idx].get("urls", [])) for idx in sorted_group_indices]
-                )
+                images_per_group = min([len(comparison_groups[idx].get("urls", [])) for idx in sorted_group_indices])
 
                 for img_idx in range(images_per_group):
                     for group_idx in sorted_group_indices:
@@ -1134,9 +1023,7 @@ class DescriptionBuilder:
             for img_index in range(len(images[: int(meta["screens"])])):
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
-                desc_parts.append(
-                    f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                )
+                desc_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
                 if screensPerRow and (img_index + 1) % screensPerRow == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
@@ -1169,17 +1056,11 @@ class DescriptionBuilder:
                 if i > 0:
                     new_images_key = f"new_images_file_{i}"
                     # Check for saved images first
-                    if (
-                        pack_images_data
-                        and "keys" in pack_images_data
-                        and new_images_key in pack_images_data["keys"]
-                    ):
+                    if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                         saved_images = pack_images_data["keys"][new_images_key]["images"]
                         if saved_images:
                             if meta["debug"]:
-                                console.print(
-                                    f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                )
+                                console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -1197,9 +1078,7 @@ class DescriptionBuilder:
 
                         # If no screenshots exist, create them
                         if not new_screens and meta["debug"]:
-                            console.print(
-                                f"[yellow]No existing screenshots for {new_images_key}; generating new ones."
-                            )
+                            console.print(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
                         try:
                             await self.takescreens_manager.screenshots(
                                 file,
@@ -1255,9 +1134,7 @@ class DescriptionBuilder:
                 if i >= process_limit:
                     continue
                 # Extract filename directly from the file path
-                filename = (
-                    os.path.splitext(os.path.basename(file.strip()))[0].replace("[", "").replace("]", "")
-                )
+                filename = os.path.splitext(os.path.basename(file.strip()))[0].replace("[", "").replace("]", "")
 
                 # If we are beyond the file limit, add all further files in a spoiler
                 if multi_screens != 0 and i >= file_limit and not other_files_spoiler_open:
@@ -1268,17 +1145,11 @@ class DescriptionBuilder:
                 # Write filename in BBCode format with MediaInfo in spoiler if not the first file
                 if multi_screens != 0:
                     if i > 0 and char_count < max_char_limit:
-                        mi_dump = MediaInfo.parse(
-                            file, output="STRING", full=False, mediainfo_options={"inform_version": "1"}
-                        )
+                        mi_dump = MediaInfo.parse(file, output="STRING", full=False, mediainfo_options={"inform_version": "1"})
                         parsed_mediainfo = self.parser.parse_mediainfo(str(mi_dump))
                         formatted_bbcode = self.parser.format_bbcode(parsed_mediainfo)
-                        desc_parts.append(
-                            f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n"
-                        )
-                        char_count += len(
-                            f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n"
-                        )
+                        desc_parts.append(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
+                        char_count += len(f"[center][spoiler={filename}]{formatted_bbcode}[/spoiler][/center]\n")
                     else:
                         if i == 0 and images and screenheader is not None:
                             desc_parts.append(screenheader + "\n")
@@ -1360,9 +1231,7 @@ class DescriptionBuilder:
                         raw_url = image.get("raw_url")
                         if not web_url or not raw_url:
                             continue
-                        menu_parts.append(
-                            f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] "
-                        )
+                        menu_parts.append(f"[url={web_url}][img={self.config['DEFAULT'].get('thumbnail_size', '350')}]{raw_url}[/img][/url] ")
                         if screensPerRow and (img_index + 1) % screensPerRow == 0:
                             menu_parts.append("\n")
                     menu_parts.append("[/center]\n\n")

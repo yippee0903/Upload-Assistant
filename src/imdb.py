@@ -43,7 +43,7 @@ class ImdbManager:
         imdb_info: dict[str, Any] = {}
 
         if not imdbID or imdbID == 0:
-            imdb_info['type'] = None
+            imdb_info["type"] = None
             return imdb_info
 
         try:
@@ -289,50 +289,48 @@ class ImdbManager:
         if not title_data:
             return imdb_info  # Return empty if no data found
 
-        imdb_info['imdbID'] = imdbID
-        imdb_info['imdb_url'] = f"https://www.imdb.com/title/{imdbID}"
-        imdb_info['title'] = self.safe_get(title_data, ['titleText', 'text'])
-        countries_list = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['countriesOfOrigin', 'countries'], []))
+        imdb_info["imdbID"] = imdbID
+        imdb_info["imdb_url"] = f"https://www.imdb.com/title/{imdbID}"
+        imdb_info["title"] = self.safe_get(title_data, ["titleText", "text"])
+        countries_list = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["countriesOfOrigin", "countries"], []))
         if countries_list:
             # First country for 'country'
-            imdb_info['country'] = countries_list[0].get('text', '')
+            imdb_info["country"] = countries_list[0].get("text", "")
             # All countries joined for 'country_list'
-            imdb_info['country_list'] = ', '.join(
-                [c.get('text', '') for c in countries_list if isinstance(c, dict) and 'text' in c]
-            )
+            imdb_info["country_list"] = ", ".join([c.get("text", "") for c in countries_list if isinstance(c, dict) and "text" in c])
         else:
-            imdb_info['country'] = ''
-            imdb_info['country_list'] = ''
-        imdb_info['year'] = self.safe_get(title_data, ['releaseYear', 'year'])
-        imdb_info['end_year'] = self.safe_get(title_data, ['releaseYear', 'endYear'])
-        original_title = self.safe_get(title_data, ['originalTitleText', 'text'], '')
-        imdb_info['aka'] = original_title if original_title and original_title != imdb_info['title'] else imdb_info['title']
-        imdb_info['type'] = self.safe_get(title_data, ['titleType', 'id'], None)
-        runtime_seconds = self.safe_get(title_data, ['runtime', 'seconds'], 0)
-        imdb_info['runtime'] = str(runtime_seconds // 60 if runtime_seconds else 60)
-        imdb_info['cover'] = self.safe_get(title_data, ['primaryImage', 'url'])
-        imdb_info['plot'] = self.safe_get(title_data, ['plot', 'plotText', 'plainText'], 'No plot available')
+            imdb_info["country"] = ""
+            imdb_info["country_list"] = ""
+        imdb_info["year"] = self.safe_get(title_data, ["releaseYear", "year"])
+        imdb_info["end_year"] = self.safe_get(title_data, ["releaseYear", "endYear"])
+        original_title = self.safe_get(title_data, ["originalTitleText", "text"], "")
+        imdb_info["aka"] = original_title if original_title and original_title != imdb_info["title"] else imdb_info["title"]
+        imdb_info["type"] = self.safe_get(title_data, ["titleType", "id"], None)
+        runtime_seconds = self.safe_get(title_data, ["runtime", "seconds"], 0)
+        imdb_info["runtime"] = str(runtime_seconds // 60 if runtime_seconds else 60)
+        imdb_info["cover"] = self.safe_get(title_data, ["primaryImage", "url"])
+        imdb_info["plot"] = self.safe_get(title_data, ["plot", "plotText", "plainText"], "No plot available")
 
-        genres = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['titleGenres', 'genres'], []))
-        genre_list = [self.safe_get(g, ['genre', 'text'], '') for g in genres]
-        imdb_info['genres'] = ', '.join(filter(None, genre_list))
+        genres = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["titleGenres", "genres"], []))
+        genre_list = [self.safe_get(g, ["genre", "text"], "") for g in genres]
+        imdb_info["genres"] = ", ".join(filter(None, genre_list))
 
-        imdb_info['rating'] = self.safe_get(title_data, ['ratingsSummary', 'aggregateRating'], 'N/A')
+        imdb_info["rating"] = self.safe_get(title_data, ["ratingsSummary", "aggregateRating"], "N/A")
 
         def get_credits(title_data: dict[str, Any], category_keyword: str) -> tuple[list[str], list[str]]:
             people_list: list[str] = []
             people_id_list: list[str] = []
-            principal_credits = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['principalCredits'], []))
+            principal_credits = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["principalCredits"], []))
 
             for pc in principal_credits:
-                category_text = self.safe_get(pc, ['category', 'text'], '')
+                category_text = self.safe_get(pc, ["category", "text"], "")
 
                 if category_keyword in category_text:
-                    credits = cast(list[Mapping[str, Any]], self.safe_get(pc, ['credits'], []))
+                    credits = cast(list[Mapping[str, Any]], self.safe_get(pc, ["credits"], []))
                     for c in credits:
-                        name_obj = self.safe_get(c, ['name'], {})
-                        person_id = self.safe_get(name_obj, ['id'], '')
-                        person_name = self.safe_get(name_obj, ['nameText', 'text'], '')
+                        name_obj = self.safe_get(c, ["name"], {})
+                        person_id = self.safe_get(name_obj, ["id"], "")
+                        person_name = self.safe_get(name_obj, ["nameText", "text"], "")
 
                         if person_id and person_name:
                             people_list.append(person_name)
@@ -341,25 +339,25 @@ class ImdbManager:
 
             return people_list, people_id_list
 
-        imdb_info['directors'], imdb_info['directors_id'] = get_credits(title_data, 'Direct')
-        imdb_info['creators'], imdb_info['creators_id'] = get_credits(title_data, 'Creat')
-        imdb_info['writers'], imdb_info['writers_id'] = get_credits(title_data, 'Writ')
-        imdb_info['stars'], imdb_info['stars_id'] = get_credits(title_data, 'Star')
+        imdb_info["directors"], imdb_info["directors_id"] = get_credits(title_data, "Direct")
+        imdb_info["creators"], imdb_info["creators_id"] = get_credits(title_data, "Creat")
+        imdb_info["writers"], imdb_info["writers_id"] = get_credits(title_data, "Writ")
+        imdb_info["stars"], imdb_info["stars_id"] = get_credits(title_data, "Star")
 
-        editions = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['runtimes', 'edges'], []))
+        editions = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["runtimes", "edges"], []))
         if editions:
             edition_list: list[str] = []
-            imdb_info['edition_details'] = {}
+            imdb_info["edition_details"] = {}
 
             for edge in editions:
-                node = self.safe_get(edge, ['node'], {})
-                seconds = self.safe_get(node, ['seconds'], 0)
+                node = self.safe_get(edge, ["node"], {})
+                seconds = self.safe_get(node, ["seconds"], 0)
                 minutes = seconds // 60 if seconds else 0
-                displayable_property = self.safe_get(node, ['displayableProperty', 'value', 'plainText'], '')
-                attributes = cast(list[Mapping[str, Any]], self.safe_get(node, ['attributes'], []))
+                displayable_property = self.safe_get(node, ["displayableProperty", "value", "plainText"], "")
+                attributes = cast(list[Mapping[str, Any]], self.safe_get(node, ["attributes"], []))
                 attribute_texts: list[str] = []
                 for attr in attributes:
-                    text = attr.get('text')
+                    text = attr.get("text")
                     if isinstance(text, str) and text:
                         attribute_texts.append(text)
 
@@ -371,65 +369,60 @@ class ImdbManager:
                     edition_list.append(edition_display)
 
                     runtime_key = str(minutes)
-                    imdb_info['edition_details'][runtime_key] = {
-                        'display_name': displayable_property,
-                        'seconds': seconds,
-                        'minutes': minutes,
-                        'attributes': attribute_texts
-                    }
+                    imdb_info["edition_details"][runtime_key] = {"display_name": displayable_property, "seconds": seconds, "minutes": minutes, "attributes": attribute_texts}
 
-            imdb_info['editions'] = ', '.join(edition_list)
+            imdb_info["editions"] = ", ".join(edition_list)
 
-        akas_edges = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['akas', 'edges'], default=[]))
-        imdb_info['akas'] = [
+        akas_edges = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["akas", "edges"], default=[]))
+        imdb_info["akas"] = [
             {
-                "title": self.safe_get(edge, ['node', 'text']),
-                "country": self.safe_get(edge, ['node', 'country', 'text']),
-                "language": self.safe_get(edge, ['node', 'language', 'text']),
-                "attributes": self.safe_get(edge, ['node', 'attributes'], []),
+                "title": self.safe_get(edge, ["node", "text"]),
+                "country": self.safe_get(edge, ["node", "country", "text"]),
+                "language": self.safe_get(edge, ["node", "language", "text"]),
+                "attributes": self.safe_get(edge, ["node", "attributes"], []),
             }
             for edge in akas_edges
         ]
 
         if manual_language:
-            imdb_info['original_language'] = manual_language
+            imdb_info["original_language"] = manual_language
 
         episodes_list: list[dict[str, Any]] = []
-        imdb_info['episodes'] = episodes_list
-        episodes_data = self.safe_get(title_data, ['episodes', 'episodes'], None)
+        imdb_info["episodes"] = episodes_list
+        episodes_data = self.safe_get(title_data, ["episodes", "episodes"], None)
         if episodes_data:
-            edges = cast(list[Mapping[str, Any]], self.safe_get(episodes_data, ['edges'], []))
+            edges = cast(list[Mapping[str, Any]], self.safe_get(episodes_data, ["edges"], []))
             for edge in edges:
-                node = self.safe_get(edge, ['node'], {})
+                node = self.safe_get(edge, ["node"], {})
 
-                series_info = self.safe_get(node, ['series', 'displayableEpisodeNumber'], {})
-                season_info = self.safe_get(series_info, ['displayableSeason'], {})
-                episode_number_info = self.safe_get(series_info, ['episodeNumber'], {})
+                series_info = self.safe_get(node, ["series", "displayableEpisodeNumber"], {})
+                season_info = self.safe_get(series_info, ["displayableSeason"], {})
+                episode_number_info = self.safe_get(series_info, ["episodeNumber"], {})
 
                 episode_info = {
-                    'id': self.safe_get(node, ['id'], ''),
-                    'title': self.safe_get(node, ['titleText', 'text'], 'Unknown Title'),
-                    'release_year': self.safe_get(node, ['releaseYear', 'year'], 'Unknown Year'),
-                    'release_date': {
-                        'year': self.safe_get(node, ['releaseDate', 'year'], None),
-                        'month': self.safe_get(node, ['releaseDate', 'month'], None),
-                        'day': self.safe_get(node, ['releaseDate', 'day'], None),
+                    "id": self.safe_get(node, ["id"], ""),
+                    "title": self.safe_get(node, ["titleText", "text"], "Unknown Title"),
+                    "release_year": self.safe_get(node, ["releaseYear", "year"], "Unknown Year"),
+                    "release_date": {
+                        "year": self.safe_get(node, ["releaseDate", "year"], None),
+                        "month": self.safe_get(node, ["releaseDate", "month"], None),
+                        "day": self.safe_get(node, ["releaseDate", "day"], None),
                     },
-                    'season': self.safe_get(season_info, ['season'], 'unknown'),
-                    'episode_number': self.safe_get(episode_number_info, ['text'], '')
+                    "season": self.safe_get(season_info, ["season"], "unknown"),
+                    "episode_number": self.safe_get(episode_number_info, ["text"], ""),
                 }
                 episodes_list.append(episode_info)
 
-        if imdb_info['episodes']:
+        if imdb_info["episodes"]:
             seasons_data: dict[int, set[int]] = {}
 
-            episodes = cast(list[dict[str, Any]], imdb_info.get('episodes', []))
+            episodes = cast(list[dict[str, Any]], imdb_info.get("episodes", []))
             for episode in episodes:
-                season_str = episode.get('season', 'unknown')
-                release_year = episode.get('release_year')
+                season_str = episode.get("season", "unknown")
+                release_year = episode.get("release_year")
 
                 try:
-                    season_int = int(season_str) if season_str != 'unknown' and season_str else None
+                    season_int = int(season_str) if season_str != "unknown" and season_str else None
                 except (ValueError, TypeError):
                     season_int = None
 
@@ -441,34 +434,26 @@ class ImdbManager:
             seasons_summary: list[dict[str, Any]] = []
             for season_num in sorted(seasons_data.keys()):
                 years = sorted(seasons_data[season_num])
-                season_entry = {
-                    'season': season_num,
-                    'year': years[0],
-                    'year_range': f"{years[0]}" if len(years) == 1 else f"{years[0]}-{years[-1]}"
-                }
+                season_entry = {"season": season_num, "year": years[0], "year_range": f"{years[0]}" if len(years) == 1 else f"{years[0]}-{years[-1]}"}
                 seasons_summary.append(season_entry)
 
-            imdb_info['seasons_summary'] = seasons_summary
+            imdb_info["seasons_summary"] = seasons_summary
         else:
-            imdb_info['seasons_summary'] = []
+            imdb_info["seasons_summary"] = []
 
-        sound_mixes = cast(list[Mapping[str, Any]], self.safe_get(title_data, ['technicalSpecifications', 'soundMixes', 'items'], []))
-        imdb_info['sound_mixes'] = [sm.get('text', '') for sm in sound_mixes if 'text' in sm]
+        sound_mixes = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["technicalSpecifications", "soundMixes", "items"], []))
+        imdb_info["sound_mixes"] = [sm.get("text", "") for sm in sound_mixes if "text" in sm]
 
-        episodes = cast(list[dict[str, Any]], imdb_info.get('episodes', []))
+        episodes = cast(list[dict[str, Any]], imdb_info.get("episodes", []))
         current_year = datetime.now(timezone.utc).year
-        release_years = [
-            episode['release_year']
-            for episode in episodes
-            if 'release_year' in episode and isinstance(episode['release_year'], int)
-        ]
-        if imdb_info['end_year']:
-            imdb_info['tv_year'] = imdb_info['end_year']
+        release_years = [episode["release_year"] for episode in episodes if "release_year" in episode and isinstance(episode["release_year"], int)]
+        if imdb_info["end_year"]:
+            imdb_info["tv_year"] = imdb_info["end_year"]
         elif release_years:
             closest_year = min(release_years, key=lambda year: abs(year - current_year))
-            imdb_info['tv_year'] = closest_year
+            imdb_info["tv_year"] = closest_year
         else:
-            imdb_info['tv_year'] = None
+            imdb_info["tv_year"] = None
 
         if debug:
             console.print(f"[yellow]IMDb Response: {json.dumps(imdb_info, indent=2)[:1000]}...[/yellow]")
@@ -516,7 +501,7 @@ class ImdbManager:
                 await asyncio.sleep(1)  # Whoa baby, slow down
             url = "https://api.graphql.imdb.com/"
             if category == "MOVIE":
-                filename = filename.replace('and', '&').replace('And', '&').replace('AND', '&').strip()
+                filename = filename.replace("and", "&").replace("And", "&").replace("AND", "&").strip()
 
             constraints_parts = [f'titleTextConstraint: {{searchTerm: "{filename}"}}']
 
@@ -525,19 +510,15 @@ class ImdbManager:
                 search_year_int = int(search_year)
                 start_year = search_year_int - 1
                 end_year = search_year_int + 1
-                constraints_parts.append(
-                    f'releaseDateConstraint: {{releaseDateRange: {{start: "{start_year}-01-01", end: "{end_year}-12-31"}}}}'
-                )
+                constraints_parts.append(f'releaseDateConstraint: {{releaseDateRange: {{start: "{start_year}-01-01", end: "{end_year}-12-31"}}}}')
 
             if not wide_search and duration and isinstance(duration, int):
                 duration = str(duration)
                 start_duration = int(duration) - 10
                 end_duration = int(duration) + 10
-                constraints_parts.append(
-                    f'runtimeConstraint: {{runtimeRangeMinutes: {{min: {start_duration}, max: {end_duration}}}}}'
-                )
+                constraints_parts.append(f"runtimeConstraint: {{runtimeRangeMinutes: {{min: {start_duration}, max: {end_duration}}}}}")
 
-            constraints_string = ', '.join(constraints_parts)
+            constraints_string = ", ".join(constraints_parts)
 
             query = {
                 "query": f"""
@@ -606,13 +587,13 @@ class ImdbManager:
         if not search_results:
             try:
                 words = filename.split()
-                bad_words = ['the']
+                bad_words = ["the"]
                 words_lower = [word.lower() for word in words]
 
                 if words_lower and words_lower[0] in bad_words:
                     words.pop(0)
                     words_lower.pop(0)
-                    title = ' '.join(words)
+                    title = " ".join(words)
                     if debug:
                         console.print(f"[bold yellow]Trying IMDb with the prefix removed: {title}[/bold yellow]")
                     result = await run_imdb_search(title, search_year, category, debug, attempted + 1, wide_search=False)
@@ -637,8 +618,8 @@ class ImdbManager:
         if not search_results:
             try:
                 parsed = guessit_fn(untouched_filename or "", {"excludes": ["country", "language"]})
-                parsed_title_data = cast(dict[str, Any], anitopy_parse_fn(parsed.get('title', '')) or {})
-                parsed_title = str(parsed_title_data.get('anime_title', ''))
+                parsed_title_data = cast(dict[str, Any], anitopy_parse_fn(parsed.get("title", "")) or {})
+                parsed_title = str(parsed_title_data.get("anime_title", ""))
                 if debug:
                     console.print(f"[bold yellow]Trying IMDB with parsed title: {parsed_title}[/bold yellow]")
                 result = await run_imdb_search(parsed_title, search_year, category, debug, attempted + 1, wide_search=True)
@@ -651,7 +632,7 @@ class ImdbManager:
         if not search_results:
             try:
                 words = filename.split()
-                extensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'wmv']
+                extensions = ["mp4", "mkv", "avi", "webm", "mov", "wmv"]
                 words_lower = [word.lower() for word in words]
 
                 for ext in extensions:
@@ -662,7 +643,7 @@ class ImdbManager:
                         break
 
                 if len(words) > 1:
-                    reduced_title = ' '.join(words[:-1])
+                    reduced_title = " ".join(words[:-1])
                     if debug:
                         console.print(f"[bold yellow]Trying IMDB with reduced name: {reduced_title}[/bold yellow]")
                     result = await run_imdb_search(reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
@@ -675,7 +656,7 @@ class ImdbManager:
         if not search_results:
             try:
                 words = filename.split()
-                extensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'wmv']
+                extensions = ["mp4", "mkv", "avi", "webm", "mov", "wmv"]
                 words_lower = [word.lower() for word in words]
 
                 for ext in extensions:
@@ -686,7 +667,7 @@ class ImdbManager:
                         break
 
                 if len(words) > 2:
-                    further_reduced_title = ' '.join(words[:-2])
+                    further_reduced_title = " ".join(words[:-2])
                     if debug:
                         console.print(f"[bold yellow]Trying IMDB with further reduced name: {further_reduced_title}[/bold yellow]")
                     result = await run_imdb_search(further_reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
@@ -718,14 +699,14 @@ class ImdbManager:
                 if imdb_id and type_matches:
                     if year_int and search_year_int:
                         if year_int == search_year_int:
-                            imdbID = int(imdb_id.replace('tt', '').strip())
+                            imdbID = int(imdb_id.replace("tt", "").strip())
                             return imdbID
                         else:
                             if debug:
                                 console.print(f"[yellow]Year mismatch: found {year_int}, expected {search_year_int}[/yellow]")
                             return 0
                     else:
-                        imdbID = int(imdb_id.replace('tt', '').strip())
+                        imdbID = int(imdb_id.replace("tt", "").strip())
                         return imdbID
                 else:
                     if not imdb_id and debug:
@@ -740,7 +721,7 @@ class ImdbManager:
             if len(search_results) == 1:
                 imdb_id = self.safe_get(search_results[0], ["node", "title", "id"], "")
                 if imdb_id:
-                    imdbID = int(imdb_id.replace('tt', '').strip())
+                    imdbID = int(imdb_id.replace("tt", "").strip())
                     return imdbID
             elif len(search_results) > 1:
                 # Calculate similarity for all results
@@ -771,15 +752,11 @@ class ImdbManager:
                 # Filter results: if we have high similarity matches (>= 0.90), hide low similarity ones (< 0.75)
                 best_similarity = results_with_similarity[0][1]
                 if best_similarity >= 0.90:
-                    filtered_results_with_similarity: list[tuple[dict[str, Any], float]] = [
-                        (result, sim) for result, sim in results_with_similarity if sim >= 0.75
-                    ]
+                    filtered_results_with_similarity: list[tuple[dict[str, Any], float]] = [(result, sim) for result, sim in results_with_similarity if sim >= 0.75]
                     results_with_similarity = filtered_results_with_similarity
 
                     if debug:
-                        console.print(
-                            f"[yellow]Filtered out low similarity results (< 0.70) since best match has {best_similarity:.2f} similarity[/yellow]"
-                        )
+                        console.print(f"[yellow]Filtered out low similarity results (< 0.70) since best match has {best_similarity:.2f} similarity[/yellow]")
 
                 sorted_results: list[dict[str, Any]] = [r[0] for r in results_with_similarity]
 
@@ -797,13 +774,13 @@ class ImdbManager:
                             )
                         imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
                         if imdb_id:
-                            imdbID = int(imdb_id.replace('tt', '').strip())
+                            imdbID = int(imdb_id.replace("tt", "").strip())
                             return imdbID
 
                 if unattended:
                     imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
                     if imdb_id:
-                        imdbID = int(imdb_id.replace('tt', '').strip())
+                        imdbID = int(imdb_id.replace("tt", "").strip())
                         if debug:
                             console.print(f"[green]Unattended mode: auto-selected IMDb ID {imdbID}[/green]")
                         return imdbID
@@ -822,7 +799,7 @@ class ImdbManager:
                     similarity_score = results_with_similarity[idx][1]
 
                     console.print(
-                        f"[cyan]{idx+1}.[/cyan] [bold]{title_text}[/bold] ({year}) [yellow]ID:[/yellow] {imdb_id} [yellow]Type:[/yellow] {title_type} [dim](similarity: {similarity_score:.2f})[/dim]"
+                        f"[cyan]{idx + 1}.[/cyan] [bold]{title_text}[/bold] ({year}) [yellow]ID:[/yellow] {imdb_id} [yellow]Type:[/yellow] {title_type} [dim](similarity: {similarity_score:.2f})[/dim]"
                     )
                     if plot:
                         console.print(f"[green]Plot:[/green] {plot[:200]}{'...' if len(plot) > 200 else ''}")
@@ -832,9 +809,7 @@ class ImdbManager:
                     selection = None
                     while True:
                         try:
-                            selection = cli_ui.ask_string(
-                                "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): "
-                            ) or ""
+                            selection = cli_ui.ask_string("Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
                         except (EOFError, KeyboardInterrupt):
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
@@ -842,9 +817,9 @@ class ImdbManager:
                             sys.exit(1)
                         try:
                             # Check if it's a manual IMDb ID entry
-                            if selection.lower().startswith('tt') and len(selection) >= 3:
+                            if selection.lower().startswith("tt") and len(selection) >= 3:
                                 try:
-                                    manual_imdb_id = selection.lower().replace('tt', '').strip()
+                                    manual_imdb_id = selection.lower().replace("tt", "").strip()
                                     if manual_imdb_id.isdigit():
                                         console.print(f"[green]Using manual IMDb ID: {selection}[/green]")
                                         return int(manual_imdb_id)
@@ -861,7 +836,7 @@ class ImdbManager:
                                 selected = sorted_results[selection_int - 1]
                                 imdb_id = self.safe_get(selected, ["node", "title", "id"], "")
                                 if imdb_id:
-                                    imdbID = int(imdb_id.replace('tt', '').strip())
+                                    imdbID = int(imdb_id.replace("tt", "").strip())
                                     return imdbID
                             elif selection_int == 0:
                                 console.print("[bold red]Skipping IMDb[/bold red]")
@@ -874,17 +849,15 @@ class ImdbManager:
             else:
                 if not unattended:
                     try:
-                        selection = cli_ui.ask_string(
-                            "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: "
-                        ) or ""
+                        selection = cli_ui.ask_string("No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
                     except (EOFError, KeyboardInterrupt):
                         console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
                         sys.exit(1)
-                    if selection.lower().startswith('tt') and len(selection) >= 3:
+                    if selection.lower().startswith("tt") and len(selection) >= 3:
                         try:
-                            manual_imdb_id = selection.lower().replace('tt', '').strip()
+                            manual_imdb_id = selection.lower().replace("tt", "").strip()
                             if manual_imdb_id.isdigit():
                                 console.print(f"[green]Using manual IMDb ID: {selection}[/green]")
                                 return int(manual_imdb_id)
@@ -946,12 +919,7 @@ class ImdbManager:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(
-                    "https://api.graphql.imdb.com/",
-                    json=query,
-                    headers={"Content-Type": "application/json"},
-                    timeout=10
-                )
+                response = await client.post("https://api.graphql.imdb.com/", json=query, headers={"Content-Type": "application/json"}, timeout=10)
                 response.raise_for_status()
                 data = response.json()
             except Exception as e:

@@ -15,17 +15,17 @@ Config = dict[str, Any]
 
 class A4K(UNIT3D):
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='A4K')
+        super().__init__(config, tracker_name="A4K")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'A4K'
-        self.base_url = 'https://aura4k.net'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
+        self.tracker = "A4K"
+        self.base_url = "https://aura4k.net"
+        self.id_url = f"{self.base_url}/api/torrents/"
+        self.upload_url = f"{self.base_url}/api/torrents/upload"
+        self.search_url = f"{self.base_url}/api/torrents/filter"
+        self.torrent_url = f"{self.base_url}/torrents/"
         self.rehost_images_manager = RehostImagesManager(config)
-        self.approved_image_hosts = ['imgbox', 'ptscreens', 'imgbb', 'imgur', 'postimg']
+        self.approved_image_hosts = ["imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
         self.banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
         pass
 
@@ -37,13 +37,8 @@ class A4K(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
-        type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'WEBDL': '4',
-            'ENCODE': '3'
-        }.get(meta['type'], '0')
-        return {'type_id': type_id}
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}.get(meta["type"], "0")
+        return {"type_id": type_id}
 
     async def get_resolution_id(
         self,
@@ -54,67 +49,69 @@ class A4K(UNIT3D):
     ) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-        }.get(meta['resolution'], '10')
-        return {'resolution_id': resolution_id}
+            "4320p": "1",
+            "2160p": "2",
+        }.get(meta["resolution"], "10")
+        return {"resolution_id": resolution_id}
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         should_continue = True
-        if meta.get('resolution') not in ['2160p', '4320p']:
-            if not meta.get('unattended'):
+        if meta.get("resolution") not in ["2160p", "4320p"]:
+            if not meta.get("unattended"):
                 console.print(f"[red]{self.tracker} only accepts 4K uploads.")
             return False
 
-        if meta.get('type') not in ['DISC', 'REMUX', 'WEBDL', 'ENCODE']:
-            if not meta.get('unattended'):
+        if meta.get("type") not in ["DISC", "REMUX", "WEBDL", "ENCODE"]:
+            if not meta.get("unattended"):
                 console.print(f"[red]{self.tracker} only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
             return False
 
-        if meta['is_disc'] not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
+        if meta["is_disc"] not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True
         ):
             return False
 
-        if not meta['is_disc'] and meta['type'] in ['ENCODE', 'WEBRIP', 'WEBDL', 'DVDRIP', 'HDTV']:
-            tracks = meta.get('mediainfo', {}).get('media', {}).get('track', [])
+        if not meta["is_disc"] and meta["type"] in ["ENCODE", "WEBRIP", "WEBDL", "DVDRIP", "HDTV"]:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
 
             # Try Video track BitRate first, then fall back to General OverallBitRate
             bit_rate_num = None
             bitrate_source = None
             for track in tracks:
-                if track.get('@type') == "Video":
-                    raw = track.get('BitRate')
+                if track.get("@type") == "Video":
+                    raw = track.get("BitRate")
                     if raw and not isinstance(raw, dict):
                         try:
                             bit_rate_num = int(raw)
-                            bitrate_source = 'video'
+                            bitrate_source = "video"
                         except (ValueError, TypeError):
                             pass
                     break
 
             if bit_rate_num is None and tracks:
-                general = tracks[0] if tracks[0].get('@type') == 'General' else {}
-                raw = general.get('OverallBitRate')
+                general = tracks[0] if tracks[0].get("@type") == "General" else {}
+                raw = general.get("OverallBitRate")
                 if raw and not isinstance(raw, dict):
                     try:
                         bit_rate_num = int(raw)
-                        bitrate_source = 'overall'
+                        bitrate_source = "overall"
                     except (ValueError, TypeError):
                         pass
 
             if bit_rate_num is not None:
                 bit_rate_kbps = bit_rate_num / 1000
-                min_kbps = 15000 if meta.get('category') == "MOVIE" else 10000
-                label = "movies" if meta.get('category') == "MOVIE" else "TV shows"
+                min_kbps = 15000 if meta.get("category") == "MOVIE" else 10000
+                label = "movies" if meta.get("category") == "MOVIE" else "TV shows"
 
                 if bit_rate_kbps < min_kbps:
-                    source_label = "Overall" if bitrate_source == 'overall' else "Video"
-                    if not meta.get('unattended', False):
-                        console.print(f"[bold red]{source_label} bitrate too low: {bit_rate_kbps:.0f} kbps (minimum {min_kbps} kbps for {label}) for {self.tracker} upload.[/bold red]")
+                    source_label = "Overall" if bitrate_source == "overall" else "Video"
+                    if not meta.get("unattended", False):
+                        console.print(
+                            f"[bold red]{source_label} bitrate too low: {bit_rate_kbps:.0f} kbps (minimum {min_kbps} kbps for {label}) for {self.tracker} upload.[/bold red]"
+                        )
                     return False
             else:
-                if not meta.get('unattended') or meta.get('unattended_confirm', False):
+                if not meta.get("unattended") or meta.get("unattended_confirm", False):
                     console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
                     console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                     if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
@@ -124,18 +121,18 @@ class A4K(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
-            'modq': await self.get_flag(meta, 'modq'),
+            "modq": await self.get_flag(meta, "modq"),
         }
 
         return data
 
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
         url_host_mapping = {
-            'ibb.co': 'imgbb',
-            'imgbox.com': 'imgbox',
-            'imgur.com': 'imgur',
-            'postimg.cc': 'postimg',
-            'ptscreens.com': 'ptscreens',
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "imgur.com": "imgur",
+            "postimg.cc": "postimg",
+            "ptscreens.com": "ptscreens",
         }
         await self.rehost_images_manager.check_hosts(
             meta,

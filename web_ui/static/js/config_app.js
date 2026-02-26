@@ -1596,7 +1596,7 @@ function ItemList({
         </div>
       )}
 
-      
+
 
       {/* Subsections */}
       {subsections.map((item) => {
@@ -1756,8 +1756,8 @@ function SecurityTab({ isDarkMode }) {
   const [createdTokenRaw, setCreatedTokenRaw] = useState(null);
   const [tokenMessage, setTokenMessage] = useState('');
   const [createdTokenCopied, setCreatedTokenCopied] = useState(false);
-  
-  
+
+
 
   useEffect(() => {
     loadTwofaStatus();
@@ -1985,7 +1985,7 @@ function SecurityTab({ isDarkMode }) {
   return (
     <div className={`rounded-lg border p-6 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
       <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Two-Factor Authentication (2FA)</h2>
-      
+
       <div className="space-y-4">
         <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -2075,7 +2075,7 @@ function SecurityTab({ isDarkMode }) {
             {message}
           </div>
         )}
-        
+
         {/* API Tokens management */}
         <div className="mt-6">
           <h2 className={`text-lg font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>API Access Tokens</h2>
@@ -2113,7 +2113,7 @@ function SecurityTab({ isDarkMode }) {
             <div className="mb-2 font-medium">Token label</div>
             <input value={newTokenLabel} onChange={(e) => setNewTokenLabel(e.target.value)} placeholder="Optional label" className={`w-full px-3 py-2 rounded border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`} />
 
-            
+
 
             <div className="mt-3 flex gap-2">
               <button onClick={handleCreateToken} className="px-3 py-1 bg-green-600 text-white rounded">Generate</button>
@@ -2517,10 +2517,10 @@ function ConfigApp() {
     }
     const subTabs = [];
     const seenSubsections = new Set();
-    
+
     section.items.forEach(item => {
       let subsectionName = null;
-      
+
       // Check for string subsections
       if (item.subsection && typeof item.subsection === 'string') {
         subsectionName = formatDisplayLabel(item.subsection);
@@ -2529,7 +2529,7 @@ function ConfigApp() {
       else if (item.subsection === true) {
         subsectionName = formatDisplayLabel(item.key);
       }
-      
+
       if (subsectionName && !seenSubsections.has(subsectionName)) {
         seenSubsections.add(subsectionName);
         subTabs.push({
@@ -2538,7 +2538,7 @@ function ConfigApp() {
         });
       }
     });
-    
+
     return subTabs;
   };
 
@@ -2613,7 +2613,7 @@ function ConfigApp() {
         console.warn('Failed to load torrent clients:', error);
         setTorrentClients([]);
       }
-      
+
       // Only set default tabs if we don't have any sections loaded yet
       const currentlyHaveSections = (currentSectionsRef && currentSectionsRef.current && currentSectionsRef.current.length) ? currentSectionsRef.current.length : (sections ? sections.length : 0);
       if (currentlyHaveSections === 0 && newSections.length > 0) {
@@ -2629,7 +2629,7 @@ function ConfigApp() {
         }
       } else if (newSections.length > 0) {
         // Validate that current active tab still exists
-        const currentTabExists = newSections.some(section => 
+        const currentTabExists = newSections.some(section =>
           section.section.toLowerCase() === activeTab
         );
         if (!currentTabExists) {
@@ -2644,7 +2644,7 @@ function ConfigApp() {
           }
         } else {
           // Validate that current sub-tab still exists for the active tab
-          const activeSection = newSections.find(section => 
+          const activeSection = newSections.find(section =>
             section.section.toLowerCase() === activeTab
           );
           if (activeSection) {
@@ -2908,7 +2908,7 @@ function ConfigApp() {
               )}
             </div>
           )}
-          
+
           {sections.length > 0 && (
             <div className="space-y-6">
               {/* Config load warning banner */}
@@ -2987,10 +2987,10 @@ function ConfigApp() {
                 {sections.map((section) => {
                   const sectionId = section.section.toLowerCase();
                   if (activeTab !== sectionId) return null;
-                  
+
                   const subTabs = getSubTabsForSection(section);
                   const hasSubTabs = subTabs.length > 0;
-                  
+
                   return (
                     <div key={sectionId} className="space-y-4">
                       {/* Sub-tab Navigation */}
@@ -3018,7 +3018,7 @@ function ConfigApp() {
                           })}
                         </div>
                       )}
-                      
+
                       {/* Content */}
                       <ItemList
                         items={hasSubTabs ? section.items.filter((item) => {

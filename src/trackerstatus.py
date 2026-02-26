@@ -16,9 +16,9 @@ from src.console import console
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.torrentcreate import TorrentCreator
+from src.trackers.COMMON import COMMON
 from src.trackers.PTP import PTP
 from src.trackersetup import TRACKER_SETUP, notag_labels, tracker_class_map
-from src.trackers.COMMON import COMMON
 from src.uphelper import UploadHelper
 
 Meta: TypeAlias = MutableMapping[str, Any]
@@ -28,7 +28,7 @@ def _normalize_dupes_for_comparison(dupes: list[Any]) -> list[str]:
     """Normalize dupe entries to comparable list of names for duplicate comparison."""
     names: list[str] = []
     for entry in dupes:
-        name = str(entry.get('name', '')) if isinstance(entry, dict) else str(entry)
+        name = str(entry.get("name", "")) if isinstance(entry, dict) else str(entry)
         if name:
             names.append(name)
     return sorted(names)
@@ -37,7 +37,7 @@ def _normalize_dupes_for_comparison(dupes: list[Any]) -> list[str]:
 class TrackerStatusManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.trackers_config = cast(Mapping[str, Mapping[str, Any]], config.get('TRACKERS', {}))
+        self.trackers_config = cast(Mapping[str, Mapping[str, Any]], config.get("TRACKERS", {}))
 
     async def process_all_trackers(self, meta: Meta) -> int:
         tracker_status: dict[str, dict[str, bool]] = {}
@@ -47,38 +47,36 @@ class TrackerStatusManager:
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
         meta_lock = asyncio.Lock()
-        for tracker in meta['trackers']:
-            if 'tracker_status' not in meta:
-                meta['tracker_status'] = {}
-            if tracker not in meta['tracker_status']:
-                meta['tracker_status'][tracker] = {}
+        for tracker in meta["trackers"]:
+            if "tracker_status" not in meta:
+                meta["tracker_status"] = {}
+            if tracker not in meta["tracker_status"]:
+                meta["tracker_status"][tracker] = {}
 
         async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool]]:
             nonlocal successful_trackers
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
-            local_tracker_status = {'banned': False, 'skipped': False, 'dupe': False, 'upload': False, 'other': False}
-            disctype = local_meta.get('disctype', None)
+            local_tracker_status = {"banned": False, "skipped": False, "dupe": False, "upload": False, "other": False}
+            disctype = local_meta.get("disctype", None)
             we_already_asked = False
 
-            if local_meta['name'].endswith('DUPE?'):
-                local_meta['name'] = local_meta['name'].replace(' DUPE?', '')
+            if local_meta["name"].endswith("DUPE?"):
+                local_meta["name"] = local_meta["name"].replace(" DUPE?", "")
 
             if tracker_name == "MANUAL":
-                local_tracker_status['upload'] = True
+                local_tracker_status["upload"] = True
                 successful_trackers += 1
 
             if tracker_name in tracker_class_map:
                 tracker_class: Any = tracker_class_map[tracker_name](config=self.config)
-                if tracker_name in {"THR", "PTP"} and local_meta.get('imdb_id', 0) == 0:
+                if tracker_name in {"THR", "PTP"} and local_meta.get("imdb_id", 0) == 0:
                     while True:
-                        if local_meta.get('unattended', False):
-                            local_meta['imdb_id'] = 0
-                            local_tracker_status['skipped'] = True
+                        if local_meta.get("unattended", False):
+                            local_meta["imdb_id"] = 0
+                            local_tracker_status["skipped"] = True
                             break
                         try:
-                            imdb_id = cli_ui.ask_string(
-                                f"Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to {tracker_name}:"
-                            )
+                            imdb_id = cli_ui.ask_string(f"Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to {tracker_name}:")
                         except EOFError:
                             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
@@ -86,171 +84,172 @@ class TrackerStatusManager:
                             sys.exit(1)
 
                         if imdb_id is None or imdb_id.strip() == "":
-                            local_meta['imdb_id'] = 0
+                            local_meta["imdb_id"] = 0
                             break
 
                         imdb_id = imdb_id.strip().lower()
                         if imdb_id.startswith("tt") and imdb_id[2:].isdigit():
-                            local_meta['imdb_id'] = int(imdb_id[2:])
-                            local_meta['imdb'] = str(imdb_id[2:].zfill(7))
-                            local_meta['imdb_info'] = await imdb_manager.get_imdb_info_api(
-                                local_meta['imdb_id'],
-                                manual_language=local_meta.get('manual_language'),
-                                debug=bool(local_meta.get('debug', False)),
+                            local_meta["imdb_id"] = int(imdb_id[2:])
+                            local_meta["imdb"] = str(imdb_id[2:].zfill(7))
+                            local_meta["imdb_info"] = await imdb_manager.get_imdb_info_api(
+                                local_meta["imdb_id"],
+                                manual_language=local_meta.get("manual_language"),
+                                debug=bool(local_meta.get("debug", False)),
                             )
                             break
                         else:
                             cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
 
                 result = await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta)
-                local_tracker_status['banned'] = bool(result)
+                local_tracker_status["banned"] = bool(result)
 
-                if local_meta['tracker_status'][tracker_name].get('skip_upload'):
-                    local_tracker_status['skipped'] = True
-                elif 'skipped' not in local_meta:
-                    local_tracker_status['skipped'] = False
+                if local_meta["tracker_status"][tracker_name].get("skip_upload"):
+                    local_tracker_status["skipped"] = True
+                elif "skipped" not in local_meta:
+                    local_tracker_status["skipped"] = False
 
-                if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
+                if not local_tracker_status["banned"] and not local_tracker_status["skipped"]:
                     # Check for detag/notag (mismatched or missing release group)
-                    detag_info = local_meta.get('detag_info')
+                    detag_info = local_meta.get("detag_info")
                     if not detag_info:
                         common = COMMON(self.config)
                         if await common.check_detag(local_meta, tracker_name):
-                            detag_info = local_meta.get('detag_info')
+                            detag_info = local_meta.get("detag_info")
 
                     if detag_info:
-                        if detag_info.get('type') == 'notag':
+                        if detag_info.get("type") == "notag":
                             # Check if tracker inherently accepts notag
-                            global_accept = self.config.get('DEFAULT', {}).get('accept_notag', False)
+                            global_accept = self.config.get("DEFAULT", {}).get("accept_notag", False)
                             if tracker_name not in notag_labels and not global_accept:
-                                local_tracker_status['skipped'] = True
+                                local_tracker_status["skipped"] = True
                             else:
                                 # Apply notag_label if tracker defines one
-                                label = notag_labels.get(tracker_name, '')
+                                label = notag_labels.get(tracker_name, "")
                                 if label:
-                                    local_meta['tag'] = f'-{label}'
+                                    local_meta["tag"] = f"-{label}"
                         else:
                             # detag: always skip
-                            local_tracker_status['skipped'] = True
+                            local_tracker_status["skipped"] = True
 
-                if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
+                if not local_tracker_status["banned"] and not local_tracker_status["skipped"]:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)
-                    local_tracker_status['skipped'] = bool(claimed)
+                    local_tracker_status["skipped"] = bool(claimed)
 
-                    if tracker_name not in {"PTP"} and not local_tracker_status['skipped']:
+                    if tracker_name not in {"PTP"} and not local_tracker_status["skipped"]:
                         dupes: list[Any] = cast(list[Any], await tracker_class.search_existing(local_meta, disctype))
                         # set trackers here so that they are not double checked later with cross seeding
                         async with meta_lock:
-                            meta.setdefault('dupe_checked_trackers', []).append(tracker_name)
-                        if local_meta['tracker_status'][tracker_name].get('other', False):
-                            local_tracker_status['other'] = True
+                            meta.setdefault("dupe_checked_trackers", []).append(tracker_name)
+                        if local_meta["tracker_status"][tracker_name].get("other", False):
+                            local_tracker_status["other"] = True
                     elif tracker_name == "PTP":
                         ptp: Any = PTP(config=self.config)
-                        groupID = await ptp.get_group_by_imdb(local_meta['imdb'])
+                        groupID = await ptp.get_group_by_imdb(local_meta["imdb"])
                         async with meta_lock:
-                            meta['ptp_groupID'] = groupID
+                            meta["ptp_groupID"] = groupID
                         dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta), disctype))
                     else:
                         dupes = []
 
-                    if tracker_name == "ASC" and meta.get('anon', 'false'):
+                    if tracker_name == "ASC" and meta.get("anon", "false"):
                         console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
-                        console.print("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
+                        console.print(
+                            "EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]"
+                        )
 
-                    if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped']:
+                    if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
                         dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
 
                         # Normalize dupes for comparison (for double dupe check feature)
                         normalized_dupes = _normalize_dupes_for_comparison(dupes)
 
                         # Check if this is a double dupe check and results are identical to first pass
-                        first_pass_dupes_key = f'{tracker_name}_first_pass_dupes'
-                        is_double_dupe_check = local_meta.get('dupe_again', False)
+                        first_pass_dupes_key = f"{tracker_name}_first_pass_dupes"
+                        is_double_dupe_check = local_meta.get("dupe_again", False)
                         first_pass_dupes = shared_meta.get(first_pass_dupes_key)
-                        previous_upload_decision = shared_meta.get('tracker_status', {}).get(tracker_name, {}).get('upload')
+                        previous_upload_decision = shared_meta.get("tracker_status", {}).get(tracker_name, {}).get("upload")
 
                         # If double dupe check with identical results and user already confirmed, skip re-asking
                         if is_double_dupe_check and first_pass_dupes is not None and normalized_dupes == first_pass_dupes and previous_upload_decision is True:
                             console.print(f"[green]{tracker_name}: Dupe check results identical to first pass, skipping re-confirmation.[/green]")
-                            local_tracker_status['upload'] = True
+                            local_tracker_status["upload"] = True
                             successful_trackers += 1
                             # Skip both dupe_check and the later confirmation prompt
-                            local_meta['we_asked'] = True
+                            local_meta["we_asked"] = True
                         else:
                             # Store dupes for future double dupe check comparison
                             async with meta_lock:
                                 meta[first_pass_dupes_key] = normalized_dupes
 
                             # Show bloat warning before dupe prompt so user can make informed decision
-                            if tracker_name in meta.get('bloated_trackers', []):
+                            if tracker_name in meta.get("bloated_trackers", []):
                                 console.print(f"[bold red]⚠ Warning: This release may be considered bloated on {tracker_name}[/bold red]")
 
                             # Run dupe check first so it can modify local_meta (e.g., set cross-seed values)
                             is_dupe, local_meta = await helper.dupe_check(dupes, local_meta, tracker_name)
                             if is_dupe:
-                                local_tracker_status['dupe'] = True
+                                local_tracker_status["dupe"] = True
 
-                            matched_episode_ids = local_meta.get(f'{tracker_name}_matched_episode_ids', [])
-                            trumpable_id = local_meta.get('trumpable_id')
-                            cross_seed_key = f'{tracker_name}_cross_seed'
+                            matched_episode_ids = local_meta.get(f"{tracker_name}_matched_episode_ids", [])
+                            trumpable_id = local_meta.get("trumpable_id")
+                            cross_seed_key = f"{tracker_name}_cross_seed"
                             cross_seed_value = local_meta.get(cross_seed_key) if cross_seed_key in local_meta else None
 
                             # Only shared-state writes go under the lock
                             async with meta_lock:
                                 if matched_episode_ids:
-                                    meta[f'{tracker_name}_matched_episode_ids'] = matched_episode_ids
+                                    meta[f"{tracker_name}_matched_episode_ids"] = matched_episode_ids
                                 if trumpable_id:
-                                    meta['trumpable_id'] = trumpable_id
+                                    meta["trumpable_id"] = trumpable_id
                                 if cross_seed_key in local_meta and cross_seed_value:
                                     meta[cross_seed_key] = cross_seed_value
 
                             if tracker_name in ["AITHER", "LST"]:
-                                were_trumping = local_meta.get('were_trumping', False)
-                                trump_reason = local_meta.get('trump_reason')
-                                trumpable_id_after_dupe_check = local_meta.get(f'{tracker_name}_trumpable_id')
+                                were_trumping = local_meta.get("were_trumping", False)
+                                trump_reason = local_meta.get("trump_reason")
+                                trumpable_id_after_dupe_check = local_meta.get(f"{tracker_name}_trumpable_id")
                                 async with meta_lock:
                                     if were_trumping:
-                                        meta['were_trumping'] = were_trumping
+                                        meta["were_trumping"] = were_trumping
                                     if trump_reason:
-                                        meta['trump_reason'] = trump_reason
+                                        meta["trump_reason"] = trump_reason
                                     if trumpable_id_after_dupe_check:
-                                        meta[f'{tracker_name}_trumpable_id'] = trumpable_id_after_dupe_check
+                                        meta[f"{tracker_name}_trumpable_id"] = trumpable_id_after_dupe_check
 
-                    elif 'skipping' in local_meta:
-                        local_tracker_status['skipped'] = True
+                    elif "skipping" in local_meta:
+                        local_tracker_status["skipped"] = True
 
-                    if tracker_name == "MTV" and not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
+                    if tracker_name == "MTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
                         tracker_config = self.trackers_config.get(tracker_name, {})
-                        if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "true":
+                        if str(tracker_config.get("skip_if_rehash", "false")).lower() == "true":
                             torrent_path = os.path.abspath(f"{local_meta['base_dir']}/tmp/{local_meta['uuid']}/BASE.torrent")
                             if not os.path.exists(torrent_path):
                                 check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
                                 if check_torrent:
                                     console.print(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
-                                    reuse_success = await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta['base_dir'], local_meta['uuid'], local_meta.get('path'), local_meta.get('skip_nfo', False))
+                                    reuse_success = await TorrentCreator.create_base_from_existing_torrent(
+                                        check_torrent, local_meta["base_dir"], local_meta["uuid"], local_meta.get("path"), local_meta.get("skip_nfo", False)
+                                    )
                                     if reuse_success:
                                         torrent = Torrent.read(torrent_path)
                                         if torrent.piece_size > 8388608:
                                             console.print("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
-                                            local_tracker_status['skipped'] = True
+                                            local_tracker_status["skipped"] = True
                                     else:
                                         console.print("[yellow]Existing torrent could not be reused (files mismatch)[yellow]")
                             elif os.path.exists(torrent_path):
                                 torrent = Torrent.read(torrent_path)
                                 if torrent.piece_size > 8388608:
                                     console.print("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
-                                    local_tracker_status['skipped'] = True
+                                    local_tracker_status["skipped"] = True
 
-                    we_already_asked = bool(local_meta.get('we_asked', False))
+                    we_already_asked = bool(local_meta.get("we_asked", False))
 
-                if not local_meta['debug']:
-                    if not local_tracker_status['banned'] and not local_tracker_status['skipped'] and not local_tracker_status['dupe']:
-                        if not local_meta.get('unattended', False):
+                if not local_meta["debug"]:
+                    if not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
+                        if not local_meta.get("unattended", False):
                             console.print(f"[bold yellow]Tracker '{tracker_name}' passed all checks.")
-                        if (
-                            not local_meta['unattended']
-                            or (local_meta['unattended'] and local_meta.get('unattended_confirm', False))
-                        ) and not we_already_asked:
+                        if (not local_meta["unattended"] or (local_meta["unattended"] and local_meta.get("unattended_confirm", False))) and not we_already_asked:
                             try:
                                 tracker_rename = await tracker_class.get_name(meta)
                             except Exception:
@@ -261,42 +260,40 @@ class TrackerStatusManager:
 
                             display_name: Optional[str] = None
                             if tracker_rename is not None:
-                                if isinstance(tracker_rename, dict) and 'name' in tracker_rename:
-                                    display_name = cast(str, tracker_rename['name'])
+                                if isinstance(tracker_rename, dict) and "name" in tracker_rename:
+                                    display_name = cast(str, tracker_rename["name"])
                                 elif isinstance(tracker_rename, str):
                                     display_name = tracker_rename
 
-                            if display_name is not None and display_name != "" and display_name != meta['name']:
+                            if display_name is not None and display_name != "" and display_name != meta["name"]:
                                 console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
                             try:
-                                edit_choice = cli_ui.ask_string(
-                                    "Enter 'y' to upload, or press enter to skip uploading:"
-                                )
-                                if (edit_choice or "").lower() == 'y':
-                                    local_tracker_status['upload'] = True
+                                edit_choice = cli_ui.ask_string("Enter 'y' to upload, or press enter to skip uploading:")
+                                if (edit_choice or "").lower() == "y":
+                                    local_tracker_status["upload"] = True
                                     successful_trackers += 1
                                 else:
-                                    local_tracker_status['upload'] = False
+                                    local_tracker_status["upload"] = False
                             except EOFError:
                                 console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                 await cleanup_manager.cleanup()
                                 cleanup_manager.reset_terminal()
                                 sys.exit(1)
                         else:
-                            local_tracker_status['upload'] = True
+                            local_tracker_status["upload"] = True
                             successful_trackers += 1
                 else:
-                    local_tracker_status['upload'] = True
+                    local_tracker_status["upload"] = True
                     successful_trackers += 1
 
             return tracker_name, local_tracker_status
 
-        if meta.get('unattended', False):
-            searching_trackers: list[str] = [name for name in meta['trackers'] if name in tracker_class_map]
+        if meta.get("unattended", False):
+            searching_trackers: list[str] = [name for name in meta["trackers"] if name in tracker_class_map]
             if searching_trackers:
                 console.print()
                 console.print(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
-            tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta['trackers']]
+            tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta["trackers"]]
             results = await asyncio.gather(*tasks)
 
             # Collect passed trackers and skip reasons
@@ -306,11 +303,11 @@ class TrackerStatusManager:
 
             for tracker_name, status in results:
                 tracker_status[tracker_name] = status
-                if not status['banned'] and not status['skipped'] and not status['dupe']:
+                if not status["banned"] and not status["skipped"] and not status["dupe"]:
                     passed_trackers.append(tracker_name)
-                elif status['dupe']:
+                elif status["dupe"]:
                     dupe_trackers.append(tracker_name)
-                elif status['skipped']:
+                elif status["skipped"]:
                     skipped_trackers.append(tracker_name)
 
             if skipped_trackers:
@@ -321,28 +318,28 @@ class TrackerStatusManager:
                 console.print(f"[bold green]Trackers passed all checks: [bold yellow]{', '.join(passed_trackers)}")
         else:
             passed_trackers: list[str] = []
-            for tracker_name in meta['trackers']:
+            for tracker_name in meta["trackers"]:
                 if tracker_name in tracker_class_map:
                     console.print()
                     console.print(f"[yellow]Searching for existing torrents on {tracker_name}...")
                 tracker_name, status = await process_single_tracker(tracker_name, meta)
                 tracker_status[tracker_name] = status
-                if not status['banned'] and not status['skipped'] and not status['dupe']:
+                if not status["banned"] and not status["skipped"] and not status["dupe"]:
                     passed_trackers.append(tracker_name)
 
-        if meta['debug']:
+        if meta["debug"]:
             console.print("\n[bold]Tracker Processing Summary:[/bold]")
             for t_name, status in tracker_status.items():
-                banned_status = 'Yes' if status['banned'] else 'No'
-                skipped_status = 'Yes' if status['skipped'] else 'No'
-                dupe_status = 'Yes' if status['dupe'] else 'No'
-                upload_status = 'Yes' if status['upload'] else 'No'
+                banned_status = "Yes" if status["banned"] else "No"
+                skipped_status = "Yes" if status["skipped"] else "No"
+                dupe_status = "Yes" if status["dupe"] else "No"
+                upload_status = "Yes" if status["upload"] else "No"
                 console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
             console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
             console.print("", markup=False)
             console.print("[bold red]DEBUG MODE does not upload to sites")
 
-        meta['tracker_status'] = tracker_status
+        meta["tracker_status"] = tracker_status
         return successful_trackers
 
 

@@ -53,6 +53,7 @@ except Exception:
 
 access_logger = AccessLogger(cfg_dir) if AccessLogger is not None else None
 
+
 # Helper: simple file-backed config store under the auth config dir. Values
 # are stored as raw text. This replaces OS keyring usage and allows Docker
 # and non-Docker deployments to persist credentials via the configured
@@ -105,7 +106,7 @@ def _sanitize_relpath(rel: str) -> str:
         if re.search(r"[\x00-\x1f]", p):
             raise ValueError("Invalid path component")
         # Reject path-separator characters
-        if '/' in p or '\\' in p:
+        if "/" in p or "\\" in p:
             raise ValueError("Invalid path component")
 
         clean_parts.append(p)
@@ -142,6 +143,7 @@ def _assert_safe_resolved_path(path: str) -> None:
 
     if not allowed:
         raise ValueError("Path outside allowed roots")
+
 
 Flask = cast(Any, Flask)
 Response = cast(Any, Response)
@@ -209,6 +211,7 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
+
 
 def _rate_limit_key_func():
     """Rate limit key function that considers authentication status."""
@@ -486,14 +489,15 @@ def _cleanup_duplicate_sessions(username: str) -> None:
     except Exception:
         pass
 
+
 # Supported video file extensions for WebUI file browser
-SUPPORTED_VIDEO_EXTS = {'.mkv', '.mp4', '.ts'}
+SUPPORTED_VIDEO_EXTS = {".mkv", ".mp4", ".ts"}
 
 # Supported description file extensions for WebUI description file browser
-SUPPORTED_DESC_EXTS = {'.txt', '.nfo', '.md'}
+SUPPORTED_DESC_EXTS = {".txt", ".nfo", ".md"}
 
 # Regex for splitting filenames on common separators (dots, dashes, underscores, spaces)
-_BROWSE_SEARCH_SEP_RE = re.compile(r'[\s.\-_]+')
+_BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
 # Lock to prevent concurrent in-process uploads (avoids cross-session interference)
 inproc_lock = threading.Lock()
@@ -503,6 +507,7 @@ _runtime_browse_roots: Optional[str] = None
 
 # Runtime flags and stored totp
 saved_totp_secret: Optional[str] = None
+
 
 # CSRF helpers ---------------------------------------------------------------
 def _verify_csrf_header() -> bool:
@@ -586,6 +591,7 @@ try:
 except Exception:
     saved_totp_secret = None
 
+
 # Persistent cookie key helpers -------------------------------------------------
 def _get_persistent_cookie_key() -> Optional[bytes]:
     """Return a bytes key used to HMAC-sign remember-me cookies.
@@ -610,11 +616,13 @@ def _get_persistent_cookie_key() -> Optional[bytes]:
     except Exception:
         return None
 
+
 def _load_token_store() -> dict[str, Any]:
     try:
         return auth_mod.get_api_tokens() or {}
     except Exception:
         return {}
+
 
 def _persist_token_store(store: dict[str, Any]) -> None:
     with suppress(Exception):
@@ -769,9 +777,8 @@ def _verify_remember_token(token: str) -> Optional[str]:
         return None
 
 
-
 def _hash_code(code: str) -> str:
-    return hashlib.pbkdf2_hmac('sha256', code.encode('utf-8'), b'upload-assistant-recovery-salt', 100000).hex()
+    return hashlib.pbkdf2_hmac("sha256", code.encode("utf-8"), b"upload-assistant-recovery-salt", 100000).hex()
 
 
 def _generate_recovery_codes(n: int = 10, length: int = 10) -> list[str]:
@@ -1061,7 +1068,7 @@ def _maybe_log_api_access(response):
         # Minimal headers for context
         headers = dict(request.headers) if request.headers else None
 
-        remote = request.remote_addr or request.environ.get('REMOTE_ADDR')
+        remote = request.remote_addr or request.environ.get("REMOTE_ADDR")
 
         access_logger.log(
             endpoint=path,
@@ -1085,6 +1092,8 @@ def _totp_enabled() -> bool:
     if persisted:
         return bool(auth_mod.get_totp_secret())
     return bool(saved_totp_secret)
+
+
 def _verify_totp_code(code: str) -> bool:
     """Verify a TOTP code against the stored secret."""
     persisted = auth_mod.load_user()
@@ -1098,6 +1107,7 @@ def _verify_totp_code(code: str) -> bool:
         return bool(code and totp.verify(code))
     except Exception:
         return False
+
 
 def _get_browse_roots() -> list[str]:
     # Check environment first, then runtime browse roots (set by upload.py)
@@ -1147,24 +1157,20 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
         return None
 
     try:
-        with open(path, encoding='utf-8') as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         tree = ast.parse(content)
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == 'config':
+                    if isinstance(target, ast.Name) and target.id == "config":
                         config_value = ast.literal_eval(node.value)
                         if isinstance(config_value, dict):
                             return config_value
-        console.print(
-            f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]"
-        )
+        console.print(f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]")
         return None
     except Exception as exc:
-        console.print(
-            f"[yellow]Failed to parse config file {path.name}: {exc}[/yellow]"
-        )
+        console.print(f"[yellow]Failed to parse config file {path.name}: {exc}[/yellow]")
         return None
 
 
@@ -1217,7 +1223,12 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
         audit_path = base_dir / "data" / "config_audit.log"
         # Determine acting user: session -> Basic auth username -> persisted user -> remote_addr
         persisted = auth_mod.load_user()
-        user = _session_get("username") or (request.authorization.username if request.authorization else None) or (persisted.get("username") if persisted else None) or request.remote_addr
+        user = (
+            _session_get("username")
+            or (request.authorization.username if request.authorization else None)
+            or (persisted.get("username") if persisted else None)
+            or request.remote_addr
+        )
         # Redact sensitive fields from values before serializing to the audit log.
         audit = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1729,7 +1740,7 @@ def _resolve_user_path(
                 # None for Windows backslash paths. Fall back to os.path.join on
                 # Windows since we already validated rel above and commonpath check
                 # below provides additional symlink-escape protection.
-                if joined is None and sys.platform == 'win32':
+                if joined is None and sys.platform == "win32":
                     joined = os.path.join(check_root, rel)
 
                 if joined is None:
@@ -1752,17 +1763,17 @@ def _resolve_user_path(
             try:
                 sanitized_expanded = _sanitize_relpath(expanded)
             except ValueError as err:
-                raise ValueError('Browsing this path is not allowed') from err
+                raise ValueError("Browsing this path is not allowed") from err
 
             joined = safe_join(matched_root, sanitized_expanded)
 
             # Windows fallback: safe_join uses posixpath internally and returns
             # None for Windows backslash paths. Fall back to manual validation
             # and os.path.join. The commonpath check below provides additional security.
-            if joined is None and sys.platform == 'win32':
+            if joined is None and sys.platform == "win32":
                 expanded_norm = os.path.normpath(sanitized_expanded)
                 if expanded_norm == os.pardir or expanded_norm.startswith(os.pardir + os.sep) or os.path.isabs(expanded_norm):
-                    raise ValueError('Browsing this path is not allowed')
+                    raise ValueError("Browsing this path is not allowed")
                 joined = os.path.join(matched_root, expanded_norm)
 
             if joined is None:
@@ -1787,7 +1798,7 @@ def _resolve_user_path(
     # operations. This defends against accidental use of unvalidated
     # user-controlled data (helps static analysis tools and provides a
     # clear guard at the call site).
-    if '\x00' in candidate:
+    if "\x00" in candidate:
         raise ValueError("Browsing this path is not allowed")
 
     # Ensure the resolved candidate path is within the resolved root path.
@@ -2084,11 +2095,13 @@ def config_page():
             console.print(f"[yellow]CSRF check failed for /config: host_url={effective_host_url}, Referer={referer}")
             # Return a helpful error including the observed host_url and referer
             return (
-                jsonify({
-                    "error": "CSRF token missing or invalid",
-                    "success": False,
-                    "debug": {"host_url": effective_host_url, "referer": referer, "request_host": request.host},
-                }),
+                jsonify(
+                    {
+                        "error": "CSRF token missing or invalid",
+                        "success": False,
+                        "debug": {"host_url": effective_host_url, "referer": referer, "request_host": request.host},
+                    }
+                ),
                 403,
             )
 
@@ -2207,7 +2220,7 @@ def access_log_entries_api():
         return jsonify({"success": False, "error": "Access logging unavailable"}), 500
 
     try:
-        n = request.args.get('n', '50')
+        n = request.args.get("n", "50")
         n = int(n)
         if n < 1 or n > 200:
             n = 50
@@ -2261,6 +2274,7 @@ def ip_control_api():
 
             # Validate IP addresses
             import ipaddress
+
             for ip in whitelist + blacklist:
                 if not isinstance(ip, str):
                     return jsonify({"success": False, "error": f"Invalid IP format: {ip}"}), 400
@@ -2275,7 +2289,6 @@ def ip_control_api():
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)
             return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
-
 
 
 @app.route("/api/2fa/setup", methods=["POST"])
@@ -2443,11 +2456,7 @@ def config_options():
     # instead of silently showing defaults.
     config_warning: Optional[str] = None
     if not config_path.exists():
-        config_warning = (
-            "No config.py found — showing example defaults. "
-            "Configure your settings and save, or place your config.py "
-            "into the mounted data/ directory."
-        )
+        config_warning = "No config.py found — showing example defaults. Configure your settings and save, or place your config.py into the mounted data/ directory."
     elif user_config is None:
         config_warning = (
             "config.py exists but could not be loaded — showing example defaults. "
@@ -2674,8 +2683,7 @@ def api_tokens():
         store = _list_api_tokens()
         # Return metadata only (do not leak token values)
         tokens = [
-            {"id": tid, "user": info.get("user"), "label": info.get("label"), "created": info.get("created"), "expiry": info.get("expiry")}
-            for tid, info in store.items()
+            {"id": tid, "user": info.get("user"), "label": info.get("label"), "created": info.get("created"), "expiry": info.get("expiry")} for tid, info in store.items()
         ]
         read_only = False
         return jsonify({"success": True, "tokens": tokens, "read_only": read_only})
@@ -2741,7 +2749,7 @@ def browse_path():
 
     # Defensive sanity checks before using `path` in filesystem operations.
     safe_path = os.path.abspath(path)
-    if '\x00' in safe_path:
+    if "\x00" in safe_path:
         console.print("Path contains invalid characters", markup=False)
         return jsonify({"error": "Invalid path specified", "success": False}), 400
     if not os.path.isdir(safe_path):
@@ -2996,7 +3004,7 @@ def execute_command():
                     # Quick normalization: single -> double quotes
                     candidate = raw.replace("'", '"')
                     # Quote unquoted keys like: {path:...} -> {"path":...}
-                    candidate = re.sub(r'([\{\s,])([A-Za-z0-9_]+)\s*:', r'\1"\2":', candidate)
+                    candidate = re.sub(r"([\{\s,])([A-Za-z0-9_]+)\s*:", r'\1"\2":', candidate)
                     try:
                         data = json.loads(candidate)
                     except Exception:
@@ -3006,9 +3014,9 @@ def execute_command():
                         m_sess = re.search(r'session_id\s*[:=]\s*["\']?([^"\'\},]+)', raw)
                         m_args = re.search(r'args\s*[:=]\s*["\']?([^"\'\}]+)', raw)
                         if m_path:
-                            d['path'] = m_path.group(1)
+                            d["path"] = m_path.group(1)
                         if m_sess:
-                            d['session_id'] = m_sess.group(1)
+                            d["session_id"] = m_sess.group(1)
                         if m_args:
                             # Trim any trailing quote/comma characters and preserve spacing
                             raw_args = m_args.group(1).strip()
@@ -3018,8 +3026,8 @@ def execute_command():
                             # comma followed by a session_id key so args remain
                             # clean.
                             raw_args = re.split(r',\s*(?:"?session_id|session_id)\b', raw_args)[0]
-                            raw_args = raw_args.rstrip(',').strip().strip('"').strip("'")
-                            d['args'] = raw_args
+                            raw_args = raw_args.rstrip(",").strip().strip('"').strip("'")
+                            d["args"] = raw_args
                         if d:
                             data = d
             except Exception:
@@ -3180,38 +3188,38 @@ def execute_command():
                         orig_ask_yes_no = _cli_ui.ask_yes_no
 
                         def wrapped_ask_yes_no(*args, default: bool = False, **kwargs) -> bool:
-                                # Support both signatures used across the codebase:
-                                #   ask_yes_no(question, default=...)
-                                #   ask_yes_no(color, question, default=...)
-                                # Extract the question and default value from args/kwargs.
-                                if len(args) >= 2:
-                                    question = args[1]
-                                elif len(args) == 1:
-                                    question = args[0]
-                                else:
-                                    question = kwargs.get('question', '')
+                            # Support both signatures used across the codebase:
+                            #   ask_yes_no(question, default=...)
+                            #   ask_yes_no(color, question, default=...)
+                            # Extract the question and default value from args/kwargs.
+                            if len(args) >= 2:
+                                question = args[1]
+                            elif len(args) == 1:
+                                question = args[0]
+                            else:
+                                question = kwargs.get("question", "")
 
-                                # If default was passed positionally (third arg), use it.
-                                default_val = args[2] if len(args) >= 3 else kwargs.get('default', default)
+                            # If default was passed positionally (third arg), use it.
+                            default_val = args[2] if len(args) >= 3 else kwargs.get("default", default)
 
-                                with contextlib.suppress(Exception):
-                                    wrapped_print(str(question))
-                                # Wait for a response or cancellation
-                                while True:
-                                    if cancel_event.is_set():
-                                        raise EOFError()
-                                    try:
-                                        resp = input_queue.get(timeout=0.5)
-                                    except queue.Empty:
-                                        continue
-                                    except Exception:
-                                        raise
-                                    resp = (resp or "").strip().lower()
-                                    if resp in ("y", "yes"):
-                                        return True
-                                    if resp in ("n", "no"):
-                                        return False
-                                    return default_val
+                            with contextlib.suppress(Exception):
+                                wrapped_print(str(question))
+                            # Wait for a response or cancellation
+                            while True:
+                                if cancel_event.is_set():
+                                    raise EOFError()
+                                try:
+                                    resp = input_queue.get(timeout=0.5)
+                                except queue.Empty:
+                                    continue
+                                except Exception:
+                                    raise
+                                resp = (resp or "").strip().lower()
+                                if resp in ("y", "yes"):
+                                    return True
+                                if resp in ("n", "no"):
+                                    return False
+                                return default_val
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
@@ -3470,7 +3478,7 @@ def execute_command():
                     # `base_dir` is computed from the application `__file__`, but
                     # perform lightweight validation to satisfy static analysis
                     # tools and ensure we do not pass uncontrolled input here.
-                    if '\x00' in str(base_dir) or not str(base_dir):
+                    if "\x00" in str(base_dir) or not str(base_dir):
                         raise ValueError("Invalid execution directory")
                     if not os.path.isabs(str(base_dir)):
                         base_dir = os.path.abspath(str(base_dir))
@@ -3702,7 +3710,7 @@ def send_input():
         else:
             # Require a web session for non-token callers
             if not _is_authenticated():
-                return jsonify({"error": "Authentication required (web session)" , "success": False}), 401
+                return jsonify({"error": "Authentication required (web session)", "success": False}), 401
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
@@ -3765,17 +3773,17 @@ def kill_process():
                 return jsonify({"error": "Forbidden (invalid token)", "success": False}), 403
         else:
             if not _is_authenticated():
-                return jsonify({"error": "Authentication required (web session)" , "success": False}), 401
+                return jsonify({"error": "Authentication required (web session)", "success": False}), 401
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
 
         process_info = active_processes[session_id]
-        mode = process_info.get('mode')
+        mode = process_info.get("mode")
 
         # If this is an in-process run, perform best-effort cleanup of patched
         # console state and release the inproc lock so future inproc runs can start.
-        if mode == 'inproc':
+        if mode == "inproc":
             # Signal cancellation to the inproc worker and attempt to join it
             try:
                 cancel_event = process_info.get("cancel_event")
@@ -3794,6 +3802,7 @@ def kill_process():
                     # Prefer restoring originals tied to the current src.console
                     try:
                         from src import console as _src_console
+
                         ck = id(_src_console.console)
                         if ck in _ua_console_store:
                             origs = _ua_console_store.pop(ck)
@@ -3806,6 +3815,7 @@ def kill_process():
                             # Restore any cli_ui wrappers if we have originals
                             try:
                                 import cli_ui as _cli_ui
+
                                 with contextlib.suppress(Exception):
                                     if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
                                         _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
