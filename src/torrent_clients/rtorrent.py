@@ -48,12 +48,8 @@ class RtorrentClientMixin:
         # Get the appropriate source path (same as in qbittorrent method)
         tracker_dir: Optional[str] = None
         dst = path
-        filelist = self._coerce_str_list(meta.get('filelist', []))
-        src = (
-            filelist[0]
-            if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.get('keep_folder')
-            else meta.get('path')
-        )
+        filelist = self._coerce_str_list(meta.get("filelist", []))
+        src = filelist[0] if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.get("keep_folder") else meta.get("path")
 
         if not src:
             error_msg = "[red]No source path found in meta."
@@ -61,8 +57,8 @@ class RtorrentClientMixin:
             raise ValueError(error_msg)
 
         # Determine linking method
-        linking_method = client.get('linking')  # "symlink", "hardlink", or None
-        if meta.get('debug', False):
+        linking_method = client.get("linking")  # "symlink", "hardlink", or None
+        if meta.get("debug", False):
             console.print("Linking method:", linking_method)
         use_symlink = linking_method == "symlink"
         use_hardlink = linking_method == "hardlink"
@@ -70,8 +66,8 @@ class RtorrentClientMixin:
         # Process linking if enabled
         if use_symlink or use_hardlink:
             # Get linked folder for this drive
-            linked_folder = self._coerce_str_list(client.get('linked_folder', []))
-            if meta.get('debug', False):
+            linked_folder = self._coerce_str_list(client.get("linked_folder", []))
+            if meta.get("debug", False):
                 console.print(f"Linked folders: {linked_folder}")
 
             # Determine drive letter (Windows) or root (Linux)
@@ -81,9 +77,9 @@ class RtorrentClientMixin:
                 # On Unix/Linux, use the root directory or first directory component
                 src_drive = "/"
                 # Extract the first directory component for more specific matching
-                src_parts = src.strip('/').split('/')
+                src_parts = src.strip("/").split("/")
                 if src_parts:
-                    src_root_dir = '/' + src_parts[0]
+                    src_root_dir = "/" + src_parts[0]
                     # Check if any linked folder contains this root
                     for folder in linked_folder:
                         if src_root_dir in folder or folder in src_root_dir:
@@ -107,7 +103,7 @@ class RtorrentClientMixin:
                         link_target = folder
                         break
 
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print(f"Source drive: {src_drive}")
                 console.print(f"Link target: {link_target}")
 
@@ -130,7 +126,7 @@ class RtorrentClientMixin:
                 tracker_dir = os.path.join(link_target, link_dir_name or tracker)
                 os.makedirs(tracker_dir, exist_ok=True)
 
-                if meta.get('debug', False):
+                if meta.get("debug", False):
                     console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
                     console.print(f"[cyan]Source path: {src}")
 
@@ -140,7 +136,7 @@ class RtorrentClientMixin:
 
                 # path magic
                 if os.path.exists(dst) or os.path.islink(dst):
-                    if meta.get('debug', False):
+                    if meta.get("debug", False):
                         console.print(f"[yellow]Skipping linking, path already exists: {dst}")
                 else:
                     if use_hardlink:
@@ -150,7 +146,7 @@ class RtorrentClientMixin:
                                 # For a single file, create a hardlink directly
                                 try:
                                     os.link(src, dst)
-                                    if meta.get('debug', False):
+                                    if meta.get("debug", False):
                                         console.print(f"[green]Hard link created: {dst} -> {src}")
                                 except OSError as e:
                                     # If hardlink fails, try to copy the file instead
@@ -163,7 +159,7 @@ class RtorrentClientMixin:
                                 os.makedirs(dst, exist_ok=True)
 
                                 # Check if skip_nfo is enabled
-                                skip_nfo = meta.get('skip_nfo', False)
+                                skip_nfo = meta.get("skip_nfo", False)
 
                                 for root, _, files in os.walk(src):
                                     # Get the relative path from source
@@ -172,20 +168,20 @@ class RtorrentClientMixin:
                                     dst_dir = dst
 
                                     # Create corresponding directory in destination
-                                    if rel_path != '.':
+                                    if rel_path != ".":
                                         dst_dir = os.path.join(dst, rel_path)
                                         os.makedirs(dst_dir, exist_ok=True)
 
                                     # Create hardlinks for each file
                                     for idx, file in enumerate(files):
                                         # Skip .nfo files if skip_nfo is enabled
-                                        if skip_nfo and file.lower().endswith('.nfo'):
+                                        if skip_nfo and file.lower().endswith(".nfo"):
                                             continue
                                         src_file = os.path.join(root, file)
-                                        dst_file = os.path.join(dst if rel_path == '.' else dst_dir, file)
+                                        dst_file = os.path.join(dst if rel_path == "." else dst_dir, file)
                                         try:
                                             os.link(src_file, dst_file)
-                                            if meta.get('debug', False) and idx == 0:
+                                            if meta.get("debug", False) and idx == 0:
                                                 console.print(f"[green]Hard link created for file: {dst_file} -> {src_file}")
                                         except OSError as e:
                                             # If hardlink fails, copy file instead
@@ -193,12 +189,12 @@ class RtorrentClientMixin:
                                             shutil.copy2(src_file, dst_file)  # copy2 preserves metadata
                                             console.print(f"[yellow]File copied instead: {dst_file}")
 
-                                if meta.get('debug', False):
+                                if meta.get("debug", False):
                                     console.print(f"[green]Directory structure and files processed: {dst}")
                         except OSError as e:
                             error_msg = f"Failed to create link: {e}"
                             console.print(f"[bold red]{error_msg}")
-                            if meta.get('debug', False):
+                            if meta.get("debug", False):
                                 console.print(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
                                 console.print(f"[yellow]Destination: {dst}")
                             # Don't raise exception - just warn and continue
@@ -211,7 +207,7 @@ class RtorrentClientMixin:
                             else:
                                 os.symlink(src, dst)
 
-                            if meta.get('debug', False):
+                            if meta.get("debug", False):
                                 console.print(f"[green]Symbolic link created: {dst} -> {src}")
 
                         except OSError as e:
@@ -249,19 +245,19 @@ class RtorrentClientMixin:
             elif local_path.lower() in save_path.lower():
                 save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
 
-        if meta.get('debug', False):
+        if meta.get("debug", False):
             console.print(f"[cyan]Original path: {path}")
             console.print(f"[cyan]Mapped save path: {save_path}")
 
-        rtorrent = xmlrpc.client.Server(client['rtorrent_url'], context=ssl.create_default_context())
+        rtorrent = xmlrpc.client.Server(client["rtorrent_url"], context=ssl.create_default_context())
         metainfo = _bencode_bread(torrent_path)
-        if meta.get('debug', False):
+        if meta.get("debug", False):
             console.print(f"rtorrent: {Redaction.redact_private_info(str(rtorrent))}", markup=False)
             console.print(f"metainfo: {Redaction.redact_private_info(str(metainfo))}", markup=False)
         try:
             # Use dst path if linking was successful, otherwise use original path
             resume_path = dst if (use_symlink or use_hardlink) and os.path.exists(dst) else path
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print(f"[cyan]Using resume path: {resume_path}")
             fast_resume = self.add_fast_resume(metainfo, resume_path, torrent)
         except OSError as exc:
@@ -272,8 +268,8 @@ class RtorrentClientMixin:
         original_meta_bytes = _bencode_bencode(metainfo)
         new_meta = _bencode_bencode(fast_resume)
         if new_meta != original_meta_bytes:
-            fr_file = torrent_path.replace('.torrent', '-resume.torrent')
-            if meta.get('debug', False):
+            fr_file = torrent_path.replace(".torrent", "-resume.torrent")
+            if meta.get("debug", False):
                 console.print("Creating fast resume file:", fr_file)
             _bencode_bwrite(fast_resume, fr_file)
 
@@ -287,54 +283,55 @@ class RtorrentClientMixin:
         if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
             path_dir = os.path.dirname(path)
             path = path.replace(local_path, remote_path)
-            path = path.replace(os.sep, '/')
+            path = path.replace(os.sep, "/")
             shutil.copy(fr_file, f"{path_dir}/fr.torrent")
             fr_file = f"{os.path.dirname(path)}/fr.torrent"
             modified_fr = True
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
         if isdir is False:
             path = os.path.dirname(path)
-        if meta.get('debug', False):
+        if meta.get("debug", False):
             console.print(f"[cyan]Final path for rTorrent: {path}")
 
         console.print("[bold yellow]Adding and starting torrent")
-        rtorrent.load.start_verbose('', fr_file, f"d.directory_base.set={path}")
-        if meta.get('debug', False):
+        rtorrent.load.start_verbose("", fr_file, f"d.directory_base.set={path}")
+        if meta.get("debug", False):
             console.print(f"[green]rTorrent load start for {fr_file} with d.directory_base.set={path}")
         time.sleep(1)
         # Add labels
-        if client.get('rtorrent_label') is not None:
-            if meta.get('debug', False):
+        if client.get("rtorrent_label") is not None:
+            if meta.get("debug", False):
                 console.print(f"[cyan]Setting rTorrent label: {client['rtorrent_label']}")
-            rtorrent.d.custom1.set(torrent.infohash, client['rtorrent_label'])
-        if meta.get('rtorrent_label') is not None:
-            rtorrent.d.custom1.set(torrent.infohash, meta['rtorrent_label'])
-            if meta.get('debug', False):
+            rtorrent.d.custom1.set(torrent.infohash, client["rtorrent_label"])
+        if meta.get("rtorrent_label") is not None:
+            rtorrent.d.custom1.set(torrent.infohash, meta["rtorrent_label"])
+            if meta.get("debug", False):
                 console.print(f"[cyan]Setting rTorrent label from meta: {meta['rtorrent_label']}")
 
         # Delete modified fr_file location
         if modified_fr:
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print(f"[cyan]Removing modified fast resume file: {fr_file}")
             os.remove(f"{path_dir}/fr.torrent")
-        if meta.get('debug', False):
+        if meta.get("debug", False):
             console.print(f"[cyan]Path: {path}")
         return
 
     def add_fast_resume(self, metainfo: dict[str, Any], datapath: str, _torrent: Torrent) -> dict[str, Any]:
-        """ Add fast resume data to a metafile dict.
-        """
+        """Add fast resume data to a metafile dict."""
         # Get list of files
         files = metainfo["info"].get("files", None)
         single = files is None
         if single:
             if os.path.isdir(datapath):
                 datapath = os.path.join(datapath, metainfo["info"]["name"])
-            files = [{
-                "path": [os.path.abspath(datapath)],
-                "length": metainfo["info"]["length"],
-            }]
+            files = [
+                {
+                    "path": [os.path.abspath(datapath)],
+                    "length": metainfo["info"]["length"],
+                }
+            ]
 
         # Prepare resume data
         resume = metainfo.setdefault("libtorrent_resume", {})
@@ -362,29 +359,28 @@ class RtorrentClientMixin:
                 )
 
             # Add resume data for this file
-            resume["files"].append({
-                'priority': 1,
-                'mtime': int(os.path.getmtime(filepath)),
-                'completed': (
-                    (offset + file_length + piece_length - 1) // piece_length -
-                    offset // piece_length
-                ),
-            })
+            resume["files"].append(
+                {
+                    "priority": 1,
+                    "mtime": int(os.path.getmtime(filepath)),
+                    "completed": ((offset + file_length + piece_length - 1) // piece_length - offset // piece_length),
+                }
+            )
             offset += file_length
 
         return metainfo
 
     async def get_ptp_from_hash_rtorrent(self, meta: dict[str, Any], pathed: bool = False) -> dict[str, Any]:
-        default_cfg = cast(dict[str, Any], self.config.get('DEFAULT', {}))
-        default_client_value = default_cfg.get('default_torrent_client')
+        default_cfg = cast(dict[str, Any], self.config.get("DEFAULT", {}))
+        default_client_value = default_cfg.get("default_torrent_client")
         if not isinstance(default_client_value, str) or not default_client_value:
             console.print("[yellow]Missing default torrent client for rTorrent")
             return meta
-        clients_cfg = cast(dict[str, Any], self.config.get('TORRENT_CLIENTS', {}))
+        clients_cfg = cast(dict[str, Any], self.config.get("TORRENT_CLIENTS", {}))
         client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
-        torrent_storage_dir_value = client.get('torrent_storage_dir')
+        torrent_storage_dir_value = client.get("torrent_storage_dir")
         torrent_storage_dir = str(torrent_storage_dir_value) if isinstance(torrent_storage_dir_value, str) else None
-        info_hash_value = meta.get('infohash')
+        info_hash_value = meta.get("infohash")
         info_hash_v1 = str(info_hash_value) if isinstance(info_hash_value, str) else None
 
         if not torrent_storage_dir or not info_hash_v1:
@@ -396,11 +392,11 @@ class RtorrentClientMixin:
         torrent_path = os.path.join(torrent_storage_dir, f"{info_hash_v1}.torrent")
 
         # Extract folder ID for use in temporary file path
-        folder_id = os.path.basename(meta['path'])
-        if meta.get('uuid') is None:
-            meta['uuid'] = folder_id
+        folder_id = os.path.basename(meta["path"])
+        if meta.get("uuid") is None:
+            meta["uuid"] = folder_id
 
-        extracted_torrent_dir = os.path.join(meta.get('base_dir', ''), "tmp", meta.get('uuid', ''))
+        extracted_torrent_dir = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
         os.makedirs(extracted_torrent_dir, exist_ok=True)
 
         # Check if the torrent file exists directly
@@ -432,30 +428,22 @@ class RtorrentClientMixin:
             comment = torrent.comment or ""
 
             # Try to find tracker IDs in the comment
-            if meta.get('debug'):
+            if meta.get("debug"):
                 console.print(f"[cyan]Torrent comment: {comment}")
 
-            torrent_comments_value = meta.get('torrent_comments')
-            torrent_comments_list = (
-                cast(list[Any], torrent_comments_value)
-                if isinstance(torrent_comments_value, list)
-                else []
-            )
-            torrent_comments = [
-                cast(dict[str, Any], entry)
-                for entry in torrent_comments_list
-                if isinstance(entry, dict)
-            ]
-            meta['torrent_comments'] = torrent_comments
+            torrent_comments_value = meta.get("torrent_comments")
+            torrent_comments_list = cast(list[Any], torrent_comments_value) if isinstance(torrent_comments_value, list) else []
+            torrent_comments = [cast(dict[str, Any], entry) for entry in torrent_comments_list if isinstance(entry, dict)]
+            meta["torrent_comments"] = torrent_comments
 
             comment_data = {
-                'hash': getattr(torrent, 'infohash_v1', '') or '',
-                'name': getattr(torrent, 'name', '') or '',
-                'comment': comment,
+                "hash": getattr(torrent, "infohash_v1", "") or "",
+                "name": getattr(torrent, "name", "") or "",
+                "comment": comment,
             }
             torrent_comments.append(comment_data)
 
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
             # Handle various tracker URL formats in the comment
@@ -463,28 +451,28 @@ class RtorrentClientMixin:
             meta.update(tracker_ids)
 
             # If we found a tracker ID, log it
-            for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
+            for tracker in ["ptp", "bhd", "btn", "blu", "aither", "lst", "oe", "hdb"]:
                 if meta.get(tracker):
                     console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
-            if torrent_comments and meta.get('debug', False):
+            if torrent_comments and meta.get("debug", False):
                 console.print(f"[green]Stored {len(torrent_comments)} torrent comments for later use")
 
             if not pathed:
-                valid, resolved_path = await self.is_valid_torrent(
-                    meta, torrent_path, info_hash_v1, 'rtorrent', client
-                )
+                valid, resolved_path = await self.is_valid_torrent(meta, torrent_path, info_hash_v1, "rtorrent", client)
 
                 if valid:
                     base_torrent_path = os.path.join(extracted_torrent_dir, "BASE.torrent")
 
                     try:
-                        reuse_success = await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta['base_dir'], meta['uuid'], meta.get('path'), meta.get('skip_nfo', False))
+                        reuse_success = await TorrentCreator.create_base_from_existing_torrent(
+                            resolved_path, meta["base_dir"], meta["uuid"], meta.get("path"), meta.get("skip_nfo", False)
+                        )
                         if reuse_success:
-                            if meta['debug']:
+                            if meta["debug"]:
                                 console.print("[green]Created BASE.torrent from existing torrent")
                         else:
-                            if meta['debug']:
+                            if meta["debug"]:
                                 console.print("[yellow]Existing torrent files don't match content on disk or contains .nfo when skip_nfo is enabled")
                     except Exception as e:
                         console.print(f"[bold red]Error creating BASE.torrent: {e}")

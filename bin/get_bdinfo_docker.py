@@ -3,6 +3,7 @@
 """
 Docker-specific script to download bdinfo binaries for Linux containers.
 """
+
 import os
 import platform
 import shutil
@@ -14,6 +15,7 @@ import requests
 try:
     from src.console import console
 except ImportError:
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)

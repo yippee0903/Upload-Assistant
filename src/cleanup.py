@@ -19,13 +19,11 @@ if os.name == "posix":
     import termios
 
 # Detect Android environment
-IS_ANDROID = ('android' in platform.platform().lower() or
-              os.path.exists('/system/build.prop') or
-              'ANDROID_ROOT' in os.environ)
+IS_ANDROID = "android" in platform.platform().lower() or os.path.exists("/system/build.prop") or "ANDROID_ROOT" in os.environ
 
 running_subprocesses: set[subprocess.Popen[Any]] = set()
 thread_executor: Optional[ThreadPoolExecutor] = None
-IS_MACOS = sys.platform == 'darwin'
+IS_MACOS = sys.platform == "darwin"
 erase_key: Optional[str] = None
 
 
@@ -117,16 +115,14 @@ class CleanupManager:
         if IS_MACOS:
             # If you add shared memory or semaphore usage, append their (name, kind)
             # pairs below so unregister can release them.
-            resource_tracker = getattr(multiprocessing, 'resource_tracker', None)
-            if resource_tracker and hasattr(resource_tracker, 'unregister'):
+            resource_tracker = getattr(multiprocessing, "resource_tracker", None)
+            if resource_tracker and hasattr(resource_tracker, "unregister"):
                 resources_to_release: list[tuple[str, str]] = []
                 for name, kind in resources_to_release:  # noqa: PERF203 - per-item logging is required here
                     try:
                         resource_tracker.unregister(name, kind)
                     except Exception as exc:  # noqa: PERF203 - per-item logging is required here
-                        console.print(
-                            f"[red]Error unregistering multiprocessing resource {name} ({kind}): {exc}[/red]"
-                        )
+                        console.print(f"[red]Error unregistering multiprocessing resource {name} ({kind}): {exc}[/red]")
 
         # console.print("[green]Cleanup completed. Exiting safely.[/green]")
 
@@ -175,7 +171,7 @@ class CleanupManager:
                 console.print(f"[red]Error during process cleanup: {e}[/red]")
 
         # 🔹 For macOS, specifically check and terminate any multiprocessing processes
-        if IS_MACOS and hasattr(multiprocessing, 'active_children'):
+        if IS_MACOS and hasattr(multiprocessing, "active_children"):
             for child in multiprocessing.active_children():
                 with contextlib.suppress(Exception):
                     child.terminate()
@@ -185,7 +181,7 @@ class CleanupManager:
         try:
             for thread in threading.enumerate():
                 if thread != threading.current_thread() and not thread.is_alive():
-                    delete_fn = getattr(thread, '_delete', None)
+                    delete_fn = getattr(thread, "_delete", None)
                     if callable(delete_fn):
                         with contextlib.suppress(Exception):
                             delete_fn()
@@ -210,13 +206,13 @@ class CleanupManager:
             if not sys.stderr.closed:
                 sys.stderr.flush()
 
-            if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+            if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
                 try:
                     subprocess.run(["stty", "sane"], check=False)
                     if erase_key is not None:
                         subprocess.run(["stty", "erase", erase_key], check=False)  # explicitly restore backspace character to original value
-                    if hasattr(termios, 'tcflush'):
-                        tciflush = getattr(termios, 'TCIOFLUSH', None)
+                    if hasattr(termios, "tcflush"):
+                        tciflush = getattr(termios, "TCIOFLUSH", None)
                         if tciflush is not None:
                             termios.tcflush(sys.stdin.fileno(), tciflush)
                     subprocess.run(["stty", "-ixon"], check=False)
@@ -252,10 +248,10 @@ class CleanupManager:
 
 
 # Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
-if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
     try:
-        output = subprocess.check_output(['stty', '-a']).decode()
-        match = re.search(r' erase = (\S+);', output)
+        output = subprocess.check_output(["stty", "-a"]).decode()
+        match = re.search(r" erase = (\S+);", output)
         if match:
             erase_key = match.group(1)
     except OSError:

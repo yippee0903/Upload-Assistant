@@ -13,7 +13,6 @@ from src.trackers.UNIT3D import UNIT3D, QueryValue
 
 
 class TOS(FrenchTrackerMixin, UNIT3D):
-
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="TOS")
         self.config = config
@@ -90,9 +89,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
 
         if not self.api_key:
             if not meta["debug"]:
-                console.print(
-                    f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]"
-                )
+                console.print(f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]")
             meta["skipping"] = f"{self.tracker}"
             return dupes
 
@@ -119,7 +116,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             category_ids = ["1", "6"]
 
         params: list[tuple[str, QueryValue]] = [
-            ("tmdbId", str(meta['tmdb'])),
+            ("tmdbId", str(meta["tmdb"])),
             ("name", ""),
             ("perPage", "100"),
         ]
@@ -139,10 +136,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         params.append(("types[]", type_id))
 
         if meta["category"] == "TV":
-            params = [
-                (k, (str(v) + f" {meta.get('season', '')}" if k == "name" else v))
-                for k, v in params
-            ]
+            params = [(k, (str(v) + f" {meta.get('season', '')}" if k == "name" else v)) for k, v in params]
 
         try:
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -158,10 +152,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                         result: dict[str, Any] = {
                             "name": name,
                             "size": size,
-                            "files": (
-                                [f["name"] for f in attributes.get("files", []) if isinstance(f, dict) and "name" in f]
-                                if not meta["is_disc"] else []
-                            ),
+                            "files": ([f["name"] for f in attributes.get("files", []) if isinstance(f, dict) and "name" in f] if not meta["is_disc"] else []),
                             "file_count": len(attributes.get("files", [])) if isinstance(attributes.get("files"), list) else 0,
                             "trumpable": attributes.get("trumpable", False),
                             "link": attributes.get("details_link", None),
@@ -178,9 +169,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 else:
                     console.print(f"[bold red]Failed to search torrents on {self.tracker}. HTTP Status: {response.status_code}")
         except httpx.HTTPStatusError as e:
-            meta["tracker_status"][self.tracker]["status_message"] = (
-                f"data error: HTTP {e.response.status_code}"
-            )
+            meta["tracker_status"][self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code}"
         except Exception as e:
             console.print(f"[bold red]{self.tracker}: Error searching for existing torrents — {e}[/bold red]")
 
@@ -195,151 +184,151 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         import re
 
         is_scene = meta.get("scene", False)
-        if is_scene and not meta.get('tv_pack'):
+        if is_scene and not meta.get("tv_pack"):
             return {"name": str(meta.get("scene_name", ""))}
-        if is_scene and meta.get('tv_pack'):
+        if is_scene and meta.get("tv_pack"):
             # For scene packs, scene_name is the first episode name (e.g. S01E01);
             # use the folder basename which is the actual pack name (e.g. S01).
             import os
+
             return {"name": os.path.basename(str(meta.get("path", meta.get("scene_name", ""))))}
 
-
-        type_val = meta.get('type', '').upper()
-        title = meta.get('title', '')
-        year = str(meta.get('year', ''))
-        manual_year = meta.get('manual_year')
+        type_val = meta.get("type", "").upper()
+        title = meta.get("title", "")
+        year = str(meta.get("year", ""))
+        manual_year = meta.get("manual_year")
         if manual_year is not None and int(manual_year) > 0:
             year = str(manual_year)
 
-        resolution = meta.get('resolution', '')
-        if resolution == 'OTHER':
-            resolution = ''
+        resolution = meta.get("resolution", "")
+        if resolution == "OTHER":
+            resolution = ""
 
-        audio = meta.get('audio', '').replace('Dual-Audio', '').replace('Dubbed', '')
+        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "")
         language = await self._build_audio_string(meta)
-        service = meta.get('service', '')
-        season = meta.get('season', '')
-        episode = meta.get('episode', '')
-        part = meta.get('part', '')
-        repack = meta.get('repack', '')
-        three_d = meta.get('3D', '')
-        tag = meta.get('tag', '')
-        source = meta.get('source', '')
-        uhd = meta.get('uhd', '')
-        hdr = meta.get('hdr', '')
-        edition = meta.get('edition', '')
-        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
-        if 'hybrid' in edition.upper():
-            edition = edition.replace('Hybrid', '').strip()
+        service = meta.get("service", "")
+        season = meta.get("season", "")
+        episode = meta.get("episode", "")
+        part = meta.get("part", "")
+        repack = meta.get("repack", "")
+        three_d = meta.get("3D", "")
+        tag = meta.get("tag", "")
+        source = meta.get("source", "")
+        uhd = meta.get("uhd", "")
+        hdr = meta.get("hdr", "")
+        edition = meta.get("edition", "")
+        hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
+        if "hybrid" in edition.upper():
+            edition = edition.replace("Hybrid", "").strip()
 
-        video_codec = ''
-        video_encode = ''
-        region = ''
-        dvd_size = ''
+        video_codec = ""
+        video_encode = ""
+        region = ""
+        dvd_size = ""
 
-        if meta.get('is_disc') == 'BDMV':
-            video_codec = meta.get('video_codec', '')
-            region = meta.get('region', '') or ''
-        elif meta.get('is_disc') == 'DVD':
-            region = meta.get('region', '') or ''
-            dvd_size = meta.get('dvd_size', '')
+        if meta.get("is_disc") == "BDMV":
+            video_codec = meta.get("video_codec", "")
+            region = meta.get("region", "") or ""
+        elif meta.get("is_disc") == "DVD":
+            region = meta.get("region", "") or ""
+            dvd_size = meta.get("dvd_size", "")
         else:
-            video_codec = meta.get('video_codec', '')
-            video_encode = meta.get('video_encode', '')
+            video_codec = meta.get("video_codec", "")
+            video_encode = meta.get("video_encode", "")
 
-        if meta['category'] == 'TV':
-            year = meta['year'] if meta.get('search_year', '') != '' else ''
-            if meta.get('manual_date'):
-                season = ''
-                episode = ''
-        if meta.get('tv_pack'):
-            episode = ''
-        if meta.get('no_season', False) is True:
-            season = ''
-        if meta.get('no_year', False) is True:
-            year = ''
+        if meta["category"] == "TV":
+            year = meta["year"] if meta.get("search_year", "") != "" else ""
+            if meta.get("manual_date"):
+                season = ""
+                episode = ""
+        if meta.get("tv_pack"):
+            episode = ""
+        if meta.get("no_season", False) is True:
+            season = ""
+        if meta.get("no_year", False) is True:
+            year = ""
 
-        name = ''
+        name = ""
 
         # ── MOVIE ──
         # G3MINI order with video/audio swapped:
         #   Disc/Remux: …Source HDR Audio VideoCodec
         #   Encode/WEB: …Source Audio HDR VideoEncode
-        if meta['category'] == 'MOVIE':
-            if type_val == 'DISC':
-                if meta.get('is_disc') == 'BDMV':
+        if meta["category"] == "MOVIE":
+            if type_val == "DISC":
+                if meta.get("is_disc") == "BDMV":
                     name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
-                elif meta.get('is_disc') == 'DVD':
+                elif meta.get("is_disc") == "DVD":
                     name = f"{title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                elif meta.get('is_disc') == 'HDDVD':
+                elif meta.get("is_disc") == "HDDVD":
                     name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
+            elif type_val == "REMUX" and source in ("BluRay", "HDDVD"):
                 name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
+            elif type_val == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 name = f"{title} {year} {edition} {repack} {source} REMUX {audio}"
-            elif type_val == 'ENCODE':
+            elif type_val == "ENCODE":
                 name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-            elif type_val == 'WEBDL':
+            elif type_val == "WEBDL":
                 name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
-            elif type_val == 'WEBRIP':
+            elif type_val == "WEBRIP":
                 name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
-            elif type_val == 'HDTV':
+            elif type_val == "HDTV":
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif type_val == 'DVDRIP':
+            elif type_val == "DVDRIP":
                 name = f"{title} {year} {source} DVDRip {audio} {video_encode}"
 
         # ── TV ──
-        elif meta['category'] == 'TV':
-            if type_val == 'DISC':
-                if meta.get('is_disc') == 'BDMV':
+        elif meta["category"] == "TV":
+            if type_val == "DISC":
+                if meta.get("is_disc") == "BDMV":
                     name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
-                elif meta.get('is_disc') == 'DVD':
+                elif meta.get("is_disc") == "DVD":
                     name = f"{title} {year} {season}{episode} {repack} {edition} {region} {source} {dvd_size} {audio}"
-                elif meta.get('is_disc') == 'HDDVD':
+                elif meta.get("is_disc") == "HDDVD":
                     name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('BluRay', 'HDDVD'):
+            elif type_val == "REMUX" and source in ("BluRay", "HDDVD"):
                 name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
-            elif type_val == 'REMUX' and source in ('PAL DVD', 'NTSC DVD', 'DVD'):
+            elif type_val == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {source} REMUX {audio}"
-            elif type_val == 'ENCODE':
+            elif type_val == "ENCODE":
                 name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
-            elif type_val == 'WEBDL':
+            elif type_val == "WEBDL":
                 name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
-            elif type_val == 'WEBRIP':
+            elif type_val == "WEBRIP":
                 name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
-            elif type_val == 'HDTV':
+            elif type_val == "HDTV":
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
-            elif type_val == 'DVDRIP':
+            elif type_val == "DVDRIP":
                 name = f"{title} {year} {season} {source} DVDRip {audio} {video_encode}"
 
         if not name:
             console.print("[bold red]TOS: Unable to generate release name.[/bold red]")
             console.print(f"  category={meta.get('category')}  type={meta.get('type')}  source={meta.get('source')}")
-            return {'name': ''}
+            return {"name": ""}
 
         # Collapse whitespace, append tag, dotify, clean
-        name = ' '.join(name.split()) + tag
+        name = " ".join(name.split()) + tag
         # Normalise special codec notations before stripping
-        name = name.replace('DTS:X', 'DTS-X')
+        name = name.replace("DTS:X", "DTS-X")
         # Allow alphanumeric, spaces, dots, hyphens, colons, and + (for DD+, HDR10+)
-        name = re.sub(r'[^a-zA-Z0-9 .+\-]', '', name)
-        name = name.replace(' ', '.')
-        name = re.sub(r'\.(-\.)+', '.', name)
-        name = re.sub(r'\.{2,}', '.', name)
-        name = name.strip('.')
+        name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
+        name = name.replace(" ", ".")
+        name = re.sub(r"\.(-\.)+", ".", name)
+        name = re.sub(r"\.{2,}", ".", name)
+        name = name.strip(".")
 
         # Recreate torrent if keep_nfo is set
-        if meta.get('keep_nfo', False):
-            tracker_config = self.config['TRACKERS'].get(self.tracker, {})
-            tracker_url = str(tracker_config.get('announce_url', "https://fake.tracker")).strip()
+        if meta.get("keep_nfo", False):
+            tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+            tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
             torrent_create = f"[{self.tracker}]"
             try:
-                cooldown = int(self.config.get('DEFAULT', {}).get('rehash_cooldown', 0) or 0)
+                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
             except (ValueError, TypeError):
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)
-            await TorrentCreator.create_torrent(meta, str(meta['path']), torrent_create, tracker_url=tracker_url)
+            await TorrentCreator.create_torrent(meta, str(meta["path"]), torrent_create, tracker_url=tracker_url)
 
         return {"name": name}
 
@@ -363,9 +352,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         has_nfo = meta.get("nfo", False) or meta.get("auto_nfo", False)
 
         if is_scene and not has_nfo:
-            console.print(
-                f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]"
-            )
+            console.print(f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]")
             return False
 
         return True
@@ -376,20 +363,20 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         Tags: MUTE, MULTi [VFF|VFQ|VF2|VFn], FRENCH [VFQ], VOSTFR, VO
         """
         # No mediainfo available - can't determine language
-        if 'mediainfo' not in meta or 'media' not in meta.get('mediainfo', {}):
-            return ''
+        if "mediainfo" not in meta or "media" not in meta.get("mediainfo", {}):
+            return ""
 
         audio_tracks = self._get_audio_tracks(meta)
 
         # MUTE - mediainfo present but no audio tracks
         if not audio_tracks:
-            return 'MUTE'
+            return "MUTE"
 
         audio_langs = self._extract_audio_languages(audio_tracks, meta)
         if not audio_langs:
-            return ''
+            return ""
 
-        has_french_audio = 'FRA' in audio_langs
+        has_french_audio = "FRA" in audio_langs
         has_french_subs = self._has_french_subs(meta)
         num_audio_tracks = len(audio_tracks)
         fr_suffix = self._get_french_dub_suffix(audio_tracks)
@@ -403,7 +390,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         # FRENCH - 1 audio track, it's French
         if num_audio_tracks == 1 and has_french_audio:
             # Only append VFQ suffix; VFF or generic fr -> just FRENCH
-            if fr_suffix == 'VFQ':
+            if fr_suffix == "VFQ":
                 return "FRENCH VFQ"
             return "FRENCH"
 
@@ -415,7 +402,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         if not has_french_audio and not has_french_subs:
             return "VO"
 
-        return ''
+        return ""
 
     # _get_french_dub_suffix, _get_audio_tracks, _extract_audio_languages,
     # _map_language, _has_french_subs — inherited from FrenchTrackerMixin

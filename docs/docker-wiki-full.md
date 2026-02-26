@@ -1,4 +1,4 @@
-There is a docker image available for Upload-Assistant that is automatically built within a few minutes of each release. 
+There is a docker image available for Upload-Assistant that is automatically built within a few minutes of each release.
 
 > **Looking for the WebUI?** See [docker-gui-wiki-full.md](docker-gui-wiki-full.md) for the WebUI Docker setup (environment variables, persistent sessions, Compose examples, and Unraid notes).
 
@@ -60,7 +60,7 @@ ghcr.io/audionut/upload-assistant:latest /downloads/path/to/content --help
 ## What is docker?
 Google is your friend
 
-## How do I update the docker image? 
+## How do I update the docker image?
 `docker pull ghcr.io/audionut/upload-assistant:latest`
 
 ## How do I use an image of a specific commit?

@@ -50,13 +50,13 @@ class CustomTorrent(torf.Torrent):
         self._meta = meta
 
         # Extract and store the precalculated piece size
-        self._precalculated_piece_size: Optional[int] = kwargs.pop('piece_size', None)
+        self._precalculated_piece_size: Optional[int] = kwargs.pop("piece_size", None)
         super().__init__(*args, **kwargs)
 
         # Set piece size directly
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
-            self.metainfo['info']['piece length'] = self._precalculated_piece_size
+            self.metainfo["info"]["piece length"] = self._precalculated_piece_size
 
     @property
     def piece_size_min(self) -> int:
@@ -88,12 +88,12 @@ class CustomTorrent(torf.Torrent):
             return
 
         self._piece_size = value
-        self.metainfo['info']['piece length'] = value
+        self.metainfo["info"]["piece length"] = value
 
     def validate_piece_size(self, _meta: Optional[Mapping[str, Any]] = None) -> None:
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
-            self.metainfo['info']['piece length'] = self._precalculated_piece_size
+            self.metainfo["info"]["piece length"] = self._precalculated_piece_size
             return
 
 
@@ -120,11 +120,11 @@ class TorrentCreator:
         else:
             max_size = 134217728  # 128 MiB default maximum
 
-        if meta.get('debug'):
-            console.print(f"Content size: {total_size / (1024*1024):.2f} MiB")
+        if meta.get("debug"):
+            console.print(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
             console.print(f"Max size: {max_size}")
 
-        total_size_mib = total_size / (1024*1024)
+        total_size_mib = total_size / (1024 * 1024)
 
         if total_size_mib <= 60:  # <= 60 MiB
             piece_size = 32 * 1024  # 32 KiB
@@ -153,7 +153,7 @@ class TorrentCreator:
         else:
             piece_size = 128 * 1024 * 1024  # 128 MiB
 
-        if any(tracker in meta.get('trackers', []) for tracker in ['HDB', 'PTP']) and piece_size > 16 * 1024 * 1024:
+        if any(tracker in meta.get("trackers", []) for tracker in ["HDB", "PTP"]) and piece_size > 16 * 1024 * 1024:
             piece_size = 16 * 1024 * 1024
 
         # Enforce minimum and maximum limits
@@ -161,7 +161,7 @@ class TorrentCreator:
 
         # Calculate number of pieces for debugging
         num_pieces = math.ceil(total_size / piece_size)
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print(f"Selected piece size: {piece_size / 1024:.2f} KiB")
             console.print(f"Number of pieces: {num_pieces}")
 
@@ -169,7 +169,7 @@ class TorrentCreator:
 
     @staticmethod
     def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str]) -> str:
-        manual_patterns = ["*.nfo", "*.jpg", "*.png", '*.srt', '*.sub', '*.vtt', '*.ssa', '*.ass', "*.txt", "*.xml"]
+        manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.txt", "*.xml"]
         keep_set = {os.path.abspath(f) for f in filelist}
 
         exclude_files: set[str] = set()
@@ -198,12 +198,12 @@ class TorrentCreator:
         wait_started: Optional[float] = None
         if cls._create_torrent_semaphore.locked():
             wait_started = time.time()
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 console.print("[yellow]Waiting for create_torrent slot...[/yellow]")
 
         async with cls._create_torrent_semaphore:
             cls._create_torrent_inflight += 1
-            if meta.get('debug', False):
+            if meta.get("debug", False):
                 wait_msg = ""
                 if wait_started is not None:
                     waited = time.time() - wait_started
@@ -212,63 +212,58 @@ class TorrentCreator:
 
             try:
                 if not piece_size:
-                    piece_size = meta.get('max_piece_size', 0)
+                    piece_size = meta.get("max_piece_size", 0)
                 tracker_url = tracker_url or None
                 include: list[str] = []
                 exclude: list[str] = []
 
-                if meta['keep_folder']:
-                    console.print('--keep-folder was specified. Using complete folder for torrent creation.')
+                if meta["keep_folder"]:
+                    console.print("--keep-folder was specified. Using complete folder for torrent creation.")
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
-                    if meta.get('keep_nfo', False) and "BASE" not in output_filename:
-                        console.print('--keep-nfo was specified. Including NFO files in torrent.')
+                    if meta.get("keep_nfo", False) and "BASE" not in output_filename:
+                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
-                        meta['mkbrr'] = False
-                    elif not meta.get('tv_pack', False):
+                        meta["mkbrr"] = False
+                    elif not meta.get("tv_pack", False):
                         folder_name = os.path.basename(str(path))
-                        include = [
-                            f"{folder_name}/{os.path.basename(f)}"
-                            for f in meta['filelist']
-                        ]
+                        include = [f"{folder_name}/{os.path.basename(f)}" for f in meta["filelist"]]
                         exclude = ["*", "*/**"]
 
-                elif meta['isdir']:
-                    if meta.get('keep_nfo', False) and not meta.get('is_disc', False) and "BASE" not in output_filename:
-                        console.print('--keep-nfo was specified. Including NFO files in torrent.')
+                elif meta["isdir"]:
+                    if meta.get("keep_nfo", False) and not meta.get("is_disc", False) and "BASE" not in output_filename:
+                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
-                        meta['mkbrr'] = False
-                    elif meta.get('is_disc', False):
+                        meta["mkbrr"] = False
+                    elif meta.get("is_disc", False):
                         include = []
                         exclude = []
-                    elif not meta.get('tv_pack', False):
+                    elif not meta.get("tv_pack", False):
                         path_dir = os.fspath(path)
                         os.chdir(path_dir)
-                        globs = [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))] + [
-                            os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))
-                        ] + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                        globs = (
+                            [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))]
+                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))]
+                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                        )
                         no_sample_globs = [
-                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs
-                            if not file.lower().endswith('sample.mkv') or "!sample" in file.lower()
+                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
                         ]
                         if len(no_sample_globs) == 1:
-                            path = meta['filelist'][0]
-                        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else []
-                        include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else []
+                            path = meta["filelist"][0]
+                        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta["is_disc"] else []
+                        include = ["*.mkv", "*.mp4", "*.ts"] if not meta["is_disc"] else []
                     else:
                         folder_name = os.path.basename(str(path))
-                        include = [
-                            f"{folder_name}/{os.path.basename(f)}"
-                            for f in meta['filelist']
-                        ]
+                        include = [f"{folder_name}/{os.path.basename(f)}" for f in meta["filelist"]]
                         exclude = ["*", "*/**"]
                 else:
-                    exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta['is_disc'] else []
-                    include = ["*.mkv", "*.mp4", "*.ts"] if not meta['is_disc'] else []
+                    exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta["is_disc"] else []
+                    include = ["*.mkv", "*.mp4", "*.ts"] if not meta["is_disc"] else []
 
                 # If using mkbrr, run the external application
-                if meta.get('mkbrr'):
+                if meta.get("mkbrr"):
                     try:
                         # Validate input path to prevent potential command injection
                         if not os.path.exists(path):
@@ -277,7 +272,7 @@ class TorrentCreator:
                         # Validate mkbrr binary exists and is executable
                         if not os.path.exists(mkbrr_binary):
                             raise FileNotFoundError(f"mkbrr binary not found: {mkbrr_binary}")
-                        output_path = os.path.join(meta['base_dir'], "tmp", meta['uuid'], f"{output_filename}.torrent")
+                        output_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"{output_filename}.torrent")
 
                         # Ensure executable permission for non-Windows systems
                         if not sys.platform.startswith("win"):
@@ -289,7 +284,7 @@ class TorrentCreator:
                         if tracker_url:
                             cmd.extend(["-t", tracker_url])
 
-                        if int(meta.get('randomized', 0)) >= 1:
+                        if int(meta.get("randomized", 0)) >= 1:
                             cmd.extend(["-e"])
 
                         if piece_size and not tracker_url:
@@ -305,18 +300,18 @@ class TorrentCreator:
                             except (ValueError, TypeError):
                                 console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
-                        if not piece_size and not tracker_url and not any(tracker in meta.get('trackers', []) for tracker in ['HDB', 'PTP', 'MTV']):
-                            cmd.extend(['-m', '27'])
+                        if not piece_size and not tracker_url and not any(tracker in meta.get("trackers", []) for tracker in ["HDB", "PTP", "MTV"]):
+                            cmd.extend(["-m", "27"])
 
-                        if meta.get('mkbrr_threads') != '0':
-                            cmd.extend(["--workers", str(meta['mkbrr_threads'])])
+                        if meta.get("mkbrr_threads") != "0":
+                            cmd.extend(["--workers", str(meta["mkbrr_threads"])])
 
-                        if not meta.get('is_disc', False):
-                            exclude_str = cls.build_mkbrr_exclude_string(str(path), meta['filelist'])
+                        if not meta.get("is_disc", False):
+                            exclude_str = cls.build_mkbrr_exclude_string(str(path), meta["filelist"])
                             cmd.extend(["--exclude", exclude_str])
 
                         cmd.extend(["-o", output_path])
-                        if meta['debug']:
+                        if meta["debug"]:
                             console.print(f"[cyan]mkbrr cmd: {cmd}")
 
                         # Run mkbrr subprocess in thread to avoid blocking
@@ -340,7 +335,7 @@ class TorrentCreator:
                                     pieces_done = int(match.group(2))  # Extract percentage (e.g., "14")
 
                                     # Try to extract the ETA directly if it's in the format [elapsed:remaining]
-                                    eta_match = re.search(r'\[(\d+)s:(\d+)s\]', line)
+                                    eta_match = re.search(r"\[(\d+)s:(\d+)s\]", line)
                                     if eta_match:
                                         eta_seconds = int(eta_match.group(2))
                                         eta = time.strftime("%M:%S", time.gmtime(eta_seconds))
@@ -357,7 +352,7 @@ class TorrentCreator:
                                     cli_ui.info_progress(f"mkbrr hashing... {speed} | ETA: {eta}", pieces_done, total_pieces)
 
                                 # Detect final output line
-                                if "Wrote" in line and ".torrent" in line and meta['debug']:
+                                if "Wrote" in line and ".torrent" in line and meta["debug"]:
                                     console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
 
                             # Wait for the process to finish
@@ -379,11 +374,11 @@ class TorrentCreator:
                     except subprocess.CalledProcessError as e:
                         console.print(f"[bold red]Error creating torrent with mkbrr: {e}")
                         console.print("[yellow]Falling back to CustomTorrent method")
-                        meta['mkbrr'] = False
+                        meta["mkbrr"] = False
                     except Exception as e:
                         console.print(f"[bold red]Error using mkbrr: {str(e)}")
                         console.print("[yellow]Falling back to CustomTorrent method")
-                        meta['mkbrr'] = False
+                        meta["mkbrr"] = False
                 overall_start_time = time.time()
 
                 # Calculate initial size
@@ -412,7 +407,7 @@ class TorrentCreator:
                     creation_date=datetime.now(timezone.utc),
                     comment="Created by Upload Assistant",
                     created_by="Upload Assistant",
-                    piece_size=piece_size
+                    piece_size=piece_size,
                 )
 
                 # Run torrent generation in thread to avoid blocking the event loop
@@ -428,14 +423,14 @@ class TorrentCreator:
 
                 torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{output_filename}.torrent"
                 torrent_file_size = os.path.getsize(torrent_file_path) / 1024
-                if meta['debug']:
+                if meta["debug"]:
                     console.print()
                     console.print(f"[bold green]torrent created in {formatted_time}")
                     console.print(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
-                if meta.get('debug', False):
+                if meta.get("debug", False):
                     console.print(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
 
     @staticmethod
@@ -474,7 +469,7 @@ class TorrentCreator:
         base_torrent = Torrent.read(f"{base_dir}/tmp/{uuid}/BASE.torrent")
         for i in range(1, int(num) + 1):
             new_torrent = base_torrent
-            new_torrent.metainfo['info']['entropy'] = random.randint(1, 999999)  # type: ignore  # nosec B311
+            new_torrent.metainfo["info"]["entropy"] = random.randint(1, 999999)  # type: ignore  # nosec B311
             Torrent.copy(new_torrent).write(f"{base_dir}/tmp/{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
@@ -501,7 +496,7 @@ class TorrentCreator:
         if skip_nfo:
             for torrent_file in base_torrent.files:
                 file_name = str(torrent_file).lower()
-                if file_name.endswith('.nfo'):
+                if file_name.endswith(".nfo"):
                     console.print(f"[yellow]Existing torrent contains .nfo file but skip_nfo is enabled: {torrent_file}[/yellow]")
                     console.print("[yellow]Cannot reuse this torrent, will find/create a new one.[/yellow]")
                     return False
@@ -528,26 +523,26 @@ class TorrentCreator:
                     console.print("[yellow]Cannot reuse this torrent, will find/create a new one.[/yellow]")
                     return False
 
-        base_torrent.trackers = ['https://fake.tracker']
+        base_torrent.trackers = ["https://fake.tracker"]
         base_torrent.comment = "Created by Upload Assistant"
         base_torrent.created_by = "Created by Upload Assistant"
-        info_dict = base_torrent.metainfo['info']
-        valid_keys = ['name', 'piece length', 'pieces', 'private', 'source']
+        info_dict = base_torrent.metainfo["info"]
+        valid_keys = ["name", "piece length", "pieces", "private", "source"]
 
         # Add the correct key based on single vs multi file torrent
-        if 'files' in info_dict:
-            valid_keys.append('files')
-        elif 'length' in info_dict:
-            valid_keys.append('length')
+        if "files" in info_dict:
+            valid_keys.append("files")
+        elif "length" in info_dict:
+            valid_keys.append("length")
 
         # Remove everything not in the whitelist
         for each in list(info_dict):
             if each not in valid_keys:
                 info_dict.pop(each, None)  # type: ignore
         for each in list(base_torrent.metainfo):
-            if each not in ('announce', 'comment', 'creation date', 'created by', 'encoding', 'info'):
+            if each not in ("announce", "comment", "creation date", "created by", "encoding", "info"):
                 base_torrent.metainfo.pop(each, None)  # type: ignore
-        base_torrent.source = 'L4G'
+        base_torrent.source = "L4G"
         base_torrent.private = True
         Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/BASE.torrent", overwrite=True)
         return True
@@ -559,7 +554,7 @@ class TorrentCreator:
         if system_mkbrr:
             return system_mkbrr
 
-        base_dir = os.path.join(str(meta['base_dir']), "bin", "mkbrr")
+        base_dir = os.path.join(str(meta["base_dir"]), "bin", "mkbrr")
 
         # Detect OS & Architecture
         system = platform.system().lower()

@@ -10,15 +10,15 @@ Config = dict[str, Any]
 
 class UTP(UNIT3D):
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='UTP')
+        super().__init__(config, tracker_name="UTP")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'UTP'
-        self.base_url = 'https://utp.to'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
+        self.tracker = "UTP"
+        self.base_url = "https://utp.to"
+        self.id_url = f"{self.base_url}/api/torrents/"
+        self.upload_url = f"{self.base_url}/api/torrents/upload"
+        self.search_url = f"{self.base_url}/api/torrents/filter"
+        self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = []
         pass
 
@@ -30,12 +30,12 @@ class UTP(UNIT3D):
         mapping_only: bool = False,
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        category_name = meta['category']
+        category_name = meta["category"]
         category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-        }.get(category_name, '1')  # Default to MOVIE
-        return {'category_id': category_id}
+            "MOVIE": "1",
+            "TV": "2",
+        }.get(category_name, "1")  # Default to MOVIE
+        return {"category_id": category_id}
 
     async def get_resolution_id(
         self,
@@ -46,12 +46,12 @@ class UTP(UNIT3D):
     ) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1080p': '3',
-            '1080i': '4',
-        }.get(meta['resolution'], '11')  # Default to Other (11)
-        return {'resolution_id': resolution_id}
+            "4320p": "1",
+            "2160p": "2",
+            "1080p": "3",
+            "1080i": "4",
+        }.get(meta["resolution"], "11")  # Default to Other (11)
+        return {"resolution_id": resolution_id}
 
     async def get_type_id(
         self,
@@ -62,14 +62,14 @@ class UTP(UNIT3D):
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {
-            'DISC': '1',
-            'REMUX': '2',
-            'ENCODE': '3',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6',
-        }.get(str(meta.get('type', '')).upper(), '3')  # Default to ENCODE
-        return {'type_id': type_id}
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+        }.get(str(meta.get("type", "")).upper(), "3")  # Default to ENCODE
+        return {"type_id": type_id}
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         """
@@ -85,39 +85,39 @@ class UTP(UNIT3D):
         # We want: raw_url (full) for [url=], img_url (medium) for [img]
 
         # Save original values and transform
-        original_image_list = meta.get('image_list', [])
+        original_image_list = meta.get("image_list", [])
         transformed_image_list: list[dict[str, Any]] = [
             {
-                'web_url': img.get('raw_url', ''),   # Link goes to full image
-                'raw_url': img.get('img_url', ''),   # Display shows medium image
-                'img_url': img.get('img_url', ''),
+                "web_url": img.get("raw_url", ""),  # Link goes to full image
+                "raw_url": img.get("img_url", ""),  # Display shows medium image
+                "img_url": img.get("img_url", ""),
             }
             for img in original_image_list
         ]
 
         # Also transform any new_images_* keys for packed content
-        new_images_keys = [k for k in meta if k.startswith('new_images_')]
+        new_images_keys = [k for k in meta if k.startswith("new_images_")]
         original_new_images: dict[str, Any] = {}
         for key in new_images_keys:
             original_new_images[key] = meta[key]
             meta[key] = [
                 {
-                    'web_url': img.get('raw_url', ''),
-                    'raw_url': img.get('img_url', ''),
-                    'img_url': img.get('img_url', ''),
+                    "web_url": img.get("raw_url", ""),
+                    "raw_url": img.get("img_url", ""),
+                    "img_url": img.get("img_url", ""),
                 }
                 for img in meta[key]
             ]
 
         # Temporarily replace image_list
-        meta['image_list'] = transformed_image_list
+        meta["image_list"] = transformed_image_list
 
         try:
             builder = DescriptionBuilder(self.tracker, self.config)
             description = await builder.unit3d_edit_desc(meta, comparison=True)
         finally:
             # Restore original values even if an error occurs
-            meta['image_list'] = original_image_list
+            meta["image_list"] = original_image_list
             for key, value in original_new_images.items():
                 meta[key] = value
 
@@ -134,37 +134,37 @@ class UTP(UNIT3D):
         TV:    Name AKA Original LOCALE S##E## Year Cut Ratio Hybrid REPACK PROPER RERip Edition Region 3D SOURCE TYPE Resolution HDR VCodec ACodec Channels Object-Tag
 
         """
-        category = str(meta.get('category', ''))
-        release_type = str(meta.get('type', '')).upper()
+        category = str(meta.get("category", ""))
+        release_type = str(meta.get("type", "")).upper()
 
         # Common components
-        title = str(meta.get('title', ''))
-        aka = str(meta.get('aka', '')).strip()
-        year = str(meta.get('year', ''))
-        three_d = str(meta.get('3D', ''))
-        uhd = str(meta.get('uhd', ''))
-        edition = str(meta.get('edition', ''))
-        hybrid = str(meta.get('webdv', '')) if meta.get('webdv', '') else ''
-        repack = str(meta.get('repack', ''))
-        resolution = str(meta.get('resolution', ''))
-        hdr = str(meta.get('hdr', ''))
-        service = str(meta.get('service', ''))
-        audio_raw = str(meta.get('audio', ''))
+        title = str(meta.get("title", ""))
+        aka = str(meta.get("aka", "")).strip()
+        year = str(meta.get("year", ""))
+        three_d = str(meta.get("3D", ""))
+        uhd = str(meta.get("uhd", ""))
+        edition = str(meta.get("edition", ""))
+        hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
+        repack = str(meta.get("repack", ""))
+        resolution = str(meta.get("resolution", ""))
+        hdr = str(meta.get("hdr", ""))
+        service = str(meta.get("service", ""))
+        audio_raw = str(meta.get("audio", ""))
         # Only include audio for Atmos or lossless codecs
-        lossless_indicators = ['Atmos', 'TrueHD', 'DTS-HD MA', 'DTS:X', 'LPCM', 'FLAC', 'PCM']
+        lossless_indicators = ["Atmos", "TrueHD", "DTS-HD MA", "DTS:X", "LPCM", "FLAC", "PCM"]
         if any(indicator in audio_raw for indicator in lossless_indicators):
-            audio = audio_raw.replace('Dual-Audio', '').replace('Dubbed', '').strip()
-            audio = ' '.join(audio.split())
+            audio = audio_raw.replace("Dual-Audio", "").replace("Dubbed", "").strip()
+            audio = " ".join(audio.split())
         else:
             audio = ""  # Don't include lossy audio (AAC, DD, DD+, etc.) in name
-        video_codec = str(meta.get('video_codec', ''))
-        video_encode = str(meta.get('video_encode', ''))
-        tag = str(meta.get('tag', ''))
-        region = str(meta.get('region', '')) if meta.get('region') else ''
-        season = str(meta.get('season', ''))
-        episode = str(meta.get('episode', ''))
+        video_codec = str(meta.get("video_codec", ""))
+        video_encode = str(meta.get("video_encode", ""))
+        tag = str(meta.get("tag", ""))
+        region = str(meta.get("region", "")) if meta.get("region") else ""
+        season = str(meta.get("season", ""))
+        episode = str(meta.get("episode", ""))
 
-        source_tag = str(meta.get('source', ''))
+        source_tag = str(meta.get("source", ""))
         type_tag = ""
         vcodec = video_codec  # Default for DISC/REMUX (AVC, HEVC)
 
@@ -187,12 +187,11 @@ class UTP(UNIT3D):
         elif category == "TV":
             name = f"{title} {aka} {season}{episode} {year} {hybrid} {edition} {repack} {region} {three_d} {uhd} {source_tag} {type_tag} {resolution} {hdr} {vcodec} {audio}"
         else:
-            name = str(meta.get('name', ''))
+            name = str(meta.get("name", ""))
 
         # Clean up multiple spaces and add tag
-        name = ' '.join(name.split())
+        name = " ".join(name.split())
         if tag:
             name = f"{name}{tag}"
 
-
-        return {'name': name}
+        return {"name": name}

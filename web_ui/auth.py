@@ -6,6 +6,7 @@ Provides:
 - AES-GCM encrypt/decrypt helpers that return base64 payloads
 - File-backed user and credential storage under XDG config dir
 """
+
 from __future__ import annotations
 
 import base64
@@ -26,7 +27,9 @@ log = logging.getLogger(__name__)
 
 class EncryptionError(Exception):
     """Raised when encryption or key derivation fails."""
+
     pass
+
 
 # Defaults and env var names
 # These are environment variable *names* and not actual secrets — suppress
@@ -177,15 +180,13 @@ def _resolve_session_secret() -> bytes:
                 except Exception as e:
                     log.error("failed to create session secret inside directory: %s", e)
                     raise OSError(
-                        f"SESSION_SECRET_FILE points to a directory ({f}) and "
-                        f"we could not create a session_secret file inside it; "
-                        f"check permissions or mount a file instead"
+                        f"SESSION_SECRET_FILE points to a directory ({f}) and we could not create a session_secret file inside it; check permissions or mount a file instead"
                     ) from e
             else:
                 log.debug(
-                    "SESSION_SECRET_FILE (%s) is a directory; using "
-                    "existing file at %s",
-                    f, p,
+                    "SESSION_SECRET_FILE (%s) is a directory; using existing file at %s",
+                    f,
+                    p,
                 )
 
         try:
@@ -367,6 +368,7 @@ def create_user(username: str, password: str) -> None:
     # Prevent creating a new user if one already exists. Persisted user is authoritative.
     if path.exists():
         raise ValueError("a user account already exists")
+
     # Enforce minimum password entropy to ensure user-chosen secrets are strong.
     # Estimate entropy by character-class pool size heuristic: lowercase, uppercase,
     # digits, punctuation. This provides a conservative approximation of bits.
@@ -393,7 +395,7 @@ def create_user(username: str, password: str) -> None:
     _pack_field(extras, "username", username)
 
     key = _get_master_key()
-    extras_enc = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    extras_enc = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     username_enc = encrypt_text(key, username)
 
     data = {"username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
@@ -486,7 +488,7 @@ def set_totp_secret(secret: Optional[str]) -> None:
     _pack_field(extras, "totp_secret", secret)
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)
@@ -528,10 +530,10 @@ def set_recovery_hashes(hashes: list[str]) -> None:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
         extras = json.loads(dec)
 
-    _pack_field(extras, "recovery_hashes", json.dumps(hashes, separators=(",",":"), ensure_ascii=False))
+    _pack_field(extras, "recovery_hashes", json.dumps(hashes, separators=(",", ":"), ensure_ascii=False))
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)
@@ -572,10 +574,10 @@ def set_api_tokens(store: dict) -> None:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
         extras = json.loads(dec)
 
-    _pack_field(extras, "api_tokens", json.dumps(store, separators=(",",":"), ensure_ascii=False))
+    _pack_field(extras, "api_tokens", json.dumps(store, separators=(",", ":"), ensure_ascii=False))
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)
