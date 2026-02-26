@@ -921,6 +921,20 @@ class FrenchTrackerMixin:
 
         return {"name": dot_name}
 
+    # Map special Unicode chars to their ASCII equivalents *before*
+    # unidecode (which would map · → * and lose the separator).
+    _TITLE_CHAR_MAP: dict[str, str] = {
+        "\u00b7": " ",  # middle dot   (WALL·E → WALL E → WALL.E / Wall E)
+        "\u2022": " ",  # bullet       (same rationale)
+        "\u2010": "-",  # hyphen
+        "\u2011": "-",  # non-breaking hyphen
+        "\u2012": "-",  # figure dash
+        "\u2013": "-",  # en dash
+        "\u2014": "-",  # em dash
+        "\u2015": "-",  # horizontal bar
+        "\u2212": "-",  # minus sign
+    }
+
     @staticmethod
     def _fr_clean(text: str) -> str:
         """Strip accents and non-filename characters.
@@ -929,6 +943,8 @@ class FrenchTrackerMixin:
         ``l'Ordre`` becomes ``L Ordre`` (→ ``L.Ordre`` after dot-formatting),
         matching French-tracker naming conventions.
         """
+        for char, repl in FrenchTrackerMixin._TITLE_CHAR_MAP.items():
+            text = text.replace(char, repl)
         text = unidecode(text)
         # Replace apostrophes / RIGHT SINGLE QUOTATION MARK / backticks
         # that follow a French elided article with a space, and uppercase

@@ -683,6 +683,11 @@ class GF(FrenchTrackerMixin, UNIT3D):
         DD+ → DDP and HDR10+ → HDR10PLUS are handled upstream in
         ``FrenchTrackerMixin.get_name`` before this function is called.
         """
+        # GF keeps title-internal hyphens (WALL·E → WALL-E), so
+        # middle dot / bullet map to hyphen instead of space.
+        _GF_CHAR_MAP = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
+        for char, repl in _GF_CHAR_MAP.items():
+            text = text.replace(char, repl)
         text = unidecode(text)
         return re.sub(r"[^a-zA-Z0-9 .\-]", "", text)
 
@@ -697,13 +702,13 @@ class GF(FrenchTrackerMixin, UNIT3D):
         # Replace dots NOT between digits (keep 5.1, 7.1, 2.0 …)
         clean = re.sub(r"(?<!\d)\.(?!\d)", " ", clean)
 
-        # Keep only the LAST hyphen (group-tag separator)
+        # Keep only the LAST hyphen (group-tag separator).
+        # Hyphens flanked by word chars (e.g. WALL-E, Spider-Man) are
+        # title-internal and must be preserved.
         idx = clean.rfind("-")
         if idx > 0:
-            clean = clean[:idx].replace("-", " ") + clean[idx:]
-
-        # Remove isolated hyphens between spaces
-        clean = re.sub(r" (- )+", " ", clean)
+            # Only strip standalone hyphens (" - ") before the group tag
+            clean = re.sub(r"(?<=\s)-(?=\s)", " ", clean[:idx]) + clean[idx:]
         # Collapse multiple spaces
         clean = re.sub(r" {2,}", " ", clean).strip()
 

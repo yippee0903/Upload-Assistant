@@ -510,6 +510,28 @@ class TestGetName:
         assert '.DTSX.' in name
         assert '.DTS:X.' not in name
 
+    def test_title_middle_dot_preserved_as_separator(self):
+        """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""
+        meta = _meta_base(
+            title='WALL\u00b7E',
+            year='2008',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            hdr='HDR',
+            dv='DV',
+            video_encode='x265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # Middle dot → space → dot (standard dot-separated format)
+        assert 'Wall.E' in name or 'WALL.E' in name
+        assert 'Walle' not in name.replace('.', '') or 'WALL.E' in name
+
 
 # ─── Commentary track filtering ──────────────────────────────
 
