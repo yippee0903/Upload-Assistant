@@ -292,7 +292,7 @@ class TestCheckFrenchLangDupes:
         dupes = [
             _dupe('Chainsaw.Man.2025.MULTI.VFF.2160p.WEB.DV.HDR10PLUS.EAC3.5.1.H265-BOUC'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert len(result) == 1
@@ -306,7 +306,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.VFF.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
@@ -319,7 +319,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.FRENCH.1080p.WEB.H264-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
@@ -332,7 +332,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.TRUEFRENCH.1080p.WEB.H264-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
@@ -347,7 +347,7 @@ class TestCheckFrenchLangDupes:
             original_language='en',
         )
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
@@ -365,7 +365,7 @@ class TestCheckFrenchLangDupes:
             _dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-OTHGRP'),
             _dupe('Movie.2025.VOSTFR.2160p.WEB.H265-YETANOTHER'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         # VOSTFR should be dropped, only MULTI kept
@@ -382,7 +382,7 @@ class TestCheckFrenchLangDupes:
         dupes = [
             _dupe('Movie.2025.VO.2160p.WEB.H265-OTHGRP'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert len(result) == 0
@@ -398,7 +398,7 @@ class TestCheckFrenchLangDupes:
             _dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP1'),
             _dupe('Movie.2025.MULTI.VFQ.1080p.WEB.H264-GROUP2'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert len(result) == 2
@@ -413,7 +413,7 @@ class TestCheckFrenchLangDupes:
         dupes = [
             _dupe('Movie.2025.2160p.WEB.DV.HDR10.DDP5.1.H265-GROUP'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert len(result) == 1
@@ -429,7 +429,7 @@ class TestCheckFrenchLangDupes:
             _dupe('Movie.2025.VOSTFR.1080p.WEB.H264-GROUP'),
             _dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert len(result) == 1
@@ -444,7 +444,7 @@ class TestCheckFrenchLangDupes:
             uuid='Movie.2025.TRUEFRENCH.1080p',
         )
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' not in result[0].get('flags', [])
@@ -459,7 +459,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.VOSTFR.2160p.WEB.H265-OTHERGROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' not in result[0].get('flags', [])
@@ -472,7 +472,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.VO.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' not in result[0].get('flags', [])
@@ -485,7 +485,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.2160p.WEB.DV.HDR10.DDP5.1.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' not in result[0].get('flags', [])
@@ -504,7 +504,7 @@ class TestCheckFrenchLangDupes:
             _dupe('Movie.2025.VOSTFR.1080p.WEB.H264-GRP2'),
             _dupe('Movie.2025.VFQ.2160p.WEB.H265-GRP3'),
         ]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])  # MULTI → flagged
@@ -520,7 +520,7 @@ class TestCheckFrenchLangDupes:
             mediainfo=_mi([_audio_track('ja')], [_sub_track('fr')]),
             original_language='ja',
         )
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes([], meta)
         )
         assert result == []
@@ -533,7 +533,7 @@ class TestCheckFrenchLangDupes:
         meta = _meta_base()
         del meta['mediainfo']
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         # Empty string from _build_audio_string = VO, MULTI exists → flag
@@ -549,10 +549,10 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP')]
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         flags = dupes[0].get('flags', [])
@@ -568,7 +568,7 @@ class TestCheckFrenchLangDupes:
             original_language='en',
         )
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP')]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         # MUET films are a special category — don't flag
@@ -584,7 +584,7 @@ class TestCheckFrenchLangDupes:
             original_language='ja',
         )
         dupes = [_dupe('Movie.2025.MULTI.VFF.2160p.WEB.H265-GROUP', flags=['some_other_flag'])]
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         flags = result[0].get('flags', [])
@@ -630,7 +630,7 @@ class TestChainsawManScenario:
             ),
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mixin._check_french_lang_dupes(dupes, meta)
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
@@ -684,7 +684,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         # Same resolution → kept as dupe
@@ -725,7 +725,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         # Should be excluded (resolution mismatch, no flag to override)
@@ -766,7 +766,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         # Resolution mismatch → supersede is NOT applied, normal exclusion kicks in
@@ -806,7 +806,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         assert meta.get('C411_matched_reason') == 'french_lang_supersede'
@@ -862,7 +862,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         # S01/S02/S03 should NOT be dupes for an S04 upload
@@ -904,7 +904,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         assert len(result) == 1
@@ -947,7 +947,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         assert len(result) == 0
@@ -1048,7 +1048,7 @@ class TestFilterDupesFrenchFlag:
             },
         ]
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             checker.filter_dupes(dupes, meta, 'C411')
         )
         # Only the S04 2160p entry should survive
