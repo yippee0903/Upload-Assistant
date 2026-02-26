@@ -27,7 +27,14 @@ select = [
   # Async (if applicable)
   "ASYNC",
 ]
-ignore = ["E501", "UP045"]
+ignore = [
+  "E501",      # line too long — managed by formatter
+  "UP045",     # existing suppression
+  "ASYNC240",  # os.path in async — pervasive in codebase, low risk
+  "ASYNC250",  # pathlib in async — same rationale
+  "ARG002",    # unused method args — required by abstract interface signatures
+  "DTZ007",    # naive datetime — intentional for display-only date formatting
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["cogs", "data", "src", "web_ui"]

@@ -39,7 +39,7 @@ async def _read_text_lines(path: str) -> list[str]:
 class QueueManager:
     @staticmethod
     async def process_site_upload_queue(meta: Mapping[str, Any], base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
-        site_upload = meta.get('site_upload')
+        site_upload = meta.get("site_upload")
         if not site_upload:
             return [], None
 
@@ -69,29 +69,25 @@ class QueueManager:
         # Extract paths and IMDb IDs, filtering out processed paths
         queue: list[QueueItem] = []
         for item in search_results:
-            path = item.get('path')
+            path = item.get("path")
             try:
-                imdb_id = item.get('imdb_id')
+                imdb_id = item.get("imdb_id")
             except KeyError:
                 imdb_id = 0
 
             if path and imdb_id is not None and path not in processed_paths:
                 # Set tracker and imdb_id in meta for this queue item
-                queue_item: QueueItem = {
-                    'path': path,
-                    'imdb_id': imdb_id,
-                    'tracker': site_upload
-                }
+                queue_item: QueueItem = {"path": path, "imdb_id": imdb_id, "tracker": site_upload}
                 queue.append(queue_item)
 
         console.print(f"[cyan]Found {len(queue)} unprocessed items for {site_upload} upload[/cyan]")
 
         if queue:
             # Display the queue
-            paths_only = [item['path'] for item in queue]
+            paths_only = [item["path"] for item in queue]
             md_text = "\n - ".join(paths_only)
-            console.print("\n[bold green]Queuing these files for site upload:[/bold green]", end='')
-            console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+            console.print("\n[bold green]Queuing these files for site upload:[/bold green]", end="")
+            console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color="cyan")))
             console.print(f"[yellow]Tracker: {site_upload}[/yellow]")
             console.print("\n\n")
 
@@ -100,15 +96,15 @@ class QueueManager:
     @staticmethod
     async def process_site_upload_item(queue_item: Mapping[str, Any], meta: MutableMapping[str, Any]) -> str:
         # Set the tracker argument (-tk XXX)
-        tracker = cast(str, queue_item['tracker'])
-        meta['trackers'] = [tracker]
+        tracker = cast(str, queue_item["tracker"])
+        meta["trackers"] = [tracker]
 
         # Set the IMDb ID
-        imdb = queue_item.get('imdb_id', 0)
-        meta['imdb_id'] = imdb
+        imdb = queue_item.get("imdb_id", 0)
+        meta["imdb_id"] = imdb
 
         # Return the path for processing
-        return cast(str, queue_item['path'])
+        return cast(str, queue_item["path"])
 
     @staticmethod
     async def save_processed_path(processed_files_log: str, path: str) -> None:
@@ -160,11 +156,12 @@ class QueueManager:
         allowed_extensions_tuple = tuple(allowed_extensions) if allowed_extensions else None
 
         # Normalize the path to handle Unicode characters properly
-        path_str = path.decode('utf-8', errors='replace') if isinstance(path, bytes) else path
+        path_str = path.decode("utf-8", errors="replace") if isinstance(path, bytes) else path
         try:
             # Normalize Unicode characters
             import unicodedata
-            path_str = unicodedata.normalize('NFC', path_str)
+
+            path_str = unicodedata.normalize("NFC", path_str)
 
             # Ensure proper path format
             normalized_path = os.path.normpath(path_str)
@@ -175,9 +172,7 @@ class QueueManager:
         if os.path.isdir(normalized_path):
             try:
                 for entry in os.scandir(normalized_path):
-                    queue.extend(
-                        await QueueManager._process_scandir_entry(entry, normalized_path, allowed_extensions_tuple, allowed_extensions)
-                    )
+                    queue.extend(await QueueManager._process_scandir_entry(entry, normalized_path, allowed_extensions_tuple, allowed_extensions))
 
             except (OSError, PermissionError) as e:
                 console.print(f"[red]Error scanning directory {normalized_path}: {e}[/red]")
@@ -217,10 +212,7 @@ class QueueManager:
                 alt_path = os.path.join(normalized_path, entry.name)
                 if os.path.exists(alt_path) and (
                     (os.path.isdir(alt_path) and await QueueManager.should_include_directory(alt_path, allowed_extensions))
-                    or (
-                        os.path.isfile(alt_path)
-                        and (allowed_extensions_tuple is None or alt_path.lower().endswith(allowed_extensions_tuple))
-                    )
+                    or (os.path.isfile(alt_path) and (allowed_extensions_tuple is None or alt_path.lower().endswith(allowed_extensions_tuple)))
                 ):
                     entry_paths.append(alt_path)
             except Exception:
@@ -243,7 +235,7 @@ class QueueManager:
 
             # Check for disc structures first (VIDEO_TS or BDMV subfolders)
             for entry in os.scandir(dir_path):
-                if entry.is_dir() and entry.name.upper() in ('VIDEO_TS', 'BDMV'):
+                if entry.is_dir() and entry.name.upper() in ("VIDEO_TS", "BDMV"):
                     return True
 
             # Check for files with allowed extensions
@@ -298,26 +290,26 @@ class QueueManager:
         queue: list[str] = []
         allowed_extensions_tuple = tuple(allowed_extensions) if allowed_extensions else None
         if os.path.exists(os.path.dirname(path)) and len(paths) <= 1:
-            escaped_path = path.replace('[', '[[]')
+            escaped_path = path.replace("[", "[[]")
             queue = [
-                file for file in glob.glob(escaped_path)
-                if os.path.isdir(file)
-                or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                file
+                for file in glob.glob(escaped_path)
+                if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             if queue:
                 await QueueManager.display_queue(queue, save_to_log=False)
         elif os.path.exists(os.path.dirname(path)) and len(paths) > 1:
             queue = [
-                file for file in paths
-                if os.path.isdir(file)
-                or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                file
+                for file in paths
+                if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             await QueueManager.display_queue(queue, save_to_log=False)
         elif not os.path.exists(os.path.dirname(path)):
             queue = [
-                file for file in await QueueManager._resolve_split_path(path)
-                if os.path.isdir(file)
-                or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                file
+                for file in await QueueManager._resolve_split_path(path)
+                if os.path.isdir(file) or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             await QueueManager.display_queue(queue, save_to_log=False)
         return queue
@@ -334,20 +326,20 @@ class QueueManager:
         safe_file_locations: list[str] = []
 
         for line in await _read_text_lines(log_file):
-                line = line.strip()
+            line = line.strip()
 
-                # Detect the start and end of 'safe' sections
-                if line.lower() == "safe":
-                    safe_section = True
-                    continue
-                elif line.lower() in {"danger", "risky"}:
-                    safe_section = False
+            # Detect the start and end of 'safe' sections
+            if line.lower() == "safe":
+                safe_section = True
+                continue
+            elif line.lower() in {"danger", "risky"}:
+                safe_section = False
 
-                # Extract 'File Location' if in a 'safe' section
-                if safe_section and line.startswith("File Location:"):
-                    match = re.search(r"File Location:\s*(.+)", line)
-                    if match:
-                        safe_file_locations.append(match.group(1).strip())
+            # Extract 'File Location' if in a 'safe' section
+            if safe_section and line.startswith("File Location:"):
+                match = re.search(r"File Location:\s*(.+)", line)
+                if match:
+                    safe_file_locations.append(match.group(1).strip())
 
         return safe_file_locations
 
@@ -360,8 +352,8 @@ class QueueManager:
     ) -> None:
         """Displays the queued files in markdown format and optionally saves them to a log file in the tmp directory."""
         md_text = "\n - ".join(queue)
-        console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-        console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+        console.print("\n[bold green]Queuing these files:[/bold green]", end="")
+        console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color="cyan")))
         console.print("\n\n")
 
         if save_to_log and base_dir and queue_name:
@@ -369,10 +361,10 @@ class QueueManager:
             if not os.path.exists(tmp_dir):
                 os.makedirs(tmp_dir, mode=0o700, exist_ok=True)
                 # Enforce 0700 regardless of process umask (POSIX only).
-                if os.name != 'nt':
+                if os.name != "nt":
                     os.chmod(tmp_dir, 0o700)
             else:
-                if os.name != 'nt':
+                if os.name != "nt":
                     os.chmod(tmp_dir, 0o700)
             log_file = os.path.join(tmp_dir, f"{queue_name}_queue.log")
 
@@ -389,16 +381,16 @@ class QueueManager:
         paths: Sequence[str],
         base_dir: str,
     ) -> tuple[QueueList, Optional[str]]:
-        allowed_extensions = ['.mkv', '.mp4', '.ts']
+        allowed_extensions = [".mkv", ".mp4", ".ts"]
         queue: list[str] = []
 
-        if meta.get('site_upload'):
+        if meta.get("site_upload"):
             console.print(f"[bold yellow]Processing site upload queue for tracker: {meta['site_upload']}[/bold yellow]")
             site_queue, processed_log = await QueueManager.process_site_upload_queue(meta, base_dir)
 
             if site_queue:
-                meta['queue'] = f"{meta['site_upload']}_upload"
-                meta['site_upload_queue'] = True
+                meta["queue"] = f"{meta['site_upload']}_upload"
+                meta["site_upload_queue"] = True
 
                 # Return the structured queue and log file
                 return site_queue, processed_log
@@ -408,14 +400,14 @@ class QueueManager:
 
         log_file = os.path.join(base_dir, "tmp", f"{meta.get('queue', 'default')}_queue.log")
 
-        if path.endswith('.txt') and meta.get('unit3d'):
+        if path.endswith(".txt") and meta.get("unit3d"):
             console.print(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if os.path.exists(path):
                 safe_file_locations = await QueueManager.extract_safe_file_locations(path)
                 if safe_file_locations:
                     console.print(f"[cyan]Extracted {len(safe_file_locations)} safe file locations from the text file.[/cyan]")
                     queue = safe_file_locations
-                    meta['queue'] = "unit3d"
+                    meta["queue"] = "unit3d"
 
                     # Save the queue to the log file
                     try:
@@ -431,18 +423,18 @@ class QueueManager:
                 console.print(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
-        elif path.endswith('.log') and meta['debug']:
+        elif path.endswith(".log") and meta["debug"]:
             console.print(f"[bold yellow]Processing debugging queue:[/bold yellow] [bold green{path}[/bold green]")
             if os.path.exists(path):
                 log_file = path
                 queue = cast(list[str], await _read_json_file(path))
-                meta['queue'] = "debugging"
+                meta["queue"] = "debugging"
 
             else:
                 console.print(f"[bold red]Log file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
-        elif meta.get('queue'):
+        elif meta.get("queue"):
             if os.path.exists(log_file):
                 existing_queue = cast(list[str], await _read_json_file(log_file))
 
@@ -455,7 +447,7 @@ class QueueManager:
                 current_set = set(current_files)
                 new_files = current_set - existing_set
                 removed_files = existing_set - current_set
-                log_file_proccess = await QueueManager.get_log_file(base_dir, meta['queue'])
+                log_file_proccess = await QueueManager.get_log_file(base_dir, meta["queue"])
                 processed_files = await QueueManager.load_processed_files(log_file_proccess)
                 queued = [file for file in existing_queue if file not in processed_files]
 
@@ -464,33 +456,35 @@ class QueueManager:
 
                 if new_files or removed_files:
                     console.print("[bold yellow]Queue changes detected:[/bold yellow]")
-                    if new_files and meta.get('debug'):
+                    if new_files and meta.get("debug"):
                         console.print(f"[green]New files found ({len(new_files)}):[/green]")
                         for file in sorted(new_files):
                             console.print(f"  + {file}")
-                    if removed_files and meta.get('debug'):
+                    if removed_files and meta.get("debug"):
                         console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
                         for file in sorted(removed_files):
                             console.print(f"  - {file}")
 
-                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                         console.print("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
-                        edit_choice_raw = cli_ui.ask_string("Enter 'u' to update, 'a' to add specific new files, 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+                        edit_choice_raw = cli_ui.ask_string(
+                            "Enter 'u' to update, 'a' to add specific new files, 'e' to edit, 'd' to discard, or press Enter to keep it as is: "
+                        )
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
-                        if edit_choice == 'u':
+                        if edit_choice == "u":
                             queue = current_files
                             console.print(f"[bold green]Queue updated with current files ({len(queue)} items).")
                             await _write_json_file(log_file, queue, indent=4)
                             console.print(f"[bold green]Queue log file updated: {log_file}[/bold green]")
-                        elif edit_choice == 'a':
+                        elif edit_choice == "a":
                             console.print("[yellow]Select which new files to add (comma-separated numbers):[/yellow]")
                             for idx, file in enumerate(sorted(new_files), 1):
                                 console.print(f"  {idx}. {file}")
                             selected_raw = cli_ui.ask_string("Enter numbers (e.g., 1,3,5): ")
                             selected = (selected_raw or "").strip()
                             try:
-                                indices = [int(x) for x in selected.split(',') if x.strip().isdigit()]
+                                indices = [int(x) for x in selected.split(",") if x.strip().isdigit()]
                                 selected_files = [file for i, file in enumerate(sorted(new_files), 1) if i in indices]
                                 queue = list(existing_queue) + selected_files
                                 console.print(f"[bold green]Queue updated with selected new files ({len(queue)} items).")
@@ -499,7 +493,7 @@ class QueueManager:
                             except Exception as e:
                                 console.print(f"[bold red]Failed to update queue with selected files: {e}. Using the existing queue.")
                                 queue = existing_queue
-                        elif edit_choice == 'e':
+                        elif edit_choice == "e":
                             edited_content = click.edit(json.dumps(current_files, indent=4))
                             if edited_content:
                                 try:
@@ -512,7 +506,7 @@ class QueueManager:
                             else:
                                 console.print("[bold red]No changes were made. Using the current files.")
                                 queue = current_files
-                        elif edit_choice == 'd':
+                        elif edit_choice == "d":
                             console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
                             queue = current_files
                             await _write_json_file(log_file, queue, indent=4)
@@ -527,12 +521,12 @@ class QueueManager:
                 else:
                     # No changes detected
                     console.print("[green]No changes detected in the queue.[/green]")
-                    if not meta['unattended'] or (meta['unattended'] and meta.get('unattended_confirm', False)):
+                    if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                         console.print("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
                         edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
-                        if edit_choice == 'e':
+                        if edit_choice == "e":
                             edited_content = click.edit(json.dumps(existing_queue, indent=4))
                             if edited_content:
                                 try:
@@ -545,7 +539,7 @@ class QueueManager:
                             else:
                                 console.print("[bold red]No changes were made. Using the original queue.")
                                 queue = existing_queue
-                        elif edit_choice == 'd':
+                        elif edit_choice == "d":
                             console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
                             queue = current_files
                             await _write_json_file(log_file, queue, indent=4)
@@ -568,7 +562,7 @@ class QueueManager:
                 edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, or press Enter to save as is: ")
                 edit_choice = (edit_choice_raw or "").strip().lower()
 
-                if edit_choice == 'e':
+                if edit_choice == "e":
                     edited_content = click.edit(json.dumps(queue, indent=4))
                     if edited_content:
                         try:
@@ -589,13 +583,13 @@ class QueueManager:
         else:
             # Search glob if dirname exists
             if os.path.exists(os.path.dirname(path)) and len(paths) <= 1:
-                escaped_path = path.replace('[', '[[]')
+                escaped_path = path.replace("[", "[[]")
                 globs = glob.glob(escaped_path)
                 queue = globs
                 if queue:
                     md_text = "\n - ".join(queue)
-                    console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+                    console.print("\n[bold green]Queuing these files:[/bold green]", end="")
+                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color="cyan")))
                     console.print("\n\n")
                 else:
                     console.print(f"[red]Path: [bold red]{path}[/bold red] does not exist")
@@ -603,15 +597,15 @@ class QueueManager:
             elif os.path.exists(os.path.dirname(path)) and len(paths) != 1:
                 queue = list(paths)
                 md_text = "\n - ".join(queue)
-                console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+                console.print("\n[bold green]Queuing these files:[/bold green]", end="")
+                console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color="cyan")))
                 console.print("\n\n")
             elif not os.path.exists(os.path.dirname(path)):
                 queue = await QueueManager._resolve_split_path(path)
                 if queue:
                     md_text = "\n - ".join(queue)
-                    console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
+                    console.print("\n[bold green]Queuing these files:[/bold green]", end="")
+                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color="cyan")))
                     console.print("\n\n")
 
             else:
@@ -623,15 +617,15 @@ class QueueManager:
             console.print(f"[red]No valid files or directories found for path: {path}")
             exit(1)
 
-        if meta.get('queue'):
-            queue_name = meta['queue']
-            log_file = await QueueManager.get_log_file(base_dir, meta['queue'])
+        if meta.get("queue"):
+            queue_name = meta["queue"]
+            log_file = await QueueManager.get_log_file(base_dir, meta["queue"])
             processed_files = await QueueManager.load_processed_files(log_file)
             queue = [file for file in queue if file not in processed_files]
             if not queue:
                 console.print(f"[bold yellow]All files in the {meta['queue']} queue have already been processed.")
                 exit(0)
-            if meta['debug']:
+            if meta["debug"]:
                 await QueueManager.display_queue(queue, base_dir, queue_name, save_to_log=False)
 
         return queue, log_file

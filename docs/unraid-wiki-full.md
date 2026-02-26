@@ -8,7 +8,7 @@ As unraid is completely focused on docker, i was having issues installing Upload
 
 So here are the steps you will need to take to get Upload Assistant to work directly on unraid.
 ```
-1. You will need the nerd tools package, this can be installed from CA app. 
+1. You will need the nerd tools package, this can be installed from CA app.
 After that enable this packages
 ```
 ![](https://images2.imgbox.com/3f/d2/vPw50sqv_o.png?)
@@ -27,7 +27,7 @@ https://forums.unraid.net/topic/129200-plug-in-nerdtools/page/7/#comment-1192737
 ```
 ```
 4. Youre almost there, the final thing you need is ffmpeg and the steps to install are
-as follows make a directory you want to download ffmpeg to then 
+as follows make a directory you want to download ffmpeg to then
 "wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz" this
 will download the tar.xz file to the location you are in currently.
 ```
@@ -38,7 +38,7 @@ this unpackes ffmpeg folder for you. Now cd to the newly unpacked folder, and ru
 
 you now are done, and Upload Assistant should work natively.
 
-Thank you to noraa for all your help, shoutout to deeznuts and ringbear 
+Thank you to noraa for all your help, shoutout to deeznuts and ringbear
 
 ## Since people were asking how to do it in Unraid when still wanting CLI options, here goes:
     * create /mnt/user/appdata/upload-assistant
@@ -128,7 +128,7 @@ Leftclick on your newly created upload-assistant container and go to console.
 Here you can type the same exact commands you used for native install but with one change. You'll want to start with how your container side of qbit is mounted.
 For example. Since my container side is "/data/torrents/"
 My example command would be: python3 upload.py "/data/torrents/movies/nicemovieiupload.mkv".
-This will run exactly how a native install runs where you can supply with extra arguments. 
+This will run exactly how a native install runs where you can supply with extra arguments.
 
 ## For anyone not wanting to run dockge, the compose plugin or Portainer.
 

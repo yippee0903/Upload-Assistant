@@ -16,22 +16,22 @@ Config = dict[str, Any]
 class SN:
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'SN'
-        self.source_flag = 'Swarmazon'
-        self.upload_url = 'https://swarmazon.club/api/upload.php'
-        self.forum_link = 'https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules'
-        self.search_url = 'https://swarmazon.club/api/search.php'
+        self.tracker = "SN"
+        self.source_flag = "Swarmazon"
+        self.upload_url = "https://swarmazon.club/api/upload.php"
+        self.forum_link = "https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules"
+        self.search_url = "https://swarmazon.club/api/search.php"
         self.banned_groups = [""]
         pass
 
     async def get_type_id(self, type: str) -> str:
         type_id = {
-            'BluRay': '3',
-            'Web': '1',
+            "BluRay": "3",
+            "Web": "1",
             # boxset is 4
             # 'NA': '4',
-            'DVD': '2'
-        }.get(type, '0')
+            "DVD": "2",
+        }.get(type, "0")
         return type_id
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
@@ -44,80 +44,70 @@ class SN:
         # cat_id = await self.get_cat_id(meta)
 
         # Anime
-        if meta.get('mal_id'):
-            cat_id = '7'
-            sub_cat_id = '47'
+        if meta.get("mal_id"):
+            cat_id = "7"
+            sub_cat_id = "47"
 
-            demographics_map = {
-                'Shounen': '27',
-                'Seinen': '28',
-                'Shoujo': '29',
-                'Josei': '30',
-                'Kodomo': '31',
-                'Mina': '47'
-            }
+            demographics_map = {"Shounen": "27", "Seinen": "28", "Shoujo": "29", "Josei": "30", "Kodomo": "31", "Mina": "47"}
 
-            demographic = str(meta.get('demographic', 'Mina'))
+            demographic = str(meta.get("demographic", "Mina"))
             sub_cat_id = demographics_map.get(demographic, sub_cat_id)
 
-        category = str(meta.get('category', ''))
-        if category == 'MOVIE':
-            cat_id = '1'
+        category = str(meta.get("category", ""))
+        if category == "MOVIE":
+            cat_id = "1"
             # sub cat is source so using source to get
-            sub_cat_id = await self.get_type_id(str(meta.get('source', '')))
-        elif category == 'TV':
-            cat_id = '2'
-            sub_cat_id = '6' if bool(meta.get('tv_pack')) else '5'
+            sub_cat_id = await self.get_type_id(str(meta.get("source", "")))
+        elif category == "TV":
+            cat_id = "2"
+            sub_cat_id = "6" if bool(meta.get("tv_pack")) else "5"
             # todo need to do a check for docs and add as subcat
 
         mi_dump: Optional[str]
         bd_dump: Optional[str]
-        if meta.get('bdinfo') is not None:
+        if meta.get("bdinfo") is not None:
             mi_dump = None
             async with aiofiles.open(
                 f"{meta['base_dir']}/tmp/{meta['uuid']}/BD_SUMMARY_00.txt",
-                encoding='utf-8',
+                encoding="utf-8",
             ) as bd_file:
                 bd_dump = await bd_file.read()
         else:
             async with aiofiles.open(
                 f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO.txt",
-                encoding='utf-8',
+                encoding="utf-8",
             ) as mi_file:
                 mi_dump = await mi_file.read()
             bd_dump = None
         async with aiofiles.open(
             f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt",
-            encoding='utf-8',
+            encoding="utf-8",
         ) as desc_file:
             desc = await desc_file.read()
 
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", 'rb') as f:
+        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent", "rb") as f:
             tfile = await f.read()
 
         # uploading torrent file.
-        files = {
-            'torrent': (f"{meta['name']}.torrent", tfile)
-        }
+        files = {"torrent": (f"{meta['name']}.torrent", tfile)}
 
         # adding bd_dump to description if it exits and adding empty string to mediainfo
         if bd_dump:
             desc += "\n\n" + bd_dump
             mi_dump = ""
 
-        api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
+        api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
         data: dict[str, Any] = {
-            'api_key': api_key,
-            'name': str(meta.get('name', '')),
-            'category_id': cat_id,
-            'type_id': sub_cat_id,
-            'media_ref': f"tt{meta.get('imdb', '')}",
-            'description': desc,
-            'media_info': mi_dump
-
+            "api_key": api_key,
+            "name": str(meta.get("name", "")),
+            "category_id": cat_id,
+            "type_id": sub_cat_id,
+            "media_ref": f"tt{meta.get('imdb', '')}",
+            "description": desc,
+            "media_info": mi_dump,
         }
 
-        if not bool(meta.get('debug')):
+        if not bool(meta.get("debug")):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(self.upload_url, data=data, files=files)
@@ -126,20 +116,18 @@ class SN:
                 return False
 
             try:
-                if response.json().get('success'):
-                    tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+                if response.json().get("success"):
+                    tracker_status = cast(dict[str, Any], meta.get("tracker_status", {}))
                     tracker_status.setdefault(self.tracker, {})
-                    tracker_status[self.tracker]['status_message'] = response.json()['link']
-                    if 'link' in response.json():
-                        announce_url = str(
-                            self.config['TRACKERS'][self.tracker].get('announce_url', '')
-                        )
+                    tracker_status[self.tracker]["status_message"] = response.json()["link"]
+                    if "link" in response.json():
+                        announce_url = str(self.config["TRACKERS"][self.tracker].get("announce_url", ""))
                         await common.create_torrent_ready_to_seed(
                             meta,
                             self.tracker,
                             self.source_flag,
                             announce_url,
-                            str(response.json()['link']),
+                            str(response.json()["link"]),
                         )
                         return True
                     else:
@@ -157,26 +145,26 @@ class SN:
         else:
             console.print("[cyan]SN Request Data:")
             console.print(Redaction.redact_private_info(data))
-            tracker_status = cast(dict[str, Any], meta.get('tracker_status', {}))
+            tracker_status = cast(dict[str, Any], meta.get("tracker_status", {}))
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
     async def edit_desc(self, meta: Meta) -> None:
         async with aiofiles.open(
             f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt",
-            encoding='utf-8',
+            encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
 
         parts: list[str] = [base]
-        images = cast(list[dict[str, Any]], meta.get('image_list', []))
+        images = cast(list[dict[str, Any]], meta.get("image_list", []))
         if images:
             parts.append("[center]")
             for image in images:
-                web_url = image.get('web_url')
-                img_url = image.get('img_url')
+                web_url = image.get("web_url")
+                img_url = image.get("img_url")
                 if not web_url or not img_url:
                     continue
                 parts.append(f"[url={web_url}][img=720]{img_url}[/img][/url]")
@@ -185,43 +173,41 @@ class SN:
 
         async with aiofiles.open(
             f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt",
-            'w',
-            encoding='utf-8',
+            "w",
+            encoding="utf-8",
         ) as desc:
             await desc.write("".join(parts))
         return
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[str]:
         dupes: list[str] = []
-        api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
-        params: dict[str, str] = {
-            'api_key': api_key
-        }
+        api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
+        params: dict[str, str] = {"api_key": api_key}
 
         # Determine search parameters based on metadata
-        imdb_id = int(meta.get('imdb_id', 0) or 0)
-        category = str(meta.get('category', ''))
-        title = str(meta.get('title', ''))
+        imdb_id = int(meta.get("imdb_id", 0) or 0)
+        category = str(meta.get("category", ""))
+        title = str(meta.get("title", ""))
         if imdb_id == 0:
-            if category == 'TV':
-                params['filter'] = f"{title}{meta.get('season', '')}"
+            if category == "TV":
+                params["filter"] = f"{title}{meta.get('season', '')}"
             else:
-                params['filter'] = title
+                params["filter"] = title
         else:
-            params['media_ref'] = f"tt{meta.get('imdb', '')}"
-            if category == 'TV':
-                params['filter'] = f"{meta.get('season', '')}"
+            params["media_ref"] = f"tt{meta.get('imdb', '')}"
+            if category == "TV":
+                params["filter"] = f"{meta.get('season', '')}"
             else:
-                params['filter'] = str(meta.get('resolution', ''))
+                params["filter"] = str(meta.get("resolution", ""))
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(self.search_url, params=params)
                 if response.status_code == 200:
                     data = cast(dict[str, Any], response.json())
-                    items = cast(list[dict[str, Any]], data.get('data', []))
+                    items = cast(list[dict[str, Any]], data.get("data", []))
                     for item in items:
-                        result = item.get('name')
+                        result = item.get("name")
                         if result:
                             dupes.append(str(result))
                 else:
