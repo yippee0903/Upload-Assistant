@@ -1,0 +1,67 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/guides/configure-coderabbit
+language: en-US
+reviews:
+  # Automatically review every PR
+  auto_review:
+    enabled: true
+    # Ignore formatting-only commits (ruff format, trailing whitespace, etc.)
+    ignore_title_keywords:
+      - "style:"
+      - "chore(format)"
+      - "WIP"
+    drafts: false
+
+  # Review profile: assertive gives more thorough feedback
+  profile: assertive
+
+  # Path-based instructions give CodeRabbit domain context
+  path_instructions:
+    - path: "src/trackers/**"
+      instructions: |
+        These are tracker modules for a torrent upload assistant.
+        Each tracker (C411, TORR9, ACM, GF, etc.) implements upload logic for a specific
+        French or international private tracker. Pay attention to:
+        - Correct BBCode formatting in description builders
+        - Proper async/await usage (all tracker methods are async)
+        - French language conventions in user-facing strings
+        - Dupe-checking logic and slot-based filtering (especially C411)
+    - path: "tests/**"
+      instructions: |
+        Test suite using pytest. Tests are synchronous wrappers around async code.
+        Ensure assertions are specific and cover edge cases.
+    - path: "web_ui/**"
+      instructions: |
+        Flask-based web UI for the upload assistant.
+        Check for security issues (XSS, path traversal, auth bypasses).
+    - path: ".github/workflows/**"
+      instructions: |
+        GitHub Actions CI workflows. Ensure steps are efficient
+        and caching is used where possible.
+
+  # Request changes (not just comments) for important issues
+  request_changes_workflow: true
+
+  # High-level summary at the top of each review
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+
+  # Poem disabled — keep reviews concise
+  poem: false
+
+  # Collapse long walkthroughs by default
+  collapse_walkthrough: true
+
+  # Enable review status tracking
+  review_status: true
+
+chat:
+  # Allow @coderabbitai mentions in PR comments
+  auto_reply: true
+
+knowledge_base:
+  # Learn from merged PRs to improve reviews over time
+  learnings:
+    scope: auto
+  # Index issues for better context
+  issues:
+    scope: auto
