@@ -127,7 +127,7 @@ class TestLanguageDetection:
 
     def _run(self, meta: dict[str, Any]) -> str:
         c = C411(_config())
-        return asyncio.get_event_loop().run_until_complete(c._build_audio_string(meta))
+        return asyncio.run(c._build_audio_string(meta))
 
     def test_no_mediainfo(self):
         meta = _meta_base()
@@ -307,7 +307,7 @@ class TestGetName:
         c = C411(_config())
         # Mock _get_french_title to return meta['title'] (avoids TMDB API call)
         c._get_french_title = AsyncMock(return_value=meta.get('title', ''))
-        result = asyncio.get_event_loop().run_until_complete(c.get_name(meta))
+        result = asyncio.run(c.get_name(meta))
         return result.get('name', '')
 
     def test_movie_webdl_french(self):
@@ -518,7 +518,7 @@ class TestCommentaryFiltering:
 
     def _run(self, meta: dict[str, Any]) -> str:
         c = C411(_config())
-        return asyncio.get_event_loop().run_until_complete(c._build_audio_string(meta))
+        return asyncio.run(c._build_audio_string(meta))
 
     def test_commentary_excluded(self):
         """Commentary tracks should not count as audio tracks for language."""
@@ -555,7 +555,7 @@ class TestCodecCleanup:
         c = C411(_config())
         c._get_french_title = AsyncMock(return_value=meta.get('title', ''))
         c._build_audio_string = AsyncMock(return_value='')
-        result = asyncio.get_event_loop().run_until_complete(c.get_name(meta))
+        result = asyncio.run(c.get_name(meta))
         return result.get('name', '')
 
     def test_h264_cleaned(self):
@@ -804,7 +804,7 @@ class TestBuildOptions:
 class TestDescription:
     def _run(self, meta: dict[str, Any]) -> str:
         c = C411(_config())
-        return asyncio.get_event_loop().run_until_complete(c._build_description(meta))
+        return asyncio.run(c._build_description(meta))
 
     def test_basic_structure(self):
         meta = _meta_base()
@@ -825,7 +825,7 @@ class TestDescription:
             {'raw_url': 'https://img.host/2.png', 'web_url': ''},
         ])
         c = C411(_config({'include_screenshots': True}))
-        desc = asyncio.get_event_loop().run_until_complete(c._build_description(meta))
+        desc = asyncio.run(c._build_description(meta))
         assert "[color=#3d85c6]Captures d'écran[/color]" in desc
         assert '[url=https://img.host/view/1][img]https://img.host/1.png[/img][/url]' in desc
         assert '[img]https://img.host/2.png[/img]' in desc
@@ -882,7 +882,7 @@ _FAKE_TMDB_RESPONSE: dict[str, Any] = {
 
 
 def _run_async(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class TestTmdbData:
@@ -1052,7 +1052,7 @@ class TestSearchExisting:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
 
-            dupes = asyncio.get_event_loop().run_until_complete(
+            dupes = asyncio.run(
                 c.search_existing(meta, 'nodisc')
             )
 
@@ -1066,7 +1066,7 @@ class TestSearchExisting:
     def test_search_no_api_key(self):
         c = C411({'TRACKERS': {'C411': {'api_key': ''}}, 'DEFAULT': {'tmdb_api': 'fake'}})
         meta = _meta_base()
-        dupes = asyncio.get_event_loop().run_until_complete(
+        dupes = asyncio.run(
             c.search_existing(meta, 'nodisc')
         )
         assert dupes == []
@@ -1086,7 +1086,7 @@ class TestSearchExisting:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
 
-            dupes = asyncio.get_event_loop().run_until_complete(
+            dupes = asyncio.run(
                 c.search_existing(meta, 'nodisc')
             )
 
@@ -1108,7 +1108,7 @@ class TestSearchExisting:
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
 
-            dupes = asyncio.get_event_loop().run_until_complete(
+            dupes = asyncio.run(
                 c.search_existing(meta, 'nodisc')
             )
 
@@ -1213,12 +1213,12 @@ class TestServiceExclusion:
     def _run_name(self, meta: dict[str, Any]) -> str:
         c = C411(_config())
         c._get_french_title = AsyncMock(return_value=meta.get('title', ''))
-        result = asyncio.get_event_loop().run_until_complete(c.get_name(meta))
+        result = asyncio.run(c.get_name(meta))
         return result.get('name', '')
 
     def _run_desc(self, meta: dict[str, Any]) -> str:
         c = C411(_config())
-        return asyncio.get_event_loop().run_until_complete(c._build_description(meta))
+        return asyncio.run(c._build_description(meta))
 
     def test_webdl_no_service_in_name(self):
         """WEBDL release with service='NF' must NOT have 'NF' in the name."""

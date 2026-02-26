@@ -40,7 +40,7 @@ class TestHomogeneousPacks:
             '/media/Show.S01E03.FRENCH.1080p.WEB.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is True
@@ -49,14 +49,14 @@ class TestHomogeneousPacks:
     def test_single_file_always_ok(self) -> None:
         files = ['/media/Show.S01E01.FRENCH.1080p.WEB.H264-GRP.mkv']
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is True
 
     def test_empty_filelist(self) -> None:
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta([]))
         )
         assert result['homogeneous'] is True
@@ -69,7 +69,7 @@ class TestHomogeneousPacks:
             '/media/info.nfo',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is True
@@ -80,7 +80,7 @@ class TestHomogeneousPacks:
             '/media/Show.S01E02.MULTI.1080p.BluRay.x265-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is True
@@ -97,7 +97,7 @@ class TestResolutionMismatch:
             '/media/Show.S01E03.FRENCH.1080p.WEB.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -115,7 +115,7 @@ class TestCodecMismatch:
             '/media/Show.S01E02.FRENCH.1080p.WEB.H265-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -132,7 +132,7 @@ class TestSourceMismatch:
             '/media/Show.S01E02.FRENCH.1080p.BluRay.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -152,7 +152,7 @@ class TestLanguageMismatch:
             '/media/Show.S01E04.FRENCH.1080p.WEB.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -166,7 +166,7 @@ class TestLanguageMismatch:
             '/media/Show.S01E02.TRUEFRENCH.1080p.WEB.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -183,7 +183,7 @@ class TestMultipleIssues:
             '/media/Show.S01E02.MULTI.720p.WEB.H264-GRP.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
@@ -196,7 +196,7 @@ class TestMultipleIssues:
             '/media/Show.S01E02.MULTI.720p.WEB-DL.x265-BBB.mkv',
         ]
         mgr = SeasonEpisodeManager(_config())
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             mgr.check_pack_homogeneity(_meta(files))
         )
         assert result['homogeneous'] is False
