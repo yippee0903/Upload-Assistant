@@ -75,7 +75,18 @@ class AccessLogger:
         # access_denied: only log non-success (failed) attempts
         return not bool(success)
 
-    def log(self, *, endpoint: str, method: str, remote_addr: Optional[str], username: Optional[str], success: bool, status: int, headers: Optional[dict[str, Any]] = None, details: Optional[str] = None) -> None:
+    def log(
+        self,
+        *,
+        endpoint: str,
+        method: str,
+        remote_addr: Optional[str],
+        username: Optional[str],
+        success: bool,
+        status: int,
+        headers: Optional[dict[str, Any]] = None,
+        details: Optional[str] = None,
+    ) -> None:
         try:
             record: dict[str, Any] = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),

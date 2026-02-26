@@ -9,7 +9,20 @@ if TYPE_CHECKING:
     from upload import Meta
 
 SENSITIVE_KEYS: set[str] = {
-    "token", "passkey", "password", "auth", "cookie", "csrf", "email", "username", "user", "key", "info_hash", "AntiCsrfToken", "torrent_pass", "Popcron"
+    "token",
+    "passkey",
+    "password",
+    "auth",
+    "cookie",
+    "csrf",
+    "email",
+    "username",
+    "user",
+    "key",
+    "info_hash",
+    "AntiCsrfToken",
+    "torrent_pass",
+    "Popcron",
 }
 
 
@@ -47,7 +60,7 @@ class Redaction:
                     string_char = None
                 continue
 
-            if ch in ("\"", "'"):
+            if ch in ('"', "'"):
                 in_string = True
                 string_char = ch
                 continue
@@ -92,13 +105,13 @@ class Redaction:
                 val = val[:start] + redacted_str + val[end:]
 
             # Redact passkeys in announce URLs (e.g. /<passkey>/announce)
-            val = re.sub(r'(?<=/)[a-zA-Z0-9]{10,}(?=/announce)', '[REDACTED]', val)
+            val = re.sub(r"(?<=/)[a-zA-Z0-9]{10,}(?=/announce)", "[REDACTED]", val)
             # Redact content between /proxy/ and /api (e.g. /proxy/<secret>/api)
-            val = re.sub(r'(?<=/proxy/)[^/]+(?=/api)', '[REDACTED]', val)
+            val = re.sub(r"(?<=/proxy/)[^/]+(?=/api)", "[REDACTED]", val)
             # Redact query params like ?passkey=... or &token=...
-            val = re.sub(r'([?&](passkey|key|token|auth|info_hash|torrent_pass)=)[^&]+', r'\1[REDACTED]', val, flags=re.I)
+            val = re.sub(r"([?&](passkey|key|token|auth|info_hash|torrent_pass)=)[^&]+", r"\1[REDACTED]", val, flags=re.I)
             # Redact long hex or base64-like strings (common for tokens)
-            val = re.sub(r'\b[a-fA-F0-9]{32,}\b', '[REDACTED]', val)
+            val = re.sub(r"\b[a-fA-F0-9]{32,}\b", "[REDACTED]", val)
         return val
 
     @staticmethod
@@ -107,13 +120,7 @@ class Redaction:
         keys = sensitive_keys or SENSITIVE_KEYS
         if isinstance(data, dict):
             typed_data = cast(dict[str, Any], data)
-            return {
-                k: (
-                    "[REDACTED]" if any(s.lower() in k.lower() for s in keys)
-                    else Redaction.redact_private_info(v, keys)
-                )
-                for k, v in typed_data.items()
-            }
+            return {k: ("[REDACTED]" if any(s.lower() in k.lower() for s in keys) else Redaction.redact_private_info(v, keys)) for k, v in typed_data.items()}
         if isinstance(data, list):
             typed_list = cast(list[Any], data)
             return [Redaction.redact_private_info(item, keys) for item in typed_list]
@@ -136,21 +143,21 @@ class Redaction:
         """
         # tracker status is not in the saved meta file, but adding the catch here
         # in case the meta file is updated in the future
-        tracker_status = meta.get('tracker_status')
+        tracker_status = meta.get("tracker_status")
         if isinstance(tracker_status, dict):
             typed_status = cast(dict[str, dict[str, Any]], tracker_status)
             for tracker in list(typed_status):  # list() to avoid RuntimeError if deleting keys
-                if 'status_message' in typed_status[tracker]:
-                    del typed_status[tracker]['status_message']
+                if "status_message" in typed_status[tracker]:
+                    del typed_status[tracker]["status_message"]
 
-        if 'torrent_comments' in meta:
-            del meta['torrent_comments']
+        if "torrent_comments" in meta:
+            del meta["torrent_comments"]
 
-        if 'matched_episode_ids' in meta:
-            del meta['matched_episode_ids']
+        if "matched_episode_ids" in meta:
+            del meta["matched_episode_ids"]
 
         output_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json"
-        async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+        async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
             await f.write(json.dumps(meta, indent=4))
 
         return meta

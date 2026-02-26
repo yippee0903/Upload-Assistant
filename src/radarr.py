@@ -8,13 +8,14 @@ from src.console import console
 
 MovieInfo = dict[str, Any]
 
+
 class RadarrManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.default_config = cast(dict[str, Any], config.get('DEFAULT', {}))
+        self.default_config = cast(dict[str, Any], config.get("DEFAULT", {}))
 
     async def get_radarr_data(self, tmdb_id: Optional[int] = None, filename: Optional[str] = None, debug: bool = False) -> Optional[MovieInfo]:
-        if not any(key.startswith('radarr_api_key') for key in self.default_config):
+        if not any(key.startswith("radarr_api_key") for key in self.default_config):
             console.print("[red]No Radarr API keys are configured.[/red]")
             return None
 
@@ -42,7 +43,7 @@ class RadarrManager:
                 continue
 
             api_key = api_key_value.strip()
-            base_url = base_url_value.strip().rstrip('/')
+            base_url = base_url_value.strip().rstrip("/")
 
             if debug:
                 console.print(f"[blue]Trying Radarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
@@ -56,10 +57,7 @@ class RadarrManager:
                 instance_index += 1
                 continue
 
-            headers = {
-                "X-Api-Key": api_key,
-                "Content-Type": "application/json"
-            }
+            headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
 
             if debug:
                 console.print(f"[green]TMDB ID {tmdb_id}[/green]")
@@ -83,7 +81,9 @@ class RadarrManager:
                             console.print(f"[green]Found valid movie data from Radarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                             return movie_data
                     else:
-                        console.print(f"[yellow]Failed to fetch from Radarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
+                        console.print(
+                            f"[yellow]Failed to fetch from Radarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]"
+                        )
 
             except httpx.TimeoutException:
                 console.print(f"[red]Timeout when fetching from Radarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
@@ -101,22 +101,10 @@ class RadarrManager:
 
     async def extract_movie_data(self, radarr_data: Any, filename: Optional[str] = None) -> Optional[MovieInfo]:
         if not radarr_data or not isinstance(radarr_data, list):
-            return {
-                "imdb_id": None,
-                "tmdb_id": None,
-                "year": None,
-                "genres": [],
-                "release_group": None
-            }
+            return {"imdb_id": None, "tmdb_id": None, "year": None, "genres": [], "release_group": None}
         items = cast(list[Mapping[str, Any]], radarr_data)
         if len(items) == 0:
-            return {
-                "imdb_id": None,
-                "tmdb_id": None,
-                "year": None,
-                "genres": [],
-                "release_group": None
-            }
+            return {"imdb_id": None, "tmdb_id": None, "year": None, "genres": [], "release_group": None}
 
         if filename:
             movie: Optional[Mapping[str, Any]] = None
@@ -140,7 +128,5 @@ class RadarrManager:
             "tmdb_id": movie.get("tmdbId", None),
             "year": movie.get("year", None),
             "genres": movie.get("genres", []),
-            "release_group": release_group if release_group else None
+            "release_group": release_group if release_group else None,
         }
-
-

@@ -4,7 +4,7 @@ __version__ = "v7.0.2"
 Release Notes for version v7.0.2 (2026-02-07):
 
 # ## What's Changed
-# 
+#
 # * fix(audio): set object based channel layout as LFE when not proper channel layout by @Audionut in f087110
 # * fix(meta): allow override automatic daily show decision by @Audionut in 0bec16e
 # * Add bilibili to services (#1203) by @WOSSFOSS in 5fabd3f
@@ -25,7 +25,7 @@ Release Notes for version v7.0.2 (2026-02-07):
 # * SHRI: Fixed the audio language tag building following rules (#1207) by @gekiryu in 6c20128
 # * bump bdinfo by @Audionut in bdc14a9
 # * simplify playlist handling by @Audionut in 08f29ec
-# 
+#
 # **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.0.1...v7.0.2
 """
 
@@ -33,21 +33,21 @@ Release Notes for version v7.0.2 (2026-02-07):
 """
 Release Notes for version v7.0.1 (2026-02-01):
 
-# 
+#
 # ## RELEASE NOTES
 #  - Fixed a breaking bug that could validate wrong torrent files.
 #  - wastaken added an option to delay torrent injection, which helps for sites that take a moment to register the torrent hash.
 #  - Better proxy handling for the webui.
 #  - maksii improved the shutdown handling when running the webui.
 #  - UA now ships with a pre-built bdifno in docker (no more mono), and will download the matching binary for bare metal systems.
-# 
+#
 # ## New config options - see example.py
 #  - inject_delay - time in seconds to delay torrent injection. Can be set at an individual tracker level, inside of the tracker config.
-# 
+#
 # ---
-# 
+#
 # ## What's Changed
-# 
+#
 # * fix torrent validation check by @Audionut in cd39ecd
 # * fix(ci): exclude data dir by @Audionut in 4aa9642
 # * Add option to delay torrent injections (#1192) by @wastaken7 in e212b57
@@ -67,7 +67,7 @@ Release Notes for version v7.0.1 (2026-02-01):
 # * bump bdinfo version by @Audionut in 57e9210
 # * bump bdinfo version by @Audionut in 8d7d5ab
 # * release notes by @Audionut in 8945791
-# 
+#
 # **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.0.0...v7.0.1
 """
 
@@ -75,7 +75,7 @@ Release Notes for version v7.0.1 (2026-02-01):
 """
 Release Notes for version v7.0.0 (2026-01-28):
 
-# 
+#
 # ## RELEASE NOTES
 #  - Pushing this release as version 7, given the significant code changes.
 #  - The webui have received a large overhaul, see below.
@@ -89,24 +89,24 @@ Release Notes for version v7.0.0 (2026-01-28):
 #  - Added Aither/LST semi-automated trump handling, using their new api endpoint (thanks both of you). See further notes below.
 #  - richardr1126 added arm64 support for docker.
 #  - CptCherry added TOS support. TOS has some specific support for using NFO files, as is required by their rules. See help for --keep-nfo
-#  
+#
 #  ## SECURITY
 #  - There have been a number of changes in the UA coding process, with the specific intent of improving security.
 #  - Some of the changes protect against malicious attacks that could have occurred, under quite specific circumstances, such as attacks via downloaded binaries. These would likely have never occurred, but are now mitigated against.
 #  - There have been significant updates to the webui, see below.
-# 
+#
 # ## CONFIG VALIDATION
 # - UA now performs some config validation, and gives better feedback on hard loading errors. Did you accidentally edit out a pesky little comma.....
 # - Alternatively, for users new to Upload Assistant, the config editing in the webui will be useful.
-# 
+#
 # ## New config options - see example.py
 #  - suppress_warnings - which will suppress config validation warnings.
 #  - Sharex image host.
 #  - rehash_cooldown - set in seconds. adds that specified small delay to trackers needing specific torrent rehashing, which allows all of the other tracker uploads to process, before resources are consumed by rehashing.
-# 
+#
 # ## New command argument
 # - -ddc or --double-dupe-check, if you want to race uploads, but tend to lose, this arg will perform a secondary dupe check right before the actual upload process.
-#  
+#
 # ## Aither/LST trump processing
 # - For the initial rollout, this will only work in full manual mode.
 # - If a torrent has an existing trump report (Aither only), you will not be allowed to file a new report.
@@ -120,18 +120,18 @@ Release Notes for version v7.0.0 (2026-01-28):
 # - Pay attention, you must pass a few prompts to be able to trump, so the onus is on you to only file correct reports.
 # - In debug mode. it will do everything except actually file the report.
 # - This process will be streamlined in the future, to further increase automation and reduce prompting.
-# 
+#
 # ## WEBUI
 # - User who have previously run the webui, should take particular note at the changes.
 # - https://github.com/Audionut/Upload-Assistant/blob/master/docs/web-ui-basic.md
 # - Docker builds with the -webui moniker have been retired, with the existing docker entrypoint handling being retained moving forward.
 # - See other docs in https://github.com/Audionut/Upload-Assistant/tree/master/docs
 # - Expect some further refinement on the config pages.
-# 
+#
 # ---
-# 
+#
 # ## What's Changed
-# 
+#
 # * manual dispatch latest by @Audionut in bfb5780
 # * YUS: Updated Banned Release Groups (#1090) by @FortKnox1337 in f5e1b25
 # * add debugging for clients by @Audionut in 21b6862
@@ -269,7 +269,7 @@ Release Notes for version v7.0.0 (2026-01-28):
 # * feat(UTP): add hybrid tag to torrent naming (#1181) by @maksii in 98ebddd
 # * fix(LCD): resolution mapping for 1080i (#1184) by @wastaken7 in 1c2d7db
 # * release notes by @Audionut in 185e7dc
-# 
+#
 # **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v6.3.2...v7.0.0
 """
 

@@ -52,20 +52,20 @@ def download_file(url: str, output_path: Path) -> None:
 
 def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> None:
     # Extract MediaInfo CLI from zip file
-    with zipfile.ZipFile(cli_archive, 'r') as zip_ref:
+    with zipfile.ZipFile(cli_archive, "r") as zip_ref:
         file_list = zip_ref.namelist()
         mediainfo_file = output_dir / "mediainfo"
 
         # Look for the mediainfo binary in the archive
         for member in file_list:
-            if member.endswith('/mediainfo') or member == 'mediainfo':
+            if member.endswith("/mediainfo") or member == "mediainfo":
                 zip_ref.extract(member, output_dir.parent)
                 extracted_path = output_dir.parent / member
                 shutil.move(str(extracted_path), str(mediainfo_file))
                 break
 
     # Extract MediaInfo library
-    with zipfile.ZipFile(lib_archive, 'r') as zip_ref:
+    with zipfile.ZipFile(lib_archive, "r") as zip_ref:
         file_list = zip_ref.namelist()
         lib_file = output_dir / "libmediainfo.so.0"
 
@@ -146,7 +146,7 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> Optional[str]:
         if debug:
             console.print("[green]Extracted library[/green]")
 
-        with open(version_file, 'w') as f:
+        with open(version_file, "w") as f:
             f.write(f"MediaInfo {MEDIAINFO_VERSION}")
 
         # Make CLI binary executable

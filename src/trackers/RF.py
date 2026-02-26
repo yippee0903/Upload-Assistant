@@ -12,16 +12,16 @@ Config = dict[str, Any]
 
 class RF(UNIT3D):
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='RF')
+        super().__init__(config, tracker_name="RF")
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'RF'
-        self.base_url = 'https://reelflix.cc'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
+        self.tracker = "RF"
+        self.base_url = "https://reelflix.cc"
+        self.id_url = f"{self.base_url}/api/torrents/"
+        self.upload_url = f"{self.base_url}/api/torrents/upload"
+        self.search_url = f"{self.base_url}/api/torrents/filter"
+        self.requests_url = f"{self.base_url}/api/requests/filter"
+        self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = []
         pass
 
@@ -29,21 +29,21 @@ class RF(UNIT3D):
         should_continue = True
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
-        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta['unattended']:
-                console.print('[bold red]Erotic not allowed at RF.')
+        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
+        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+            if not meta["unattended"]:
+                console.print("[bold red]Erotic not allowed at RF.")
             should_continue = False
-        if meta.get('category') == "TV":
-            if not meta['unattended']:
-                console.print('[bold red]RF only ALLOWS Movies.')
+        if meta.get("category") == "TV":
+            if not meta["unattended"]:
+                console.print("[bold red]RF only ALLOWS Movies.")
             should_continue = False
 
         return should_continue
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        rf_name = str(meta.get('name', ''))
-        tag_value = str(meta.get('tag', ''))
+        rf_name = str(meta.get("name", ""))
+        tag_value = str(meta.get("tag", ""))
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -52,54 +52,42 @@ class RF(UNIT3D):
                 rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
             rf_name = f"{rf_name}-NoGroup"
 
-        return {'name': rf_name}
+        return {"name": rf_name}
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: Optional[str] = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
-            'DISC': '43',
-            'REMUX': '40',
-            'WEBDL': '42',
-            'WEBRIP': '45',
+            "DISC": "43",
+            "REMUX": "40",
+            "WEBDL": "42",
+            "WEBRIP": "45",
             # 'FANRES': '6',
-            'ENCODE': '41',
-            'HDTV': '35',
+            "ENCODE": "41",
+            "HDTV": "35",
         }
         if mapping_only:
             return type_id
         elif reverse:
             return {v: k for k, v in type_id.items()}
-        type_value = str(type) if type is not None else str(meta.get('type', ''))
-        return {'type_id': type_id.get(type_value, '0')}
+        type_value = str(type) if type is not None else str(meta.get("type", ""))
+        return {"type_id": type_id.get(type_value, "0")}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: Optional[str] = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_resolution_id(self, meta: Meta, resolution: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {
             # '8640p':'10',
-            '4320p': '1',
-            '2160p': '2',
+            "4320p": "1",
+            "2160p": "2",
             # '1440p' : '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
         }
         if mapping_only:
             return resolution_id
         elif reverse:
             return {v: k for k, v in resolution_id.items()}
-        resolution_value = str(resolution) if resolution is not None else str(meta.get('resolution', ''))
-        return {'resolution_id': resolution_id.get(resolution_value, '10')}
+        resolution_value = str(resolution) if resolution is not None else str(meta.get("resolution", ""))
+        return {"resolution_id": resolution_id.get(resolution_value, "10")}

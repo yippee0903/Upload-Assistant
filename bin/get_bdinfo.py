@@ -15,6 +15,7 @@ import httpx
 try:
     from src.console import console
 except ImportError:
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
@@ -139,6 +140,7 @@ class BDInfoBinaryManager:
             try:
                 if file_pattern.endswith(".zip"):
                     with zipfile.ZipFile(temp_archive, "r") as zip_ref:
+
                         def safe_extract_zip(zip_file: zipfile.ZipFile, path: str = ".") -> None:
                             for member in zip_file.namelist():
                                 info = zip_file.getinfo(member)
@@ -182,6 +184,7 @@ class BDInfoBinaryManager:
 
                 elif file_pattern.endswith(".tar.gz"):
                     with tarfile.open(temp_archive, "r:gz") as tar_ref:
+
                         def safe_extract_tar(tar_file: tarfile.TarFile, path: str = ".") -> None:
                             for member in tar_file.getmembers():
                                 if member.islnk() or member.issym():

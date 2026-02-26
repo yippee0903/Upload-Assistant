@@ -15,7 +15,7 @@ class Search:
         pass
 
     def _get_search_dirs(self) -> list[str]:
-        config_dir = self.config.get('DISCORD', {}).get('search_dir', [])
+        config_dir = self.config.get("DISCORD", {}).get("search_dir", [])
         if isinstance(config_dir, str):
             return [config_dir]
         if isinstance(config_dir, list):
@@ -36,11 +36,12 @@ class Search:
             console.print(f"Searching {search_dir}")
             for root, _dirs, files in os.walk(search_dir, topdown=False):
                 for name in files:
-                    if not name.endswith('.nfo'):
+                    if not name.endswith(".nfo"):
                         l_name = name.lower()
                         if await self.file_search(l_name, words):
                             files_total_search.append(os.path.join(root, name))
             return files_total_search
+
         for each in self._get_search_dirs():
             files = await search_file(each)
             files_total.extend(files)
@@ -58,7 +59,6 @@ class Search:
             console.print(f"Searching {search_dir}")
             folders_total_search: list[str] = []
             for root, dirs, _files in os.walk(search_dir, topdown=False):
-
                 for name in dirs:
                     l_name = name.lower()
 
@@ -66,6 +66,7 @@ class Search:
                         folders_total_search.append(os.path.join(root, name))
 
             return folders_total_search
+
         for each in self._get_search_dirs():
             folders = await search_dir(each)
             folders_total.extend(folders)

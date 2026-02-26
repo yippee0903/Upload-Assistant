@@ -26,11 +26,9 @@ class TvmazeManager:
         - Otherwise, only returns `tvmaze_id`.
         """
         if debug:
-            console.print(
-                f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]"
-            )
+            console.print(f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]")
         # Convert TVDB ID to integer
-        if isinstance(tvdbID, (int, str)) and tvdbID not in ('', '0'):
+        if isinstance(tvdbID, (int, str)) and tvdbID not in ("", "0"):
             try:
                 tvdbID = int(tvdbID)
             except (ValueError, TypeError):
@@ -41,9 +39,9 @@ class TvmazeManager:
 
         # Handle IMDb ID - ensure it's an integer without tt prefix
         try:
-            if isinstance(imdbID, str) and imdbID.startswith('tt'):
+            if isinstance(imdbID, str) and imdbID.startswith("tt"):
                 imdbID = int(imdbID[2:])
-            elif isinstance(imdbID, (int, str)) and imdbID not in ('', '0'):
+            elif isinstance(imdbID, (int, str)) and imdbID not in ("", "0"):
                 imdbID = int(imdbID)
             else:
                 imdbID = 0
@@ -79,19 +77,19 @@ class TvmazeManager:
 
         if not results:
             search_resp = await fetch_tvmaze_data("https://api.tvmaze.com/search/shows", {"q": filename})
-            results.extend([each['show'] for each in search_resp if 'show' in each])
+            results.extend([each["show"] for each in search_resp if "show" in each])
 
         if not results:
             first_two_words = " ".join(filename.split()[:2])
             if first_two_words and first_two_words != filename:
                 search_resp = await fetch_tvmaze_data("https://api.tvmaze.com/search/shows", {"q": first_two_words})
-                results.extend([each['show'] for each in search_resp if 'show' in each])
+                results.extend([each["show"] for each in search_resp if "show" in each])
 
         # Deduplicate results by TVMaze ID
         seen: set[int] = set()
         unique_results: list[dict[str, Any]] = []
         for show in results:
-            show_id = int(show['id'])
+            show_id = int(show["id"])
             if show_id not in seen:
                 seen.add(show_id)
                 unique_results.append(show)
@@ -105,9 +103,7 @@ class TvmazeManager:
         if manual_date is not None:
             console.print("[bold]Search results:[/bold]")
             for idx, show in enumerate(unique_results):
-                console.print(
-                    f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])"
-                )
+                console.print(f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])")
                 console.print(f"[yellow]   Premiered: {show.get('premiered', 'Unknown')}[/yellow]")
                 console.print(f"   Externals: {json.dumps(show.get('externals', {}), indent=2)}")
 
@@ -120,11 +116,11 @@ class TvmazeManager:
                         break
                     if 1 <= choice <= len(unique_results):
                         selected_show = unique_results[choice - 1]
-                        tvmaze_id = int(selected_show['id'])
+                        tvmaze_id = int(selected_show["id"])
                         # set the tvdb id since it's sure to be correct
                         # won't get returned outside manual date since full tuple is not returned
-                        if 'externals' in selected_show and 'thetvdb' in selected_show['externals']:
-                            new_tvdb_id = selected_show['externals']['thetvdb']
+                        if "externals" in selected_show and "thetvdb" in selected_show["externals"]:
+                            new_tvdb_id = selected_show["externals"]["thetvdb"]
                             if new_tvdb_id:
                                 tvdbID = int(new_tvdb_id)
                                 console.print(f"[green]Updated TVDb ID to: {tvdbID}[/green]")
@@ -136,7 +132,7 @@ class TvmazeManager:
                     console.print("Invalid input. Please enter a number.")
         else:
             selected_show = unique_results[0]
-            tvmaze_id = int(selected_show['id'])
+            tvmaze_id = int(selected_show["id"])
             if debug:
                 console.print(f"[cyan]Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})[/cyan]")
 
@@ -162,11 +158,7 @@ class TvmazeManager:
                     if isinstance(data, dict):
                         return cast(dict[str, Any], data)
                     if isinstance(data, list):
-                        return [
-                            cast(dict[str, Any], item)
-                            for item in cast(list[Any], data)
-                            if isinstance(item, dict)
-                        ]
+                        return [cast(dict[str, Any], item) for item in cast(list[Any], data) if isinstance(item, dict)]
                     return None
                 return None
         except httpx.HTTPStatusError as e:
@@ -183,10 +175,7 @@ class TvmazeManager:
         meta: Optional[dict[str, Any]] = None,
     ) -> Optional[dict[str, Any]]:
         url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodebynumber"
-        params = {
-            "season": season,
-            "number": episode
-        }
+        params = {"season": season, "number": episode}
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -238,46 +227,46 @@ class TvmazeManager:
                 airdate = None
 
                 # First priority: manual_date
-                if meta and meta.get('manual_date'):
-                    manual_date = meta['manual_date']
+                if meta and meta.get("manual_date"):
+                    manual_date = meta["manual_date"]
                     if isinstance(manual_date, str):
                         airdate = manual_date
-                    if meta.get('debug'):
+                    if meta.get("debug"):
                         console.print(f"[cyan]Using manual_date: {airdate}[/cyan]")
 
                 # Second priority: find airdate from tvdb_episode_data using tvdb_episode_id
-                elif meta and meta.get('tvdb_episode_id') and meta.get('tvdb_episode_data'):
-                    tvdb_episode_id = meta['tvdb_episode_id']
-                    tvdb_data = meta['tvdb_episode_data']
+                elif meta and meta.get("tvdb_episode_id") and meta.get("tvdb_episode_data"):
+                    tvdb_episode_id = meta["tvdb_episode_id"]
+                    tvdb_data = meta["tvdb_episode_data"]
 
                     episodes: list[dict[str, Any]] = []
                     if isinstance(tvdb_data, dict):
                         tvdb_data_dict = cast(dict[str, Any], tvdb_data)
-                        tvdb_episodes_raw = tvdb_data_dict.get('episodes', [])
+                        tvdb_episodes_raw = tvdb_data_dict.get("episodes", [])
                         if isinstance(tvdb_episodes_raw, list):
                             episodes = list(cast(list[dict[str, Any]], tvdb_episodes_raw))
                     elif isinstance(tvdb_data, list):
                         episodes = list(cast(list[dict[str, Any]], tvdb_data))
 
                     for ep in episodes:
-                        if ep.get('id') == tvdb_episode_id:
-                            ep_airdate = ep.get('aired')
+                        if ep.get("id") == tvdb_episode_id:
+                            ep_airdate = ep.get("aired")
                             if isinstance(ep_airdate, str):
                                 airdate = ep_airdate
-                                if meta.get('debug'):
+                                if meta.get("debug"):
                                     console.print(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
                                 break
 
-                    if not airdate and meta.get('debug'):
+                    if not airdate and meta.get("debug"):
                         console.print(f"[yellow]Could not find airdate for TVDB episode ID {tvdb_episode_id}[/yellow]")
 
                 # Try date-based lookup if we have an airdate
                 if isinstance(airdate, str) and airdate:
-                    if meta.get('debug'):
+                    if meta.get("debug"):
                         console.print(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
                     return await self.get_tvmaze_episode_data_by_date(tvmaze_id, airdate)
                 else:
-                    if meta.get('debug'):
+                    if meta.get("debug"):
                         console.print("[yellow]No airdate available for fallback lookup[/yellow]")
                     return None
             else:

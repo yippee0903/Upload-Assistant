@@ -15,6 +15,7 @@ API docs reverse-engineered from:
 
 import asyncio
 import base64
+import contextlib
 import json
 import os
 import re
@@ -35,26 +36,37 @@ Meta = dict[str, Any]
 Config = dict[str, Any]
 
 FRENCH_MONTHS: list[str] = [
-    '', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    "",
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre",
 ]
 
 
 class TORR9(FrenchTrackerMixin):
     """torr9.xyz tracker — French private tracker with custom REST API."""
 
-    LOGIN_URL: str = 'https://api.torr9.xyz/api/v1/auth/login'
+    LOGIN_URL: str = "https://api.torr9.xyz/api/v1/auth/login"
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker: str = 'TORR9'
-        self.source_flag: str = 'TORR9'
-        self.upload_url: str = 'https://api.torr9.xyz/api/v1/torrents/upload'
-        self.torrent_url: str = 'https://torr9.xyz/torrents/'
-        tracker_cfg = self.config['TRACKERS'].get(self.tracker, {})
-        self.username: str = str(tracker_cfg.get('username', '')).strip()
-        self.password: str = str(tracker_cfg.get('password', '')).strip()
-        self.api_key: str = str(tracker_cfg.get('api_key', '')).strip()
+        self.tracker: str = "TORR9"
+        self.source_flag: str = "TORR9"
+        self.upload_url: str = "https://api.torr9.xyz/api/v1/torrents/upload"
+        self.torrent_url: str = "https://torr9.xyz/torrents/"
+        tracker_cfg = self.config["TRACKERS"].get(self.tracker, {})
+        self.username: str = str(tracker_cfg.get("username", "")).strip()
+        self.password: str = str(tracker_cfg.get("password", "")).strip()
+        self.api_key: str = str(tracker_cfg.get("api_key", "")).strip()
         self._bearer_token: str | None = None  # cached JWT from login
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[str] = [""]
@@ -78,9 +90,9 @@ class TORR9(FrenchTrackerMixin):
             return None
 
         payload = {
-            'username': self.username,
-            'password': self.password,
-            'remember_me': True,
+            "username": self.username,
+            "password": self.password,
+            "remember_me": True,
         }
 
         try:
@@ -88,19 +100,19 @@ class TORR9(FrenchTrackerMixin):
                 resp = await client.post(
                     self.LOGIN_URL,
                     json=payload,
-                    headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+                    headers={"Accept": "application/json", "Content-Type": "application/json"},
                 )
 
             if resp.status_code in (200, 201):
                 data = resp.json()
-                token = data.get('token', '')
+                token = data.get("token", "")
                 if token:
                     return token
                 else:
                     console.print("[red]TORR9: Login response missing token.[/red]")
                     return None
             else:
-                detail = ''
+                detail = ""
                 try:
                     detail = resp.json()
                 except Exception:
@@ -136,7 +148,6 @@ class TORR9(FrenchTrackerMixin):
     #  Audio / naming / French title — inherited from FrenchTrackerMixin
     # ──────────────────────────────────────────────────────────
 
-
     # ──────────────────────────────────────────────────────────
     #  Category / Subcategory  (exact strings from the upload form)
     #
@@ -154,19 +165,19 @@ class TORR9(FrenchTrackerMixin):
         Values must match the exact labels shown on the site's upload page.
         """
         # Detect animation: anime flag, mal_id, or animation genre
-        is_anime = bool(meta.get('anime')) or bool(meta.get('mal_id'))
-        genres = str(meta.get('genres', '')).lower()
-        is_animation = is_anime or 'animation' in genres
+        is_anime = bool(meta.get("anime")) or bool(meta.get("mal_id"))
+        genres = str(meta.get("genres", "")).lower()
+        is_animation = is_anime or "animation" in genres
 
-        if meta.get('category') == 'TV':
+        if meta.get("category") == "TV":
             if is_animation:
-                return ('Séries', 'Mangas-Animes')
-            return ('Séries', 'Séries TV')
+                return ("Séries", "Mangas-Animes")
+            return ("Séries", "Séries TV")
 
         # Movie
         if is_animation:
-            return ('Films', "Films d'animation")
-        return ('Films', 'Films')
+            return ("Films", "Films d'animation")
+        return ("Films", "Films")
 
     # ──────────────────────────────────────────────────────────
     #  Tags  (comma-separated string inferred from release)
@@ -189,62 +200,62 @@ class TORR9(FrenchTrackerMixin):
         tags: list[str] = []
 
         # Quality / Resolution
-        res = meta.get('resolution', '')
-        if '2160' in res:
-            tags.append('2160p')
-        elif '1080' in res:
-            tags.append('1080p')
-        elif '720' in res:
-            tags.append('720p')
+        res = meta.get("resolution", "")
+        if "2160" in res:
+            tags.append("2160p")
+        elif "1080" in res:
+            tags.append("1080p")
+        elif "720" in res:
+            tags.append("720p")
 
         # Source
-        type_val = meta.get('type', '').upper()
-        source = meta.get('source', '')
+        type_val = meta.get("type", "").upper()
+        source = meta.get("source", "")
 
-        if type_val == 'REMUX':
-            tags.append('REMUX')
-        if source in ('BluRay',) or type_val == 'DISC':
-            tags.append('BluRay')
-        if type_val == 'WEBDL':
-            tags.append('WEB-DL')
-        elif type_val == 'WEBRIP':
-            tags.append('WEBRip')
-        elif type_val == 'HDTV':
-            tags.append('HDTV')
+        if type_val == "REMUX":
+            tags.append("REMUX")
+        if source in ("BluRay",) or type_val == "DISC":
+            tags.append("BluRay")
+        if type_val == "WEBDL":
+            tags.append("WEB-DL")
+        elif type_val == "WEBRIP":
+            tags.append("WEBRip")
+        elif type_val == "HDTV":
+            tags.append("HDTV")
 
         # HDR / DV
-        hdr = meta.get('hdr', '')
-        if 'HDR10+' in hdr or 'HDR10Plus' in hdr:
-            tags.append('HDR10Plus')
-        elif 'HDR' in hdr:
-            tags.append('HDR')
+        hdr = meta.get("hdr", "")
+        if "HDR10+" in hdr or "HDR10Plus" in hdr:
+            tags.append("HDR10Plus")
+        elif "HDR" in hdr:
+            tags.append("HDR")
 
-        if meta.get('dv', '') or 'DV' in str(meta.get('hdr', '')):
-            tags.append('DV')
+        if meta.get("dv", "") or "DV" in str(meta.get("hdr", "")):
+            tags.append("DV")
 
         # Video codec
-        codec = meta.get('video_codec', '') or meta.get('video_encode', '')
-        codec_upper = codec.upper().replace('.', '').replace('-', '')
-        if 'AV1' in codec_upper:
-            tags.append('AV1')
-        elif 'X265' in codec_upper or 'H265' in codec_upper or 'HEVC' in codec_upper:
-            tags.append('x265')
-        elif 'X264' in codec_upper or 'H264' in codec_upper or 'AVC' in codec_upper:
-            tags.append('x264')
+        codec = meta.get("video_codec", "") or meta.get("video_encode", "")
+        codec_upper = codec.upper().replace(".", "").replace("-", "")
+        if "AV1" in codec_upper:
+            tags.append("AV1")
+        elif "X265" in codec_upper or "H265" in codec_upper or "HEVC" in codec_upper:
+            tags.append("x265")
+        elif "X264" in codec_upper or "H264" in codec_upper or "AVC" in codec_upper:
+            tags.append("x264")
 
         # Language
         if language_tag:
             # Normalize MULTI.VFF → MULTi
-            if language_tag.startswith('MULTI'):
-                tags.append('MULTi')
+            if language_tag.startswith("MULTI"):
+                tags.append("MULTi")
                 # Also add the specific variant (VFF, VOF, etc.)
-                parts = language_tag.split('.')
+                parts = language_tag.split(".")
                 if len(parts) > 1:
                     tags.append(parts[1])
             else:
                 tags.append(language_tag)
 
-        return ', '.join(tags)
+        return ", ".join(tags)
 
     # ──────────────────────────────────────────────────────────
     #  Description builder  (BBCode) — matches Torr9 site template
@@ -256,327 +267,311 @@ class TORR9(FrenchTrackerMixin):
         Structure: [center] wrapped, [font=Verdana] content, section headers,
         flag emojis for audio/subtitles, actor photos, rating badge.
         """
-        C = '#3d85c6'   # accent colour
-        TC = '#ea9999'  # tagline colour
+        C = "#3d85c6"  # accent colour
+        TC = "#ea9999"  # tagline colour
         parts: list[str] = []
 
         # ── Fetch French TMDB data ──
         fr_data: dict[str, Any] = {}
-        try:
-            fr_data = await self.tmdb_manager.get_tmdb_localized_data(
-                meta, data_type='main', language='fr', append_to_response='credits'
-            ) or {}
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="credits") or {}
 
-        fr_title = str(fr_data.get('title', '') or meta.get('title', '')).strip()
-        fr_overview = str(fr_data.get('overview', '')).strip()
-        year = meta.get('year', '')
-        tagline = str(fr_data.get('tagline', '')).strip()
+        fr_title = str(fr_data.get("title", "") or meta.get("title", "")).strip()
+        fr_overview = str(fr_data.get("overview", "")).strip()
+        year = meta.get("year", "")
+        tagline = str(fr_data.get("tagline", "")).strip()
 
         # Full-size poster (w500)
-        poster = meta.get('poster', '') or ''
-        if 'image.tmdb.org/t/p/' in poster:
-            poster = re.sub(r'/t/p/[^/]+/', '/t/p/w500/', poster)
+        poster = meta.get("poster", "") or ""
+        if "image.tmdb.org/t/p/" in poster:
+            poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
 
         # MI text for technical parsing
         mi_text = await self._get_mediainfo_text(meta)
 
         # ── Open [center] ──
-        parts.append('[center]')
+        parts.append("[center]")
 
         # ── Title block ──
-        parts.append(f'[b][font=Verdana][color={C}][size=29]{fr_title} ({year})[/size][/color][/font][/b]')
-        parts.append('')
+        parts.append(f"[b][font=Verdana][color={C}][size=29]{fr_title} ({year})[/size][/color][/font][/b]")
+        parts.append("")
 
         # ── Poster (original size) ──
         if poster:
-            parts.append(f'[img]{poster}[/img]')
-            parts.append('')
+            parts.append(f"[img]{poster}[/img]")
+            parts.append("")
 
         # ── Tagline ──
         if tagline:
-            parts.append(f'[color={TC}][i][b][font=Verdana][size=22]')
-            parts.append(f'\"{ tagline }\"[/size][/font][/b][/i][/color]')
-            parts.append('')
+            parts.append(f"[color={TC}][i][b][font=Verdana][size=22]")
+            parts.append(f'"{tagline}"[/size][/font][/b][/i][/color]')
+            parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Informations
         # ══════════════════════════════════════════════════════
-        parts.append(f'[b][font=Verdana][color={C}][size=18]━━━ Informations ━━━[/size][/color][/font][/b]')
+        parts.append(f"[b][font=Verdana][color={C}][size=18]━━━ Informations ━━━[/size][/color][/font][/b]")
 
         # Open content wrapper
-        parts.append('[font=Verdana][size=13]')
+        parts.append("[font=Verdana][size=13]")
 
         # Original title
-        original_title = str(meta.get('original_title', '') or meta.get('title', '')).strip()
+        original_title = str(meta.get("original_title", "") or meta.get("title", "")).strip()
         if original_title and original_title != fr_title:
-            parts.append(f'[b][color={C}]Titre original :[/color][/b] [i]{original_title}[/i]')
+            parts.append(f"[b][color={C}]Titre original :[/color][/b] [i]{original_title}[/i]")
 
         # Country
-        countries = fr_data.get('production_countries', meta.get('production_countries', []))
+        countries = fr_data.get("production_countries", meta.get("production_countries", []))
         if countries and isinstance(countries, list):
-            names = [c.get('name', '') for c in countries if isinstance(c, dict) and c.get('name')]
+            names = [c.get("name", "") for c in countries if isinstance(c, dict) and c.get("name")]
             if names:
-                parts.append(f'[b][color={C}]Pays :[/color][/b] [i]{", ".join(names)}[/i]')
+                parts.append(f"[b][color={C}]Pays :[/color][/b] [i]{', '.join(names)}[/i]")
 
         # Genres (with tag links)
-        genres_list = fr_data.get('genres', [])
+        genres_list = fr_data.get("genres", [])
         if genres_list and isinstance(genres_list, list):
             links = []
             for g in genres_list:
-                if isinstance(g, dict) and g.get('name'):
-                    gn = g['name']
-                    links.append(f'[i][url=/torrents?tags={gn}]{gn}[/url][/i]')
+                if isinstance(g, dict) and g.get("name"):
+                    gn = g["name"]
+                    links.append(f"[i][url=/torrents?tags={gn}]{gn}[/url][/i]")
             if links:
-                parts.append(f'[b][color={C}]Genres :[/color][/b] {", ".join(links)}')
+                parts.append(f"[b][color={C}]Genres :[/color][/b] {', '.join(links)}")
 
         # Release date (French formatted)
-        release_date = str(
-            fr_data.get('release_date', '')
-            or meta.get('release_date', '')
-            or meta.get('first_air_date', '')
-        ).strip()
+        release_date = str(fr_data.get("release_date", "") or meta.get("release_date", "") or meta.get("first_air_date", "")).strip()
         if release_date:
-            parts.append(f'[b][color={C}]Date de sortie :[/color][/b] [i]{self._format_french_date(release_date)}[/i]')
+            parts.append(f"[b][color={C}]Date de sortie :[/color][/b] [i]{self._format_french_date(release_date)}[/i]")
         elif year:
-            parts.append(f'[b][color={C}]Date de sortie :[/color][/b] [i]{year}[/i]')
+            parts.append(f"[b][color={C}]Date de sortie :[/color][/b] [i]{year}[/i]")
 
         # Runtime
-        runtime = fr_data.get('runtime') or meta.get('runtime', 0)
+        runtime = fr_data.get("runtime") or meta.get("runtime", 0)
         if runtime:
             h, m = divmod(int(runtime), 60)
             dur = f"{h}h{m:02d}" if h > 0 else f"{m}min"
-            parts.append(f'[b][color={C}]Durée :[/color][/b] [i]{dur}[/i]')
+            parts.append(f"[b][color={C}]Durée :[/color][/b] [i]{dur}[/i]")
 
         # Credits
-        credits = fr_data.get('credits', {})
-        crew = credits.get('crew', []) if isinstance(credits, dict) else []
-        cast = credits.get('cast', []) if isinstance(credits, dict) else []
+        credits = fr_data.get("credits", {})
+        crew = credits.get("crew", []) if isinstance(credits, dict) else []
+        cast = credits.get("cast", []) if isinstance(credits, dict) else []
 
-        directors = [p['name'] for p in crew if isinstance(p, dict) and p.get('job') == 'Director' and p.get('name')]
+        directors = [p["name"] for p in crew if isinstance(p, dict) and p.get("job") == "Director" and p.get("name")]
         if not directors:
-            meta_dirs = meta.get('tmdb_directors', [])
+            meta_dirs = meta.get("tmdb_directors", [])
             if isinstance(meta_dirs, list):
-                directors = [d.get('name', d) if isinstance(d, dict) else str(d) for d in meta_dirs]
+                directors = [d.get("name", d) if isinstance(d, dict) else str(d) for d in meta_dirs]
         if directors:
-            label = 'Réalisateur' if len(directors) == 1 else 'Réalisateurs'
-            parts.append(f'[b][color={C}]{label} :[/color][/b] [i]{", ".join(directors)}[/i]')
+            label = "Réalisateur" if len(directors) == 1 else "Réalisateurs"
+            parts.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(directors)}[/i]")
 
         # Scénaristes
         seen_w: set[str] = set()
         writers: list[str] = []
         for p in crew:
-            if isinstance(p, dict) and p.get('job') in ('Screenplay', 'Writer', 'Story') and p.get('name') and p['name'] not in seen_w:
-                writers.append(p['name'])
-                seen_w.add(p['name'])
+            if isinstance(p, dict) and p.get("job") in ("Screenplay", "Writer", "Story") and p.get("name") and p["name"] not in seen_w:
+                writers.append(p["name"])
+                seen_w.add(p["name"])
         if writers:
-            w_label = 'Scénariste' if len(writers) == 1 else 'Scénaristes'
-            parts.append(f'[b][color={C}]{w_label} :[/color][/b] [i]{", ".join(writers)}[/i]')
+            w_label = "Scénariste" if len(writers) == 1 else "Scénaristes"
+            parts.append(f"[b][color={C}]{w_label} :[/color][/b] [i]{', '.join(writers)}[/i]")
 
-        actors = [p['name'] for p in cast[:5] if isinstance(p, dict) and p.get('name')]
+        actors = [p["name"] for p in cast[:5] if isinstance(p, dict) and p.get("name")]
         if actors:
-            parts.append(f'[b][color={C}]Acteurs :[/color][/b] [i]{", ".join(actors)}[/i]')
+            parts.append(f"[b][color={C}]Acteurs :[/color][/b] [i]{', '.join(actors)}[/i]")
 
         # Blank line before rating/links
-        parts.append('')
+        parts.append("")
 
         # Actor profile photos (w185 thumbnails)
-        actor_photos = []
-        for p in cast[:5]:
-            if isinstance(p, dict) and p.get('profile_path'):
-                actor_photos.append(f'[img]https://image.tmdb.org/t/p/w185{p["profile_path"]}[/img]')
+        actor_photos = [f"[img]https://image.tmdb.org/t/p/w185{p['profile_path']}[/img]" for p in cast[:5] if isinstance(p, dict) and p.get("profile_path")]
         if actor_photos:
-            parts.append('')
-            parts.append(' '.join(actor_photos))
+            parts.append("")
+            parts.append(" ".join(actor_photos))
 
         # Rating with SVG badge
-        vote_avg = fr_data.get('vote_average') or meta.get('vote_average')
-        vote_count = fr_data.get('vote_count') or meta.get('vote_count')
+        vote_avg = fr_data.get("vote_average") or meta.get("vote_average")
+        vote_count = fr_data.get("vote_count") or meta.get("vote_count")
         if vote_avg and vote_count:
             score = round(float(vote_avg) * 10)
-            parts.append(
-                f'[img]https://img.streetprez.com/note/{score}.svg[/img] '
-                f'[i]{vote_avg} ({vote_count})[/i]'
-            )
+            parts.append(f"[img]https://img.streetprez.com/note/{score}.svg[/img] [i]{vote_avg} ({vote_count})[/i]")
 
         # External links
         ext_links: list[str] = []
-        imdb_id = meta.get('imdb_id', 0)
+        imdb_id = meta.get("imdb_id", 0)
         if imdb_id and int(imdb_id) > 0:
-            ext_links.append(f'[url=https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/]IMDb[/url]')
-        tmdb_id_val = meta.get('tmdb', '')
+            ext_links.append(f"[url=https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/]IMDb[/url]")
+        tmdb_id_val = meta.get("tmdb", "")
         if tmdb_id_val:
-            tmdb_cat = 'movie' if meta.get('category', '').upper() != 'TV' else 'tv'
-            ext_links.append(f'[url=https://www.themoviedb.org/{tmdb_cat}/{tmdb_id_val}]TMDB[/url]')
-        if meta.get('tvdb_id'):
+            tmdb_cat = "movie" if meta.get("category", "").upper() != "TV" else "tv"
+            ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{tmdb_id_val}]TMDB[/url]")
+        if meta.get("tvdb_id"):
             ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
-        if meta.get('tvmaze_id'):
+        if meta.get("tvmaze_id"):
             ext_links.append(f"[url=https://www.tvmaze.com/shows/{meta['tvmaze_id']}]TVmaze[/url]")
-        if meta.get('mal_id'):
+        if meta.get("mal_id"):
             ext_links.append(f"[url=https://myanimelist.net/anime/{meta['mal_id']}]MAL[/url]")
         if ext_links:
-            parts.append('')
-            parts.append(' │ '.join(ext_links))
+            parts.append("")
+            parts.append(" │ ".join(ext_links))
 
-        parts.append('')
+        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Synopsis
         # ══════════════════════════════════════════════════════
-        parts.append(f'[b][color={C}][size=18]━━━ Synopsis ━━━[/size][/color][/b]')
-        synopsis = fr_overview or str(meta.get('overview', '')).strip() or 'Aucun synopsis disponible.'
+        parts.append(f"[b][color={C}][size=18]━━━ Synopsis ━━━[/size][/color][/b]")
+        synopsis = fr_overview or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
         parts.append(synopsis)
-        parts.append('')
+        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Informations techniques
         # ══════════════════════════════════════════════════════
-        parts.append(f'[b][color={C}][size=18]━━━ Informations techniques ━━━[/size][/color][/b]')
+        parts.append(f"[b][color={C}][size=18]━━━ Informations techniques ━━━[/size][/color][/b]")
 
         # Type (Remux, Encode, WEB-DL, …)
         type_label = self._get_type_label(meta)
         if type_label:
-            parts.append(f'[b][color={C}]Type :[/color][/b] [i]{type_label}[/i]')
+            parts.append(f"[b][color={C}]Type :[/color][/b] [i]{type_label}[/i]")
 
         # Source
-        source_str = meta.get('source', '') or meta.get('type', '')
+        source_str = meta.get("source", "") or meta.get("type", "")
         if source_str:
-            parts.append(f'[b][color={C}]Source :[/color][/b] [i]{source_str}[/i]')
+            parts.append(f"[b][color={C}]Source :[/color][/b] [i]{source_str}[/i]")
 
         # Resolution
-        resolution = meta.get('resolution', '')
+        resolution = meta.get("resolution", "")
         if resolution:
-            parts.append(f'[b][color={C}]Résolution :[/color][/b] [i]{resolution}[/i]')
+            parts.append(f"[b][color={C}]Résolution :[/color][/b] [i]{resolution}[/i]")
 
         # Container format from MI
         container_display = self._format_container(mi_text)
         if container_display:
-            parts.append(f'[b][color={C}]Format vidéo :[/color][/b] [i]{container_display}[/i]')
+            parts.append(f"[b][color={C}]Format vidéo :[/color][/b] [i]{container_display}[/i]")
 
         # Video codec – prefer the encode label (H264/x264/…) which matches the release name,
         # falling back to the raw MediaInfo format (AVC/HEVC) for REMUX/DISC types.
         # When both exist and differ, append the raw format in parentheses: "H265 (HEVC)".
-        video_codec = (meta.get('video_encode', '').strip() or meta.get('video_codec', '')).strip()
-        video_codec = video_codec.replace('H.264', 'H264').replace('H.265', 'H265')
-        raw_codec = meta.get('video_codec', '').strip()
+        video_codec = (meta.get("video_encode", "").strip() or meta.get("video_codec", "")).strip()
+        video_codec = video_codec.replace("H.264", "H264").replace("H.265", "H265")
+        raw_codec = meta.get("video_codec", "").strip()
         if video_codec and raw_codec and raw_codec != video_codec:
             video_codec = f"{video_codec} ({raw_codec})"
         if video_codec:
-            parts.append(f'[b][color={C}]Codec vidéo :[/color][/b] [i]{video_codec}[/i]')
+            parts.append(f"[b][color={C}]Codec vidéo :[/color][/b] [i]{video_codec}[/i]")
 
         # HDR / Dolby Vision
         hdr_dv_badge = self._format_hdr_dv_bbcode(meta)
         if hdr_dv_badge:
-            parts.append(f'[b][color={C}]HDR :[/color][/b] {hdr_dv_badge}')
+            parts.append(f"[b][color={C}]HDR :[/color][/b] {hdr_dv_badge}")
 
         # Video bitrate from MI
         if mi_text:
-            vbr_match = re.search(r'(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)', mi_text)
+            vbr_match = re.search(r"(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)", mi_text)
             if vbr_match:
-                parts.append(f'[b][color={C}]Débit vidéo :[/color][/b] [i]{vbr_match.group(1).strip()}[/i]')
+                parts.append(f"[b][color={C}]Débit vidéo :[/color][/b] [i]{vbr_match.group(1).strip()}[/i]")
 
-        parts.append('')
+        parts.append("")
 
         # ── Audio tracks ──
-        parts.append(f'[b][color={C}][size=18]━━━ Audio(s) ━━━[/size][/color][/b]')
+        parts.append(f"[b][color={C}][size=18]━━━ Audio(s) ━━━[/size][/color][/b]")
         audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
-            for al in audio_lines:
-                parts.append(f' {al}')
+            parts.extend(f" {al}" for al in audio_lines)
         else:
-            parts.append(' [i]Non spécifié[/i]')
-        parts.append('')
+            parts.append(" [i]Non spécifié[/i]")
+        parts.append("")
 
         # ── Subtitles ──
-        parts.append(f'[b][color={C}][size=18]━━━ Sous-titre(s) ━━━[/size][/color][/b]')
+        parts.append(f"[b][color={C}][size=18]━━━ Sous-titre(s) ━━━[/size][/color][/b]")
         sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
-            for sl in sub_lines:
-                parts.append(f' {sl}')
+            parts.extend(f" {sl}" for sl in sub_lines)
         else:
-            parts.append(' [i]Aucun[/i]')
-        parts.append('')
+            parts.append(" [i]Aucun[/i]")
+        parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Captures d'écran  (opt-in via config: include_screenshots)
         # ══════════════════════════════════════════════════════
-        include_screens = self.config['TRACKERS'].get(self.tracker, {}).get('include_screenshots', False)
-        image_list: list[dict[str, Any]] = meta.get('image_list', []) if include_screens else []
+        include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
+        image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
         if image_list:
-            parts.append(f'[b][color={C}][size=18]━━━ Captures d\'écran ━━━[/size][/color][/b]')
+            parts.append(f"[b][color={C}][size=18]━━━ Captures d'écran ━━━[/size][/color][/b]")
             for img in image_list:
-                raw = img.get('raw_url', '')
-                web = img.get('web_url', '')
+                raw = img.get("raw_url", "")
+                web = img.get("web_url", "")
                 if raw:
                     if web:
-                        parts.append(f'[url={web}][img]{raw}[/img][/url]')
+                        parts.append(f"[url={web}][img]{raw}[/img][/url]")
                     else:
-                        parts.append(f'[img]{raw}[/img]')
-            parts.append('')
+                        parts.append(f"[img]{raw}[/img]")
+            parts.append("")
 
         # ══════════════════════════════════════════════════════
         #  Release
         # ══════════════════════════════════════════════════════
-        parts.append(f'[b][color={C}][size=18]━━━ Release ━━━[/size][/color][/b]')
+        parts.append(f"[b][color={C}][size=18]━━━ Release ━━━[/size][/color][/b]")
 
-        release_name = meta.get('uuid', '')
-        parts.append(f'[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]')
+        release_name = meta.get("uuid", "")
+        parts.append(f"[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]")
 
         # Total size
         size_str = self._get_total_size(meta, mi_text)
         if size_str:
-            parts.append(f'[b][color={C}]Taille totale :[/color][/b] {size_str}')
+            parts.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}")
 
         # File count
         file_count = self._count_files(meta)
         if file_count:
-            parts.append(f'[b][color={C}]Nombre de fichier :[/color][/b] {file_count}')
+            parts.append(f"[b][color={C}]Nombre de fichier :[/color][/b] {file_count}")
 
         # Release group
         group = self._get_release_group(meta)
         if group:
-            parts.append(f'[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]')
+            parts.append(f"[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]")
 
         # Close content wrapper
-        parts.append('[/size][/font]')
+        parts.append("[/size][/font]")
 
         # Close center
-        parts.append('[/center]')
+        parts.append("[/center]")
 
         # ── Signature ──
-        ua_sig = meta.get('ua_signature', 'Created by Upload Assistant')
-        parts.append('')
-        parts.append(f'[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]')
+        ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
+        parts.append("")
+        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
 
-        return '\n'.join(parts)
+        return "\n".join(parts)
 
     async def _get_mediainfo_text(self, meta: Meta) -> str:
         """Read MediaInfo text from temp files."""
-        base = os.path.join(meta.get('base_dir', ''), 'tmp', meta.get('uuid', ''))
+        base = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
 
-        for fname in ('MEDIAINFO_CLEANPATH.txt', 'MEDIAINFO.txt'):
+        for fname in ("MEDIAINFO_CLEANPATH.txt", "MEDIAINFO.txt"):
             fpath = os.path.join(base, fname)
             if os.path.exists(fpath):
-                async with aiofiles.open(fpath, encoding='utf-8') as f:
+                async with aiofiles.open(fpath, encoding="utf-8") as f:
                     content = await f.read()
                     if content.strip():
                         return content
 
-        if meta.get('bdinfo') is not None:
-            bd_path = os.path.join(base, 'BD_SUMMARY_00.txt')
+        if meta.get("bdinfo") is not None:
+            bd_path = os.path.join(base, "BD_SUMMARY_00.txt")
             if os.path.exists(bd_path):
-                async with aiofiles.open(bd_path, encoding='utf-8') as f:
+                async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
 
-        return ''
+        return ""
 
     @staticmethod
     def _format_french_date(date_str: str) -> str:
         """Format YYYY-MM-DD to French full date, e.g. '24 octobre 2011'."""
         try:
-            dt = datetime.strptime(date_str, '%Y-%m-%d')
-            day_str = '1er' if dt.day == 1 else str(dt.day)
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            day_str = "1er" if dt.day == 1 else str(dt.day)
             return f"{day_str} {FRENCH_MONTHS[dt.month]} {dt.year}"
         except (ValueError, IndexError):
             return date_str
@@ -616,21 +611,21 @@ class TORR9(FrenchTrackerMixin):
 
         # ── Build release name ──
         name_result = await self.get_name(meta)
-        title = name_result.get('name', '') if isinstance(name_result, dict) else str(name_result)
+        title = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
 
         # ── Language tag (for tags) ──
         language_tag = await self._build_audio_string(meta)
 
         # ── Read torrent file ──
         torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
-        async with aiofiles.open(torrent_path, 'rb') as f:
+        async with aiofiles.open(torrent_path, "rb") as f:
             torrent_bytes = await f.read()
 
         # ── NFO file ──
         nfo_path = await self._get_or_generate_nfo(meta)
-        nfo_bytes = b''
+        nfo_bytes = b""
         if nfo_path and os.path.exists(nfo_path):
-            async with aiofiles.open(nfo_path, 'rb') as f:
+            async with aiofiles.open(nfo_path, "rb") as f:
                 nfo_bytes = await f.read()
         else:
             console.print("[yellow]TORR9: No NFO available — upload may be rejected[/yellow]")
@@ -645,39 +640,39 @@ class TORR9(FrenchTrackerMixin):
         tags = self._build_tags(meta, language_tag)
 
         # ── Anonymous flag ──
-        anon = meta.get('anon', False) or self.config['TRACKERS'].get(self.tracker, {}).get('anon', False)
+        anon = meta.get("anon", False) or self.config["TRACKERS"].get(self.tracker, {}).get("anon", False)
 
         # ── Multipart form ──
         files: dict[str, tuple[str, bytes, str]] = {
-            'torrent_file': (f'{title}.torrent', torrent_bytes, 'application/x-bittorrent'),
+            "torrent_file": (f"{title}.torrent", torrent_bytes, "application/x-bittorrent"),
         }
 
         data: dict[str, Any] = {
-            'title': title,
-            'description': description,
-            'nfo': nfo_bytes.decode('utf-8', errors='replace') if nfo_bytes else '',
-            'category': category,
-            'subcategory': subcategory,
-            'tags': tags,
-            'is_exclusive': 'false',
-            'is_anonymous': str(anon).lower(),
+            "title": title,
+            "description": description,
+            "nfo": nfo_bytes.decode("utf-8", errors="replace") if nfo_bytes else "",
+            "category": category,
+            "subcategory": subcategory,
+            "tags": tags,
+            "is_exclusive": "false",
+            "is_anonymous": str(anon).lower(),
         }
 
         token = await self._get_token()
         if not token:
             console.print("[red]TORR9: No authentication available (set username/password or api_key).[/red]")
-            meta['tracker_status'][self.tracker]['status_message'] = 'No authentication configured'
+            meta["tracker_status"][self.tracker]["status_message"] = "No authentication configured"
             return False
 
         headers: dict[str, str] = {
-            'Authorization': f'Bearer {token}',
-            'Accept': '*/*',
-            'Origin': 'https://torr9.xyz',
-            'Referer': 'https://torr9.xyz',
+            "Authorization": f"Bearer {token}",
+            "Accept": "*/*",
+            "Origin": "https://torr9.xyz",
+            "Referer": "https://torr9.xyz",
         }
 
         try:
-            if not meta['debug']:
+            if not meta["debug"]:
                 max_retries = 2
                 retry_delay = 5
                 timeout = 40.0
@@ -696,47 +691,43 @@ class TORR9(FrenchTrackerMixin):
                             try:
                                 response_data = response.json()
 
-                                if isinstance(response_data, dict) and response_data.get('error'):
-                                    error_msg = response_data.get('error', 'Unknown error')
-                                    meta['tracker_status'][self.tracker]['status_message'] = f"API error: {error_msg}"
+                                if isinstance(response_data, dict) and response_data.get("error"):
+                                    error_msg = response_data.get("error", "Unknown error")
+                                    meta["tracker_status"][self.tracker]["status_message"] = f"API error: {error_msg}"
                                     console.print(f"[yellow]TORR9 upload failed: {error_msg}[/yellow]")
                                     return False
 
                                 # Extract torrent_id from response
                                 torrent_id = None
                                 if isinstance(response_data, dict):
-                                    torrent_id = (
-                                        response_data.get('torrent_id')
-                                        or response_data.get('id')
-                                        or response_data.get('slug')
-                                    )
+                                    torrent_id = response_data.get("torrent_id") or response_data.get("id") or response_data.get("slug")
                                 if torrent_id:
-                                    meta['tracker_status'][self.tracker]['torrent_id'] = torrent_id
-                                meta['tracker_status'][self.tracker]['status_message'] = response_data
+                                    meta["tracker_status"][self.tracker]["torrent_id"] = torrent_id
+                                meta["tracker_status"][self.tracker]["status_message"] = response_data
 
                                 # Download the tracker-generated torrent file
                                 # (the site may randomise the infohash, so
                                 #  the locally-created .torrent is invalid)
                                 await self._save_tracker_torrent(
-                                    response_data, torrent_path, headers,
+                                    response_data,
+                                    torrent_path,
+                                    headers,
                                 )
 
                                 return True
                             except json.JSONDecodeError:
-                                meta['tracker_status'][self.tracker]['status_message'] = (
-                                    "data error: TORR9 JSON decode error"
-                                )
+                                meta["tracker_status"][self.tracker]["status_message"] = "data error: TORR9 JSON decode error"
                                 return False
 
                         elif response.status_code in (400, 401, 403, 404, 422):
-                            error_detail: Any = ''
+                            error_detail: Any = ""
                             try:
                                 error_detail = response.json()
                             except Exception:
                                 error_detail = response.text[:500]
-                            meta['tracker_status'][self.tracker]['status_message'] = {
-                                'error': f'HTTP {response.status_code}',
-                                'detail': error_detail,
+                            meta["tracker_status"][self.tracker]["status_message"] = {
+                                "error": f"HTTP {response.status_code}",
+                                "detail": error_detail,
                             }
                             console.print(f"[red]TORR9 upload failed: HTTP {response.status_code}[/red]")
                             if error_detail:
@@ -745,20 +736,17 @@ class TORR9(FrenchTrackerMixin):
 
                         else:
                             if attempt < max_retries - 1:
-                                console.print(
-                                    f"[yellow]TORR9: HTTP {response.status_code}, retrying in "
-                                    f"{retry_delay}s… (attempt {attempt + 1}/{max_retries})[/yellow]"
-                                )
+                                console.print(f"[yellow]TORR9: HTTP {response.status_code}, retrying in {retry_delay}s… (attempt {attempt + 1}/{max_retries})[/yellow]")
                                 await asyncio.sleep(retry_delay)
                                 continue
-                            error_detail = ''
+                            error_detail = ""
                             try:
                                 error_detail = response.json()
                             except Exception:
                                 error_detail = response.text[:500]
-                            meta['tracker_status'][self.tracker]['status_message'] = {
-                                'error': f'HTTP {response.status_code}',
-                                'detail': error_detail,
+                            meta["tracker_status"][self.tracker]["status_message"] = {
+                                "error": f"HTTP {response.status_code}",
+                                "detail": error_detail,
                             }
                             console.print(f"[red]TORR9 upload failed after {max_retries} attempts: HTTP {response.status_code}[/red]")
                             if error_detail:
@@ -768,28 +756,18 @@ class TORR9(FrenchTrackerMixin):
                     except httpx.TimeoutException:
                         if attempt < max_retries - 1:
                             timeout = timeout * 1.5
-                            console.print(
-                                f"[yellow]TORR9: timeout, retrying in {retry_delay}s with "
-                                f"{timeout:.0f}s timeout… (attempt {attempt + 1}/{max_retries})[/yellow]"
-                            )
+                            console.print(f"[yellow]TORR9: timeout, retrying in {retry_delay}s with {timeout:.0f}s timeout… (attempt {attempt + 1}/{max_retries})[/yellow]")
                             await asyncio.sleep(retry_delay)
                             continue
-                        meta['tracker_status'][self.tracker]['status_message'] = (
-                            "data error: Request timed out after multiple attempts"
-                        )
+                        meta["tracker_status"][self.tracker]["status_message"] = "data error: Request timed out after multiple attempts"
                         return False
 
                     except httpx.RequestError as e:
                         if attempt < max_retries - 1:
-                            console.print(
-                                f"[yellow]TORR9: request error, retrying in {retry_delay}s… "
-                                f"(attempt {attempt + 1}/{max_retries})[/yellow]"
-                            )
+                            console.print(f"[yellow]TORR9: request error, retrying in {retry_delay}s… (attempt {attempt + 1}/{max_retries})[/yellow]")
                             await asyncio.sleep(retry_delay)
                             continue
-                        meta['tracker_status'][self.tracker]['status_message'] = (
-                            f"data error: Upload failed: {e}"
-                        )
+                        meta["tracker_status"][self.tracker]["status_message"] = f"data error: Upload failed: {e}"
                         console.print(f"[red]TORR9 upload error: {e}[/red]")
                         return False
 
@@ -798,7 +776,7 @@ class TORR9(FrenchTrackerMixin):
             else:
                 # ── Debug mode ──
                 desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-                async with aiofiles.open(desc_path, 'w', encoding='utf-8') as f:
+                async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
                     await f.write(description)
                 console.print(f"DEBUG: Saving final description to {desc_path}")
                 console.print("[cyan]TORR9 Debug — Request data:[/cyan]")
@@ -807,15 +785,17 @@ class TORR9(FrenchTrackerMixin):
                 console.print(f"  Tags:        {tags}")
                 console.print(f"  Anonymous:   {anon}")
                 console.print(f"  Description: {description[:500]}…")
-                meta['tracker_status'][self.tracker]['status_message'] = "Debug mode, not uploaded."
+                meta["tracker_status"][self.tracker]["status_message"] = "Debug mode, not uploaded."
                 await common.create_torrent_for_upload(
-                    meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG",
+                    meta,
+                    f"{self.tracker}_DEBUG",
+                    f"{self.tracker}_DEBUG",
                     announce_url="https://fake.tracker",
                 )
                 return True
 
         except Exception as e:
-            meta['tracker_status'][self.tracker]['status_message'] = f"data error: Upload failed: {e}"
+            meta["tracker_status"][self.tracker]["status_message"] = f"data error: Upload failed: {e}"
             console.print(f"[red]TORR9 upload error: {e}[/red]")
             return False
 
@@ -841,16 +821,16 @@ class TORR9(FrenchTrackerMixin):
         saved = False
 
         # ── 1. base64-encoded torrent in the response ────────
-        b64 = response_data.get('torrent_file') or ''
+        b64 = response_data.get("torrent_file") or ""
         if b64:
             try:
                 raw = b64.strip()
                 # Pad to a multiple of 4 if necessary
                 pad = len(raw) % 4
                 if pad:
-                    raw += '=' * (4 - pad)
+                    raw += "=" * (4 - pad)
                 torrent_bytes = base64.b64decode(raw)
-                async with aiofiles.open(torrent_path, 'wb') as f:
+                async with aiofiles.open(torrent_path, "wb") as f:
                     await f.write(torrent_bytes)
                 saved = True
             except Exception as e:
@@ -858,29 +838,30 @@ class TORR9(FrenchTrackerMixin):
 
         # ── 2. Fallback: download from URL ───────────────────
         if not saved:
-            download_url = response_data.get('download_url') or ''
+            download_url = response_data.get("download_url") or ""
             if download_url:
                 # Make absolute if the API returns a relative path
-                if download_url.startswith('/'):
+                if download_url.startswith("/"):
                     download_url = f"https://api.torr9.xyz{download_url}"
                 try:
-                    async with httpx.AsyncClient(
-                        headers=headers, timeout=30.0, follow_redirects=True,
-                    ) as client:
-                        async with client.stream('GET', download_url) as r:
-                            r.raise_for_status()
-                            async with aiofiles.open(torrent_path, 'wb') as f:
-                                async for chunk in r.aiter_bytes():
-                                    await f.write(chunk)
+                    async with (
+                        httpx.AsyncClient(
+                            headers=headers,
+                            timeout=30.0,
+                            follow_redirects=True,
+                        ) as client,
+                        client.stream("GET", download_url) as r,
+                    ):
+                        r.raise_for_status()
+                        async with aiofiles.open(torrent_path, "wb") as f:
+                            async for chunk in r.aiter_bytes():
+                                await f.write(chunk)
                     saved = True
                 except Exception as e:
                     console.print(f"[yellow]TORR9: torrent download failed: {e}[/yellow]")
 
         if not saved:
-            console.print(
-                "[yellow]TORR9: could not obtain tracker torrent — "
-                "client injection may use a stale infohash.[/yellow]"
-            )
+            console.print("[yellow]TORR9: could not obtain tracker torrent — client injection may use a stale infohash.[/yellow]")
 
     # ──────────────────────────────────────────────────────────
     #  Dupe search
@@ -903,61 +884,61 @@ class TORR9(FrenchTrackerMixin):
             console.print("[yellow]TORR9: No authentication configured, skipping dupe check.[/yellow]")
             return []
 
-        title = meta.get('title', '')
+        title = meta.get("title", "")
         # Ensure French title is resolved (may not be populated yet at dupe-check time)
-        fr_title = meta.get('frtitle', '')
+        fr_title = meta.get("frtitle", "")
         if not fr_title:
             fr_title = await self._get_french_title(meta)
-        year = meta.get('year', '')
+        year = meta.get("year", "")
 
         # Normalize for relevance filtering
         def _normalize(s: str) -> str:
-            return re.sub(r'[^a-z0-9]', '', unidecode(s).lower())
+            return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
         # Build the list of search queries — original-language title first
         search_queries: list[str] = []
-        is_original_french = str(meta.get('original_language', '')).lower() == 'fr'
+        is_original_french = str(meta.get("original_language", "")).lower() == "fr"
 
         if is_original_french:
             # Original is French → search FR first, then EN as complement
             if fr_title:
                 search_queries.append(f"{fr_title} {year}".strip())
-            if title and _normalize(title) != _normalize(fr_title or ''):
+            if title and _normalize(title) != _normalize(fr_title or ""):
                 search_queries.append(f"{title} {year}".strip())
         else:
             # Original is not French → search EN first, then FR as complement
             if title:
                 search_queries.append(f"{title} {year}".strip())
-            if fr_title and _normalize(fr_title) != _normalize(title or ''):
+            if fr_title and _normalize(fr_title) != _normalize(title or ""):
                 search_queries.append(f"{fr_title} {year}".strip())
 
         if not search_queries:
             return []
 
         title_norm = _normalize(title)
-        fr_title_norm = _normalize(fr_title) if fr_title else ''
+        fr_title_norm = _normalize(fr_title) if fr_title else ""
         year_str = str(year).strip()
         seen_names: set[str] = set()
 
         try:
             headers = {
-                'Authorization': f'Bearer {token}',
-                'Accept': 'application/json',
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
             }
 
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 for search_term in search_queries:
                     try:
                         response = await client.get(
-                            'https://api.torr9.xyz/api/v1/torrents/search',
+                            "https://api.torr9.xyz/api/v1/torrents/search",
                             headers=headers,
-                            params={'q': search_term},
+                            params={"q": search_term},
                         )
-                    except Exception:
-                        continue
+                    except Exception:  # noqa: BLE001
+                        continue  # nosec B112 — skip failed search queries gracefully
 
                     if response.status_code != 200:
-                        if meta.get('debug'):
+                        if meta.get("debug"):
                             console.print(f"[yellow]TORR9 search returned HTTP {response.status_code} for '{search_term}'[/yellow]")
                         continue
 
@@ -966,14 +947,14 @@ class TORR9(FrenchTrackerMixin):
                     except json.JSONDecodeError:
                         continue
 
-                    items = data.get('torrents', data.get('data', []))
+                    items = data.get("torrents", data.get("data", []))
                     if not items:
                         continue
 
                     for item in items:
                         if not isinstance(item, dict):
                             continue
-                        name = item.get('title', item.get('name', ''))
+                        name = item.get("title", item.get("name", ""))
                         if not name:
                             continue
 
@@ -986,32 +967,34 @@ class TORR9(FrenchTrackerMixin):
                         title_match = title_norm and title_norm in name_norm
                         fr_title_match = fr_title_norm and fr_title_norm in name_norm
                         if not title_match and not fr_title_match:
-                            if meta.get('debug'):
+                            if meta.get("debug"):
                                 console.print(f"[dim]TORR9 dupe skip (title mismatch): {name}[/dim]")
                             continue
                         if year_str and year_str not in name:
-                            if meta.get('debug'):
+                            if meta.get("debug"):
                                 console.print(f"[dim]TORR9 dupe skip (year mismatch): {name}[/dim]")
                             continue
 
                         seen_names.add(name_norm)
-                        dupes.append({
-                            'name': name,
-                            'size': item.get('size', item.get('file_size_bytes')),
-                            'link': (
-                                item.get('url')
-                                or item.get('link')
-                                or (f"{self.torrent_url}{item['slug']}" if item.get('slug') else None)
-                                or (f"{self.torrent_url}{item['id']}" if item.get('id') else None)
-                            ),
-                            'id': item.get('id', item.get('torrent_id')),
-                        })
+                        dupes.append(
+                            {
+                                "name": name,
+                                "size": item.get("size", item.get("file_size_bytes")),
+                                "link": (
+                                    item.get("url")
+                                    or item.get("link")
+                                    or (f"{self.torrent_url}{item['slug']}" if item.get("slug") else None)
+                                    or (f"{self.torrent_url}{item['id']}" if item.get("id") else None)
+                                ),
+                                "id": item.get("id", item.get("torrent_id")),
+                            }
+                        )
 
         except Exception as e:
-            if meta.get('debug'):
+            if meta.get("debug"):
                 console.print(f"[yellow]TORR9 search error: {e}[/yellow]")
 
-        if meta.get('debug'):
+        if meta.get("debug"):
             console.print(f"[cyan]TORR9 dupe search found {len(dupes)} result(s)[/cyan]")
 
         return await self._check_french_lang_dupes(dupes, meta)
