@@ -1489,12 +1489,12 @@ class C411(FrenchTrackerMixin):
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
 
-        # ── Corrective versions bypass dupe blocking ──
-        # PROPER, REPACK, FIX, RERIP, V2 are always allowed
-        if self._is_corrective_version_meta(meta):
-            if meta.get("debug"):
-                console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — skipping dupe check[/cyan]")
-            return []
+        # ── Corrective versions: note but still check dupes ──
+        # PROPER/REPACK/… may replace the original, but we still need to
+        # show the user what currently occupies the slot so they can decide.
+        is_corrective = self._is_corrective_version_meta(meta)
+        if is_corrective and meta.get("debug"):
+            console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — still checking slot occupancy[/cyan]")
 
         # ── Filter dupes by C411 slot ──
         # Only show dupes that occupy the same slot as the upload
@@ -1569,6 +1569,15 @@ class C411(FrenchTrackerMixin):
             dupe_name = dupe.get("name", "")
             slot = dupe.get("_c411_slot") or self._determine_c411_slot_from_name(dupe_name)
             dupe["name"] = f"[{slot}] {dupe_name}"
+
+        # ── Corrective version: warn about occupied slot ──
+        if is_corrective and dupes:
+            repack_tag = str(meta.get("repack", "")).upper().replace(" ", ".")
+            console.print(
+                f"[yellow]C411: This is a corrective version ({repack_tag}). "
+                f"The slot already has {len(dupes)} release(s) — "
+                f"C411 may reject if the existing version has equal or higher priority.[/yellow]"
+            )
 
         return await self._check_french_lang_dupes(dupes, meta)
 
