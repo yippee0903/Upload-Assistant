@@ -1570,14 +1570,9 @@ class C411(FrenchTrackerMixin):
             slot = dupe.get("_c411_slot") or self._determine_c411_slot_from_name(dupe_name)
             dupe["name"] = f"[{slot}] {dupe_name}"
 
-        # ── Corrective version: warn about occupied slot ──
+        # ── Corrective version: flag for display in dupe_check ──
         if is_corrective and dupes:
-            repack_tag = str(meta.get("repack", "")).upper().replace(" ", ".")
-            console.print(
-                f"[yellow]C411: This is a corrective version ({repack_tag}). "
-                f"The slot already has {len(dupes)} release(s) — "
-                f"C411 may reject if the existing version has equal or higher priority.[/yellow]"
-            )
+            meta["_corrective_slot_warning"] = True
 
         return await self._check_french_lang_dupes(dupes, meta)
 

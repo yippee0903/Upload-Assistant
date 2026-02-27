@@ -1546,6 +1546,8 @@ class TestCorrectiveVersionDupe:
         # The slot-matching dupe must NOT be silently dropped
         assert len(dupes) >= 1, "REPACK should not suppress dupe results"
         assert any('Inglourious' in d.get('name', '') for d in dupes)
+        # The corrective slot warning flag must be set for dupe_check() to display
+        assert meta.get('_corrective_slot_warning') is True
 
     def test_non_repack_also_shows_dupes(self):
         """Sanity: a non-corrective upload in the same slot shows dupes too."""
@@ -1567,3 +1569,5 @@ class TestCorrectiveVersionDupe:
             dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
 
         assert len(dupes) >= 1
+        # Non-corrective should NOT have the warning flag
+        assert meta.get('_corrective_slot_warning') is None
