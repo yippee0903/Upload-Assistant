@@ -101,7 +101,12 @@ class TrackerStatusManager:
                             cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
 
                 result = await tracker_setup.check_banned_group(tracker_class.tracker, tracker_class.banned_groups, local_meta)
-                local_tracker_status["banned"] = bool(result)
+                if result == "skipped":
+                    # User declined to continue after banned-group warning
+                    local_tracker_status["banned"] = True
+                    local_tracker_status["skipped"] = True
+                else:
+                    local_tracker_status["banned"] = bool(result)
 
                 if local_meta["tracker_status"][tracker_name].get("skip_upload"):
                     local_tracker_status["skipped"] = True
