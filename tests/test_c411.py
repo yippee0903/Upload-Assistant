@@ -562,6 +562,34 @@ class TestGetName:
             f"REPACK ({repack_pos}) must come before language ({lang_match.start()}): {name}"
         )
 
+    def test_hybrid_after_resolution(self):
+        """C411 rule: Hybrid token must appear AFTER resolution, not before."""
+        meta = _meta_base(
+            title='X-Men Apocalypse',
+            year='2016',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='REMUX',
+            webdv='Hybrid',
+            hdr='DV HDR10+',
+            video_codec='HEVC',
+            video_encode='',
+            audio='DTS 5.1',
+            tag='-KENOBi3838',
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        import re
+        assert '.Hybrid.' in name, f"Hybrid not found: {name}"
+        res_match = re.search(r'\.(2160p|1080p|720p)\.', name)
+        hybrid_pos = name.find('.Hybrid.')
+        assert res_match is not None, f"Resolution not found in name: {name}"
+        assert hybrid_pos > res_match.start(), (
+            f"Hybrid ({hybrid_pos}) must come after resolution ({res_match.start()}): {name}"
+        )
+
     def test_uhd_stripped_for_encode(self):
         """C411 rule: UHD must NOT appear for ENCODE releases (only REMUX/DISC)."""
         meta = _meta_base(
@@ -1494,3 +1522,80 @@ class TestPatchMiFilename:
         cn_line = [l for l in result.splitlines() if "Complete name" in l][0]
         # The prefix "Complete name                            : " should remain
         assert cn_line.startswith("Complete name                            : ")
+
+
+# ─── Corrective version (REPACK) dupe behaviour ──────────────
+
+class TestCorrectiveVersionDupe:
+    """REPACK / PROPER should NOT bypass dupe checking."""
+
+    TORZNAB_RESPONSE = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Inglourious.Basterds.2009.VOSTFR.2160p.BluRay.HDR10PLUS.DTS.HD.MA.5.1.x265-GRP</title>
+      <guid>https://c411.org/torrents/999</guid>
+      <link>https://c411.org/torrents/999/download</link>
+      <size>50000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def _make_mock_client(self):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = self.TORZNAB_RESPONSE
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        return mock_client
+
+    def test_repack_still_shows_dupes(self):
+        """A REPACK upload must still surface existing releases in the same slot."""
+        c = C411(_config())
+        meta = _meta_base(
+            title='Inglourious Basterds',
+            year='2009',
+            repack='REPACK',
+            resolution='2160p',
+            type='ENCODE',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            hdr='HDR10+',
+            source='BluRay',
+        )
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_cls.return_value = self._make_mock_client()
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        # The slot-matching dupe must NOT be silently dropped
+        assert len(dupes) >= 1, "REPACK should not suppress dupe results"
+        assert any('Inglourious' in d.get('name', '') for d in dupes)
+        # The corrective slot warning flag must be set for dupe_check() to display
+        assert meta.get('_corrective_slot_warning') is True
+
+    def test_non_repack_also_shows_dupes(self):
+        """Sanity: a non-corrective upload in the same slot shows dupes too."""
+        c = C411(_config())
+        meta = _meta_base(
+            title='Inglourious Basterds',
+            year='2009',
+            repack='',
+            resolution='2160p',
+            type='ENCODE',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            hdr='HDR10+',
+            source='BluRay',
+        )
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_cls.return_value = self._make_mock_client()
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        assert len(dupes) >= 1
+        # Non-corrective should NOT have the warning flag
+        assert meta.get('_corrective_slot_warning') is None
