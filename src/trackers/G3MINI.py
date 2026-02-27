@@ -153,6 +153,11 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             return text.replace(" ", ".")
 
         def _clean_filename(name):
+            # G3MINI keeps title-internal hyphens (WALL·E → WALL-E), so
+            # middle dot / bullet map to hyphen instead of space.
+            _g3_map = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
+            for char, repl in _g3_map.items():
+                name = name.replace(char, repl)
             # Strip all non-alphanumeric chars except spaces, dots, hyphens, and + (for DD+, HDR10+)
             name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
             return name

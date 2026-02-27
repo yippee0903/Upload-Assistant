@@ -310,6 +310,11 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         name = " ".join(name.split()) + tag
         # Normalise special codec notations before stripping
         name = name.replace("DTS:X", "DTS-X")
+        # Substitute known Unicode separators with ASCII hyphens
+        # (e.g. WALL·E → WALL-E, Spider‑Man → Spider-Man)
+        _TOS_CHAR_MAP = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
+        for char, repl in _TOS_CHAR_MAP.items():
+            name = name.replace(char, repl)
         # Allow alphanumeric, spaces, dots, hyphens, colons, and + (for DD+, HDR10+)
         name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
         name = name.replace(" ", ".")

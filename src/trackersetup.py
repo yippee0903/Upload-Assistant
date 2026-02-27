@@ -312,7 +312,7 @@ class TRACKER_SETUP:
         with open(file_path, encoding="utf-8") as file:
             return file.read()
 
-    async def check_banned_group(self, tracker: str, banned_group_list: list[Any], meta: Meta) -> bool:
+    async def check_banned_group(self, tracker: str, banned_group_list: list[Any], meta: Meta) -> bool | str:
         result = False
         if not meta["tag"]:
             return False
@@ -366,17 +366,17 @@ class TRACKER_SETUP:
             if not meta["unattended"] or meta.get("unattended_confirm", False):
                 try:
                     if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
-                        return False
+                        return "skipped"  # User declined — tracker must be skipped
                 except EOFError:
                     console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
-                return True
+                return True  # User chose to continue despite ban
 
-            return True
+            return True  # Unattended — continue despite ban
 
-        return False
+        return False  # Group is not banned
 
     async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict], debug: bool = False) -> None:
         try:
