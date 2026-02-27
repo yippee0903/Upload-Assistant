@@ -396,24 +396,42 @@ class GF(FrenchTrackerMixin, UNIT3D):
         except articles, short conjunctions and short prepositions —
         unless they are the first or last word.
 
+        Hyphenated words have each segment capitalised independently
+        (e.g. ``Spider-Man``, ``WALL-E``).  All-uppercase segments are
+        preserved (``WALL`` stays ``WALL``, not ``Wall``).
+
         Examples:
             "Harry Potter and the Deathly Hallows Part 2"
               → "Harry Potter and the Deathly Hallows Part 2"
             "the lord of the rings" → "The Lord of the Rings"
+            "WALL-E"               → "WALL-E"
+            "spider-man"           → "Spider-Man"
         """
         if not text or not text.strip():
             return text
+
+        def _cap_word(w: str) -> str:
+            """Capitalise a (possibly hyphenated) word, preserving all-caps segments."""
+            parts = w.split("-")
+            capped = []
+            for p in parts:
+                if p.isupper() or p.isnumeric():
+                    capped.append(p)  # keep WALL, E, 10, etc.
+                else:
+                    capped.append(p.capitalize())
+            return "-".join(capped)
+
         words = text.split()
         last = len(words) - 1
         result: list[str] = []
         for i, word in enumerate(words):
             if i == 0 or i == last:
                 # First / last word — always capitalise
-                result.append(word.capitalize())
+                result.append(_cap_word(word))
             elif word.lower() in cls._TITLE_CASE_LOWER:
                 result.append(word.lower())
             else:
-                result.append(word.capitalize())
+                result.append(_cap_word(word))
         return " ".join(result)
 
     async def _get_french_title(self, meta):
