@@ -520,7 +520,6 @@ class TestGetName:
             source='BluRay',
             type='ENCODE',
             hdr='HDR',
-            dv='DV',
             video_encode='x265',
             audio='TrueHD Atmos 7.1',
             tag='-W4NK3R',
