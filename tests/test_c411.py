@@ -588,6 +588,27 @@ class TestGetName:
         )
         name = self._run(meta)
         assert '.UHD.' not in name, f"UHD must not appear in WEBDL: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
+    def test_uhd_kept_for_disc_bdmv(self):
+        """C411 rule: UHD must be present for DISC/BDMV releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='DISC',
+            is_disc='BDMV',
+            hdr='HDR',
+            video_codec='H265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' in name, f"UHD must be present in DISC/BDMV: {name}"
 
 
 # ─── Commentary track filtering ──────────────────────────────
