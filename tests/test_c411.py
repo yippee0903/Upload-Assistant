@@ -562,6 +562,34 @@ class TestGetName:
             f"REPACK ({repack_pos}) must come before language ({lang_match.start()}): {name}"
         )
 
+    def test_hybrid_after_resolution(self):
+        """C411 rule: Hybrid token must appear AFTER resolution, not before."""
+        meta = _meta_base(
+            title='X-Men Apocalypse',
+            year='2016',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='REMUX',
+            webdv='Hybrid',
+            hdr='DV HDR10+',
+            video_codec='HEVC',
+            video_encode='',
+            audio='DTS 5.1',
+            tag='-KENOBi3838',
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        import re
+        assert '.Hybrid.' in name, f"Hybrid not found: {name}"
+        res_match = re.search(r'\.(2160p|1080p|720p)\.', name)
+        hybrid_pos = name.find('.Hybrid.')
+        assert res_match is not None, f"Resolution not found in name: {name}"
+        assert hybrid_pos > res_match.start(), (
+            f"Hybrid ({hybrid_pos}) must come after resolution ({res_match.start()}): {name}"
+        )
+
     def test_uhd_stripped_for_encode(self):
         """C411 rule: UHD must NOT appear for ENCODE releases (only REMUX/DISC)."""
         meta = _meta_base(
