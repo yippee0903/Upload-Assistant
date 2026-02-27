@@ -1570,11 +1570,17 @@ class C411(FrenchTrackerMixin):
             slot = dupe.get("_c411_slot") or self._determine_c411_slot_from_name(dupe_name)
             dupe["name"] = f"[{slot}] {dupe_name}"
 
-        # ── Corrective version: flag for display in dupe_check ──
-        if is_corrective and dupes:
-            meta["_corrective_slot_warning"] = True
+        # ── Apply French language hierarchy filtering ──
+        final_dupes = await self._check_french_lang_dupes(dupes, meta)
 
-        return await self._check_french_lang_dupes(dupes, meta)
+        # ── Corrective version: flag for display in dupe_check ──
+        # Set only after final filtering so the flag reflects actual slot occupancy.
+        if is_corrective and final_dupes:
+            meta["_corrective_slot_warning"] = True
+        else:
+            meta.pop("_corrective_slot_warning", None)
+
+        return final_dupes
 
     @staticmethod
     def _parse_torznab_response(xml_text: str) -> list[dict[str, Any]]:
