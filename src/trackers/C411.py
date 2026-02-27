@@ -58,6 +58,9 @@ class C411(FrenchTrackerMixin):
     # it should appear in the description instead.
     INCLUDE_SERVICE_IN_NAME: bool = False
 
+    # C411 wiki: UHD is only allowed when the release is REMUX/BDMV/ISO.
+    UHD_ONLY_FOR_REMUX_DISC: bool = True
+
     def _format_name(self, raw_name: str) -> dict[str, str]:
         """C411 override: title-case only the movie/show title portion.
 

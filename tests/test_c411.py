@@ -532,6 +532,103 @@ class TestGetName:
         # Regression guard: title must NOT start with concatenated "Walle."
         assert not name.lower().startswith('walle.'), f"Middle dot lost – got concatenated: {name}"
 
+    def test_uhd_stripped_for_encode(self):
+        """C411 rule: UHD must NOT appear for ENCODE releases (only REMUX/DISC)."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            hdr='HDR',
+            video_encode='x265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in ENCODE: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
+    def test_uhd_kept_for_remux(self):
+        """C411 rule: UHD must be present for REMUX releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='REMUX',
+            hdr='HDR',
+            video_codec='H265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' in name, f"UHD must be present in REMUX: {name}"
+
+    def test_uhd_stripped_for_webdl(self):
+        """C411 rule: UHD must NOT appear for WEB-DL releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            type='WEBDL',
+            hdr='DV HDR',
+            video_encode='H265',
+            audio='DDP Atmos 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in WEBDL: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
+    def test_uhd_kept_for_disc_bdmv(self):
+        """C411 rule: UHD must be present for DISC/BDMV releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='DISC',
+            is_disc='BDMV',
+            hdr='HDR',
+            video_codec='H265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' in name, f"UHD must be present in DISC/BDMV: {name}"
+
+    def test_uhd_stripped_for_webrip(self):
+        """C411 rule: UHD must NOT appear for WEBRIP releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            type='WEBRIP',
+            hdr='HDR',
+            video_encode='H265',
+            audio='DDP 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in WEBRIP: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
 
 # ─── Commentary track filtering ──────────────────────────────
 
