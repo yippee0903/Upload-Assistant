@@ -71,7 +71,7 @@ class C411(FrenchTrackerMixin):
         marker (S01…).  Everything after is left as-is.
 
         Also normalizes audio codecs to C411 conventions:
-          DD → AC3, TrueHD → TRUEHD, DTS-HD MA → DTS.HD.MA, DTS:X → DTSX
+          DD → AC3, TrueHD → TRUEHD, DTS-HD MA → DTS.HD.MA, DTS:X → DTS.X
 
         Examples:
           ``L.Age.De.Glace``  instead of ``L.Age.de.glace``
@@ -89,16 +89,17 @@ class C411(FrenchTrackerMixin):
         # DTS-HD.MA → DTS.HD.MA (dash to dot)
         dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
         dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
-        # DTS:X → DTSX (remove colon)
-        dot_name = dot_name.replace(".DTS:X.", ".DTSX.")
+        # DTS:X → DTS.X (colon to dot)
+        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
+        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
         # Atmos capitalization
         dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
         dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
         # ATMOS must appear BEFORE the audio codec entirely: DDP.5.1.ATMOS → ATMOS.DDP.5.1
         # Pattern 1: codec.channels.ATMOS → ATMOS.codec.channels
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.(\d\.\d)\.ATMOS([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
         # Pattern 2: codec.ATMOS.channels → ATMOS.codec.channels (in case already partially moved)
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.ATMOS\.(\d\.\d)([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.ATMOS\.(\d\.\d)([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split(".")
@@ -156,7 +157,7 @@ class C411(FrenchTrackerMixin):
     def _is_lossless_audio(audio: str) -> bool:
         """Return True if the audio codec string indicates lossless audio."""
         au = audio.upper()
-        return any(tag in au for tag in ("TRUEHD", "DTS-HD MA", "DTS-HD.MA", "DTS.HD.MA", "DTSX", "DTS:X", "DTS-X", "FLAC", "PCM", "LPCM"))
+        return any(tag in au for tag in ("TRUEHD", "DTS-HD MA", "DTS-HD.MA", "DTS.HD.MA", "DTSX", "DTS.X", "DTS:X", "DTS-X", "FLAC", "PCM", "LPCM"))
 
     @staticmethod
     def _is_h264_codec(codec: str) -> bool:
@@ -388,7 +389,7 @@ class C411(FrenchTrackerMixin):
         # h265 is the default if not h264 and not av1
 
         # Audio lossless detection
-        lossless = any(t in n for t in ("TRUEHD", "TRUE.HD", "DTS.HD.MA", "DTS.HD MA", "DTS-HD.MA", "DTSX", "DTS.X", "FLAC", "LPCM", "PCM"))
+        lossless = any(t in n for t in ("TRUEHD", "TRUE.HD", "DTS.HD.MA", "DTS.HD MA", "DTS-HD.MA", "DTSX", "DTS.X", "DTS-X", "FLAC", "LPCM", "PCM"))
 
         # HDR / DV
         has_dv = "DV" in n.split(".") or "DOLBY.VISION" in n or "DOVI" in n

@@ -498,7 +498,7 @@ class TestGetName:
         assert '.DTS-HD.' not in name
 
     def test_dtsx(self):
-        """DTS:X must become DTSX for C411."""
+        """DTS:X must become DTS.X for C411."""
         meta = _meta_base(
             type='REMUX',
             source='BluRay',
@@ -507,8 +507,9 @@ class TestGetName:
             original_language='en',
         )
         name = self._run(meta)
-        assert '.DTSX.' in name
+        assert '.DTS.X.' in name
         assert '.DTS:X.' not in name
+        assert '.DTSX.' not in name
 
     def test_title_middle_dot_preserved_as_separator(self):
         """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""
@@ -531,6 +532,35 @@ class TestGetName:
         assert 'Wall.E' in name or 'WALL.E' in name, f"Expected Wall.E separator: {name}"
         # Regression guard: title must NOT start with concatenated "Walle."
         assert not name.lower().startswith('walle.'), f"Middle dot lost – got concatenated: {name}"
+
+    def test_repack_before_language(self):
+        """C411 rule: REPACK/PROPER must appear before the language tag."""
+        meta = _meta_base(
+            title='Le Silence Des Agneaux',
+            year='1991',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            repack='REPACK',
+            hdr='DV HDR',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # REPACK must come before language (VOSTFR/VFF/etc.)
+        repack_pos = name.find('.REPACK.')
+        assert repack_pos != -1, f"REPACK not found in name: {name}"
+        # Find the language token (first occurrence of a known French tag after year)
+        import re
+        lang_match = re.search(r'\.(VOSTFR|VFF|VFQ|VF2|VFI|TRUEFRENCH|FRENCH|MULTI)\.', name)
+        assert lang_match is not None, f"No language tag found in name: {name}"
+        assert repack_pos < lang_match.start(), (
+            f"REPACK ({repack_pos}) must come before language ({lang_match.start()}): {name}"
+        )
 
     def test_uhd_stripped_for_encode(self):
         """C411 rule: UHD must NOT appear for ENCODE releases (only REMUX/DISC)."""
