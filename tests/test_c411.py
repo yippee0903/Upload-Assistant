@@ -528,8 +528,9 @@ class TestGetName:
         )
         name = self._run(meta)
         # Middle dot → space → dot (standard dot-separated format)
-        assert 'Wall.E' in name or 'WALL.E' in name
-        assert 'Walle' not in name.replace('.', '') or 'WALL.E' in name
+        assert 'Wall.E' in name or 'WALL.E' in name, f"Expected Wall.E separator: {name}"
+        # Regression guard: title must NOT start with concatenated "Walle."
+        assert not name.lower().startswith('walle.'), f"Middle dot lost – got concatenated: {name}"
 
 
 # ─── Commentary track filtering ──────────────────────────────
