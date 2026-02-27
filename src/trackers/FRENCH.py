@@ -375,6 +375,11 @@ class FrenchTrackerMixin:
     # Set to True for trackers that accept both title languages (e.g. TORR9).
     PREFER_ORIGINAL_TITLE: bool = False
 
+    # Whether the "UHD" tag should only appear for REMUX / DISC releases.
+    # C411 wiki: "UHD is only allowed when the title contains REMUX/BDMV/ISO".
+    # When True, UHD is stripped from ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP.
+    UHD_ONLY_FOR_REMUX_DISC: bool = False
+
     # ──────────────────────────────────────────────────────────
     #  Audio-track helpers
     # ──────────────────────────────────────────────────────────
@@ -807,6 +812,10 @@ class FrenchTrackerMixin:
 
         type_val = meta.get("type", "").upper()
         category = meta.get("category", "MOVIE")
+
+        # Some trackers (e.g. C411) only allow UHD for REMUX/DISC releases
+        if self.UHD_ONLY_FOR_REMUX_DISC and type_val not in ("REMUX", "DISC"):
+            uhd = ""
 
         video_codec = ""
         video_encode = ""
