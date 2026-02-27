@@ -610,6 +610,25 @@ class TestGetName:
         name = self._run(meta)
         assert '.UHD.' in name, f"UHD must be present in DISC/BDMV: {name}"
 
+    def test_uhd_stripped_for_webrip(self):
+        """C411 rule: UHD must NOT appear for WEBRIP releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            type='WEBRIP',
+            hdr='HDR',
+            video_encode='H265',
+            audio='DDP 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in WEBRIP: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
 
 # ─── Commentary track filtering ──────────────────────────────
 
