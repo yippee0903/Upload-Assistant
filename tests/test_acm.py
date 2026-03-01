@@ -137,3 +137,18 @@ class TestCheckAsianOrigin:
         acm = ACM(_config())
         meta = _meta(origin_country=["jp"])
         assert acm.check_asian_origin(meta) is True
+
+    def test_empty_strings_in_origin_fallback(self):
+        """origin_country with only empty/blank strings should fall back to production_countries."""
+        acm = ACM(_config())
+        meta = _meta(
+            origin_country=["", "  ", None],
+            production_countries=[{"iso_3166_1": "KR", "name": "South Korea"}],
+        )
+        assert acm.check_asian_origin(meta) is True
+
+    def test_empty_strings_in_origin_no_fallback(self):
+        """origin_country with only empty strings and no production data should reject."""
+        acm = ACM(_config())
+        meta = _meta(origin_country=["", None], production_countries=[])
+        assert acm.check_asian_origin(meta) is False

@@ -259,9 +259,9 @@ class ACM:
         ``origin_country`` is not available — co-productions with Asian studios
         (e.g. a US show filmed with a Japanese partner) should not qualify.
         """
-        origin_codes: list[str] = meta.get("origin_country", []) or []
+        origin_codes = [c.strip().upper() for c in (meta.get("origin_country", []) or []) if isinstance(c, str) and c.strip()]
         if origin_codes:
-            return any(code.upper() in self.ASIAN_COUNTRIES for code in origin_codes)
+            return any(code in self.ASIAN_COUNTRIES for code in origin_codes)
 
         # Fallback: origin_country not provided — check production_countries
         production_countries: list[dict[str, str]] = meta.get("production_countries", []) or []
