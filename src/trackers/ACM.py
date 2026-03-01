@@ -254,13 +254,16 @@ class ACM:
     def check_asian_origin(self, meta: dict[str, Any]) -> bool:
         """Return True if the media originates from at least one Asian country.
 
-        Checks both TMDB ``origin_country`` (list of ISO codes) and
-        ``production_countries`` (list of dicts with ``iso_3166_1`` key).
+        Uses TMDB ``origin_country`` as the primary signal (where the content
+        actually comes from).  Falls back to ``production_countries`` only when
+        ``origin_country`` is not available — co-productions with Asian studios
+        (e.g. a US show filmed with a Japanese partner) should not qualify.
         """
         origin_codes: list[str] = meta.get("origin_country", []) or []
-        if any(code.upper() in self.ASIAN_COUNTRIES for code in origin_codes):
-            return True
+        if origin_codes:
+            return any(code.upper() in self.ASIAN_COUNTRIES for code in origin_codes)
 
+        # Fallback: origin_country not provided — check production_countries
         production_countries: list[dict[str, str]] = meta.get("production_countries", []) or []
         return any(pc.get("iso_3166_1", "").upper() in self.ASIAN_COUNTRIES for pc in production_countries)
 
