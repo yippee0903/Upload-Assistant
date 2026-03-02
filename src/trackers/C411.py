@@ -1022,8 +1022,10 @@ class C411(FrenchTrackerMixin):
                     return await f.read()
 
         # Fallback: use in-memory mediainfo from prep
-        if not content and meta.get("mediainfo_text"):
-            content = meta["mediainfo_text"]
+        if not content:
+            fallback = str(meta.get("mediainfo_text") or "").strip()
+            if fallback:
+                content = fallback
 
         if not content:
             return ""

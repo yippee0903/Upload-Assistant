@@ -989,6 +989,14 @@ class TestDetectLangTagFromName:
     def test_no_tag(self):
         assert C411._detect_lang_tag_from_name('Movie.2025.1080p.WEB.H264-GROUP') == ''
 
+    def test_subfrench_case_insensitive(self):
+        """Lowercase subfrench must also be recognised."""
+        assert C411._detect_lang_tag_from_name('Movie.2025.subfrench.1080p.BluRay.x264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_hyphen_separated(self):
+        """Hyphen-separated name with SUBFRENCH."""
+        assert C411._detect_lang_tag_from_name('Movie-2025-SUBFRENCH-1080p-BluRay-x264-GROUP') == 'VOSTFR'
+
 
 # ─── Season / Episode option mapping ─────────────────────────
 
@@ -1689,7 +1697,7 @@ class TestC411GetMediainfoText:
 
         meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
         result = asyncio.run(c._get_mediainfo_text(meta))
-        assert "clean MI content" in result
+        assert result == "clean MI content"
 
     def test_reads_mediainfo_file(self, tmp_path):
         """Falls back to MEDIAINFO.txt when CLEANPATH missing."""
@@ -1700,7 +1708,7 @@ class TestC411GetMediainfoText:
 
         meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
         result = asyncio.run(c._get_mediainfo_text(meta))
-        assert "raw MI content" in result
+        assert result == "raw MI content"
 
     def test_reads_bdinfo_file(self, tmp_path):
         """Falls back to BD_SUMMARY_00.txt for disc releases."""
@@ -1722,7 +1730,7 @@ class TestC411GetMediainfoText:
         meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
         meta["mediainfo_text"] = "in-memory MI from prep"
         result = asyncio.run(c._get_mediainfo_text(meta))
-        assert "in-memory MI from prep" in result
+        assert result == "in-memory MI from prep"
 
     def test_returns_empty_when_nothing_available(self, tmp_path):
         """Returns empty string when no files and no meta fallback."""
@@ -1745,4 +1753,4 @@ class TestC411GetMediainfoText:
         meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
         meta["mediainfo_text"] = "fallback MI"
         result = asyncio.run(c._get_mediainfo_text(meta))
-        assert "fallback MI" in result
+        assert result == "fallback MI"

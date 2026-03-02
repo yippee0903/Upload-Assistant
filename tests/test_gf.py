@@ -437,6 +437,15 @@ class TestLanguageDetection:
         # French audio present → MULTI.VFF, not VOSTFR
         assert _run(gf._build_audio_string(meta)) == 'MULTI.VFF'
 
+    def test_subfrench_in_name(self, gf):
+        """SUBFRENCH in name field, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([_audio_track('en')]),
+            name='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert _run(gf._build_audio_string(meta)) == 'VOSTFR'
+
 
 # ═══════════════════════════════════════════════════════════════
 #  Release naming

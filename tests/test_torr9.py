@@ -1184,3 +1184,16 @@ class TestGetMediainfoText:
         meta["mediainfo_text"] = "fallback MI"
         result = _run(t._get_mediainfo_text(meta))
         assert result == "fallback MI"
+
+    def test_whitespace_cleanpath_falls_to_mediainfo(self, tmp_path):
+        """Whitespace CLEANPATH should fall through to non-empty MEDIAINFO.txt."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("   \n  ")
+        (tmpdir / "MEDIAINFO.txt").write_text("real MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "should not be used"
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "real MI content"

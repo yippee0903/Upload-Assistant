@@ -565,8 +565,9 @@ class TORR9(FrenchTrackerMixin):
                     return await f.read()
 
         # Fallback: use in-memory mediainfo from prep
-        if meta.get("mediainfo_text"):
-            return meta["mediainfo_text"]
+        fallback = str(meta.get("mediainfo_text") or "").strip()
+        if fallback:
+            return fallback
 
         return ""
 
