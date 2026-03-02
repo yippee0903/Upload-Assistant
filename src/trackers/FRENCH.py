@@ -382,6 +382,31 @@ class FrenchTrackerMixin:
     UHD_ONLY_FOR_REMUX_DISC: bool = False
 
     # ──────────────────────────────────────────────────────────
+    #  Edition formatting
+    # ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _format_edition(edition: str) -> str:
+        """Convert an uppercased edition to title case for French trackers.
+
+        French trackers use title case for edition keywords:
+        ``SPECIAL EDITION`` → ``Special Edition``,
+        ``DIRECTOR'S CUT`` → ``Director's Cut``, etc.
+
+        Mixed-case scene-style tags (e.g. ``LiMiTED``) are preserved as-is.
+        """
+        if not edition:
+            return edition
+        # Only title-case fully uppercased strings; preserve scene-style
+        # mixed-case tags like "LiMiTED" unchanged.
+        if edition != edition.upper():
+            return edition
+        result = edition.title()
+        # Fix capitalization after apostrophes: "Director'S" → "Director's"
+        result = re.sub(r"(\w)'(\w)", lambda m: f"{m.group(1)}'{m.group(2).lower()}", result)
+        return result
+
+    # ──────────────────────────────────────────────────────────
     #  Audio-track helpers
     # ──────────────────────────────────────────────────────────
 
@@ -823,7 +848,7 @@ class FrenchTrackerMixin:
         uhd = meta.get("uhd", "")
         hdr = meta.get("hdr", "").replace("HDR10+", "HDR10PLUS")
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper() or "custom" in edition.upper():
             edition = re.sub(r"\b(?:Hybrid|CUSTOM|Custom)\b", "", edition, flags=re.IGNORECASE).strip()
 

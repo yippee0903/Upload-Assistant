@@ -181,3 +181,27 @@ class TestHybridRepackSeparation:
         edition, _repack, hybrid = _run(get_edition(video, None, [video], '', meta))
         assert edition == 'SPECIAL EDITION'
         assert hybrid == 'Hybrid'
+
+
+# ─── French tracker title-case formatting ─────────────────────
+
+
+class TestFrenchEditionFormatting:
+    """French trackers must display editions in title case, not ALL-CAPS."""
+
+    @pytest.mark.parametrize(
+        'uppercased, expected',
+        [
+            ('SPECIAL EDITION', 'Special Edition'),
+            ('EXTENDED', 'Extended'),
+            ('THEATRICAL', 'Theatrical'),
+            ("DIRECTOR'S CUT", "Director's Cut"),
+            ('UNRATED', 'Unrated'),
+            ('OPEN MATTE', 'Open Matte'),
+            ('LiMiTED', 'LiMiTED'),
+            ('', ''),
+        ],
+    )
+    def test_format_edition(self, uppercased: str, expected: str) -> None:
+        from src.trackers.FRENCH import FrenchTrackerMixin  # noqa: WPS433
+        assert FrenchTrackerMixin._format_edition(uppercased) == expected
