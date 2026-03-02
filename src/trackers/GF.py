@@ -585,7 +585,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
         source = meta.get("source", "")
         uhd = meta.get("uhd", "")
         hdr = meta.get("hdr", "").replace("HDR10+", "HDR10PLUS")
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper() or "custom" in edition.upper():
             edition = re.sub(r"\b(?:Hybrid|CUSTOM|Custom)\b", "", edition, flags=re.IGNORECASE).strip()
 

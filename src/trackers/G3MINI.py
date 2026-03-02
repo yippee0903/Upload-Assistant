@@ -199,7 +199,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         else:
             video_codec = meta.get("video_codec", "")
             video_encode = meta.get("video_encode", "")
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper():
             edition = edition.replace("Hybrid", "").strip()
 
