@@ -564,6 +564,10 @@ class TORR9(FrenchTrackerMixin):
                 async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
 
+        # Fallback: use in-memory mediainfo from prep
+        if meta.get("mediainfo_text"):
+            return meta["mediainfo_text"]
+
         return ""
 
     @staticmethod

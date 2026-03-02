@@ -346,6 +346,7 @@ FRENCH_LANG_HIERARCHY: dict[str, int] = {
     "TRUEFRENCH": 4,
     "FRENCH": 3,
     "VOSTFR": 2,
+    "SUBFRENCH": 2,  # legacy alias for VOSTFR
     "VO": 1,
 }
 
@@ -656,6 +657,19 @@ class FrenchTrackerMixin:
                 return True
         return False
 
+    @staticmethod
+    def _detect_subfrench(meta: Meta) -> bool:
+        """Check if the release path/name indicates SUBFRENCH or VOSTFR.
+
+        Used as a filename-based fallback when MediaInfo does not detect
+        French subtitles (e.g. external .srt files, untagged tracks).
+        """
+        for field in ("uuid", "name", "path"):
+            val = str(meta.get(field, "")).upper()
+            if re.search(r"(?:^|[\.\-_\s])(?:SUBFRENCH|VOSTFR)(?:[\.\-_\s]|$)", val):
+                return True
+        return False
+
     # ──────────────────────────────────────────────────────────
     #  Build audio/language string
     # ──────────────────────────────────────────────────────────
@@ -721,7 +735,10 @@ class FrenchTrackerMixin:
 
         # ── No French audio ──
         if not has_french_audio:
-            return "VOSTFR" if has_french_subs else ""
+            # MediaInfo subs OR filename hint (SUBFRENCH / VOSTFR)
+            if has_french_subs or self._detect_subfrench(meta):
+                return "VOSTFR"
+            return ""
 
         # ── MULTi — 2+ audio tracks (or non-French track present) ──
         non_fr = [la for la in audio_langs if la != "FRA"]

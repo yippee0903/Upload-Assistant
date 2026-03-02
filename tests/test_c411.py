@@ -299,6 +299,54 @@ class TestLanguageDetection:
         )
         assert self._run(meta) == 'VFF'
 
+    # ── SUBFRENCH filename fallback → VOSTFR ──
+
+    def test_subfrench_in_uuid(self):
+        """SUBFRENCH in uuid, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_in_path(self):
+        """SUBFRENCH in path, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            path='/media/Movie.SUBFRENCH.720p.mkv',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_in_name(self):
+        """SUBFRENCH in name field, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            name='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_ignored_when_french_audio(self):
+        """SUBFRENCH in filename but French audio present → use audio-based tag, not VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        # French audio detected → MULTI.VFF (not VOSTFR)
+        assert self._run(meta) == 'MULTI.VFF'
+
+    def test_vostfr_in_filename_fallback(self):
+        """VOSTFR in filename, no French subs in MediaInfo → still VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.VOSTFR.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
 
 # ─── Release naming ──────────────────────────────────────────
 
@@ -918,6 +966,28 @@ class TestLanguageOptionMapping:
         c = C411(_config())
         assert c._get_language_option_id('') == 1
         assert c._get_language_option_id('UNKNOWN') == 1
+
+
+# ─── _detect_lang_tag_from_name (dupe matching) ──────────────
+
+class TestDetectLangTagFromName:
+    """Test C411._detect_lang_tag_from_name recognises lang tags in existing torrent names."""
+
+    def test_vostfr(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.VOSTFR.1080p.WEB.H264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_normalised_to_vostfr(self):
+        """SUBFRENCH in an existing torrent name should be treated as VOSTFR."""
+        assert C411._detect_lang_tag_from_name('Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_space_separated(self):
+        assert C411._detect_lang_tag_from_name('Movie 2025 SUBFRENCH 1080p BluRay x264-GROUP') == 'VOSTFR'
+
+    def test_multi_vff(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.MULTI.VFF.1080p.WEB.H264-GROUP') == 'MULTI.VFF'
+
+    def test_no_tag(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.1080p.WEB.H264-GROUP') == ''
 
 
 # ─── Season / Episode option mapping ─────────────────────────
@@ -1599,3 +1669,80 @@ class TestCorrectiveVersionDupe:
         assert len(dupes) >= 1
         # Non-corrective should NOT have the warning flag
         assert meta.get('_corrective_slot_warning') is None
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  _get_mediainfo_text fallback tests
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestC411GetMediainfoText:
+    """Test _get_mediainfo_text with file-based and meta fallback."""
+
+    def test_reads_cleanpath_file(self, tmp_path):
+        """Prefers MEDIAINFO_CLEANPATH.txt when it exists."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("clean MI content")
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert "clean MI content" in result
+
+    def test_reads_mediainfo_file(self, tmp_path):
+        """Falls back to MEDIAINFO.txt when CLEANPATH missing."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert "raw MI content" in result
+
+    def test_reads_bdinfo_file(self, tmp_path):
+        """Falls back to BD_SUMMARY_00.txt for disc releases."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "BD_SUMMARY_00.txt").write_text("BD summary content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid", bdinfo={"some": "data"})
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "BD summary content"
+
+    def test_fallback_to_meta_mediainfo_text(self, tmp_path):
+        """Falls back to meta['mediainfo_text'] when no files exist."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "in-memory MI from prep"
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert "in-memory MI from prep" in result
+
+    def test_returns_empty_when_nothing_available(self, tmp_path):
+        """Returns empty string when no files and no meta fallback."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == ""
+
+    def test_skips_empty_files(self, tmp_path):
+        """Skips files that exist but are empty/whitespace-only."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("   \n  ")
+        (tmpdir / "MEDIAINFO.txt").write_text("")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "fallback MI"
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert "fallback MI" in result

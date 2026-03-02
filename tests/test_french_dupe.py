@@ -137,6 +137,7 @@ class TestExtractFrenchLangTag:
         ('Movie.2025.TRUEFRENCH.1080p.WEB.H264-GROUP', 'TRUEFRENCH', 4),
         ('Movie.2025.FRENCH.1080p.WEB.H264-GROUP', 'FRENCH', 3),
         ('Movie.2025.VOSTFR.2160p.WEB.H265-GROUP', 'VOSTFR', 2),
+        ('Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP', 'SUBFRENCH', 2),
         ('Movie.2025.VO.2160p.WEB.H265-GROUP', 'VO', 1),
     ])
     def test_standard_release_names(self, name: str, expected_tag: str, expected_level: int):
@@ -267,7 +268,7 @@ class TestExtractFrenchLangTag:
         for t in french_audio_tags:
             assert FRENCH_LANG_HIERARCHY[t] >= _FRENCH_AUDIO_THRESHOLD, f'{t} should be >= threshold'
 
-        no_french_audio_tags = {'VOSTFR', 'VO'}
+        no_french_audio_tags = {'VOSTFR', 'SUBFRENCH', 'VO'}
         for t in no_french_audio_tags:
             assert FRENCH_LANG_HIERARCHY[t] < _FRENCH_AUDIO_THRESHOLD, f'{t} should be < threshold'
 
@@ -337,6 +338,43 @@ class TestCheckFrenchLangDupes:
         )
         assert 'french_lang_supersede' in result[0].get('flags', [])
 
+    # ── SUBFRENCH in existing dupe names ──
+
+    def test_subfrench_dupe_same_level_as_vostfr(self):
+        """Existing SUBFRENCH dupe should be treated at the same level as VOSTFR."""
+        tag, level = FrenchTrackerMixin._extract_french_lang_tag(
+            'Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP'
+        )
+        assert tag == 'SUBFRENCH'
+        assert level == 2  # same as VOSTFR
+
+    def test_multi_upload_subfrench_dupe_dropped(self):
+        """MULTI upload + existing SUBFRENCH dupe → dupe silently dropped (inferior)."""
+        mixin = _mixin()
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+        )
+        dupes = [_dupe('Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP')]
+        result = asyncio.run(
+            mixin._check_french_lang_dupes(dupes, meta)
+        )
+        assert len(result) == 0
+
+    def test_subfrench_upload_multi_dupe_flagged(self):
+        """SUBFRENCH upload (via filename fallback) + MULTI existing → flag."""
+        mixin = _mixin()
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        dupes = [_dupe('Movie.2025.MULTI.VFF.1080p.WEB.H264-GROUP')]
+        result = asyncio.run(
+            mixin._check_french_lang_dupes(dupes, meta)
+        )
+        assert len(result) == 1
+        assert 'french_lang_supersede' in result[0].get('flags', [])
     # ── Upload has NO French audio (VO — empty from _build_audio_string) ──
 
     def test_vo_upload_multi_exists(self):

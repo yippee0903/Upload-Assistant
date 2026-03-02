@@ -248,7 +248,7 @@ class C411(FrenchTrackerMixin):
         has_vf2 = "VF2" in token_set
         has_vff = "VFF" in token_set
         has_vfq = "VFQ" in token_set
-        has_vostfr = "VOSTFR" in token_set
+        has_vostfr = "VOSTFR" in token_set or "SUBFRENCH" in token_set
 
         if has_multi and has_vf2:
             return "MULTI.VF2"
@@ -1020,6 +1020,10 @@ class C411(FrenchTrackerMixin):
             if os.path.exists(bd_path):
                 async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
+
+        # Fallback: use in-memory mediainfo from prep
+        if not content and meta.get("mediainfo_text"):
+            content = meta["mediainfo_text"]
 
         if not content:
             return ""

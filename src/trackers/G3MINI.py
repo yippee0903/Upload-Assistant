@@ -134,8 +134,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                 return "FRENCH VFQ"
             return "FRENCH"
 
-        # VOSTFR - No French audio but French subtitles present
-        if not has_french_audio and has_french_subs:
+        # VOSTFR - No French audio but French subtitles present (or SUBFRENCH in filename)
+        if not has_french_audio and (has_french_subs or self._detect_subfrench(meta)):
             return "VOSTFR"
 
         # VO - No French content at all
