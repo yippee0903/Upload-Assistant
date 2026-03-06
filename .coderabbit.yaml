@@ -12,7 +12,7 @@ reviews:
     drafts: false
 
   # Review profile: assertive gives more thorough feedback
-  profile: assertive
+  profile: chill
 
   # Path-based instructions give CodeRabbit domain context
   path_instructions:

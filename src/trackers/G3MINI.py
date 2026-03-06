@@ -134,8 +134,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                 return "FRENCH VFQ"
             return "FRENCH"
 
-        # VOSTFR - No French audio but French subtitles present
-        if not has_french_audio and has_french_subs:
+        # VOSTFR - No French audio but French subtitles present (or SUBFRENCH in filename)
+        if not has_french_audio and (has_french_subs or self._detect_subfrench(meta)):
             return "VOSTFR"
 
         # VO - No French content at all
@@ -153,6 +153,11 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             return text.replace(" ", ".")
 
         def _clean_filename(name):
+            # G3MINI keeps title-internal hyphens (WALL·E → WALL-E), so
+            # middle dot / bullet map to hyphen instead of space.
+            _g3_map = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
+            for char, repl in _g3_map.items():
+                name = name.replace(char, repl)
             # Strip all non-alphanumeric chars except spaces, dots, hyphens, and + (for DD+, HDR10+)
             name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
             return name
@@ -194,7 +199,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         else:
             video_codec = meta.get("video_codec", "")
             video_encode = meta.get("video_encode", "")
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper():
             edition = edition.replace("Hybrid", "").strip()
 

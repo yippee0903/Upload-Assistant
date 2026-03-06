@@ -185,11 +185,13 @@ class UploadHelper:
                             console.print()
                             console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
                         else:
-                            if french_supersede:
+                            if meta.get("_corrective_slot_warning"):
                                 console.print()
+                                console.print(f"[yellow]Slot already taken — {tracker_name} may reject if the existing version has equal or higher priority.[/yellow]")
+                            if french_supersede:
                                 console.print(f"[bold yellow]{tracker_name}: A release with French audio (MULTI / VFF / VFQ) already exists.[/bold yellow]")
                                 console.print("[yellow]So uploading a VOSTFR/VO version is not recommended.[/yellow]")
-                            else:
+                            elif not meta.get("_corrective_slot_warning"):
                                 console.print(f"[bold blue]Check if these are actually dupes from {tracker_name}:[/bold blue]")
                             console.print()
                             console.print(f"[bold cyan]{dupe_text}[/bold cyan]")

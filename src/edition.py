@@ -341,6 +341,12 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
 
     edition = edition.replace(",", " ")
 
+    # Expand bare "Special" to "Special Edition" — guessit and the generic
+    # "edition" word cleanup both strip the word, but "Special" alone is
+    # incomplete in release naming ("Extended" works alone, "Special" does not).
+    if edition and edition.lower().strip() == "special":
+        edition = "Special Edition"
+
     # Handle repack info
     repack = ""
     if "REPACK" in (video.upper() or edition.upper()) or "V2" in video:

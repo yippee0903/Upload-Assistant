@@ -346,6 +346,7 @@ FRENCH_LANG_HIERARCHY: dict[str, int] = {
     "TRUEFRENCH": 4,
     "FRENCH": 3,
     "VOSTFR": 2,
+    "SUBFRENCH": 2,  # legacy alias for VOSTFR
     "VO": 1,
 }
 
@@ -374,6 +375,36 @@ class FrenchTrackerMixin:
     # title is used instead of the French TMDB translation.
     # Set to True for trackers that accept both title languages (e.g. TORR9).
     PREFER_ORIGINAL_TITLE: bool = False
+
+    # Whether the "UHD" tag should only appear for REMUX / DISC releases.
+    # C411 wiki: "UHD is only allowed when the title contains REMUX/BDMV/ISO".
+    # When True, UHD is stripped from ENCODE, WEBDL, WEBRIP, HDTV, DVDRIP.
+    UHD_ONLY_FOR_REMUX_DISC: bool = False
+
+    # ──────────────────────────────────────────────────────────
+    #  Edition formatting
+    # ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _format_edition(edition: str) -> str:
+        """Convert an uppercased edition to title case for French trackers.
+
+        French trackers use title case for edition keywords:
+        ``SPECIAL EDITION`` → ``Special Edition``,
+        ``DIRECTOR'S CUT`` → ``Director's Cut``, etc.
+
+        Mixed-case scene-style tags (e.g. ``LiMiTED``) are preserved as-is.
+        """
+        if not edition:
+            return edition
+        # Only title-case fully uppercased strings; preserve scene-style
+        # mixed-case tags like "LiMiTED" unchanged.
+        if edition != edition.upper():
+            return edition
+        result = edition.title()
+        # Fix capitalization after apostrophes: "Director'S" → "Director's"
+        result = re.sub(r"(\w)'(\w)", lambda m: f"{m.group(1)}'{m.group(2).lower()}", result)
+        return result
 
     # ──────────────────────────────────────────────────────────
     #  Audio-track helpers
@@ -651,6 +682,19 @@ class FrenchTrackerMixin:
                 return True
         return False
 
+    @staticmethod
+    def _detect_subfrench(meta: Meta) -> bool:
+        """Check if the release path/name indicates SUBFRENCH or VOSTFR.
+
+        Used as a filename-based fallback when MediaInfo does not detect
+        French subtitles (e.g. external .srt files, untagged tracks).
+        """
+        for field in ("uuid", "name", "path"):
+            val = str(meta.get(field, "")).upper()
+            if re.search(r"(?:^|[\.\-_\s])(?:SUBFRENCH|VOSTFR)(?:[\.\-_\s]|$)", val):
+                return True
+        return False
+
     # ──────────────────────────────────────────────────────────
     #  Build audio/language string
     # ──────────────────────────────────────────────────────────
@@ -716,7 +760,10 @@ class FrenchTrackerMixin:
 
         # ── No French audio ──
         if not has_french_audio:
-            return "VOSTFR" if has_french_subs else ""
+            # MediaInfo subs OR filename hint (SUBFRENCH / VOSTFR)
+            if has_french_subs or self._detect_subfrench(meta):
+                return "VOSTFR"
+            return ""
 
         # ── MULTi — 2+ audio tracks (or non-French track present) ──
         non_fr = [la for la in audio_langs if la != "FRA"]
@@ -763,8 +810,8 @@ class FrenchTrackerMixin:
     # ──────────────────────────────────────────────────────────
     #  Release naming   (dot-separated, French-tracker convention)
     #
-    #  Film:  Nom.Année.Edition.Hybrid.Langue.Résolution.Source.HDR.Audio.Codec-TAG
-    #  TV:    Nom.Année.SXXEXX.Edition.Hybrid.Langue.Résolution.Source.HDR.Audio.Codec-TAG
+    #  Film:  Nom.Année.Edition.Repack.Langue.Résolution.Hybrid.Source.HDR.Audio.Codec-TAG
+    #  TV:    Nom.Année.SXXEXX.Edition.Repack.Langue.Résolution.Hybrid.Source.HDR.Audio.Codec-TAG
     # ──────────────────────────────────────────────────────────
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
@@ -801,12 +848,16 @@ class FrenchTrackerMixin:
         uhd = meta.get("uhd", "")
         hdr = meta.get("hdr", "").replace("HDR10+", "HDR10PLUS")
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper() or "custom" in edition.upper():
             edition = re.sub(r"\b(?:Hybrid|CUSTOM|Custom)\b", "", edition, flags=re.IGNORECASE).strip()
 
         type_val = meta.get("type", "").upper()
         category = meta.get("category", "MOVIE")
+
+        # Some trackers (e.g. C411) only allow UHD for REMUX/DISC releases
+        if self.UHD_ONLY_FOR_REMUX_DISC and type_val not in ("REMUX", "DISC"):
+            uhd = ""
 
         video_codec = ""
         video_encode = ""
@@ -842,27 +893,27 @@ class FrenchTrackerMixin:
             if type_val == "DISC":
                 disc = meta.get("is_disc", "")
                 if disc == "BDMV":
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {language} {repack} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
+                    name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {hybrid} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif disc == "DVD":
-                    name = f"{title} {year} {edition} {language} {repack} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {edition} {repack} {language} {region} {source} {dvd_size} {audio}"
                 elif disc == "HDDVD":
-                    name = f"{title} {year} {edition} {language} {repack} {resolution} {source} {audio} {video_codec}"
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type_val == "REMUX" and source in ("BluRay", "HDDVD"):
-                name = f"{title} {year} {three_d} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                name = f"{title} {year} {edition} {language} {repack} {source} REMUX {audio}"
+                name = f"{title} {year} {edition} {repack} {language} {source} REMUX {audio}"
             elif type_val == "REMUX":
-                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == "ENCODE":
-                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == "WEBDL":
-                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
             elif type_val == "WEBRIP":
-                name = f"{title} {year} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == "HDTV":
-                name = f"{title} {year} {edition} {language} {repack} {resolution} {source} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type_val == "DVDRIP":
-                name = f"{title} {year} {language} {repack} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {repack} {language} {source} DVDRip {audio} {video_encode}"
 
         # ── TV ──
         elif category == "TV":
@@ -870,27 +921,27 @@ class FrenchTrackerMixin:
             if type_val == "DISC":
                 disc = meta.get("is_disc", "")
                 if disc == "BDMV":
-                    name = f"{title} {year} {se} {three_d} {edition} {hybrid} {language} {repack} {resolution} {region} {uhd} {source} {hdr} {audio} {video_codec}"
+                    name = f"{title} {year} {se} {three_d} {edition} {repack} {language} {resolution} {hybrid} {region} {uhd} {source} {hdr} {audio} {video_codec}"
                 elif disc == "DVD":
-                    name = f"{title} {year} {se} {three_d} {edition} {language} {repack} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {se} {three_d} {edition} {repack} {language} {region} {source} {dvd_size} {audio}"
                 elif disc == "HDDVD":
-                    name = f"{title} {year} {se} {edition} {language} {repack} {resolution} {source} {audio} {video_codec}"
+                    name = f"{title} {year} {se} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type_val == "REMUX" and source in ("BluRay", "HDDVD"):
-                name = f"{title} {year} {se} {part} {three_d} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {se} {part} {three_d} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
-                name = f"{title} {year} {se} {part} {edition} {language} {repack} {source} REMUX {audio}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {source} REMUX {audio}"
             elif type_val == "REMUX":
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {audio} {video_codec}"
             elif type_val == "ENCODE":
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {source} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {hdr} {audio} {video_encode}"
             elif type_val == "WEBDL":
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} {web_lbl} {hdr} {audio} {video_encode}"
             elif type_val == "WEBRIP":
-                name = f"{title} {year} {se} {part} {edition} {hybrid} {language} {repack} {resolution} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} WEBRip {hdr} {audio} {video_encode}"
             elif type_val == "HDTV":
-                name = f"{title} {year} {se} {part} {edition} {language} {repack} {resolution} {source} {audio} {video_encode}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type_val == "DVDRIP":
-                name = f"{title} {year} {se} {language} {repack} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {se} {repack} {language} {source} DVDRip {audio} {video_encode}"
 
         if not name:
             name = f"{title} {year} {language} {resolution} {type_val} {audio} {video_encode}"
@@ -921,6 +972,20 @@ class FrenchTrackerMixin:
 
         return {"name": dot_name}
 
+    # Map special Unicode chars to their ASCII equivalents *before*
+    # unidecode (which would map · → * and lose the separator).
+    _TITLE_CHAR_MAP: dict[str, str] = {
+        "\u00b7": " ",  # middle dot   (WALL·E → WALL E → WALL.E / Wall E)
+        "\u2022": " ",  # bullet       (same rationale)
+        "\u2010": "-",  # hyphen
+        "\u2011": "-",  # non-breaking hyphen
+        "\u2012": "-",  # figure dash
+        "\u2013": "-",  # en dash
+        "\u2014": "-",  # em dash
+        "\u2015": "-",  # horizontal bar
+        "\u2212": "-",  # minus sign
+    }
+
     @staticmethod
     def _fr_clean(text: str) -> str:
         """Strip accents and non-filename characters.
@@ -929,6 +994,8 @@ class FrenchTrackerMixin:
         ``l'Ordre`` becomes ``L Ordre`` (→ ``L.Ordre`` after dot-formatting),
         matching French-tracker naming conventions.
         """
+        for char, repl in FrenchTrackerMixin._TITLE_CHAR_MAP.items():
+            text = text.replace(char, repl)
         text = unidecode(text)
         # Replace apostrophes / RIGHT SINGLE QUOTATION MARK / backticks
         # that follow a French elided article with a space, and uppercase
