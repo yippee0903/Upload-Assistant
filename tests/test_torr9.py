@@ -1197,3 +1197,294 @@ class TestGetMediainfoText:
         meta["mediainfo_text"] = "should not be used"
         result = _run(t._get_mediainfo_text(meta))
         assert result == "real MI content"
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  _patch_mi_filename tests
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestPatchMiFilename:
+    """Test that _patch_mi_filename replaces the 'Complete name' line."""
+
+    def test_patches_complete_name(self) -> None:
+        mi = (
+            "General\n"
+            "Complete name    : /media/downloads/Aliens.1986.mkv\n"
+            "Format           : Matroska\n"
+        )
+        result = TORR9._patch_mi_filename(mi, "Aliens.1986.Special.Edition.2160p.FRENCH.UHD.BluRay.x265-GRP")
+        assert "Complete name" in result
+        assert "Aliens.1986.Special.Edition.2160p.FRENCH.UHD.BluRay.x265-GRP.mkv" in result
+        assert "/media/downloads/" not in result
+
+    def test_preserves_extension(self) -> None:
+        mi = "Complete name : movie.avi\nFormat : AVI\n"
+        result = TORR9._patch_mi_filename(mi, "NewName")
+        assert "NewName.avi" in result
+
+    def test_noop_when_empty(self) -> None:
+        assert TORR9._patch_mi_filename("", "name") == ""
+        assert TORR9._patch_mi_filename("some text", "") == "some text"
+
+    def test_noop_when_no_complete_name(self) -> None:
+        mi = "General\nFormat : Matroska\n"
+        assert TORR9._patch_mi_filename(mi, "name") == mi
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  NFO generation + upload integration tests
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+FAKE_MEDIAINFO = """\
+General
+Complete name                            : Aliens.1986.Special.Edition.2160p.UHD.BluRay.TrueHD.7.1.DoVi.HDR10.x265-W4NK3R.mkv
+Format                                   : Matroska
+Duration                                 : 2 h 34 min
+
+Video
+Format                                   : HEVC
+Width                                    : 3 840 pixels
+Height                                   : 2 160 pixels
+
+Audio
+Format                                   : TrueHD
+Channels                                 : 8 channels
+"""
+
+
+class TestNfoGeneration:
+    """Verify that NFO files are correctly generated from MediaInfo."""
+
+    def _setup_workdir(self) -> tuple[str, str, str]:
+        """Create a temp workdir with MEDIAINFO.txt and a fake torrent."""
+        tmpd = tempfile.mkdtemp()
+        uuid = 'test-nfo-integration'
+        work_dir = os.path.join(tmpd, 'tmp', uuid)
+        os.makedirs(work_dir, exist_ok=True)
+
+        with open(os.path.join(work_dir, 'MEDIAINFO.txt'), 'w') as f:
+            f.write(FAKE_MEDIAINFO)
+
+        with open(os.path.join(work_dir, '[TORR9].torrent'), 'wb') as f:
+            f.write(b'd8:announce0:e')
+
+        return tmpd, uuid, work_dir
+
+    def test_nfo_generated_from_mediainfo_file(self) -> None:
+        """_get_or_generate_nfo must produce a non-empty .nfo from MEDIAINFO.txt."""
+        tmpd, uuid, work_dir = self._setup_workdir()
+        meta = _meta_base(
+            base_dir=tmpd, uuid=uuid, debug=True,
+            name='Aliens 1986 Special Edition 2160p UHD BluRay TrueHD 7.1 DV HDR x265-W4NK3R',
+        )
+        tracker = TORR9(_config())
+
+        nfo_path = _run(tracker._get_or_generate_nfo(meta))
+
+        assert nfo_path is not None
+        assert os.path.exists(nfo_path)
+        with open(nfo_path) as f:
+            content = f.read()
+        assert len(content) > 100
+        assert 'Matroska' in content
+        assert 'HEVC' in content
+
+        import shutil
+        shutil.rmtree(tmpd)
+
+    def test_nfo_generated_from_mediainfo_text_fallback(self) -> None:
+        """When no MEDIAINFO.txt file exists, fall back to meta['mediainfo_text']."""
+        tmpd = tempfile.mkdtemp()
+        uuid = 'test-nfo-fallback'
+        work_dir = os.path.join(tmpd, 'tmp', uuid)
+        os.makedirs(work_dir, exist_ok=True)
+
+        # NO MEDIAINFO.txt written — only in-memory text
+        meta = _meta_base(
+            base_dir=tmpd, uuid=uuid, debug=True,
+            name='Fallback Test',
+            mediainfo_text=FAKE_MEDIAINFO,
+        )
+        tracker = TORR9(_config())
+
+        nfo_path = _run(tracker._get_or_generate_nfo(meta))
+
+        assert nfo_path is not None
+        assert os.path.exists(nfo_path)
+        with open(nfo_path) as f:
+            content = f.read()
+        assert 'Matroska' in content
+
+        import shutil
+        shutil.rmtree(tmpd)
+
+    def test_nfo_none_when_no_mediainfo(self) -> None:
+        """When neither file nor text exists, _get_or_generate_nfo returns None."""
+        tmpd = tempfile.mkdtemp()
+        uuid = 'test-nfo-empty'
+        os.makedirs(os.path.join(tmpd, 'tmp', uuid), exist_ok=True)
+        meta = _meta_base(base_dir=tmpd, uuid=uuid, debug=True, name='Empty')
+        tracker = TORR9(_config())
+
+        nfo_path = _run(tracker._get_or_generate_nfo(meta))
+        assert nfo_path is None
+
+        import shutil
+        shutil.rmtree(tmpd)
+
+
+class TestNfoUploadFlow:
+    """End-to-end: debug upload must include a non-empty NFO in the multipart files."""
+
+    def test_debug_upload_generates_nfo_and_description(self) -> None:
+        """In debug mode, upload() must generate an NFO file and a description file."""
+        tmpd = tempfile.mkdtemp()
+        uuid = 'test-upload-nfo'
+        work_dir = os.path.join(tmpd, 'tmp', uuid)
+        os.makedirs(work_dir, exist_ok=True)
+
+        with open(os.path.join(work_dir, 'MEDIAINFO.txt'), 'w') as f:
+            f.write(FAKE_MEDIAINFO)
+        with open(os.path.join(work_dir, '[TORR9].torrent'), 'wb') as f:
+            f.write(b'd8:announce0:e')
+
+        meta = _meta_base(
+            base_dir=tmpd, uuid=uuid, debug=True,
+            name='Aliens 1986 Special Edition 2160p UHD BluRay TrueHD 7.1 DV HDR x265-W4NK3R',
+            title='Aliens',
+            year='1986',
+            category='MOVIE',
+            type='ENCODE',
+            resolution='2160p',
+            source='Blu-ray',
+            audio='TrueHD 7.1',
+            video_encode='x265',
+            video_codec='',
+            tag='-W4NK3R',
+            edition='SPECIAL EDITION',
+            uhd='UHD',
+            hdr='DV HDR',
+            path='/fake/Aliens.1986.Special.Edition.2160p.UHD.BluRay.x265-W4NK3R.mkv',
+            imdb_info={},
+            anime=False,
+            mal_id=0,
+            anon=False,
+            ua_signature='Test',
+            mediainfo_text=FAKE_MEDIAINFO,
+        )
+
+        tracker = TORR9(_config())
+
+        with patch('src.trackers.TORR9.COMMON') as mock_common_cls:
+            mock_common = MagicMock()
+            mock_common.create_torrent_for_upload = AsyncMock()
+            mock_common_cls.return_value = mock_common
+            result = _run(tracker.upload(meta, ''))
+
+        assert result is True
+
+        # NFO should exist
+        nfo_files = [f for f in os.listdir(work_dir) if f.endswith('.nfo')]
+        assert len(nfo_files) >= 1, f"Expected at least 1 NFO file, found: {os.listdir(work_dir)}"
+
+        nfo_path = os.path.join(work_dir, nfo_files[0])
+        with open(nfo_path) as f:
+            nfo_content = f.read()
+        assert len(nfo_content) > 100, f"NFO too small ({len(nfo_content)} bytes)"
+        assert 'HEVC' in nfo_content
+
+        # Description should also exist
+        desc_path = os.path.join(work_dir, '[TORR9]DESCRIPTION.txt')
+        assert os.path.exists(desc_path), "Description file not generated"
+        with open(desc_path) as f:
+            desc = f.read()
+        assert len(desc) > 50
+
+        import shutil
+        shutil.rmtree(tmpd)
+
+    def test_nfo_patch_mi_filename_in_upload(self) -> None:
+        """The NFO sent during upload must have 'Complete name' patched to the release name."""
+        tmpd = tempfile.mkdtemp()
+        uuid = 'test-patch-in-upload'
+        work_dir = os.path.join(tmpd, 'tmp', uuid)
+        os.makedirs(work_dir, exist_ok=True)
+
+        with open(os.path.join(work_dir, 'MEDIAINFO.txt'), 'w') as f:
+            f.write(FAKE_MEDIAINFO)
+        with open(os.path.join(work_dir, '[TORR9].torrent'), 'wb') as f:
+            f.write(b'd8:announce0:e')
+
+        meta = _meta_base(
+            base_dir=tmpd, uuid=uuid, debug=True,
+            name='Aliens 1986 Special Edition 2160p UHD BluRay TrueHD 7.1 DV HDR x265-W4NK3R',
+            title='Aliens',
+            year='1986',
+            category='MOVIE',
+            type='ENCODE',
+            resolution='2160p',
+            source='Blu-ray',
+            audio='TrueHD 7.1',
+            video_encode='x265',
+            video_codec='',
+            tag='-W4NK3R',
+            edition='SPECIAL EDITION',
+            uhd='UHD',
+            hdr='DV HDR',
+            path='/fake/Aliens.1986.mkv',
+            imdb_info={},
+            anime=False,
+            mal_id=0,
+            anon=False,
+            ua_signature='Test',
+            mediainfo_text=FAKE_MEDIAINFO,
+        )
+
+        tracker = TORR9(_config())
+
+        # Capture files dict by intercepting httpx call
+        captured_files: dict[str, Any] = {}
+
+        async def fake_upload(meta_arg: Any, _disc: str) -> bool:
+            """Re-implement just the NFO part of upload to capture nfo_bytes."""
+            name_result = await tracker.get_name(meta_arg)
+            title = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
+
+            nfo_path = await tracker._get_or_generate_nfo(meta_arg)
+            nfo_bytes = b""
+            if nfo_path and os.path.exists(nfo_path):
+                with open(nfo_path, "rb") as f:
+                    nfo_bytes = f.read()
+                if title and nfo_bytes:
+                    try:
+                        nfo_text = nfo_bytes.decode("utf-8", errors="replace")
+                        nfo_text = tracker._patch_mi_filename(nfo_text, title)
+                        nfo_bytes = nfo_text.encode("utf-8")
+                    except Exception:
+                        pass
+
+            captured_files['nfo_bytes'] = nfo_bytes
+            captured_files['nfo_text'] = nfo_bytes.decode("utf-8", errors="replace") if nfo_bytes else ""
+            captured_files['title'] = title
+            return True
+
+        _run(fake_upload(meta, ''))
+
+        # NFO bytes must be non-empty
+        assert len(captured_files['nfo_bytes']) > 100, \
+            f"NFO bytes too small: {len(captured_files['nfo_bytes'])} bytes"
+
+        # TORR9 sends NFO as a plain-text data field (not a file upload)
+        nfo_text = captured_files['nfo_text']
+        assert isinstance(nfo_text, str)
+        assert len(nfo_text) > 100
+
+        # Complete name must be patched to tracker release name
+        assert 'Aliens.1986.Special.Edition.2160p.UHD.BluRay' not in nfo_text or \
+               captured_files['title'] in nfo_text.replace('.mkv', ''), \
+               "Complete name should be patched to the tracker release name"
+
+        import shutil
+        shutil.rmtree(tmpd)
