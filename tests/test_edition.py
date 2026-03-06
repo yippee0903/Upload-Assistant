@@ -134,7 +134,7 @@ class TestOtherEditions:
         video = "Movie.2020.Director's.Cut.1080p.BluRay.x264-GROUP.mkv"
         meta = _meta_base()
         edition, _repack, _hybrid = _run(get_edition(video, None, [video], '', meta))
-        assert "DIRECTOR" in edition
+        assert edition == "DIRECTOR'S CUT"
 
     def test_no_edition(self) -> None:
         video = 'Movie.2020.1080p.BluRay.x264-GROUP.mkv'
