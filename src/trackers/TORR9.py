@@ -572,6 +572,32 @@ class TORR9(FrenchTrackerMixin):
         return ""
 
     @staticmethod
+    def _patch_mi_filename(mi_text: str, new_name: str) -> str:
+        """Replace the 'Complete name' value in MediaInfo text with *new_name*.
+
+        TORR9 displays the NFO on the torrent page.  The original filename
+        inside MediaInfo may differ from the tracker release name (language
+        tags, edition formatting, etc.), so we patch it to match.
+        """
+        if not mi_text or not new_name:
+            return mi_text
+
+        def _replace_complete_name(match: re.Match[str]) -> str:
+            prefix = match.group(1)  # "Complete name    : "
+            old_value = match.group(2)
+            ext_match = re.search(r"(\.[a-zA-Z0-9]{2,4})$", old_value)
+            ext = ext_match.group(1) if ext_match else ""
+            return f"{prefix}{new_name}{ext}"
+
+        return re.sub(
+            r"^(Complete name\s*:\s*)(.+)$",
+            _replace_complete_name,
+            mi_text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
+    @staticmethod
     def _format_french_date(date_str: str) -> str:
         """Format YYYY-MM-DD to French full date, e.g. '24 octobre 2011'."""
         try:
@@ -608,8 +634,9 @@ class TORR9(FrenchTrackerMixin):
           Authorization: Bearer <api_key>
           Content-Type:  multipart/form-data
 
-        Required fields: torrent_file, title, description, nfo, category, subcategory
-        Optional fields: tags, is_exclusive, is_anonymous
+        File fields:   torrent_file
+        Data fields:   title, description, nfo (plain-text), category, subcategory
+        Optional data: tags, is_exclusive, is_anonymous
         """
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
@@ -632,6 +659,14 @@ class TORR9(FrenchTrackerMixin):
         if nfo_path and os.path.exists(nfo_path):
             async with aiofiles.open(nfo_path, "rb") as f:
                 nfo_bytes = await f.read()
+            # Patch "Complete name" in NFO to match the tracker release name
+            if title and nfo_bytes:
+                try:
+                    nfo_text = nfo_bytes.decode("utf-8", errors="replace")
+                    nfo_text = self._patch_mi_filename(nfo_text, title)
+                    nfo_bytes = nfo_text.encode("utf-8")
+                except Exception:
+                    pass  # If patching fails, upload unpatched NFO
         else:
             console.print("[yellow]TORR9: No NFO available — upload may be rejected[/yellow]")
 
@@ -648,6 +683,9 @@ class TORR9(FrenchTrackerMixin):
         anon = meta.get("anon", False) or self.config["TRACKERS"].get(self.tracker, {}).get("anon", False)
 
         # ── Multipart form ──
+        # TORR9 expects the torrent as a file upload and the NFO as a
+        # plain-text data field (NOT a file upload).  C411 uses a file
+        # upload for its NFO — the two APIs differ here.
         files: dict[str, tuple[str, bytes, str]] = {
             "torrent_file": (f"{title}.torrent", torrent_bytes, "application/x-bittorrent"),
         }
