@@ -296,10 +296,20 @@ class VideoManager:
                 type = "WEBRIP"
             elif any(word in filename for word in [" web ", ".web."]):
                 # Bare "WEB" tag without explicit WEB-DL/WEBRip qualifier.
-                # Use video codec hint in the filename to differentiate:
-                #   x264/x265 → re-encoded → WEBRIP
-                #   H264/H265 or no codec hint → stream → WEBDL
-                type = "WEBRIP" if re.search(r"[.\s-]x26[45](?:[.\s-]|$)", filename) else "WEBDL"
+                # For season packs, episode filenames often drop the "-DL"
+                # suffix that appears in the folder name.  Check the parent
+                # directory and meta["path"] for an explicit qualifier first.
+                folder = os.path.dirname(video).lower()
+                path_str = str(meta.get("path", "")).lower()
+                if "web-dl" in folder or "webdl" in folder or "web-dl" in path_str or "webdl" in path_str:
+                    type = "WEBDL"
+                elif "webrip" in folder or "webrip" in path_str:
+                    type = "WEBRIP"
+                else:
+                    # Use video codec hint in the filename to differentiate:
+                    #   x264/x265 → re-encoded → WEBRIP
+                    #   H264/H265 or no codec hint → stream → WEBDL
+                    type = "WEBRIP" if re.search(r"[.\s-]x26[45](?:[.\s-]|$)", filename) else "WEBDL"
             # elif scene == True:
             # type = "ENCODE"
             elif "hdtv" in filename:
