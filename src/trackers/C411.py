@@ -1372,6 +1372,8 @@ class C411(FrenchTrackerMixin):
                                 "detail": error_detail,
                             }
                             console.print(f"[red]C411 upload failed after {max_retries} attempts: HTTP {response.status_code}[/red]")
+                            if error_detail:
+                                console.print(f"[dim]{error_detail}[/dim]")
                             return False
 
                     except httpx.TimeoutException:
