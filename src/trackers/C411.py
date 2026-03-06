@@ -248,7 +248,7 @@ class C411(FrenchTrackerMixin):
         has_vf2 = "VF2" in token_set
         has_vff = "VFF" in token_set
         has_vfq = "VFQ" in token_set
-        has_vostfr = "VOSTFR" in token_set
+        has_vostfr = "VOSTFR" in token_set or "SUBFRENCH" in token_set
 
         if has_multi and has_vf2:
             return "MULTI.VF2"
@@ -1021,6 +1021,12 @@ class C411(FrenchTrackerMixin):
                 async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
 
+        # Fallback: use in-memory mediainfo from prep
+        if not content:
+            fallback = str(meta.get("mediainfo_text") or "").strip()
+            if fallback:
+                content = fallback
+
         if not content:
             return ""
 
@@ -1489,12 +1495,12 @@ class C411(FrenchTrackerMixin):
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
 
-        # ── Corrective versions bypass dupe blocking ──
-        # PROPER, REPACK, FIX, RERIP, V2 are always allowed
-        if self._is_corrective_version_meta(meta):
-            if meta.get("debug"):
-                console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — skipping dupe check[/cyan]")
-            return []
+        # ── Corrective versions: note but still check dupes ──
+        # PROPER/REPACK/… may replace the original, but we still need to
+        # show the user what currently occupies the slot so they can decide.
+        is_corrective = self._is_corrective_version_meta(meta)
+        if is_corrective and meta.get("debug"):
+            console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — still checking slot occupancy[/cyan]")
 
         # ── Filter dupes by C411 slot ──
         # Only show dupes that occupy the same slot as the upload
@@ -1570,7 +1576,17 @@ class C411(FrenchTrackerMixin):
             slot = dupe.get("_c411_slot") or self._determine_c411_slot_from_name(dupe_name)
             dupe["name"] = f"[{slot}] {dupe_name}"
 
-        return await self._check_french_lang_dupes(dupes, meta)
+        # ── Apply French language hierarchy filtering ──
+        final_dupes = await self._check_french_lang_dupes(dupes, meta)
+
+        # ── Corrective version: flag for display in dupe_check ──
+        # Set only after final filtering so the flag reflects actual slot occupancy.
+        if is_corrective and final_dupes:
+            meta["_corrective_slot_warning"] = True
+        else:
+            meta.pop("_corrective_slot_warning", None)
+
+        return final_dupes
 
     @staticmethod
     def _parse_torznab_response(xml_text: str) -> list[dict[str, Any]]:
