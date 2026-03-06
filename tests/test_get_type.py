@@ -81,6 +81,18 @@ class TestGetTypeWeb:
                 "/media/Show S02 WEB-DL x265",
                 "WEBDL",
             ),
+            # --- Ancestor dir named WEBRip must NOT leak into detection ---
+            (
+                "/downloads/WEBRip/Show S02/Show.S02E01.1080p.WEB.H265-Group.mkv",
+                "/downloads/WEBRip/Show S02",
+                "WEBDL",
+            ),
+            # --- Ancestor dir named WEB-DL must NOT leak into detection ---
+            (
+                "/downloads/WEB-DL/Show S02/Show.S02E01.1080p.WEB.x265-Group.mkv",
+                "/downloads/WEB-DL/Show S02",
+                "WEBRIP",
+            ),
         ],
         ids=[
             "explicit-webdl-filename",
@@ -93,6 +105,8 @@ class TestGetTypeWeb:
             "bare-web-h265-no-qualifier-heuristic",
             "bare-web-x264-folder-webdl",
             "space-web-x265-folder-webdl",
+            "ancestor-webrip-not-leaked",
+            "ancestor-webdl-not-leaked",
         ],
     )
     def test_web_type_detection(self, video: str, meta_path: str, expected: str) -> None:
