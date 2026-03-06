@@ -299,6 +299,54 @@ class TestLanguageDetection:
         )
         assert self._run(meta) == 'VFF'
 
+    # ── SUBFRENCH filename fallback → VOSTFR ──
+
+    def test_subfrench_in_uuid(self):
+        """SUBFRENCH in uuid, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_in_path(self):
+        """SUBFRENCH in path, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            path='/media/Movie.SUBFRENCH.720p.mkv',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_in_name(self):
+        """SUBFRENCH in name field, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            name='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
+    def test_subfrench_ignored_when_french_audio(self):
+        """SUBFRENCH in filename but French audio present → use audio-based tag, not VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        # French audio detected → MULTI.VFF (not VOSTFR)
+        assert self._run(meta) == 'MULTI.VFF'
+
+    def test_vostfr_in_filename_fallback(self):
+        """VOSTFR in filename, no French subs in MediaInfo → still VOSTFR."""
+        meta = _meta_base(
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+            uuid='Movie.2025.VOSTFR.1080p.BluRay.x264-GROUP',
+        )
+        assert self._run(meta) == 'VOSTFR'
+
 
 # ─── Release naming ──────────────────────────────────────────
 
@@ -498,7 +546,7 @@ class TestGetName:
         assert '.DTS-HD.' not in name
 
     def test_dtsx(self):
-        """DTS:X must become DTSX for C411."""
+        """DTS:X must become DTS.X for C411."""
         meta = _meta_base(
             type='REMUX',
             source='BluRay',
@@ -507,8 +555,185 @@ class TestGetName:
             original_language='en',
         )
         name = self._run(meta)
-        assert '.DTSX.' in name
+        assert '.DTS.X.' in name
         assert '.DTS:X.' not in name
+        assert '.DTSX.' not in name
+
+    def test_title_middle_dot_preserved_as_separator(self):
+        """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""
+        meta = _meta_base(
+            title='WALL\u00b7E',
+            year='2008',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            hdr='HDR',
+            video_encode='x265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('en')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # Middle dot → space → dot (standard dot-separated format)
+        assert 'Wall.E' in name or 'WALL.E' in name, f"Expected Wall.E separator: {name}"
+        # Regression guard: title must NOT start with concatenated "Walle."
+        assert not name.lower().startswith('walle.'), f"Middle dot lost – got concatenated: {name}"
+
+    def test_repack_before_language(self):
+        """C411 rule: REPACK/PROPER must appear before the language tag."""
+        meta = _meta_base(
+            title='Le Silence Des Agneaux',
+            year='1991',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            repack='REPACK',
+            hdr='DV HDR',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # REPACK must come before language (VOSTFR/VFF/etc.)
+        repack_pos = name.find('.REPACK.')
+        assert repack_pos != -1, f"REPACK not found in name: {name}"
+        # Find the language token (first occurrence of a known French tag after year)
+        import re
+        lang_match = re.search(r'\.(VOSTFR|VFF|VFQ|VF2|VFI|TRUEFRENCH|FRENCH|MULTI)\.', name)
+        assert lang_match is not None, f"No language tag found in name: {name}"
+        assert repack_pos < lang_match.start(), (
+            f"REPACK ({repack_pos}) must come before language ({lang_match.start()}): {name}"
+        )
+
+    def test_hybrid_after_resolution(self):
+        """C411 rule: Hybrid token must appear AFTER resolution, not before."""
+        meta = _meta_base(
+            title='X-Men Apocalypse',
+            year='2016',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='REMUX',
+            webdv='Hybrid',
+            hdr='DV HDR10+',
+            video_codec='HEVC',
+            video_encode='',
+            audio='DTS 5.1',
+            tag='-KENOBi3838',
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        import re
+        assert '.Hybrid.' in name, f"Hybrid not found: {name}"
+        res_match = re.search(r'\.(2160p|1080p|720p)\.', name)
+        hybrid_pos = name.find('.Hybrid.')
+        assert res_match is not None, f"Resolution not found in name: {name}"
+        assert hybrid_pos > res_match.start(), (
+            f"Hybrid ({hybrid_pos}) must come after resolution ({res_match.start()}): {name}"
+        )
+
+    def test_uhd_stripped_for_encode(self):
+        """C411 rule: UHD must NOT appear for ENCODE releases (only REMUX/DISC)."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='ENCODE',
+            hdr='HDR',
+            video_encode='x265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in ENCODE: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
+    def test_uhd_kept_for_remux(self):
+        """C411 rule: UHD must be present for REMUX releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='REMUX',
+            hdr='HDR',
+            video_codec='H265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' in name, f"UHD must be present in REMUX: {name}"
+
+    def test_uhd_stripped_for_webdl(self):
+        """C411 rule: UHD must NOT appear for WEB-DL releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            type='WEBDL',
+            hdr='DV HDR',
+            video_encode='H265',
+            audio='DDP Atmos 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in WEBDL: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
+
+    def test_uhd_kept_for_disc_bdmv(self):
+        """C411 rule: UHD must be present for DISC/BDMV releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            source='BluRay',
+            type='DISC',
+            is_disc='BDMV',
+            hdr='HDR',
+            video_codec='H265',
+            audio='TrueHD Atmos 7.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' in name, f"UHD must be present in DISC/BDMV: {name}"
+
+    def test_uhd_stripped_for_webrip(self):
+        """C411 rule: UHD must NOT appear for WEBRIP releases."""
+        meta = _meta_base(
+            title='Retour Vers Le Futur',
+            year='1985',
+            resolution='2160p',
+            uhd='UHD',
+            type='WEBRIP',
+            hdr='HDR',
+            video_encode='H265',
+            audio='DDP 5.1',
+            tag='-W4NK3R',
+            mediainfo=_mi([_audio_track('fr')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert '.UHD.' not in name, f"UHD must not appear in WEBRIP: {name}"
+        assert '.2160p.' in name, f"Resolution must still be present: {name}"
 
 
 # ─── Commentary track filtering ──────────────────────────────
@@ -741,6 +966,36 @@ class TestLanguageOptionMapping:
         c = C411(_config())
         assert c._get_language_option_id('') == 1
         assert c._get_language_option_id('UNKNOWN') == 1
+
+
+# ─── _detect_lang_tag_from_name (dupe matching) ──────────────
+
+class TestDetectLangTagFromName:
+    """Test C411._detect_lang_tag_from_name recognises lang tags in existing torrent names."""
+
+    def test_vostfr(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.VOSTFR.1080p.WEB.H264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_normalised_to_vostfr(self):
+        """SUBFRENCH in an existing torrent name should be treated as VOSTFR."""
+        assert C411._detect_lang_tag_from_name('Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_space_separated(self):
+        assert C411._detect_lang_tag_from_name('Movie 2025 SUBFRENCH 1080p BluRay x264-GROUP') == 'VOSTFR'
+
+    def test_multi_vff(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.MULTI.VFF.1080p.WEB.H264-GROUP') == 'MULTI.VFF'
+
+    def test_no_tag(self):
+        assert C411._detect_lang_tag_from_name('Movie.2025.1080p.WEB.H264-GROUP') == ''
+
+    def test_subfrench_case_insensitive(self):
+        """Lowercase subfrench must also be recognised."""
+        assert C411._detect_lang_tag_from_name('Movie.2025.subfrench.1080p.BluRay.x264-GROUP') == 'VOSTFR'
+
+    def test_subfrench_hyphen_separated(self):
+        """Hyphen-separated name with SUBFRENCH."""
+        assert C411._detect_lang_tag_from_name('Movie-2025-SUBFRENCH-1080p-BluRay-x264-GROUP') == 'VOSTFR'
 
 
 # ─── Season / Episode option mapping ─────────────────────────
@@ -1345,3 +1600,157 @@ class TestPatchMiFilename:
         cn_line = [l for l in result.splitlines() if "Complete name" in l][0]
         # The prefix "Complete name                            : " should remain
         assert cn_line.startswith("Complete name                            : ")
+
+
+# ─── Corrective version (REPACK) dupe behaviour ──────────────
+
+class TestCorrectiveVersionDupe:
+    """REPACK / PROPER should NOT bypass dupe checking."""
+
+    TORZNAB_RESPONSE = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Inglourious.Basterds.2009.VOSTFR.2160p.BluRay.HDR10PLUS.DTS.HD.MA.5.1.x265-GRP</title>
+      <guid>https://c411.org/torrents/999</guid>
+      <link>https://c411.org/torrents/999/download</link>
+      <size>50000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def _make_mock_client(self):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = self.TORZNAB_RESPONSE
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        return mock_client
+
+    def test_repack_still_shows_dupes(self):
+        """A REPACK upload must still surface existing releases in the same slot."""
+        c = C411(_config())
+        meta = _meta_base(
+            title='Inglourious Basterds',
+            year='2009',
+            repack='REPACK',
+            resolution='2160p',
+            type='ENCODE',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            hdr='HDR10+',
+            source='BluRay',
+        )
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_cls.return_value = self._make_mock_client()
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        # The slot-matching dupe must NOT be silently dropped
+        assert len(dupes) >= 1, "REPACK should not suppress dupe results"
+        assert any('Inglourious' in d.get('name', '') for d in dupes)
+        # The corrective slot warning flag must be set for dupe_check() to display
+        assert meta.get('_corrective_slot_warning') is True
+
+    def test_non_repack_also_shows_dupes(self):
+        """Sanity: a non-corrective upload in the same slot shows dupes too."""
+        c = C411(_config())
+        meta = _meta_base(
+            title='Inglourious Basterds',
+            year='2009',
+            repack='',
+            resolution='2160p',
+            type='ENCODE',
+            video_encode='x265',
+            audio='DTS-HD MA 5.1',
+            hdr='HDR10+',
+            source='BluRay',
+        )
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_cls.return_value = self._make_mock_client()
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        assert len(dupes) >= 1
+        # Non-corrective should NOT have the warning flag
+        assert meta.get('_corrective_slot_warning') is None
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  _get_mediainfo_text fallback tests
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestC411GetMediainfoText:
+    """Test _get_mediainfo_text with file-based and meta fallback."""
+
+    def test_reads_cleanpath_file(self, tmp_path):
+        """Prefers MEDIAINFO_CLEANPATH.txt when it exists."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("clean MI content")
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "clean MI content"
+
+    def test_reads_mediainfo_file(self, tmp_path):
+        """Falls back to MEDIAINFO.txt when CLEANPATH missing."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "raw MI content"
+
+    def test_reads_bdinfo_file(self, tmp_path):
+        """Falls back to BD_SUMMARY_00.txt for disc releases."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "BD_SUMMARY_00.txt").write_text("BD summary content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid", bdinfo={"some": "data"})
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "BD summary content"
+
+    def test_fallback_to_meta_mediainfo_text(self, tmp_path):
+        """Falls back to meta['mediainfo_text'] when no files exist."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "in-memory MI from prep"
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "in-memory MI from prep"
+
+    def test_returns_empty_when_nothing_available(self, tmp_path):
+        """Returns empty string when no files and no meta fallback."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == ""
+
+    def test_skips_empty_files(self, tmp_path):
+        """Skips files that exist but are empty/whitespace-only."""
+        c = C411(_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("   \n  ")
+        (tmpdir / "MEDIAINFO.txt").write_text("")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "fallback MI"
+        result = asyncio.run(c._get_mediainfo_text(meta))
+        assert result == "fallback MI"

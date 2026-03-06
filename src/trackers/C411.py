@@ -58,6 +58,9 @@ class C411(FrenchTrackerMixin):
     # it should appear in the description instead.
     INCLUDE_SERVICE_IN_NAME: bool = False
 
+    # C411 wiki: UHD is only allowed when the release is REMUX/BDMV/ISO.
+    UHD_ONLY_FOR_REMUX_DISC: bool = True
+
     def _format_name(self, raw_name: str) -> dict[str, str]:
         """C411 override: title-case only the movie/show title portion.
 
@@ -68,7 +71,7 @@ class C411(FrenchTrackerMixin):
         marker (S01…).  Everything after is left as-is.
 
         Also normalizes audio codecs to C411 conventions:
-          DD → AC3, TrueHD → TRUEHD, DTS-HD MA → DTS.HD.MA, DTS:X → DTSX
+          DD → AC3, TrueHD → TRUEHD, DTS-HD MA → DTS.HD.MA, DTS:X → DTS.X
 
         Examples:
           ``L.Age.De.Glace``  instead of ``L.Age.de.glace``
@@ -86,16 +89,17 @@ class C411(FrenchTrackerMixin):
         # DTS-HD.MA → DTS.HD.MA (dash to dot)
         dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
         dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
-        # DTS:X → DTSX (remove colon)
-        dot_name = dot_name.replace(".DTS:X.", ".DTSX.")
+        # DTS:X → DTS.X (colon to dot)
+        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
+        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
         # Atmos capitalization
         dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
         dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
         # ATMOS must appear BEFORE the audio codec entirely: DDP.5.1.ATMOS → ATMOS.DDP.5.1
         # Pattern 1: codec.channels.ATMOS → ATMOS.codec.channels
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.(\d\.\d)\.ATMOS([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
         # Pattern 2: codec.ATMOS.channels → ATMOS.codec.channels (in case already partially moved)
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTSX)\.ATMOS\.(\d\.\d)([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.ATMOS\.(\d\.\d)([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split(".")
@@ -153,7 +157,7 @@ class C411(FrenchTrackerMixin):
     def _is_lossless_audio(audio: str) -> bool:
         """Return True if the audio codec string indicates lossless audio."""
         au = audio.upper()
-        return any(tag in au for tag in ("TRUEHD", "DTS-HD MA", "DTS-HD.MA", "DTS.HD.MA", "DTSX", "DTS:X", "DTS-X", "FLAC", "PCM", "LPCM"))
+        return any(tag in au for tag in ("TRUEHD", "DTS-HD MA", "DTS-HD.MA", "DTS.HD.MA", "DTSX", "DTS.X", "DTS:X", "DTS-X", "FLAC", "PCM", "LPCM"))
 
     @staticmethod
     def _is_h264_codec(codec: str) -> bool:
@@ -244,7 +248,7 @@ class C411(FrenchTrackerMixin):
         has_vf2 = "VF2" in token_set
         has_vff = "VFF" in token_set
         has_vfq = "VFQ" in token_set
-        has_vostfr = "VOSTFR" in token_set
+        has_vostfr = "VOSTFR" in token_set or "SUBFRENCH" in token_set
 
         if has_multi and has_vf2:
             return "MULTI.VF2"
@@ -385,7 +389,7 @@ class C411(FrenchTrackerMixin):
         # h265 is the default if not h264 and not av1
 
         # Audio lossless detection
-        lossless = any(t in n for t in ("TRUEHD", "TRUE.HD", "DTS.HD.MA", "DTS.HD MA", "DTS-HD.MA", "DTSX", "DTS.X", "FLAC", "LPCM", "PCM"))
+        lossless = any(t in n for t in ("TRUEHD", "TRUE.HD", "DTS.HD.MA", "DTS.HD MA", "DTS-HD.MA", "DTSX", "DTS.X", "DTS-X", "FLAC", "LPCM", "PCM"))
 
         # HDR / DV
         has_dv = "DV" in n.split(".") or "DOLBY.VISION" in n or "DOVI" in n
@@ -1017,6 +1021,12 @@ class C411(FrenchTrackerMixin):
                 async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
 
+        # Fallback: use in-memory mediainfo from prep
+        if not content:
+            fallback = str(meta.get("mediainfo_text") or "").strip()
+            if fallback:
+                content = fallback
+
         if not content:
             return ""
 
@@ -1485,12 +1495,12 @@ class C411(FrenchTrackerMixin):
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
 
-        # ── Corrective versions bypass dupe blocking ──
-        # PROPER, REPACK, FIX, RERIP, V2 are always allowed
-        if self._is_corrective_version_meta(meta):
-            if meta.get("debug"):
-                console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — skipping dupe check[/cyan]")
-            return []
+        # ── Corrective versions: note but still check dupes ──
+        # PROPER/REPACK/… may replace the original, but we still need to
+        # show the user what currently occupies the slot so they can decide.
+        is_corrective = self._is_corrective_version_meta(meta)
+        if is_corrective and meta.get("debug"):
+            console.print("[cyan]C411: Corrective version detected (PROPER/REPACK/…) — still checking slot occupancy[/cyan]")
 
         # ── Filter dupes by C411 slot ──
         # Only show dupes that occupy the same slot as the upload
@@ -1566,7 +1576,17 @@ class C411(FrenchTrackerMixin):
             slot = dupe.get("_c411_slot") or self._determine_c411_slot_from_name(dupe_name)
             dupe["name"] = f"[{slot}] {dupe_name}"
 
-        return await self._check_french_lang_dupes(dupes, meta)
+        # ── Apply French language hierarchy filtering ──
+        final_dupes = await self._check_french_lang_dupes(dupes, meta)
+
+        # ── Corrective version: flag for display in dupe_check ──
+        # Set only after final filtering so the flag reflects actual slot occupancy.
+        if is_corrective and final_dupes:
+            meta["_corrective_slot_warning"] = True
+        else:
+            meta.pop("_corrective_slot_warning", None)
+
+        return final_dupes
 
     @staticmethod
     def _parse_torznab_response(xml_text: str) -> list[dict[str, Any]]:

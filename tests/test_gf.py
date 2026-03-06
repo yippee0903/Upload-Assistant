@@ -407,6 +407,45 @@ class TestLanguageDetection:
         meta = _meta_base(original_language='en', mediainfo=_mi([_audio_track('fr', Title='VFQ')]))
         assert _run(gf._build_audio_string(meta)) == 'VFQ'
 
+    # ── SUBFRENCH filename fallback ──
+
+    def test_subfrench_in_uuid(self, gf):
+        """SUBFRENCH in uuid, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([_audio_track('en')]),
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert _run(gf._build_audio_string(meta)) == 'VOSTFR'
+
+    def test_subfrench_in_path(self, gf):
+        """SUBFRENCH in path, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([_audio_track('en')]),
+            path='/media/Movie.SUBFRENCH.720p.mkv',
+        )
+        assert _run(gf._build_audio_string(meta)) == 'VOSTFR'
+
+    def test_subfrench_ignored_when_french_audio(self, gf):
+        """SUBFRENCH in filename but French audio present → honour audio-based tag."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            uuid='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        # French audio present → MULTI.VFF, not VOSTFR
+        assert _run(gf._build_audio_string(meta)) == 'MULTI.VFF'
+
+    def test_subfrench_in_name(self, gf):
+        """SUBFRENCH in name field, no French subs in MediaInfo → VOSTFR."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([_audio_track('en')]),
+            name='Movie.2025.SUBFRENCH.1080p.BluRay.x264-GROUP',
+        )
+        assert _run(gf._build_audio_string(meta)) == 'VOSTFR'
+
 
 # ═══════════════════════════════════════════════════════════════
 #  Release naming

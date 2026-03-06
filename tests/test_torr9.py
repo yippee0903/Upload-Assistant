@@ -1106,3 +1106,94 @@ class TestDupeRelevanceFilter:
         first_call = client_instance.get.call_args_list[0]
         assert 'Intouchables' in first_call.kwargs.get('params', {}).get('q', '')
         assert len(dupes) == 1
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  _get_mediainfo_text fallback tests
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestGetMediainfoText:
+    """Test _get_mediainfo_text with file-based and meta fallback."""
+
+    def test_reads_cleanpath_file(self, tmp_path):
+        """Prefers MEDIAINFO_CLEANPATH.txt when it exists."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("clean MI content")
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "clean MI content"
+
+    def test_reads_mediainfo_file(self, tmp_path):
+        """Falls back to MEDIAINFO.txt when CLEANPATH missing."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO.txt").write_text("raw MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "raw MI content"
+
+    def test_reads_bdinfo_file(self, tmp_path):
+        """Falls back to BD_SUMMARY_00.txt for disc releases."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "BD_SUMMARY_00.txt").write_text("BD summary content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid", bdinfo={"some": "data"})
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "BD summary content"
+
+    def test_fallback_to_meta_mediainfo_text(self, tmp_path):
+        """Falls back to meta['mediainfo_text'] when no files exist."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        # No MI files written
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "in-memory MI from prep"
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "in-memory MI from prep"
+
+    def test_returns_empty_when_nothing_available(self, tmp_path):
+        """Returns empty string when no files and no meta fallback."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == ""
+
+    def test_skips_empty_files(self, tmp_path):
+        """Skips files that exist but are empty/whitespace-only."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("   \n  ")
+        (tmpdir / "MEDIAINFO.txt").write_text("")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "fallback MI"
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "fallback MI"
+
+    def test_whitespace_cleanpath_falls_to_mediainfo(self, tmp_path):
+        """Whitespace CLEANPATH should fall through to non-empty MEDIAINFO.txt."""
+        t = TORR9(config=_config())
+        tmpdir = tmp_path / "tmp" / "test-uuid"
+        tmpdir.mkdir(parents=True)
+        (tmpdir / "MEDIAINFO_CLEANPATH.txt").write_text("   \n  ")
+        (tmpdir / "MEDIAINFO.txt").write_text("real MI content")
+
+        meta = _meta_base(base_dir=str(tmp_path), uuid="test-uuid")
+        meta["mediainfo_text"] = "should not be used"
+        result = _run(t._get_mediainfo_text(meta))
+        assert result == "real MI content"

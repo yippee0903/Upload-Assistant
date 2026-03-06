@@ -47,4 +47,4 @@ reportMissingImports = true
 reportMissingTypeStubs = false
 reportUnknownMemberType = true
 reportUnknownVariableType = true
-exclude = ["data"]
+exclude = ["data", "**/node_modules", "**/__pycache__", "**/.*", "venv"]

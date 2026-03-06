@@ -216,7 +216,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         source = meta.get("source", "")
         uhd = meta.get("uhd", "")
         hdr = meta.get("hdr", "")
-        edition = meta.get("edition", "")
+        edition = self._format_edition(meta.get("edition", ""))
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
         if "hybrid" in edition.upper():
             edition = edition.replace("Hybrid", "").strip()
@@ -310,6 +310,11 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         name = " ".join(name.split()) + tag
         # Normalise special codec notations before stripping
         name = name.replace("DTS:X", "DTS-X")
+        # Substitute known Unicode separators with ASCII hyphens
+        # (e.g. WALL·E → WALL-E, Spider‑Man → Spider-Man)
+        _TOS_CHAR_MAP = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
+        for char, repl in _TOS_CHAR_MAP.items():
+            name = name.replace(char, repl)
         # Allow alphanumeric, spaces, dots, hyphens, colons, and + (for DD+, HDR10+)
         name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
         name = name.replace(" ", ".")
@@ -394,8 +399,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 return "FRENCH VFQ"
             return "FRENCH"
 
-        # VOSTFR - No French audio but French subtitles present
-        if not has_french_audio and has_french_subs:
+        # VOSTFR - No French audio but French subtitles present (or SUBFRENCH in filename)
+        if not has_french_audio and (has_french_subs or self._detect_subfrench(meta)):
             return "VOSTFR"
 
         # VO - No French content at all
