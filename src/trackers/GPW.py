@@ -985,7 +985,7 @@ class GPW:
                             best_score = score
                         if score >= 10:
                             return response_data
-            except Exception:
+            except (httpx.HTTPError, json.JSONDecodeError, ValueError, KeyError, TypeError):
                 continue
 
         return best_response

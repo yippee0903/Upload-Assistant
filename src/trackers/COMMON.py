@@ -3052,6 +3052,94 @@ class COMMON:
 
         return mediainfo
 
+    # ── Detag / Notag detection ────────────────────────────────
+    async def check_detag(self, meta: dict[str, Any], tracker: str) -> bool:
+        """Detect detagged or notagged releases.
+
+        Returns True if a detag or notag is detected (upload should be skipped).
+        """
+        torrent_tag = meta.get("tag", "")
+        torrent_group = torrent_tag.lstrip("-").strip() if torrent_tag else ""
+
+        mi_filename = await self._get_mediainfo_filename(meta)
+        mi_group = self._extract_group_from_filename(mi_filename) if mi_filename else ""
+
+        if not torrent_group:
+            meta["detag_info"] = {
+                "type": "notag",
+                "mi_group": mi_group,
+                "mi_filename": mi_filename,
+            }
+            return True
+
+        if mi_filename and mi_group and torrent_group.lower() != mi_group.lower():
+            meta["detag_info"] = {
+                "type": "detag",
+                "torrent_group": torrent_group,
+                "mi_group": mi_group,
+                "mi_filename": mi_filename,
+            }
+            return True
+
+        return False
+
+    async def _get_mediainfo_filename(self, meta: dict[str, Any]) -> str:
+        """Read the original release name from MEDIAINFO_CLEANPATH.txt."""
+        base_dir = meta.get("base_dir", ".")
+        uuid = meta.get("uuid", "")
+        if not uuid:
+            return ""
+
+        cleanpath = os.path.join(base_dir, "tmp", uuid, "MEDIAINFO_CLEANPATH.txt")
+        if not os.path.isfile(cleanpath):
+            return ""
+
+        try:
+            async with aiofiles.open(cleanpath, encoding="utf-8", errors="ignore") as f:
+                content = await f.read()
+
+            movie_name = ""
+            title = ""
+            in_general = False
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped == "General":
+                    in_general = True
+                    continue
+                if in_general and stripped == "":
+                    break
+                if in_general:
+                    if stripped.startswith("Movie name"):
+                        parts = line.split(":", 1)
+                        if len(parts) == 2:
+                            movie_name = parts[1].strip()
+                    elif stripped.startswith("Title") and not title:
+                        parts = line.split(":", 1)
+                        if len(parts) == 2:
+                            title = parts[1].strip()
+
+            return movie_name or title
+        except OSError:
+            pass
+
+        return ""
+
+    @staticmethod
+    def _extract_group_from_filename(filename: str) -> str:
+        """Extract the release group from a filename (text after last hyphen)."""
+        known_ext = (".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".mpg", ".mpeg", ".vob", ".iso")
+        name = filename
+        for ext in known_ext:
+            if name.lower().endswith(ext):
+                name = name[: -len(ext)]
+                break
+        match = re.search(r"-([A-Za-z][A-Za-z0-9]+)$", name)
+        if match:
+            group = match.group(1).strip()
+            if group.lower() not in ("dl", "dts", "dd", "aac", "ma", "hd", "hr"):
+                return group
+        return ""
+
     async def check_language_requirements(
         self,
         meta: dict[str, Any],

@@ -3,7 +3,7 @@ __version__ = "v7.1.0"
 """
 Release Notes for version v7.1.0 (2026-03-03):
 
-# 
+#
 # ### NOTE:
 # - This project is in development freeze. Only critical bugs will be addressed moving forward.
 # - More details on the future of Upload Assistant will be available at a later date.
@@ -13,19 +13,19 @@ Release Notes for version v7.1.0 (2026-03-03):
 # - Specifically, to everyone at Aither. You're unwavering support has been truly appreciated.
 # - Last but certainly not least, a huge thanks to @wastaken7, who contributed greatly to the success of Upload Assistant. Not only did wasteken7 being a whole suite of new site support, but he persistently maintained all of those sites. The sheer amount of refactoring work on the codebase, to increase the ease of development cannot be overstated.
 # - Upload Assistant is not dead. I look forward to sharing a new chapter in the future.
-# 
-# 
+#
+#
 # ## Release notes:
 # - thatonePRguy added some features to the webui, including file browser searching and better mobile view support.
 # - Spy-God added DesiTorrents support
 # - maksii refactored the docker handling and documentation
 # - some tvdb related fixes
 # - Updated NBL api support
-# 
+#
 # ---
-# 
+#
 # ## What's Changed
-# 
+#
 # * BJS: change TMDb output, skip tags for existing groups (#1229) by @wastaken7 in 42fc2cc
 # * feat(webui): add search functionality to file browser (#1228) by @PRguy in f35a556
 # * Fix mkbrr: Resolve TypeError (int vs str) and support system binary path (#1233) by @Spy-God in e036ff7
@@ -53,7 +53,7 @@ Release Notes for version v7.1.0 (2026-03-03):
 # * fix(DVD): scantype handling (#1270) by @Audionut in 5c51bf3
 # * NBL api update (#1274) by @Audionut in d2e31b4
 # * release notes by @Audionut in e26f94f
-# 
+#
 # **Full Changelog**: https://github.com/Audionut/Upload-Assistant/compare/v7.0.2...v7.1.0
 """
 
@@ -2614,3 +2614,9 @@ Changelog for version 3.6.0 (2025-02-28):
 """
 
 __version__ = "3.5.3.1"
+
+# ── Active version ─────────────────────────────────────────
+# The historical __version__ assignments above (one per
+# release-notes block) are kept for reference.  The *real*
+# runtime version must come last so it wins at import time.
+__version__ = "v7.1.0"
