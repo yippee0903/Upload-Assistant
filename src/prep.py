@@ -295,7 +295,7 @@ class Prep:
                     mi = meta["mediainfo"]
 
                 meta["dvd_size"] = await self.disc_info_manager.get_dvd_size(meta["discs"], meta.get("manual_dvds"))
-                meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir)
+                meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir, meta)
                 meta["sd"] = await video_manager.is_sd(meta["resolution"])
 
         elif meta["is_disc"] == "HDDVD":
@@ -316,7 +316,7 @@ class Prep:
                 meta["mediainfo"] = mi
             else:
                 mi = meta["mediainfo"]
-            meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir)
+            meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir, meta)
             meta["sd"] = await video_manager.is_sd(meta["resolution"])
 
         else:
@@ -390,7 +390,7 @@ class Prep:
                         mi = meta["mediainfo"]
 
                     if meta.get("resolution") is None:
-                        meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir)
+                        meta["resolution"], meta["hfr"] = await video_manager.get_resolution(guessit_fn(video), meta["uuid"], base_dir, meta)
 
                     meta["sd"] = await video_manager.is_sd(meta["resolution"])
                 else:
@@ -538,11 +538,9 @@ class Prep:
 
         if not meta.get("emby") and meta.get("trackers"):
             trackers = meta["trackers"]
-            meta["trackers_explicit"] = True
         else:
             default_trackers = self.config["TRACKERS"].get("default_trackers", "")
             trackers = [tracker.strip() for tracker in default_trackers.split(",")]
-            meta["trackers_explicit"] = False
 
         if isinstance(trackers, str):
             trackers = [t.strip().upper() for t in trackers.split(",")] if "," in trackers else [trackers.strip().upper()]
@@ -1097,12 +1095,7 @@ class Prep:
 
             if meta.get("tvdb_series_name") and meta["category"] == "TV":
                 series_name = meta.get("tvdb_series_name")
-                current_title = meta.get("title", "")
-                # Only override TMDB title with TVDB series name if the current title is
-                # non-Latin (e.g. CJK characters) — if TMDB already gave a good English title,
-                # don't replace it with a potentially wrong TVDB alias.
-                current_title_is_latin = bool(current_title) and all(ord(c) < 0x3000 for c in current_title)
-                if series_name and meta.get("title") != series_name and not current_title_is_latin:
+                if series_name and meta.get("title") != series_name:
                     if meta["debug"]:
                         console.print(f"[yellow]tvdb series name: {series_name}")
                     year_match = re.search(r"\b(19|20)\d{2}\b", series_name)
@@ -1113,8 +1106,6 @@ class Prep:
                     series_name = series_name.replace("(", "").replace(")", "").strip()
                     if series_name and year_match:  # Only set if not empty and year was found
                         meta["title"] = series_name
-                elif meta["debug"] and current_title_is_latin:
-                    console.print(f"[cyan]Skipping TVDB series name override: TMDB title '{current_title}' is already in Latin script[/cyan]")
 
         # bluray.com data if config
         get_bluray_info = self.config["DEFAULT"].get("get_bluray_info", False)
@@ -1182,15 +1173,6 @@ class Prep:
                 meta["video_codec"] = await video_manager.get_video_codec(bdinfo)
             else:
                 meta["video_encode"], meta["video_codec"], meta["has_encode_settings"], meta["bit_depth"] = await video_manager.get_video_encode(mi_data, meta["type"], bdinfo)
-
-                # If type was detected as WEBDL but MediaInfo reveals encode
-                # settings, it is actually a WEBRip (re-encoded from a WEB-DL
-                # source).  Correct the type and re-derive the codec label.
-                if meta["type"] == "WEBDL" and meta.get("has_encode_settings"):
-                    meta["type"] = "WEBRIP"
-                    meta["video_encode"], meta["video_codec"], meta["has_encode_settings"], meta["bit_depth"] = await video_manager.get_video_encode(
-                        mi_data, meta["type"], bdinfo
-                    )
 
             if meta["region"] is None:
                 meta["region"] = ""
@@ -1320,11 +1302,6 @@ class Prep:
         meta["mal"] = meta.get("mal_id")
         meta["tvdb"] = meta.get("tvdb_id")
         meta["tvmaze"] = meta.get("tvmaze_id")
-
-        # skip_nfo: when reusing existing torrents, reject any containing .nfo files
-        # Exception: Scene releases MUST include the original .nfo per tracker rules
-        # Also respects --keep-nfo flag
-        meta["skip_nfo"] = not (meta.get("keep_nfo", False) or meta.get("scene", False))
 
         # we finished the metadata, time it
         if meta["debug"]:

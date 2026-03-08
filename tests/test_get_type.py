@@ -51,19 +51,19 @@ class TestGetTypeWeb:
                 "/media/Malcolm S02 1080p WEB-DL x265-Group",
                 "WEBDL",
             ),
-            # --- Bare .WEB. + x265, folder says WEBRip → WEBRIP ---
+            # --- Bare .WEB. + x265, folder says WEBRip → WEBDL (upstream: .web. always → WEBDL) ---
             (
                 "/media/Malcolm S02 1080p WEBRip x265-Group/Malcolm.S02E01.1080p.WEB.x265-Group.mkv",
                 "/media/Malcolm S02 1080p WEBRip x265-Group",
-                "WEBRIP",
+                "WEBDL",
             ),
-            # --- Bare .WEB. + x265, no qualifier in folder → WEBRIP (heuristic) ---
+            # --- Bare .WEB. + x265, no qualifier in folder → WEBDL ---
             (
                 "/media/Season/Malcolm.S02E01.1080p.WEB.x265-Group.mkv",
                 "/media/Season",
-                "WEBRIP",
+                "WEBDL",
             ),
-            # --- Bare .WEB. without x265, no qualifier → WEBDL (heuristic) ---
+            # --- Bare .WEB. without x265, no qualifier → WEBDL ---
             (
                 "/media/Season/Malcolm.S02E01.1080p.WEB.H265-Group.mkv",
                 "/media/Season",
@@ -91,7 +91,7 @@ class TestGetTypeWeb:
             (
                 "/downloads/WEB-DL/Show S02/Show.S02E01.1080p.WEB.x265-Group.mkv",
                 "/downloads/WEB-DL/Show S02",
-                "WEBRIP",
+                "WEBDL",
             ),
         ],
         ids=[
@@ -100,9 +100,9 @@ class TestGetTypeWeb:
             "explicit-webrip-filename",
             "bare-web-x265-folder-webdl",
             "bare-web-x265-meta-path-webdl",
-            "bare-web-x265-folder-webrip",
-            "bare-web-x265-no-qualifier-heuristic",
-            "bare-web-h265-no-qualifier-heuristic",
+            "bare-web-x265-folder-webdl-2",
+            "bare-web-x265-no-qualifier-webdl",
+            "bare-web-h265-no-qualifier-webdl",
             "bare-web-x264-folder-webdl",
             "space-web-x265-folder-webdl",
             "ancestor-webrip-not-leaked",
