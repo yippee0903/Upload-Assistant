@@ -95,21 +95,21 @@ class A4K(UNIT3D):
                                     console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
                                 return False
                         else:
-                            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                                console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-                                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                    pass
-                                else:
-                                    return False
-                    else:
-                        if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                             console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
                             console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-                            if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                pass
+                            if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                    return False
                             else:
                                 return False
+                    else:
+                        console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                        console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                        if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                return False
+                        else:
+                            return False
 
         return should_continue
 
