@@ -98,6 +98,7 @@ class QueueManager:
         # Set the tracker argument (-tk XXX)
         tracker = cast(str, queue_item["tracker"])
         meta["trackers"] = [tracker]
+        meta["trackers_explicit"] = True
 
         # Set the IMDb ID
         imdb = queue_item.get("imdb_id", 0)

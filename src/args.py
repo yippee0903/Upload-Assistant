@@ -649,6 +649,7 @@ class Args:
                     meta[key] = value
             if key == "trackers":
                 if value:
+                    meta["trackers_explicit"] = True
                     # Extract from list if it's a single-item list (from nargs=1)
                     if isinstance(value, list):
                         value_list = cast(list[Any], value)
