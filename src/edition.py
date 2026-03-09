@@ -402,6 +402,11 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
                 edition = edition.replace("  ", " ")
 
         if edition != "":
+            # Strip standalone 4-digit years that IMDB attributes may carry
+            # (e.g. "2003 Director's Cut") — the movie year is already in the name.
+            edition = re.sub(r"\b(19|20)\d{2}\b", "", edition).strip()
+            while "  " in edition:
+                edition = edition.replace("  ", " ")
             edition = edition.strip().upper()
             if meta["debug"]:
                 console.print(f"Final Edition: {edition}")
