@@ -375,6 +375,8 @@ class GF(FrenchTrackerMixin, UNIT3D):
             "with",
             "upon",
             "via",
+            # single-letter connectors (e.g. "x" in "Hunter x Hunter")
+            "x",
             # French articles / prepositions (for originally-French titles)
             "le",
             "la",

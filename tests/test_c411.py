@@ -814,6 +814,50 @@ class TestCodecCleanup:
         assert 'HDR10PLUS' in name
         assert 'HDR10+' not in name
 
+    def test_webdl_h264_becomes_x264(self):
+        """C411 rule: WEB-DL with H264 must use x264 in the name."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBDL', source='WEB',
+            resolution='1080p', video_encode='H.264',
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x264' in name, f"Expected x264 for WEB-DL, got: {name}"
+        assert '.H264' not in name
+
+    def test_webdl_h265_becomes_x265(self):
+        """C411 rule: WEB-DL with H265 must use x265 in the name."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBDL', source='WEB',
+            resolution='2160p', video_encode='H.265',
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x265' in name, f"Expected x265 for WEB-DL, got: {name}"
+        assert '.H265' not in name
+
+    def test_webrip_h264_becomes_x264(self):
+        """C411 rule: WEBRip with H264 must use x264 in the name."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBRIP', source='WEB',
+            resolution='1080p', video_encode='H.264',
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x264' in name, f"Expected x264 for WEBRip, got: {name}"
+        assert '.H264' not in name
+
+    def test_encode_h264_stays_h264(self):
+        """BluRay encode should keep H264 (not convert to x264)."""
+        meta = _meta_base(
+            title='Test', year='2024', type='ENCODE', source='BluRay',
+            resolution='1080p', video_encode='H.264',
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.H264' in name, f"BluRay encode should keep H264, got: {name}"
+        assert '.x264' not in name
+
 
 # ─── Category / Subcategory mapping ──────────────────────────
 

@@ -691,24 +691,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         meta["we_are_uploading"] = False
         return
 
-    if "remove_trackers" in meta and meta["remove_trackers"]:
-        removed: list[str] = []
-        remove_trackers_list = [t for t in meta["remove_trackers"] if isinstance(t, str)] if isinstance(meta.get("remove_trackers"), list) else [str(meta["remove_trackers"])]
-        for tracker in remove_trackers_list:
-            if tracker in meta["trackers"]:
-                if meta["debug"]:
-                    console.print(f"[DEBUG] Would have removed {tracker} found in client")
-                else:
-                    meta["trackers"].remove(tracker)
-                    removed.append(tracker)
-        if removed:
-            console.print(f"[yellow]Removing trackers already in your client: {', '.join(removed)}[/yellow]")
-    if not meta["trackers"]:
-        console.print("[red]No trackers remain after removal.[/red]")
-        successful_trackers = 0
-        meta["skip_uploading"] = 10
-
-    else:
+    if meta["trackers"]:
         console.print(f"[green]Processing {meta['name']} for upload...[/green]")
 
         # reset trackers after any removals
@@ -764,27 +747,50 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
                 trackers = meta["trackers"]
                 console.print(f"[green]Auto-added trackers based on detected languages: {', '.join(added_trackers)}[/green]")
 
-        await asyncio.sleep(0.2)
-        async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", "w", encoding="utf-8") as f:
-            await f.write(json.dumps(meta, indent=4))
-        await asyncio.sleep(0.2)
+        # Remove trackers already seeding in the user's client
+        # (runs after auto-add so language-based trackers are also checked)
+        if "remove_trackers" in meta and meta["remove_trackers"]:
+            removed: list[str] = []
+            remove_trackers_list = (
+                [t for t in meta["remove_trackers"] if isinstance(t, str)] if isinstance(meta.get("remove_trackers"), list) else [str(meta["remove_trackers"])]
+            )
+            for tracker in remove_trackers_list:
+                if tracker in meta["trackers"]:
+                    if meta["debug"]:
+                        console.print(f"[DEBUG] Would have removed {tracker} found in client")
+                    else:
+                        meta["trackers"].remove(tracker)
+                        removed.append(tracker)
+            if removed:
+                console.print(f"[yellow]Removing trackers already in your client: {', '.join(removed)}[/yellow]")
+            trackers = meta["trackers"]
 
-        try:
-            await validate_tracker_logins(meta, trackers)
-            await asyncio.sleep(0.2)
-        except Exception as e:
-            console.print(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
-
-        successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
-
-        if meta.get("trackers_pass") is not None:
-            meta["skip_uploading"] = meta.get("trackers_pass")
+        if not meta["trackers"]:
+            console.print("[red]No trackers remain after removal.[/red]")
+            successful_trackers = 0
+            meta["skip_uploading"] = 10
         else:
-            tracker_pass_checks = config["DEFAULT"].get("tracker_pass_checks")
-            if isinstance(tracker_pass_checks, (int, str)):
-                meta["skip_uploading"] = int(tracker_pass_checks)
+            await asyncio.sleep(0.2)
+            async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/meta.json", "w", encoding="utf-8") as f:
+                await f.write(json.dumps(meta, indent=4))
+            await asyncio.sleep(0.2)
+
+            try:
+                await validate_tracker_logins(meta, trackers)
+                await asyncio.sleep(0.2)
+            except Exception as e:
+                console.print(f"[yellow]Warning: Tracker validation encountered an error: {e}[/yellow]")
+
+            successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
+
+            if meta.get("trackers_pass") is not None:
+                meta["skip_uploading"] = meta.get("trackers_pass")
             else:
-                meta["skip_uploading"] = 1
+                tracker_pass_checks = config["DEFAULT"].get("tracker_pass_checks")
+                if isinstance(tracker_pass_checks, (int, str)):
+                    meta["skip_uploading"] = int(tracker_pass_checks)
+                else:
+                    meta["skip_uploading"] = 1
 
     skip_uploading = meta.get("skip_uploading")
     skip_uploading_int = int(skip_uploading) if isinstance(skip_uploading, (int, str)) else 0

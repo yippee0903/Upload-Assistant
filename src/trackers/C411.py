@@ -112,11 +112,21 @@ class C411(FrenchTrackerMixin):
             # No year/season found — title-case everything except group tag
             title_end = len(parts)
 
-        # Title-case only the title segments
+        # Title-case only the title segments, but preserve single
+        # lowercase letters used as connectors (e.g. "x" in "Hunter x Hunter").
         for k in range(title_end):
+            if len(parts[k]) == 1 and parts[k].islower():
+                continue
             parts[k] = parts[k].capitalize()
 
         result["name"] = ".".join(parts)
+
+        # ── C411 video codec: WEB/WEBRip sources require x264/x265, not H264/H265 ──
+        n_upper = result["name"].upper()
+        if ".WEB." in n_upper or ".WEB-DL." in n_upper or ".WEBRIP." in n_upper:
+            result["name"] = re.sub(r"\.H264\b", ".x264", result["name"], flags=re.IGNORECASE)
+            result["name"] = re.sub(r"\.H265\b", ".x265", result["name"], flags=re.IGNORECASE)
+
         return result
 
     # ──────────────────────────────────────────────────────────

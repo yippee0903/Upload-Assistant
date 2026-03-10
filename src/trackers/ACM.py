@@ -532,6 +532,10 @@ class ACM:
                 name = name.replace(f"{audio}", f"MPEG {audio}")
 
         name = name + self.get_subs_tag(subs)
+        # Remove the LTR embedding marker (U+202A) used for TV year removal
+        name = name.replace("\u202a", "")
+        # Collapse any double spaces left after marker/year removal
+        name = " ".join(name.split())
         return name
 
     async def get_description(self, meta: dict[str, Any]) -> str:
