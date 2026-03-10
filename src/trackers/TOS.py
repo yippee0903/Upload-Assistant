@@ -406,15 +406,12 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         }
 
         if not meta["is_disc"] and meta["type"] in ["ENCODE", "WEBDL"]:
+            bitrateError= False
             tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
             video_track = next((t for t in tracks if t.get("@type") == "Video"), None)
             if video_track is None:
                 console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                        return False
-                else:
-                    return False
+                bitrateError = True
             else:
                 bit_rate = video_track.get("BitRate")
                 if bit_rate:
@@ -427,53 +424,37 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                         bit_rate_kbps = bit_rate_num / 1000
                         if meta["video_codec"] in ["H264", "x264", "AVC"]:
                             if x264req[meta["resolution"]][meta["type"]] > bit_rate_kbps:
+                                minBitrate = x264req[meta["resolution"]][meta["type"]]
                                 console.print(f"[bold red]Video bitrate too low: {bit_rate_kbps:.0f} kbps for x264.[/bold red]")
-                                console.print(f"[bold yellow]Must be > { x264req[meta["resolution"]][meta["type"]] } kbps for { meta["resolution"] }[/bold yellow]")
+                                console.print(f"[bold yellow]Must be > { minBitrate } kbps for { meta["resolution"] }[/bold yellow]")
                                 console.print(f"Except for Anime : 2300/5000/- (BluRay) and 1800/3000/6000 (WEBDL) (720/10808/2160p)")
-                                if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                        return False
-                                else:
-                                    return False
-                            return False
+                                bitrateError = True
                         if meta["video_codec"] in ["H265", "x265", "HEVC"]:
                             if x265req[meta["resolution"]][meta["type"]] > bit_rate_kbps:
+                                minBitrate = x265req[meta["resolution"]][meta["type"]]
                                 console.print(f"[bold red]Video bitrate too low: {bit_rate_kbps:.0f} kbps for x265.[/bold red]")
-                                console.print(f"[bold yellow]Must be > { x265req[meta["resolution"]][meta["type"]] } kbps for { meta["resolution"] }[/bold yellow]")
+                                console.print(f"[bold yellow]Must be > { minBitrate } kbps for { meta["resolution"] }[/bold yellow]")
                                 console.print(f"Except for Anime : 1800/3500/8000 (BluRay) and 1200/2000/4000 (WEBDL) (720/10808/2160p)")
-                                if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                        return False
-                                else:
-                                    return False
-                            return False
+                                bitrateError = True
                         if meta["video_codec"] == "AV1":
                             if AV1req[meta["resolution"]][meta["type"]] > bit_rate_kbps:
+                                minBitrate = AV1req[meta["resolution"]][meta["type"]]
                                 console.print(f"[bold red]Video bitrate too low: {bit_rate_kbps:.0f} kbps for AV1.[/bold red]")
-                                console.print(f"[bold yellow]Must be > { AV1req[meta["resolution"]][meta["type"]] } kbps for { meta["resolution"] }[/bold yellow]")
+                                console.print(f"[bold yellow]Must be > { minBitrate } kbps for { meta["resolution"] }[/bold yellow]")
                                 console.print(f"Except for Anime : 10 bits mandatory (BluRay) and 1200/1500/3000 (WEBDL) (720/10808/2160p)")
-                                if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                        return False
-                                else:
-                                    return False
-                            return False
+                                bitrateError = True
                     else:
                         console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                        if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                                return False
-                            else:
-                                return False
+                        bitrateError = True
                 else:
                     console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                    if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
-                        if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                            return False
-                        else:
-                            return False
-
-        return should_continue
+                    bitrateError = True
+        if (bitrateError):
+            if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+            else:
+                return False
+        return True 
 
     async def _build_audio_string(self, meta):
         """Build the language tag following French tracker conventions.
