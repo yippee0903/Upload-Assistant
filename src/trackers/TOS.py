@@ -450,7 +450,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                     console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
                     bitrateError = True
         if (bitrateError):
-            if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+            if not meta.get("unattended", False):
                 return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
             else:
                 return False
