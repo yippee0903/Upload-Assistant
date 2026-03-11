@@ -51,7 +51,8 @@ class C411(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
     # _build_audio_string, _get_french_dub_suffix, _get_audio_tracks,
     # _extract_audio_languages, _map_language, _has_french_subs,
-    # _detect_truefrench, _detect_vfi, _get_french_title, get_name
+    # _detect_truefrench, _detect_vfi, _get_french_title
+    # get_name — overridden below (WEB re-encode codec detection)
     # ──────────────────────────────────────────────────────────
 
     # C411 does not want the streaming service (NF, AMZN, …) in release names;
@@ -60,6 +61,26 @@ class C411(FrenchTrackerMixin):
 
     # C411 wiki: UHD is only allowed when the release is REMUX/BDMV/ISO.
     UHD_ONLY_FOR_REMUX_DISC: bool = True
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        """C411 override: enforce correct codec for WEB sources.
+
+        C411 checks the *actual* mediainfo, not just the type label:
+        - WEB **without** Encoded_Library_Settings → H264 / H265 / AV1
+        - WEB **with** Encoded_Library_Settings   → x264 / x265
+        """
+        result = await super().get_name(meta)
+        release_type = str(meta.get("type", "")).upper()
+        if release_type in ("WEBDL", "WEBRIP"):
+            if meta.get("has_encode_settings", False):
+                # Re-encoded: codec must be lowercase-x form
+                result["name"] = re.sub(r"\.H264\b", ".x264", result["name"], flags=re.IGNORECASE)
+                result["name"] = re.sub(r"\.H265\b", ".x265", result["name"], flags=re.IGNORECASE)
+            else:
+                # True WEB-DL (no re-encoding): codec must be H-form
+                result["name"] = re.sub(r"\.x264\b", ".H264", result["name"], flags=re.IGNORECASE)
+                result["name"] = re.sub(r"\.x265\b", ".H265", result["name"], flags=re.IGNORECASE)
+        return result
 
     def _format_name(self, raw_name: str) -> dict[str, str]:
         """C411 override: title-case only the movie/show title portion.
@@ -120,14 +141,6 @@ class C411(FrenchTrackerMixin):
             parts[k] = parts[k].capitalize()
 
         result["name"] = ".".join(parts)
-
-        # ── C411 video codec: WEB/WEBRip sources require x264/x265, not H264/H265 ──
-        # Check only technical tokens (after title) so a movie with "Web" in
-        # its title does not trigger the conversion.
-        tech_tokens = {p.upper() for p in parts[title_end:]}
-        if "WEB" in tech_tokens or "WEB-DL" in tech_tokens or "WEBRIP" in tech_tokens:
-            result["name"] = re.sub(r"\.H264\b", ".x264", result["name"], flags=re.IGNORECASE)
-            result["name"] = re.sub(r"\.H265\b", ".x265", result["name"], flags=re.IGNORECASE)
 
         return result
 
