@@ -847,6 +847,17 @@ class TestCodecCleanup:
         assert '.x264' in name, f"Expected x264 for WEBRip, got: {name}"
         assert '.H264' not in name
 
+    def test_webrip_h265_becomes_x265(self):
+        """C411 rule: WEBRip with H265 must use x265 in the name."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBRIP', source='WEB',
+            resolution='2160p', video_encode='H.265',
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x265' in name, f"Expected x265 for WEBRip, got: {name}"
+        assert '.H265' not in name
+
     def test_encode_h264_stays_h264(self):
         """BluRay encode should keep H264 (not convert to x264)."""
         meta = _meta_base(

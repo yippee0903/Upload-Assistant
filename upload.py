@@ -691,6 +691,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> None:
         meta["we_are_uploading"] = False
         return
 
+    successful_trackers = 0
+
     if meta["trackers"]:
         console.print(f"[green]Processing {meta['name']} for upload...[/green]")
 
