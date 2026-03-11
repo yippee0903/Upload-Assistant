@@ -3,6 +3,7 @@
 import asyncio
 from typing import Any, Optional
 
+import cli_ui
 import httpx
 
 from src.console import console
@@ -359,6 +360,100 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         if is_scene and not has_nfo:
             console.print(f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]")
             return False
+
+        # ── Minimum bitrate requirements (kbps) per codec / resolution / type ──
+        # Anime has lower thresholds per TOS rules.
+        is_anime = bool(meta.get("anime", False))
+
+        bitrate_minimums: dict[str, dict[str, dict[str, int]]] = {
+            "x264": {
+                "720p": {"WEBDL": 3000, "ENCODE": 4000},
+                "1080p": {"WEBDL": 5000, "ENCODE": 8000},
+                "2160p": {"WEBDL": 10000, "ENCODE": 16000},
+            },
+            "x265": {
+                "720p": {"WEBDL": 2000, "ENCODE": 3000},
+                "1080p": {"WEBDL": 3500, "ENCODE": 6000},
+                "2160p": {"WEBDL": 8000, "ENCODE": 12000},
+            },
+            "AV1": {
+                "720p": {"WEBDL": 2000, "ENCODE": 2400},
+                "1080p": {"WEBDL": 3000, "ENCODE": 4000},
+                "2160p": {"WEBDL": 5000, "ENCODE": 8000},
+            },
+        }
+
+        anime_minimums: dict[str, dict[str, dict[str, int]]] = {
+            "x264": {
+                "720p": {"WEBDL": 1800, "ENCODE": 2300},
+                "1080p": {"WEBDL": 3000, "ENCODE": 5000},
+                "2160p": {"WEBDL": 6000, "ENCODE": 10000},
+            },
+            "x265": {
+                "720p": {"WEBDL": 1200, "ENCODE": 1800},
+                "1080p": {"WEBDL": 2000, "ENCODE": 3500},
+                "2160p": {"WEBDL": 4000, "ENCODE": 8000},
+            },
+            "AV1": {
+                "720p": {"WEBDL": 1200, "ENCODE": 1500},
+                "1080p": {"WEBDL": 1500, "ENCODE": 2000},
+                "2160p": {"WEBDL": 3000, "ENCODE": 4000},
+            },
+        }
+
+        # Map video_codec values to our table keys
+        codec_map: dict[str, str] = {
+            "H264": "x264",
+            "x264": "x264",
+            "AVC": "x264",
+            "H265": "x265",
+            "x265": "x265",
+            "HEVC": "x265",
+            "AV1": "AV1",
+        }
+
+        bitrate_error = False
+        thresholds_table = anime_minimums if is_anime else bitrate_minimums
+
+        if not meta.get("is_disc") and meta.get("type") in ("ENCODE", "WEBDL"):
+            resolution = meta.get("resolution", "")
+            release_type = meta.get("type", "")
+            video_codec = meta.get("video_codec", "")
+            codec_key = codec_map.get(video_codec)
+
+            if not codec_key:
+                if meta.get("debug"):
+                    console.print(f"[dim]{self.tracker}: No bitrate rules for codec '{video_codec}' — skipping check.[/dim]")
+            elif resolution not in thresholds_table.get(codec_key, {}):
+                if meta.get("debug"):
+                    console.print(f"[dim]{self.tracker}: No bitrate rules for {codec_key} at {resolution} — skipping check.[/dim]")
+            else:
+                min_kbps = thresholds_table[codec_key][resolution][release_type]
+                tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+                video_track = next((t for t in tracks if t.get("@type") == "Video"), None)
+                if video_track is None:
+                    console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                    bitrate_error = True
+                else:
+                    raw_br = video_track.get("BitRate")
+                    try:
+                        bit_rate_kbps = int(raw_br) / 1000 if raw_br else None
+                    except (ValueError, TypeError):
+                        bit_rate_kbps = None
+
+                    if bit_rate_kbps is None:
+                        console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                        bitrate_error = True
+                    elif bit_rate_kbps < min_kbps:
+                        label = f"{codec_key} (anime)" if is_anime else codec_key
+                        console.print(f"[bold red]{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for {label}.[/bold red]")
+                        console.print(f"[bold yellow]Must be >= {min_kbps} kbps for {resolution}.[/bold yellow]")
+                        bitrate_error = True
+
+        if bitrate_error:
+            if meta.get("unattended", False):
+                return False
+            return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
 
         return True
 
