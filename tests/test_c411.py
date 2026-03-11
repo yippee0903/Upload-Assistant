@@ -80,6 +80,7 @@ def _meta_base(**overrides: Any) -> dict[str, Any]:
             }
         },
         'tracker_status': {'C411': {}},
+        'has_encode_settings': False,
     }
     m.update(overrides)
     return m
@@ -814,49 +815,89 @@ class TestCodecCleanup:
         assert 'HDR10PLUS' in name
         assert 'HDR10+' not in name
 
-    def test_webdl_h264_becomes_x264(self):
-        """C411 rule: WEB-DL with H264 must use x264 in the name."""
+    def test_webdl_no_encode_settings_keeps_h264(self):
+        """WEB-DL without Encoded_Library_Settings must keep H264."""
         meta = _meta_base(
             title='Test', year='2024', type='WEBDL', source='WEB',
             resolution='1080p', video_encode='H.264',
+            has_encode_settings=False,
             mediainfo=_mi([_audio_track('en')]), original_language='en',
         )
         name = self._run(meta)
-        assert '.x264' in name, f"Expected x264 for WEB-DL, got: {name}"
-        assert '.H264' not in name
+        assert '.H264' in name, f"True WEB-DL should keep H264, got: {name}"
+        assert '.x264' not in name
 
-    def test_webdl_h265_becomes_x265(self):
-        """C411 rule: WEB-DL with H265 must use x265 in the name."""
+    def test_webdl_no_encode_settings_keeps_h265(self):
+        """WEB-DL without Encoded_Library_Settings must keep H265."""
         meta = _meta_base(
             title='Test', year='2024', type='WEBDL', source='WEB',
             resolution='2160p', video_encode='H.265',
+            has_encode_settings=False,
             mediainfo=_mi([_audio_track('en')]), original_language='en',
         )
         name = self._run(meta)
-        assert '.x265' in name, f"Expected x265 for WEB-DL, got: {name}"
-        assert '.H265' not in name
+        assert '.H265' in name, f"True WEB-DL should keep H265, got: {name}"
+        assert '.x265' not in name
 
-    def test_webrip_h264_becomes_x264(self):
-        """C411 rule: WEBRip with H264 must use x264 in the name."""
+    def test_webdl_with_encode_settings_becomes_x264(self):
+        """WEB-DL with Encoded_Library_Settings must use x264 (re-encoded)."""
         meta = _meta_base(
-            title='Test', year='2024', type='WEBRIP', source='WEB',
+            title='Test', year='2024', type='WEBDL', source='WEB',
             resolution='1080p', video_encode='H.264',
+            has_encode_settings=True,
             mediainfo=_mi([_audio_track('en')]), original_language='en',
         )
         name = self._run(meta)
-        assert '.x264' in name, f"Expected x264 for WEBRip, got: {name}"
+        assert '.x264' in name, f"Re-encoded WEB-DL should use x264, got: {name}"
         assert '.H264' not in name
 
-    def test_webrip_h265_becomes_x265(self):
-        """C411 rule: WEBRip with H265 must use x265 in the name."""
+    def test_webdl_with_encode_settings_becomes_x265(self):
+        """WEB-DL with Encoded_Library_Settings must use x265 (re-encoded)."""
         meta = _meta_base(
-            title='Test', year='2024', type='WEBRIP', source='WEB',
+            title='Test', year='2024', type='WEBDL', source='WEB',
             resolution='2160p', video_encode='H.265',
+            has_encode_settings=True,
             mediainfo=_mi([_audio_track('en')]), original_language='en',
         )
         name = self._run(meta)
-        assert '.x265' in name, f"Expected x265 for WEBRip, got: {name}"
+        assert '.x265' in name, f"Re-encoded WEB-DL should use x265, got: {name}"
         assert '.H265' not in name
+
+    def test_webrip_with_encode_settings_uses_x264(self):
+        """WEBRip (re-encoded) uses x264 — confirmed by encode settings."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBRIP', source='WEB',
+            resolution='1080p', video_encode='x264',
+            has_encode_settings=True,
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x264' in name, f"WEBRip should have x264, got: {name}"
+        assert '.H264' not in name
+
+    def test_webrip_with_encode_settings_uses_x265(self):
+        """WEBRip (re-encoded) uses x265 — confirmed by encode settings."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBRIP', source='WEB',
+            resolution='2160p', video_encode='x265',
+            has_encode_settings=True,
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.x265' in name, f"WEBRip should have x265, got: {name}"
+        assert '.H265' not in name
+
+    def test_webrip_no_encode_settings_normalises_to_h264(self):
+        """WEBRip WITHOUT encode settings — C411 normalises to H264 (true stream)."""
+        meta = _meta_base(
+            title='Test', year='2024', type='WEBRIP', source='WEB',
+            resolution='1080p', video_encode='x264',
+            has_encode_settings=False,
+            mediainfo=_mi([_audio_track('en')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert '.H264' in name, f"WEBRip without encode settings should be H264, got: {name}"
+        assert '.x264' not in name
 
     def test_encode_h264_stays_h264(self):
         """BluRay encode should keep H264 (not convert to x264)."""
