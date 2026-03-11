@@ -291,6 +291,19 @@ class ACM:
                 )
             return False
 
+        # FLAC/LPCM audio on a WEB-DL is a hybrid (audio sourced from BD, not
+        # from streaming).  ACM requires eac3to logs + BDInfo for hybrids.
+        if release_type == "WEBDL":
+            audio_codec = str(meta.get("audio", "")).upper()
+            if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
+                if not bool(meta.get("unattended")):
+                    console.print(
+                        f"[bold red]{self.tracker}: WEB-DL with {audio_codec.split()[0]} audio is a hybrid release.[/bold red]\n"
+                        "[red]Streaming services do not offer FLAC/LPCM — this audio was sourced from a disc.[/red]\n"
+                        "[red]Hybrids require eac3to logs and BDInfo for ACM.[/red]"
+                    )
+                return False
+
         return True
 
     async def upload(self, meta: dict[str, Any], _) -> bool:
@@ -304,6 +317,13 @@ class ACM:
         if release_type in ("ENCODE", "WEBRIP", "HDTV"):
             meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: {release_type} not allowed"
             return False
+
+        # Safety net: WEB-DL with FLAC/LPCM is a hybrid (needs eac3to log + BDInfo)
+        if release_type == "WEBDL":
+            audio_codec = str(meta.get("audio", "")).upper()
+            if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
+                meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: WEB-DL with {audio_codec.split()[0]} is a hybrid"
+                return False
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta["category"])
