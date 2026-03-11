@@ -768,12 +768,18 @@ class FrenchTrackerMixin:
         # ── MULTi — 2+ audio tracks (or non-French track present) ──
         non_fr = [la for la in audio_langs if la != "FRA"]
         if non_fr or num_audio_tracks > 1:
-            return f"MULTI.{_fr_precision()}"
-
+            language = f"MULTI.{_fr_precision()}"
         # ── Single French track ──
-        if is_original_french:
-            return "VOF"
-        return _fr_precision()
+        elif is_original_french:
+            language = "VOF"
+        else:
+            language = _fr_precision()
+
+        # ── Audio Description prefix ──
+        if meta.get("has_audiodesc"):
+            language = f"AD.{language}"
+
+        return language
 
     # ──────────────────────────────────────────────────────────
     #  French title from TMDB
@@ -1512,7 +1518,7 @@ class FrenchTrackerMixin:
 
             # Build: flag Name [layout] : Codec @ Bitrate
             parts: list[str] = [f"{flag} {name}"]
-            if is_audio_desc:
+            if is_audio_desc or meta.get("has_audiodesc"):
                 parts.append(" [AD]")
             if commentary_tag:
                 parts.append(f" [{commentary_tag}]")

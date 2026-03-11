@@ -1149,7 +1149,7 @@ class Prep:
         if not meta.get("emby", False):
             meta["container"] = await video_manager.get_container(meta)
 
-            meta["audio"], meta["channels"], meta["has_commentary"] = await self.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
+            meta["audio"], meta["channels"], meta["has_commentary"], meta["has_audiodesc"] = await self.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
 
             meta["3D"] = await video_manager.is_3d(bdinfo)
 

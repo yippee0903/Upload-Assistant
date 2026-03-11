@@ -273,6 +273,7 @@ async def _get_audio_v2(
 ) -> tuple[str, str, bool]:
     extra = ""
     dual = ""
+    has_audiodesc = False
     has_commentary = False
     meta["bloated"] = False
     meta.setdefault("bloated_trackers", [])
@@ -396,15 +397,21 @@ async def _get_audio_v2(
                         first_audio_title = first_audio_track.get("title") or first_audio_track.get("Title")
                     is_auro3d = bool(first_audio_title and "auro3d" in str(first_audio_title).lower())
                     has_commentary = False
+                    has_audiodesc = False
                     has_compatibility = False
+                    ad_indicators = ["ad", "audio-description"]
                     has_coms = [t for t in tracks if "commentary" in str(t.get("Title") or "").lower()]
+                    has_ad = [t for t in tracks if any(x in str(t.get("Title") or "").lower() for x in ad_indicators)]
                     has_compat = [t for t in tracks if "compatibility" in str(t.get("Title") or "").lower()]
                     if has_coms:
                         has_commentary = True
+                    if has_ad:
+                        has_audiodesc = True
                     if has_compat:
                         has_compatibility = True
                     if meta["debug"]:
                         console.print(f"DEBUG: Found {len(has_coms)} commentary tracks, has_commentary = {has_commentary}")
+                        console.print(f"DEBUG: Found {len(has_ad)} audio description, has_audiodesc = {has_audiodesc}")
                         console.print(f"DEBUG: Found {len(has_compat)} compatibility tracks, has_compatibility = {has_compatibility}")
                     audio_tracks = [
                         t
@@ -550,7 +557,7 @@ async def _get_audio_v2(
 
     audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
     audio = " ".join(audio.split())
-    return audio, chan, has_commentary
+    return audio, chan, has_commentary, has_audiodesc
 
 
 def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng_original_with_non_eng: bool = False) -> None:
