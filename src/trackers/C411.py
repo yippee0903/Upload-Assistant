@@ -948,6 +948,11 @@ class C411(FrenchTrackerMixin):
         release_name = meta.get("uuid", "")
         rel_lines.append(f"[b][color={C}]Titre :[/color][/b] {release_name}" if release_name else f"[b][color={C}]Titre :[/color][/b]")
 
+        # Personal note with -n/--note
+        personal_note = meta.get("personal_note", "")
+        if personal_note:
+            rel_lines.append(f"[b][color={C}]Note :[/color][/b] {personal_note}")
+
         # Total size
         size_str = self._get_total_size(meta, mi_text)
         rel_lines.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}" if size_str else f"[b][color={C}]Taille totale :[/color][/b]")

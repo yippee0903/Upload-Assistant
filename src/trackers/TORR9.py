@@ -518,6 +518,11 @@ class TORR9(FrenchTrackerMixin):
         release_name = meta.get("uuid", "")
         parts.append(f"[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]")
 
+        # Personal note with -n/--note
+        personal_note = meta.get("personal_note", "")
+        if personal_note:
+            parts.append(f"[b][color={C}]Note :[/color][/b] {personal_note}")
+
         # Total size
         size_str = self._get_total_size(meta, mi_text)
         if size_str:
