@@ -270,7 +270,7 @@ async def _get_audio_v2(
     mi: Mapping[str, Any],
     meta: Meta,
     bdinfo: Optional[Mapping[str, Any]],
-) -> tuple[str, str, bool]:
+) -> tuple[str, str, bool, bool]:
     extra = ""
     dual = ""
     has_audiodesc = False
@@ -399,9 +399,8 @@ async def _get_audio_v2(
                     has_commentary = False
                     has_audiodesc = False
                     has_compatibility = False
-                    ad_indicators = ["ad", "audio-description"]
                     has_coms = [t for t in tracks if "commentary" in str(t.get("Title") or "").lower()]
-                    has_ad = [t for t in tracks if any(x in str(t.get("Title") or "").lower() for x in ad_indicators)]
+                    has_ad = [t for t in tracks if re.search(r"\baudio[\s-]description\b", str(t.get("Title") or ""), re.IGNORECASE)]
                     has_compat = [t for t in tracks if "compatibility" in str(t.get("Title") or "").lower()]
                     if has_coms:
                         has_commentary = True

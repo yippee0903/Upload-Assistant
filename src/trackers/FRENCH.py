@@ -761,13 +761,9 @@ class FrenchTrackerMixin:
         # ── No French audio ──
         if not has_french_audio:
             # MediaInfo subs OR filename hint (SUBFRENCH / VOSTFR)
-            if has_french_subs or self._detect_subfrench(meta):
-                return "VOSTFR"
-            return ""
-
+            language = "VOSTFR" if has_french_subs or self._detect_subfrench(meta) else ""
         # ── MULTi — 2+ audio tracks (or non-French track present) ──
-        non_fr = [la for la in audio_langs if la != "FRA"]
-        if non_fr or num_audio_tracks > 1:
+        elif [la for la in audio_langs if la != "FRA"] or num_audio_tracks > 1:
             language = f"MULTI.{_fr_precision()}"
         # ── Single French track ──
         elif is_original_french:
@@ -776,7 +772,7 @@ class FrenchTrackerMixin:
             language = _fr_precision()
 
         # ── Audio Description prefix ──
-        if meta.get("has_audiodesc"):
+        if language and meta.get("has_audiodesc"):
             language = f"AD.{language}"
 
         return language
@@ -1518,7 +1514,7 @@ class FrenchTrackerMixin:
 
             # Build: flag Name [layout] : Codec @ Bitrate
             parts: list[str] = [f"{flag} {name}"]
-            if is_audio_desc or meta.get("has_audiodesc"):
+            if is_audio_desc:
                 parts.append(" [AD]")
             if commentary_tag:
                 parts.append(f" [{commentary_tag}]")
