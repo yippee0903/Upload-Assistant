@@ -407,6 +407,22 @@ class TestLanguageDetection:
         meta = _meta_base(original_language='en', mediainfo=_mi([_audio_track('fr', Title='VFQ')]))
         assert _run(gf._build_audio_string(meta)) == 'VFQ'
 
+    def test_audio_description_single_french_prefixes_ad_before_variant(self, gf):
+        meta = _meta_base(
+            original_language='en',
+            has_audiodesc=True,
+            mediainfo=_mi([_audio_track('fr')]),
+        )
+        assert _run(gf._build_audio_string(meta)) == 'AD.VFF'
+
+    def test_audio_description_multi_french_prefixes_ad_before_multi(self, gf):
+        meta = _meta_base(
+            original_language='en',
+            has_audiodesc=True,
+            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+        )
+        assert _run(gf._build_audio_string(meta)) == 'AD.MULTI.VFF'
+
     # ── SUBFRENCH filename fallback ──
 
     def test_subfrench_in_uuid(self, gf):

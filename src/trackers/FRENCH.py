@@ -1484,7 +1484,7 @@ class FrenchTrackerMixin:
                     name = "Cantonais (simplifié)"
 
             # ── Audio Description detection ──
-            is_audio_desc = bool(title and "AUDIO DESCRIPTION" in title)
+            is_audio_desc = bool(title and re.search(r"\baudio[\s-]description\b", title, re.IGNORECASE))
 
             # ── Commentary detection ──
             commentary_tag = ""
