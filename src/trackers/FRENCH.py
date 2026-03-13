@@ -422,6 +422,12 @@ class FrenchTrackerMixin:
         return audio
 
     @staticmethod
+    def _is_audio_desc_track(track: dict[str, Any]) -> bool:
+        """Return True when an audio track is an audio-description track."""
+        title = str(track.get("Title") or track.get("title") or "")
+        return bool(re.search(r"\baudio[\s-]description\b", title, re.IGNORECASE))
+
+    @staticmethod
     def _map_language(lang: str) -> str:
         """Map a language name/code to a normalised 3-letter code."""
         if not lang:
@@ -720,14 +726,20 @@ class FrenchTrackerMixin:
         if not audio_tracks:
             return "MUET.VOSTFR" if self._has_french_subs(meta) else "MUET"
 
-        audio_langs = self._extract_audio_languages(audio_tracks, meta)
-        if not audio_langs:
+        ad_audio_tracks = [track for track in audio_tracks if self._is_audio_desc_track(track)]
+        main_audio_tracks = [track for track in audio_tracks if not self._is_audio_desc_track(track)]
+
+        audio_langs = self._extract_audio_languages(main_audio_tracks, meta)
+        if not audio_langs and not ad_audio_tracks:
             return ""
 
         has_french_audio = "FRA" in audio_langs
         has_french_subs = self._has_french_subs(meta)
-        num_audio_tracks = len(audio_tracks)
-        fr_suffix = self._get_french_dub_suffix(audio_tracks)
+        num_audio_tracks = len(main_audio_tracks)
+        fr_suffix = self._get_french_dub_suffix(main_audio_tracks)
+        ad_audio_langs = self._extract_audio_languages(ad_audio_tracks)
+        has_non_french_ad = any(lang != "FRA" for lang in ad_audio_langs)
+        has_audiodesc = bool(meta.get("has_audiodesc") or ad_audio_tracks)
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"
         is_truefrench = self._detect_truefrench(meta)
         is_vfi = self._detect_vfi(meta)
@@ -761,19 +773,21 @@ class FrenchTrackerMixin:
         # ── No French audio ──
         if not has_french_audio:
             # MediaInfo subs OR filename hint (SUBFRENCH / VOSTFR)
-            if has_french_subs or self._detect_subfrench(meta):
-                return "VOSTFR"
-            return ""
-
+            language = "VOSTFR" if has_french_subs or self._detect_subfrench(meta) else ""
         # ── MULTi — 2+ audio tracks (or non-French track present) ──
-        non_fr = [la for la in audio_langs if la != "FRA"]
-        if non_fr or num_audio_tracks > 1:
-            return f"MULTI.{_fr_precision()}"
-
+        elif [la for la in audio_langs if la != "FRA"] or num_audio_tracks > 1 or has_non_french_ad:
+            language = f"MULTI.{_fr_precision()}"
         # ── Single French track ──
-        if is_original_french:
-            return "VOF"
-        return _fr_precision()
+        elif is_original_french:
+            language = "VOF"
+        else:
+            language = _fr_precision()
+
+        # ── Audio Description prefix ──
+        if language and has_audiodesc:
+            language = f"AD.{language}"
+
+        return language
 
     # ──────────────────────────────────────────────────────────
     #  French title from TMDB
@@ -1482,7 +1496,7 @@ class FrenchTrackerMixin:
                     name = "Cantonais (simplifié)"
 
             # ── Audio Description detection ──
-            is_audio_desc = bool(title and "AUDIO DESCRIPTION" in title)
+            is_audio_desc = self._is_audio_desc_track(at)
 
             # ── Commentary detection ──
             commentary_tag = ""

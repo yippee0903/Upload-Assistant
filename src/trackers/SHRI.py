@@ -630,7 +630,7 @@ class SHRI(UNIT3D):
                 audio_value = meta.get("audio", "")
                 return clean(audio_value if isinstance(audio_value, str) else "")
             best = max(italian, key=lambda t: extract_quality(t, True))
-            audio_str, _, _ = await self.audio_manager.get_audio_v2({}, meta, {"audio": [best]})
+            audio_str, _, _, _ = await self.audio_manager.get_audio_v2({}, meta, {"audio": [best]})
         else:
             tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
             italian = [
@@ -643,7 +643,7 @@ class SHRI(UNIT3D):
                 audio_value = meta.get("audio", "")
                 return clean(audio_value if isinstance(audio_value, str) else "")
             best = max(italian, key=lambda t: extract_quality(t, False))
-            audio_str, _, _ = await self.audio_manager.get_audio_v2({"media": {"track": [tracks[0], best]}}, meta, None)
+            audio_str, _, _, _ = await self.audio_manager.get_audio_v2({"media": {"track": [tracks[0], best]}}, meta, None)
 
         return clean(str(audio_str))
 

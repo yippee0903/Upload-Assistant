@@ -1259,6 +1259,38 @@ class TestFormatAudioBbcode:
         assert 'Français' in lines[0]
         assert 'Anglais' in lines[1]
 
+    def test_audio_description_only_marks_matching_track(self):
+        mi = (
+            "Audio #1\n"
+            "Language                                 : French\n"
+            "Title                                    : Audio Description\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 2 channels\n"
+            "Bit rate                                 : 192 kb/s\n"
+            "\nAudio #2\n"
+            "Language                                 : English\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 6 channels\n"
+            "Bit rate                                 : 384 kb/s\n"
+        )
+        c = C411(_config())
+        lines = c._format_audio_bbcode(mi, {'has_audiodesc': True})
+        assert ' [AD]' in lines[0]
+        assert ' [AD]' not in lines[1]
+
+    def test_audio_description_hyphenated_title_is_detected(self):
+        mi = (
+            "Audio\n"
+            "Language                                 : French\n"
+            "Title                                    : Audio-Description\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 2 channels\n"
+            "Bit rate                                 : 192 kb/s\n"
+        )
+        c = C411(_config())
+        lines = c._format_audio_bbcode(mi)
+        assert ' [AD]' in lines[0]
+
     def test_empty_mi(self):
         c = C411(_config())
         assert c._format_audio_bbcode('') == []

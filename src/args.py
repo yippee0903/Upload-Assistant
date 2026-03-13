@@ -254,6 +254,7 @@ class Args:
         parser.add_argument(
             "-df", "--descfile", dest="description_file", nargs=1, required=False, help="Custom Description (path to file OR filename in current working directory)"
         )
+        parser.add_argument("-n", "--note", dest="personal_note", nargs="+", required=False, help="Custom note to add to description (French and UNIT3D trackers only)")
         parser.add_argument(
             "-menus",
             "--disc-menus",

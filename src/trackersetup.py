@@ -372,7 +372,7 @@ class TRACKER_SETUP:
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
-                return True  # User chose to continue despite ban
+                return False  # User chose to continue despite ban
 
             return True  # Unattended — continue despite ban
 

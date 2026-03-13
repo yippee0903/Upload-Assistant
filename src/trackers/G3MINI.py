@@ -112,37 +112,44 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         if not audio_tracks:
             return "MUTE"
 
-        audio_langs = self._extract_audio_languages(audio_tracks, meta)
-        if not audio_langs:
+        ad_audio_tracks = [track for track in audio_tracks if self._is_audio_desc_track(track)]
+        main_audio_tracks = [track for track in audio_tracks if not self._is_audio_desc_track(track)]
+
+        audio_langs = self._extract_audio_languages(main_audio_tracks, meta)
+        if not audio_langs and not ad_audio_tracks:
             return ""
 
         has_french_audio = "FRA" in audio_langs
         has_french_subs = self._has_french_subs(meta)
-        num_audio_tracks = len(audio_tracks)
-        fr_suffix = self._get_french_dub_suffix(audio_tracks)
+        num_audio_tracks = len(main_audio_tracks)
+        fr_suffix = self._get_french_dub_suffix(main_audio_tracks)
+        ad_audio_langs = self._extract_audio_languages(ad_audio_tracks)
+        has_non_french_ad = any(lang != "FRA" for lang in ad_audio_langs)
+        has_audiodesc = bool(meta.get("has_audiodesc") or ad_audio_tracks)
+
+        language = ""
 
         # MULTi - 2+ audio tracks with at least 1 French
-        if num_audio_tracks >= 2 and has_french_audio:
-            if fr_suffix:
-                return f"MULTi {fr_suffix}"
-            return "MULTi"
+        if has_french_audio and (num_audio_tracks >= 2 or has_non_french_ad):
+            language = f"MULTi {fr_suffix}" if fr_suffix else "MULTi"
 
         # FRENCH - 1 audio track, it's French
-        if num_audio_tracks == 1 and has_french_audio:
+        elif num_audio_tracks == 1 and has_french_audio:
             # Only append VFQ suffix; VFF or generic fr -> just FRENCH
-            if fr_suffix == "VFQ":
-                return "FRENCH VFQ"
-            return "FRENCH"
+            language = "FRENCH VFQ" if fr_suffix == "VFQ" else "FRENCH"
 
         # VOSTFR - No French audio but French subtitles present (or SUBFRENCH in filename)
-        if not has_french_audio and (has_french_subs or self._detect_subfrench(meta)):
-            return "VOSTFR"
+        elif not has_french_audio and (has_french_subs or self._detect_subfrench(meta)):
+            language = "VOSTFR"
 
         # VO - No French content at all
-        if not has_french_audio and not has_french_subs:
-            return "VO"
+        elif not has_french_audio and not has_french_subs:
+            language = "VO"
 
-        return ""
+        if language and has_audiodesc:
+            language = f"AD.{language}"
+
+        return language
 
     # _get_french_dub_suffix, _get_audio_tracks, _extract_audio_languages,
     # _map_language, _has_french_subs — inherited from FrenchTrackerMixin
