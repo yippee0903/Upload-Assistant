@@ -564,6 +564,11 @@ class DescriptionBuilder:
         # Description from file/pastebin link
         desc_parts.append(await self.get_user_description(meta))
 
+        # Personal note (with -n/--note args)
+        personal_note = meta.get("personal_note")
+        if personal_note:
+            desc_parts.append(f"[b]Note:[/b] {personal_note}")
+
         # Menu Screenshots
         desc_parts.append(await self.menu_section(meta))
 
