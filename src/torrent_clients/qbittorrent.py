@@ -239,9 +239,9 @@ class QbittorrentClientMixin:
             ssl_context.verify_mode = ssl.CERT_NONE
         return ssl_context
 
-    async def retry_qbt_operation(self, operation_func: Callable[[], Awaitable[Any]], operation_name: str, max_retries: int = 2, initial_timeout: float = 10.0) -> Any:
+    async def retry_qbt_operation(self, operation_func: Callable[[], Awaitable[Any]], operation_name: str, max_retries: int = 3, initial_timeout: float = 10.0) -> Any:
         for attempt in range(max_retries + 1):
-            timeout = initial_timeout * (2**attempt)  # Exponential backoff: 10s, 20s, 40s
+            timeout = initial_timeout * (2**attempt)  # Exponential backoff: 10s, 20s, 40s, 80s
             try:
                 result = await asyncio.wait_for(operation_func(), timeout=timeout)
                 if attempt > 0:
