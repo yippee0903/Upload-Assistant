@@ -400,7 +400,7 @@ async def _get_audio_v2(
                     has_audiodesc = False
                     has_compatibility = False
                     has_coms = [t for t in tracks if "commentary" in str(t.get("Title") or "").lower()]
-                    has_ad = [t for t in tracks if re.search(r"\baudio[\s-]description\b", str(t.get("Title") or ""), re.IGNORECASE)]
+                    has_ad = [t for t in tracks if re.search(r"\baudio[_\-\s]?description\b", str(t.get("Title") or ""), re.IGNORECASE)]
                     has_compat = [t for t in tracks if "compatibility" in str(t.get("Title") or "").lower()]
                     if has_coms:
                         has_commentary = True
@@ -418,7 +418,7 @@ async def _get_audio_v2(
                         if t.get("@type") == "Audio"
                         and "commentary" not in str(t.get("Title") or "").lower()
                         and "compatibility" not in str(t.get("Title") or "").lower()
-                        and not re.search(r"\baudio[\s-]description\b", str(t.get("Title") or ""), re.IGNORECASE)
+                        and not re.search(r"\baudio[_\-\s]?description\b", str(t.get("Title") or ""), re.IGNORECASE)
                     ]
                     audio_language = None
                     if meta["debug"]:
