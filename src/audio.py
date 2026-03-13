@@ -33,7 +33,7 @@ class AudioManager:
         mi: Mapping[str, Any],
         meta: Meta,
         bdinfo: Optional[Mapping[str, Any]],
-    ) -> tuple[str, str, bool]:
+    ) -> tuple[str, str, bool, bool]:
         return await _get_audio_v2(self.config, mi, meta, bdinfo)
 
 
@@ -415,7 +415,10 @@ async def _get_audio_v2(
                     audio_tracks = [
                         t
                         for t in tracks
-                        if t.get("@type") == "Audio" and "commentary" not in str(t.get("Title") or "").lower() and "compatibility" not in str(t.get("Title") or "").lower()
+                        if t.get("@type") == "Audio"
+                        and "commentary" not in str(t.get("Title") or "").lower()
+                        and "compatibility" not in str(t.get("Title") or "").lower()
+                        and not re.search(r"\baudio[\s-]description\b", str(t.get("Title") or ""), re.IGNORECASE)
                     ]
                     audio_language = None
                     if meta["debug"]:

@@ -45,6 +45,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
     ) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         language_tag = await self._build_audio_string(meta)
+        while language_tag.startswith("AD."):
+            language_tag = language_tag[3:]
         if language_tag == "VOSTFR":
             category_id = "9" if meta["category"] == "TV" and meta.get("tv_pack") else {"MOVIE": "6", "TV": "7"}.get(meta["category"], "0")
         else:
