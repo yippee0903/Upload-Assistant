@@ -24,6 +24,10 @@ Meta = dict[str, Any]
 TrackDict = dict[str, Any]
 
 
+# Compiled pattern shared with src/trackers/FRENCH.py — keep in sync.
+AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:", re.IGNORECASE)
+
+
 class AudioManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -400,7 +404,7 @@ async def _get_audio_v2(
                     has_audiodesc = False
                     has_compatibility = False
                     has_coms = [t for t in tracks if "commentary" in str(t.get("Title") or "").lower()]
-                    has_ad = [t for t in tracks if re.search(r"\baudio[_\-\s]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:", str(t.get("Title") or ""), re.IGNORECASE)]
+                    has_ad = [t for t in tracks if AD_TRACK_RE.search(str(t.get("Title") or ""))]
                     has_compat = [t for t in tracks if "compatibility" in str(t.get("Title") or "").lower()]
                     if has_coms:
                         has_commentary = True
