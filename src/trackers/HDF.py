@@ -107,14 +107,14 @@ class HDF(FrenchTrackerMixin):
     #  Category mapping
     # ──────────────────────────────────────────────────────────
 
-    # HDF categories (from upload form dropdown — IDs reverse-engineered):
-    # 1 = Films
-    # 2 = Films d'animation
-    # 3 = Séries
-    # 4 = Séries d'animation
-    # 5 = Documentaires
-    # 6 = Spectacles
-    # 7 = Concerts
+    # HDF categories (from upload form <select name="type">):
+    # 0 = Film
+    # 1 = Film d'animation
+    # 2 = Spectacle
+    # 3 = Concert
+    # 4 = Série
+    # 5 = Série d'animation
+    # 6 = Documentaire
 
     async def get_category_id(self, meta: Meta) -> int:
         category = str(meta.get("category", "")).upper()
@@ -123,26 +123,24 @@ class HDF(FrenchTrackerMixin):
         is_anime = bool(meta.get("anime"))
 
         if "documentary" in genres or "documentary" in keywords:
-            if category == "TV":
-                return 5  # Documentaires (series)
-            return 5  # Documentaires
+            return 6  # Documentaire
 
         if "music" in genres or "concert" in keywords:
-            return 7  # Concerts
+            return 3  # Concert
 
         _SPECTACLE_TOKENS = {"spectacle", "spectacles", "show", "theatre", "theater", "stage", "performance", "one-man-show", "stand-up", "humour", "humor"}
         if _SPECTACLE_TOKENS & (set(genres.split(", ")) | set(keywords.split(", "))):
-            return 6  # Spectacles
+            return 2  # Spectacle
 
         if is_anime:
             if category == "TV":
-                return 4  # Séries d'animation
-            return 2  # Films d'animation
+                return 5  # Série d'animation
+            return 1  # Film d'animation
 
         if category == "TV":
-            return 3  # Séries
+            return 4  # Série
 
-        return 1  # Films (default)
+        return 0  # Film (default)
 
     # ──────────────────────────────────────────────────────────
     #  Codec mapping
@@ -150,16 +148,31 @@ class HDF(FrenchTrackerMixin):
 
     @staticmethod
     def _get_codec_id(meta: Meta) -> str:
-        """Map video codec to HDF form value."""
+        """Map video codec to HDF form <select name="format"> value.
+
+        Valid values: x264, x265, AVC, VC-1, MPEG-2, HEVC, AV1, H264, H265
+        """
         codec = str(meta.get("video_codec", "")).upper()
         encode = str(meta.get("video_encode", "")).upper()
 
         if "AV1" in encode or "AV1" in codec:
             return "AV1"
-        if "HEVC" in codec or "H265" in encode or "X265" in encode or "H.265" in encode:
+        if "X265" in encode:
             return "x265"
-        if "AVC" in codec or "H264" in encode or "X264" in encode or "H.264" in encode:
+        if "X264" in encode:
             return "x264"
+        if "H265" in encode or "H.265" in encode:
+            return "H265"
+        if "H264" in encode or "H.264" in encode:
+            return "H264"
+        if "HEVC" in codec:
+            return "HEVC"
+        if "AVC" in codec:
+            return "AVC"
+        if "VC-1" in codec or "VC1" in codec:
+            return "VC-1"
+        if "MPEG-2" in codec or "MPEG2" in codec:
+            return "MPEG-2"
         return ""
 
     # ──────────────────────────────────────────────────────────
@@ -168,14 +181,20 @@ class HDF(FrenchTrackerMixin):
 
     @staticmethod
     def _get_resolution_id(meta: Meta) -> str:
-        """Map resolution to HDF form value."""
+        """Map resolution to HDF form <select name="bitrate"> value.
+
+        Valid values: 720p, 1080p, 1080i, 2160p, 3D 1080p, 3D 720p
+        """
         resolution = str(meta.get("resolution", ""))
+        is_3d = bool(meta.get("3D"))
         if "2160" in resolution:
             return "2160p"
+        if "1080i" in resolution:
+            return "1080i"
         if "1080" in resolution:
-            return "1080p"
+            return "3D 1080p" if is_3d else "1080p"
         if "720" in resolution:
-            return "720p"
+            return "3D 720p" if is_3d else "720p"
         return resolution
 
     # ──────────────────────────────────────────────────────────
@@ -184,18 +203,21 @@ class HDF(FrenchTrackerMixin):
 
     @staticmethod
     def _get_file_type(meta: Meta) -> str:
-        """Map release type to HDF file type form value."""
+        """Map release type to HDF form <select name="media"> value.
+
+        Valid values: Blu-ray Original, Blu-ray Remux, Blu-ray Rip, mHD, HD-DVD, WEB-DL
+        """
         release_type = str(meta.get("type", "")).upper()
         is_disc = str(meta.get("is_disc", ""))
 
         if is_disc == "BDMV" or release_type == "DISC":
-            return "FULL"
+            return "Blu-ray Original"
         if release_type == "REMUX":
-            return "REMUX"
+            return "Blu-ray Remux"
         if release_type in ("WEBDL", "WEBRIP"):
             return "WEB-DL"
         if release_type == "ENCODE":
-            return "ENCODE"
+            return "Blu-ray Rip"
         return ""
 
     # ──────────────────────────────────────────────────────────
@@ -644,9 +666,30 @@ class HDF(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
-        """Build the multipart form data dict for HDF upload.php."""
+        """Build the multipart form data dict for HDF upload.php.
+
+        Real form field names (verified against hdf.world/upload.php):
+          submit, auth          — hidden fields
+          file_input            — .torrent file
+          type                  — category (select 0-6)
+          allocine_url          — allociné/TMDB URL
+          title                 — movie title
+          year                  — release year
+          format                — video codec (select)
+          bitrate               — resolution (select)
+          media                 — file type (select)
+          team                  — release group
+          scene                 — scene checkbox
+          VFI..MUET             — language checkboxes (direct names)
+          releaseVersion[]      — version checkboxes (array)
+          release_desc          — release description (BBCode)
+          album_desc            — movie/album description (BBCode)
+          image                 — poster URL
+        """
         name_result = await self.get_name(meta)
-        title = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
+        # get_name populates meta["name"]; the torrent name is embedded in the .torrent file
+        if isinstance(name_result, dict) and name_result.get("name"):
+            meta.setdefault("name", name_result["name"])
 
         # Build audio tag for language detection
         audio_tag = await self._build_audio_string(meta)
@@ -663,13 +706,10 @@ class HDF(FrenchTrackerMixin):
         # Category
         category_id = await self.get_category_id(meta)
 
-        # TMDB URL
+        # TMDB URL (form field is allocine_url but accepts any URL)
         tmdb_id = meta.get("tmdb", "")
         tmdb_cat = "movie" if str(meta.get("category", "")).upper() != "TV" else "tv"
         tmdb_url = f"https://www.themoviedb.org/{tmdb_cat}/{tmdb_id}" if tmdb_id else ""
-
-        # Scene flag
-        is_scene = "1" if meta.get("scene", False) else "0"
 
         # Team / release group
         team = self._get_release_group(meta)
@@ -677,62 +717,69 @@ class HDF(FrenchTrackerMixin):
         # Versions
         versions = self._get_versions(meta)
 
+        # Poster
+        poster = meta.get("poster", "") or ""
+
         data: dict[str, Any] = {
-            "name": title,
-            "category": str(category_id),
-            "tmdburl": tmdb_url,
-            "descr": description,
-            "mediainfo": mi_text,
-            "scene": is_scene,
-            "codec": self._get_codec_id(meta),
-            "resolution": self._get_resolution_id(meta),
-            "filetype": self._get_file_type(meta),
+            "submit": "true",
+            "type": str(category_id),
+            "allocine_url": tmdb_url,
+            "title": str(meta.get("title", "")),
+            "year": str(meta.get("year", "")),
+            "format": self._get_codec_id(meta),
+            "bitrate": self._get_resolution_id(meta),
+            "media": self._get_file_type(meta),
             "team": team,
+            "release_desc": description,
+            "album_desc": mi_text,
+            "image": poster,
         }
 
-        # Language checkboxes
-        # TODO: Verify exact <input name="..."> values against hdf.world/upload.php
-        lang_field_map = {
-            "VFI": "lang_vfi",
-            "VFF": "lang_vff",
-            "VFQ": "lang_vfq",
-            "VO": "lang_vo",
-            "VOF": "lang_vof",
-            "VOQ": "lang_voq",
-            "VF": "lang_vf",
-            "MULTi": "lang_multi",
-            "subtitles": "lang_subtitles",
-            "muet": "lang_muet",
+        # Scene checkbox
+        if meta.get("scene", False):
+            data["scene"] = "1"
+
+        # Language checkboxes — form uses the tag name directly as field name
+        _LANG_FIELDS = {
+            "VFI": "VFI",
+            "VFF": "VFF",
+            "VFQ": "VFQ",
+            "VO": "VO",
+            "VOF": "VOF",
+            "VOQ": "VOQ",
+            "VF": "VF",
+            "MULTi": "MULTI",
+            "subtitles": "SRT",
+            "muet": "MUET",
         }
-        for flag_key, form_field in lang_field_map.items():
+        for flag_key, form_field in _LANG_FIELDS.items():
             if lang_flags.get(flag_key, False):
                 data[form_field] = "1"
 
-        # Version checkboxes
-        # TODO: Verify exact <input name="..."> values against hdf.world/upload.php
-        version_field_map: dict[str, str] = {
-            "Remaster": "version_remaster",
-            "Director's Cut": "version_dc",
-            "Version Longue": "version_vl",
-            "UnCut": "version_uncut",
-            "UnRated": "version_unrated",
-            "2in1": "version_2in1",
-            "Source Netflix": "version_nf",
-            "Source Amazon": "version_amzn",
-            "Source AppleTV": "version_atvp",
-            "Source Canal+": "version_cnlp",
-            "Source Disney+": "version_dsnp",
-            "Criterion": "version_criterion",
-            "Custom / HYBRiD": "version_custom",
-            "HDR": "version_hdr",
-            "HDR10+": "version_hdr10plus",
-            "Dolby Vision": "version_dv",
-            "IMAX": "version_imax",
-            "Bonus": "version_bonus",
+        # Version checkboxes — all share name="releaseVersion[]" with distinct values
+        _VERSION_VALUES: dict[str, str] = {
+            "Remaster": "RM",
+            "Director's Cut": "DC",
+            "Version Longue": "VL",
+            "UnCut": "UC",
+            "UnRated": "UR",
+            "2in1": "2in1",
+            "Source Netflix": "NF",
+            "Source Amazon": "AMZN",
+            "Source AppleTV": "ATVP",
+            "Source Canal+": "CNLP",
+            "Source Disney+": "DSNP",
+            "Criterion": "Crit",
+            "Custom / HYBRiD": "Cust",
+            "HDR": "HDR",
+            "HDR10+": "HDR10+",
+            "Dolby Vision": "DV",
+            "IMAX": "IMAX",
+            "Bonus": "Bonus",
         }
-        for ver in versions:
-            if ver in version_field_map:
-                data[version_field_map[ver]] = "1"
+        release_versions = [_VERSION_VALUES[ver] for ver in versions if ver in _VERSION_VALUES]
+        if release_versions:
+            data["releaseVersion[]"] = release_versions
 
         # Anonymous
         anon = meta.get("anon", False) or self.config["TRACKERS"].get(self.tracker, {}).get("anon", False)

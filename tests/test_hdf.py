@@ -97,19 +97,19 @@ class TestGetCategoryId:
         "category,genres,keywords,anime,expected_id",
         [
             # Standard movies
-            ("MOVIE", "", "", False, 1),
+            ("MOVIE", "", "", False, 0),
             # TV series
-            ("TV", "", "", False, 3),
+            ("TV", "", "", False, 4),
             # Anime movies
-            ("MOVIE", "", "", True, 2),
+            ("MOVIE", "", "", True, 1),
             # Anime series
-            ("TV", "", "", True, 4),
+            ("TV", "", "", True, 5),
             # Documentaries (movie)
-            ("MOVIE", "Documentary", "", False, 5),
+            ("MOVIE", "Documentary", "", False, 6),
             # Documentaries via keywords
-            ("MOVIE", "", "documentary", False, 5),
+            ("MOVIE", "", "documentary", False, 6),
             # Concerts
-            ("MOVIE", "Music", "", False, 7),
+            ("MOVIE", "Music", "", False, 3),
         ],
     )
     def test_category_mapping(
@@ -138,9 +138,9 @@ class TestGetCodecId:
         "video_codec,video_encode,expected",
         [
             ("AVC", "x264", "x264"),
-            ("AVC", "H264", "x264"),
+            ("AVC", "H264", "H264"),
             ("HEVC", "x265", "x265"),
-            ("HEVC", "H265", "x265"),
+            ("HEVC", "H265", "H265"),
             ("", "AV1", "AV1"),
             ("", "", ""),
         ],
@@ -163,7 +163,7 @@ class TestGetResolutionId:
         [
             ("2160p", "2160p"),
             ("1080p", "1080p"),
-            ("1080i", "1080p"),
+            ("1080i", "1080i"),
             ("720p", "720p"),
         ],
     )
@@ -183,11 +183,11 @@ class TestGetFileType:
     @pytest.mark.parametrize(
         "release_type,is_disc,expected",
         [
-            ("REMUX", None, "REMUX"),
+            ("REMUX", None, "Blu-ray Remux"),
             ("WEBDL", None, "WEB-DL"),
             ("WEBRIP", None, "WEB-DL"),
-            ("ENCODE", None, "ENCODE"),
-            ("DISC", "BDMV", "FULL"),
+            ("ENCODE", None, "Blu-ray Rip"),
+            ("DISC", "BDMV", "Blu-ray Original"),
         ],
     )
     def test_file_type_mapping(self, release_type: str, is_disc: Any, expected: str):
@@ -451,7 +451,7 @@ class TestSpectaclesCategory:
     def test_spectacles_returns_6(self, genres: str, keywords: str):
         tracker = HDF(_config())
         meta = _meta_base(category="MOVIE", genres=genres, keywords=keywords)
-        assert asyncio.run(tracker.get_category_id(meta)) == 6
+        assert asyncio.run(tracker.get_category_id(meta)) == 2
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -511,28 +511,30 @@ class TestGetDataPayload:
         }
         data = asyncio.run(tracker.get_data(meta))
 
-        # Category
-        assert data["category"] == "1"  # Films
+        # Category (form field is "type")
+        assert data["type"] == "0"  # Film
 
-        # Codec / resolution / filetype
-        assert data["codec"] == "x265"
-        assert data["resolution"] == "1080p"
-        assert data["filetype"] == "WEB-DL"
+        # Codec / resolution / filetype (real field names)
+        assert data["format"] == "x265"
+        assert data["bitrate"] == "1080p"
+        assert data["media"] == "WEB-DL"
 
-        # Service in name
-        assert "AMZN" in data["name"]
+        # Name is generated via get_name but stored in torrent, not a form field;
+        # verify description was set
+        assert data.get("release_desc")
 
         # Language flags — _build_audio_string produces MULTI.VFF for en-original
         # with fr track titled "VOF" (VFF is the conservative default)
-        assert data.get("lang_multi") == "1"
-        assert data.get("lang_vff") == "1"
+        assert data.get("MULTI") == "1"
+        assert data.get("VFF") == "1"
 
-        # Version — HDR + Source Amazon
-        assert data.get("version_hdr") == "1"
-        assert data.get("version_amzn") == "1"
+        # Version — HDR + Source Amazon via releaseVersion[]
+        versions = data.get("releaseVersion[]", [])
+        assert "HDR" in versions
+        assert "AMZN" in versions
 
-        # TMDB URL present
-        assert "themoviedb.org" in data.get("tmdburl", "")
+        # TMDB URL in allocine_url field
+        assert "themoviedb.org" in data.get("allocine_url", "")
 
     @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
     @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
@@ -548,7 +550,7 @@ class TestGetDataPayload:
         meta = _meta_base(category="TV", anime=True, service="", hdr="", edition="")
         meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "ja"}]}}
         data = asyncio.run(tracker.get_data(meta))
-        assert data["category"] == "4"
+        assert data["type"] == "5"
 
     @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
     @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
@@ -578,5 +580,5 @@ class TestGetDataPayload:
             }
         }
         data = asyncio.run(tracker.get_data(meta))
-        assert data.get("lang_multi") == "1"
-        assert data.get("lang_vof") == "1"
+        assert data.get("MULTI") == "1"
+        assert data.get("VOF") == "1"
