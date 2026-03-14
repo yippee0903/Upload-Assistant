@@ -62,6 +62,8 @@ _BANNED_GROUPS: list[str] = [
 class HDF(FrenchTrackerMixin):
     """HD-Forever (hdf.world) — French private tracker with cookie-based auth."""
 
+    secret_token: str = ""
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)
@@ -101,6 +103,7 @@ class HDF(FrenchTrackerMixin):
             tracker=self.tracker,
             test_url=self.upload_url,
             error_text="login.php",
+            token_pattern=r'name="auth" value="([^"]+)"',  # nosec B106
         )
 
     # ──────────────────────────────────────────────────────────
@@ -722,6 +725,7 @@ class HDF(FrenchTrackerMixin):
 
         data: dict[str, Any] = {
             "submit": "true",
+            "auth": HDF.secret_token,
             "type": str(category_id),
             "allocine_url": tmdb_url,
             "title": str(meta.get("title", "")),
@@ -807,7 +811,7 @@ class HDF(FrenchTrackerMixin):
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
-            torrent_field_name="torrent",
+            torrent_field_name="file_input",
             upload_cookies=self.session.cookies,
             upload_url=self.upload_url,
             hash_is_id=True,
