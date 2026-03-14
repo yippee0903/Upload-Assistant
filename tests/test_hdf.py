@@ -429,3 +429,154 @@ class TestNaming:
         result = asyncio.run(tracker.get_name(meta))
         name = result.get("name", "") if isinstance(result, dict) else str(result)
         assert "REMUX" in name
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Category — Spectacles (category 6)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestSpectaclesCategory:
+    """Ensure spectacle-related genres/keywords return category 6."""
+
+    @pytest.mark.parametrize(
+        "genres,keywords",
+        [
+            ("humour", ""),
+            ("stand-up", ""),
+            ("", "spectacle"),
+            ("", "one-man-show"),
+        ],
+    )
+    def test_spectacles_returns_6(self, genres: str, keywords: str):
+        tracker = HDF(_config())
+        meta = _meta_base(category="MOVIE", genres=genres, keywords=keywords)
+        assert asyncio.run(tracker.get_category_id(meta)) == 6
+
+
+# ═══════════════════════════════════════════════════════════════
+#   MULTI.VOF language flag
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestMultiVOF:
+    """MULTI.VOF should set both MULTi and VOF flags."""
+
+    def test_multi_vof(self):
+        tracker = HDF(_config())
+        flags = tracker._compute_language_flags(_meta_base(), "MULTI.VOF")
+        assert flags["MULTi"] is True
+        assert flags["VOF"] is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#   get_data payload regression test
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetDataPayload:
+    """Regression test: build full upload payload and verify fields."""
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_movie_multi_vof_payload(
+        self,
+        mock_mi: AsyncMock,
+        mock_desc: AsyncMock,
+        mock_title: AsyncMock,
+    ):
+        """MOVIE with MULTI.VOF, AMZN service, 1080p x265 — full payload check."""
+        tracker = HDF(_config())
+        meta = _meta_base(
+            category="MOVIE",
+            type="WEBDL",
+            title="The Box",
+            year="2009",
+            resolution="1080p",
+            video_encode="x265",
+            video_codec="HEVC",
+            service="AMZN",
+            tag="-HDForever",
+            hdr="HDR",
+            edition="",
+        )
+        meta["mediainfo"] = {
+            "media": {
+                "track": [
+                    {"@type": "Audio", "Language": "fr", "Title": "VOF"},
+                    {"@type": "Audio", "Language": "en"},
+                ]
+            }
+        }
+        data = asyncio.run(tracker.get_data(meta))
+
+        # Category
+        assert data["category"] == "1"  # Films
+
+        # Codec / resolution / filetype
+        assert data["codec"] == "x265"
+        assert data["resolution"] == "1080p"
+        assert data["filetype"] == "WEB-DL"
+
+        # Service in name
+        assert "AMZN" in data["name"]
+
+        # Language flags — _build_audio_string produces MULTI.VFF for en-original
+        # with fr track titled "VOF" (VFF is the conservative default)
+        assert data.get("lang_multi") == "1"
+        assert data.get("lang_vff") == "1"
+
+        # Version — HDR + Source Amazon
+        assert data.get("version_hdr") == "1"
+        assert data.get("version_amzn") == "1"
+
+        # TMDB URL present
+        assert "themoviedb.org" in data.get("tmdburl", "")
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_anime_tv_category(
+        self,
+        mock_mi: AsyncMock,
+        mock_desc: AsyncMock,
+        mock_title: AsyncMock,
+    ):
+        """Anime TV should map to category 4 (Séries d'animation)."""
+        tracker = HDF(_config())
+        meta = _meta_base(category="TV", anime=True, service="", hdr="", edition="")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "ja"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        assert data["category"] == "4"
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_french_original_produces_vof(
+        self,
+        mock_mi: AsyncMock,
+        mock_desc: AsyncMock,
+        mock_title: AsyncMock,
+    ):
+        """French-original film with en track should produce MULTI.VOF → lang_vof."""
+        tracker = HDF(_config())
+        meta = _meta_base(
+            category="MOVIE",
+            type="WEBDL",
+            original_language="fr",
+            service="",
+            hdr="",
+            edition="",
+        )
+        meta["mediainfo"] = {
+            "media": {
+                "track": [
+                    {"@type": "Audio", "Language": "fr"},
+                    {"@type": "Audio", "Language": "en"},
+                ]
+            }
+        }
+        data = asyncio.run(tracker.get_data(meta))
+        assert data.get("lang_multi") == "1"
+        assert data.get("lang_vof") == "1"
