@@ -42,6 +42,7 @@ from src.trackers.G3MINI import G3MINI
 from src.trackers.GF import GF
 from src.trackers.GPW import GPW
 from src.trackers.HDB import HDB
+from src.trackers.HDF import HDF
 from src.trackers.HDS import HDS
 from src.trackers.HDT import HDT
 from src.trackers.HHD import HHD
@@ -1349,6 +1350,7 @@ tracker_class_map: dict[str, type[Any]] = {
     "GF": GF,
     "GPW": GPW,
     "HDB": HDB,
+    "HDF": HDF,
     "HDS": HDS,
     "HDT": HDT,
     "HHD": HHD,
@@ -1442,7 +1444,7 @@ api_trackers = {
 
 other_api_trackers = {"ANT", "BHDTV", "C411", "DC", "GPW", "NBL", "RTF", "SN", "SPD", "TL", "TORR9", "TVC"}
 
-http_trackers = {"AR", "ASC", "AZ", "BJS", "BT", "CZ", "FF", "FL", "HDB", "HDS", "HDT", "IS", "MTV", "PHD", "PTER", "PTS", "TTG"}
+http_trackers = {"AR", "ASC", "AZ", "BJS", "BT", "CZ", "FF", "FL", "HDB", "HDF", "HDS", "HDT", "IS", "MTV", "PHD", "PTER", "PTS", "TTG"}
 
 # ── Inherent tracker behaviors (not user-configurable) ──
 # Trackers that exclude .nfo files from torrents and API uploads
@@ -1452,7 +1454,7 @@ nfo_skip_trackers = frozenset({"DP", "FNP", "HHD", "LST", "LUME", "STC", "ULCX"}
 notag_labels: dict[str, str] = {"C411": "NOTAG", "FNP": "NOGROUP", "G3MINI": "NoGrP", "GF": "NoTag"}
 
 # Trackers that skip the English audio/subtitle requirement check
-english_check_skip_trackers = frozenset({"C411", "G3MINI", "GF", "TOS", "TORR9"})
+english_check_skip_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "TOS", "TORR9"})
 
 # Trackers that require French audio or subtitles (warn if neither is detected)
-french_check_trackers = frozenset({"C411", "G3MINI", "GF", "TOS", "TORR9"})
+french_check_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "TOS", "TORR9"})
