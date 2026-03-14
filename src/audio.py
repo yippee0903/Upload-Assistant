@@ -422,7 +422,7 @@ async def _get_audio_v2(
                         if t.get("@type") == "Audio"
                         and "commentary" not in str(t.get("Title") or "").lower()
                         and "compatibility" not in str(t.get("Title") or "").lower()
-                        and not re.search(r"\baudio[_\-\s]?description\b", str(t.get("Title") or ""), re.IGNORECASE)
+                        and not AD_TRACK_RE.search(str(t.get("Title") or ""))
                     ]
                     audio_language = None
                     if meta["debug"]:
