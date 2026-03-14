@@ -579,7 +579,7 @@ class C411(FrenchTrackerMixin):
     def _get_language_option_id(self, language_tag: str) -> Union[int, None]:
         """Map C411 language tag to API option value (Type 1).
 
-        1=Anglais  2=Français(VFF)  4=Multi(FR inclus)
+        1=Anglais  2=Français(VFF)  4=Multi(FR inclus)  5=Multi(QC inclus)
         6=Québécois(VFQ)  8=VOSTFR  422=Multi VF2(FR+QC)
         """
         tag_map: dict[str, int] = {
