@@ -263,7 +263,7 @@ class C411(FrenchTrackerMixin):
     def _detect_lang_tag_from_name(name: str) -> str:
         """Extract the French language tag from a torrent name.
 
-        Returns one of: MULTI.VF2, VF2, MULTI.VFF, MULTI.VFQ, VFF, VFQ, VOSTFR, ''
+        Returns one of: MULTI.VF2, VF2, MULTI.VFF, MULTI.VFI, MULTI.VFQ, VFF, VFI, VFQ, VOSTFR, ''
         """
         n = name.upper().replace("-", ".").replace(" ", ".")
         tokens = n.split(".")
@@ -272,6 +272,7 @@ class C411(FrenchTrackerMixin):
         has_multi = "MULTI" in token_set
         has_vf2 = "VF2" in token_set
         has_vff = "VFF" in token_set
+        has_vfi = "VFI" in token_set
         has_vfq = "VFQ" in token_set
         has_vostfr = "VOSTFR" in token_set or "SUBFRENCH" in token_set
 
@@ -281,12 +282,16 @@ class C411(FrenchTrackerMixin):
             return "VF2"
         if has_multi and has_vff:
             return "MULTI.VFF"
+        if has_multi and has_vfi:
+            return "MULTI.VFI"
         if has_multi and has_vfq:
             return "MULTI.VFQ"
         if has_multi:
             return "MULTI"
         if has_vff:
             return "VFF"
+        if has_vfi:
+            return "VFI"
         if has_vfq:
             return "VFQ"
         if has_vostfr:
@@ -1555,25 +1560,27 @@ class C411(FrenchTrackerMixin):
             dupes = slot_dupes
 
         # ── Language coexistence ──
-        # VFF and VFQ can coexist temporarily when no VF2/MULTI.VF2 exists.
-        # So: if upload is VFF and only VFQ dupes exist (no VF2/MULTI.VF2) → not a dupe.
+        # VFF/VFI and VFQ can coexist temporarily when no VF2/MULTI.VF2 exists.
+        # So: if upload is VFF/VFI and only VFQ dupes exist (no VF2/MULTI.VF2) → not a dupe.
+        _FR_TAGS = ("VFF", "MULTI.VFF", "VFI", "MULTI.VFI")
+        _QC_TAGS = ("VFQ", "MULTI.VFQ")
         if dupes:
             upload_audio = await self._build_audio_string(meta)
             upload_lang = self._detect_lang_tag_from_name(upload_audio)
             # Check if any existing dupe is VF2 or MULTI.VF2
             has_unified = any(self._detect_lang_tag_from_name(d.get("name", "")) in ("VF2", "MULTI.VF2") for d in dupes)
-            if not has_unified and upload_lang in ("VFF", "MULTI.VFF"):
-                # VFF upload: filter out VFQ-only dupes (they coexist)
+            if not has_unified and upload_lang in _FR_TAGS:
+                # VFF/VFI upload: filter out VFQ-only dupes (they coexist)
                 before = len(dupes)
-                dupes = [d for d in dupes if self._detect_lang_tag_from_name(d.get("name", "")) not in ("VFQ", "MULTI.VFQ")]
+                dupes = [d for d in dupes if self._detect_lang_tag_from_name(d.get("name", "")) not in _QC_TAGS]
                 if meta.get("debug") and len(dupes) < before:
-                    console.print(f"[cyan]C411 coexistence: VFF upload — {before - len(dupes)} VFQ dupe(s) removed (temporary coexistence, no VF2 found)[/cyan]")
-            elif not has_unified and upload_lang in ("VFQ", "MULTI.VFQ"):
-                # VFQ upload: filter out VFF-only dupes (they coexist)
+                    console.print(f"[cyan]C411 coexistence: {upload_lang} upload — {before - len(dupes)} VFQ dupe(s) removed (temporary coexistence, no VF2 found)[/cyan]")
+            elif not has_unified and upload_lang in _QC_TAGS:
+                # VFQ upload: filter out VFF/VFI-only dupes (they coexist)
                 before = len(dupes)
-                dupes = [d for d in dupes if self._detect_lang_tag_from_name(d.get("name", "")) not in ("VFF", "MULTI.VFF")]
+                dupes = [d for d in dupes if self._detect_lang_tag_from_name(d.get("name", "")) not in _FR_TAGS]
                 if meta.get("debug") and len(dupes) < before:
-                    console.print(f"[cyan]C411 coexistence: VFQ upload — {before - len(dupes)} VFF dupe(s) removed (temporary coexistence, no VF2 found)[/cyan]")
+                    console.print(f"[cyan]C411 coexistence: VFQ upload — {before - len(dupes)} VFF/VFI dupe(s) removed (temporary coexistence, no VF2 found)[/cyan]")
 
         # ── HDR / DV coexistence ──
         # HDR-only and DV-only can coexist when no combined DV.HDR10 exists.
