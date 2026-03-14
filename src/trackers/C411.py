@@ -585,7 +585,7 @@ class C411(FrenchTrackerMixin):
         tag_map: dict[str, int] = {
             "MULTI.VF2": 422,
             "MULTI.VFF": 4,
-            "MULTI.VFQ": 4,
+            "MULTI.VFQ": 5,
             "MULTI.VOF": 4,
             "MULTI.TRUEFRENCH": 4,
             "MULTI": 4,
