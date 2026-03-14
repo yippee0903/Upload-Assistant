@@ -130,6 +130,10 @@ class HDF(FrenchTrackerMixin):
         if "music" in genres or "concert" in keywords:
             return 7  # Concerts
 
+        _SPECTACLE_TOKENS = {"spectacle", "spectacles", "show", "theatre", "theater", "stage", "performance", "one-man-show", "stand-up", "humour", "humor"}
+        if _SPECTACLE_TOKENS & (set(genres.split(", ")) | set(keywords.split(", "))):
+            return 6  # Spectacles
+
         if is_anime:
             if category == "TV":
                 return 4  # Séries d'animation
@@ -224,6 +228,8 @@ class HDF(FrenchTrackerMixin):
                 flags["VFQ"] = True
             if "VFI" in tag:
                 flags["VFI"] = True
+            if "VOF" in tag:
+                flags["VOF"] = True
         elif "VOF" in tag:
             flags["VOF"] = True
         elif "VFF" in tag or "TRUEFRENCH" in tag:
@@ -501,7 +507,7 @@ class HDF(FrenchTrackerMixin):
         # ══════════════════════════════════════════════════════
         parts.append(f"[b][color={C}][size=18]━━━ Release ━━━[/size][/color][/b]")
 
-        release_name = meta.get("uuid", "")
+        release_name = meta.get("name", "") or meta.get("title", "")
         parts.append(f"[b][color={C}]Titre :[/color][/b] [i]{release_name}[/i]")
 
         size_str = self._get_total_size(meta, mi_text)
@@ -685,6 +691,7 @@ class HDF(FrenchTrackerMixin):
         }
 
         # Language checkboxes
+        # TODO: Verify exact <input name="..."> values against hdf.world/upload.php
         lang_field_map = {
             "VFI": "lang_vfi",
             "VFF": "lang_vff",
@@ -702,6 +709,7 @@ class HDF(FrenchTrackerMixin):
                 data[form_field] = "1"
 
         # Version checkboxes
+        # TODO: Verify exact <input name="..."> values against hdf.world/upload.php
         version_field_map: dict[str, str] = {
             "Remaster": "version_remaster",
             "Director's Cut": "version_dc",
