@@ -180,3 +180,54 @@ class TestFrenchAudioDescriptionAcrossTrackers:
         )
         lines = tracker._format_audio_bbcode(mi)
         assert " [AD]" in lines[0]
+
+    # ── Abbreviated AD format tests (issue #63) ──
+
+    def test_abbreviated_ad_single_french(self, tracker: Any):
+        """Track title 'FR AD : AC3 2.0' should be detected as audio description."""
+        meta = _meta_base(
+            mediainfo=_mi([
+                _audio_track("fr", Title="Main Audio"),
+                _audio_track("fr", Title="FR AD : AC3 2.0"),
+            ]),
+        )
+        assert _run(tracker._build_audio_string(meta)) == _expected_single(tracker)
+
+    def test_abbreviated_ad_multi(self, tracker: Any):
+        """Track 'EN AD : AC3 2.0' on a French release → AD.MULTI."""
+        meta = _meta_base(
+            mediainfo=_mi([
+                _audio_track("fr", Title="Main Audio"),
+                _audio_track("en", Title="EN AD : AC3 2.0"),
+            ]),
+        )
+        assert _run(tracker._build_audio_string(meta)) == _expected_multi(tracker)
+
+    def test_abbreviated_ad_bbcode(self, tracker: Any):
+        """BBCode should mark 'FR AD : AC3 2.0' tracks with [AD]."""
+        mi = (
+            "Audio #1\n"
+            "Language                                 : French\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 6 channels\n"
+            "Bit rate                                 : 384 kb/s\n"
+            "\nAudio #2\n"
+            "Language                                 : French\n"
+            "Title                                    : FR AD : AC3 2.0\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 2 channels\n"
+            "Bit rate                                 : 192 kb/s\n"
+        )
+        lines = tracker._format_audio_bbcode(mi, {"has_audiodesc": True})
+        assert " [AD]" not in lines[0]
+        assert " [AD]" in lines[1]
+
+    def test_abbreviated_ad_vostfr(self, tracker: Any):
+        """Only AD track is French → should be AD.VOSTFR, not counted as main FR audio."""
+        meta = _meta_base(
+            mediainfo=_mi([
+                _audio_track("en", Title="Main Audio"),
+                _audio_track("fr", Title="FR AD : AC3 2.0"),
+            ], [_sub_track("fr")]),
+        )
+        assert _run(tracker._build_audio_string(meta)) == "AD.VOSTFR"

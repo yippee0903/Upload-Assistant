@@ -425,7 +425,7 @@ class FrenchTrackerMixin:
     def _is_audio_desc_track(track: dict[str, Any]) -> bool:
         """Return True when an audio track is an audio-description track."""
         title = str(track.get("Title") or track.get("title") or "")
-        return bool(re.search(r"\baudio[\s-]description\b", title, re.IGNORECASE))
+        return bool(re.search(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:", title, re.IGNORECASE))
 
     @staticmethod
     def _map_language(lang: str) -> str:
