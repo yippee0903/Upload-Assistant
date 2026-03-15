@@ -233,3 +233,22 @@ class TestGetName:
         # Language tag (MULTi) must appear
         assert 'MULTi' in name, f"Language tag missing: {name}"
         assert name.endswith('x264-SGF'), f"Video encode not at end: {name}"
+
+    def test_tv_dvdrip_includes_episode(self):
+        """TV DVDRIP must include both season and episode in the name."""
+        meta = _meta_base(
+            category='TV',
+            type='DVDRIP',
+            source='DVD',
+            video_encode='x264',
+            video_codec='',
+            season='S01',
+            episode='E03',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'S01E03' in name, f"Season+episode missing: {name}"
+        assert 'DVDRip' in name, f"DVDRip tag missing: {name}"
+        assert name.endswith('x264-SGF'), f"Video encode not at end: {name}"
