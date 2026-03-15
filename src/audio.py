@@ -25,7 +25,7 @@ TrackDict = dict[str, Any]
 
 
 # Compiled pattern shared with src/trackers/FRENCH.py — keep in sync.
-AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:", re.IGNORECASE)
+AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:|\(AD\)", re.IGNORECASE)
 
 
 class AudioManager:
