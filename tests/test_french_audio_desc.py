@@ -102,14 +102,12 @@ def tracker(request: pytest.FixtureRequest):
 
 
 def _expected_single(tracker: Any) -> str:
-    if not getattr(tracker, 'INCLUDE_AD_IN_NAME', True):
-        return "FRENCH" if tracker.tracker in {"TOS", "G3MINI"} else "VFF"
     return "AD.FRENCH" if tracker.tracker in {"TOS", "G3MINI"} else "AD.VFF"
 
 
 def _expected_multi(tracker: Any) -> str:
-    if not getattr(tracker, 'INCLUDE_AD_IN_NAME', True):
-        return "MULTi" if tracker.tracker in {"TOS", "G3MINI"} else "MULTI.VFF"
+    if tracker.tracker == "GF":
+        return "MULTI.VFF"
     return "AD.MULTi" if tracker.tracker in {"TOS", "G3MINI"} else "AD.MULTI.VFF"
 
 
@@ -143,8 +141,7 @@ class TestFrenchAudioDescriptionAcrossTrackers:
                 _audio_track("fr", Title="Audio Description"),
             ], [_sub_track("fr")]),
         )
-        expected = "VOSTFR" if not getattr(tracker, 'INCLUDE_AD_IN_NAME', True) else "AD.VOSTFR"
-        assert _run(tracker._build_audio_string(meta)) == expected
+        assert _run(tracker._build_audio_string(meta)) == "AD.VOSTFR"
 
     def test_get_name_keeps_ad_prefix_before_multi(self, tracker: Any):
         meta = _meta_base(
@@ -235,5 +232,4 @@ class TestFrenchAudioDescriptionAcrossTrackers:
                 _audio_track("fr", Title="FR AD : AC3 2.0"),
             ], [_sub_track("fr")]),
         )
-        expected = "VOSTFR" if not getattr(tracker, 'INCLUDE_AD_IN_NAME', True) else "AD.VOSTFR"
-        assert _run(tracker._build_audio_string(meta)) == expected
+        assert _run(tracker._build_audio_string(meta)) == "AD.VOSTFR"
