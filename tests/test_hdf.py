@@ -8,6 +8,7 @@ Covers: category mapping, codec mapping, resolution mapping,
 import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -534,7 +535,9 @@ class TestGetDataPayload:
         assert "AMZN" in versions
 
         # TMDB URL in allocine_url field
-        assert "themoviedb.org" in data.get("allocine_url", "")
+        allocine_url = data.get("allocine_url", "")
+        host = urlparse(allocine_url).hostname or ""
+        assert host.endswith("themoviedb.org")
 
     @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
     @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
