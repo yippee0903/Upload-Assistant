@@ -429,6 +429,15 @@ class FrenchTrackerMixin:
         title = str(track.get("Title") or track.get("title") or "")
         return bool(AD_TRACK_RE.search(title))
 
+    def _get_audio_for_name(self, meta: Meta) -> str:
+        """Return the audio codec+channels string for the release name.
+
+        Base implementation uses ``meta['audio']`` (first track in stream
+        order).  Subclasses may override to pick a different track, e.g.
+        the first French audio track for French-tracker NFO validation.
+        """
+        return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+
     @staticmethod
     def _map_language(lang: str) -> str:
         """Map a language name/code to a normalised 3-letter code."""
@@ -852,7 +861,7 @@ class FrenchTrackerMixin:
         resolution = meta.get("resolution", "")
         if resolution == "OTHER":
             resolution = ""
-        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+        audio = self._get_audio_for_name(meta)
         service = meta.get("service", "") if self.INCLUDE_SERVICE_IN_NAME else ""
         season = meta.get("season", "")
         episode = meta.get("episode", "")

@@ -62,6 +62,28 @@ class C411(FrenchTrackerMixin):
     # C411 wiki: UHD is only allowed when the release is REMUX/BDMV/ISO.
     UHD_ONLY_FOR_REMUX_DISC: bool = True
 
+    def _get_audio_for_name(self, meta: Meta) -> str:
+        """C411 override: use the first French audio track's codec/channels.
+
+        C411's NFO validator matches the release-name audio tag against
+        the MediaInfo of the French audio tracks.  When the first track
+        is English (e.g. DTS:X 7.1) but the French track is different
+        (e.g. DTS-HD MA 5.1), the name must reflect the French track.
+        """
+        from src.audio import codec_info_from_track
+
+        audio_tracks = self._get_audio_tracks(meta)
+        main_tracks = [t for t in audio_tracks if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", "")).lower()]
+        for track in main_tracks:
+            raw_lang = str(track.get("Language", "")).strip().lower()
+            mapped = self._map_language(raw_lang)
+            if mapped == "FRA":
+                if not track.get("Format"):
+                    break  # No detailed format info — fall back to meta['audio']
+                return codec_info_from_track(track).replace("DD+", "DDP")
+
+        return super()._get_audio_for_name(meta)
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """C411 override: enforce correct codec for WEB sources.
 
