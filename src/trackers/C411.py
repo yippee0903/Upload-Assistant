@@ -73,7 +73,7 @@ class C411(FrenchTrackerMixin):
         from src.audio import codec_info_from_track
 
         audio_tracks = self._get_audio_tracks(meta)
-        main_tracks = [t for t in audio_tracks if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", "")).lower()]
+        main_tracks = [t for t in audio_tracks if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower()]
         for track in main_tracks:
             raw_lang = str(track.get("Language", "")).strip().lower()
             mapped = self._map_language(raw_lang)

@@ -637,6 +637,24 @@ class TestGetName:
         name = self._run(meta)
         assert 'DTS.HD.MA.5.1' in name, f"Expected DTS.HD.MA.5.1: {name}"
 
+    def test_french_track_missing_format_uses_meta_audio(self):
+        """FR track present but without Format key → fall back to meta['audio']."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DTS:X 7.1',
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Format_AdditionalFeatures='XLL X',
+                             Channels='8'),
+                _audio_track('fr', Channels='6'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # No Format on FR track → falls back to meta['audio'] which is DTS:X 7.1
+        assert 'DTS.X.7.1' in name, f"Expected fallback to meta audio DTS.X.7.1: {name}"
+
     def test_title_middle_dot_preserved_as_separator(self):
         """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""
         meta = _meta_base(
