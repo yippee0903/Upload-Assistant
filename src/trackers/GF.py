@@ -84,6 +84,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
         self.source_flag = "GF"
 
     WEB_LABEL: str = "WEB"
+    INCLUDE_AD_IN_NAME: bool = False
 
     # ──────────────────────────────────────────────────────────
     #  Category / Type / Resolution mappings
