@@ -1,0 +1,187 @@
+# Tests for G3MINI tracker — gemini-tracker.org
+"""
+Test suite for G3MINI release naming.
+Covers: Hybrid + video codec positioning in release names.
+"""
+
+import asyncio
+from typing import Any
+
+import pytest
+
+from src.trackers.G3MINI import G3MINI
+
+# ─── Helpers ──────────────────────────────────────────────────
+
+
+def _config() -> dict[str, Any]:
+    return {
+        'TRACKERS': {
+            'G3MINI': {
+                'api_key': 'test-api-key',
+                'announce_url': 'https://gemini-tracker.org/announce/FAKE',
+            },
+        },
+        'DEFAULT': {'tmdb_api': 'fake-tmdb-key'},
+    }
+
+
+def _meta_base(**overrides: Any) -> dict[str, Any]:
+    m: dict[str, Any] = {
+        'category': 'MOVIE',
+        'type': 'REMUX',
+        'title': 'Harry Potter and the Goblet of Fire',
+        'year': '2005',
+        'resolution': '2160p',
+        'source': 'BluRay',
+        'audio': 'DTS:X 7.1',
+        'video_encode': '',
+        'video_codec': 'HEVC',
+        'service': '',
+        'tag': '-SGF',
+        'edition': '',
+        'repack': '',
+        '3D': '',
+        'uhd': 'UHD',
+        'hdr': 'DV HDR',
+        'webdv': 'Hybrid',
+        'part': '',
+        'season': '',
+        'episode': '',
+        'is_disc': None,
+        'search_year': '',
+        'manual_year': None,
+        'manual_date': None,
+        'no_season': False,
+        'no_year': False,
+        'no_aka': False,
+        'debug': False,
+        'tv_pack': 0,
+        'path': '',
+        'name': '',
+        'uuid': 'test-uuid',
+        'base_dir': '/tmp',
+        'overview': '',
+        'poster': '',
+        'tmdb': 1234,
+        'imdb_id': 1234567,
+        'original_language': 'en',
+        'image_list': [],
+        'bdinfo': None,
+        'region': '',
+        'dvd_size': '',
+        'has_audiodesc': False,
+        'mediainfo': {
+            'media': {
+                'track': [
+                    {'@type': 'Audio', 'Language': 'en'},
+                    {'@type': 'Audio', 'Language': 'fr'},
+                ],
+            },
+        },
+        'tracker_status': {'G3MINI': {}},
+    }
+    m.update(overrides)
+    return m
+
+
+# ─── Tests ────────────────────────────────────────────────────
+
+
+class TestGetName:
+    """Tests for G3MINI release naming order."""
+
+    @staticmethod
+    def _run(meta: dict[str, Any]) -> str:
+        g = G3MINI(_config())
+        result = asyncio.run(g.get_name(meta))
+        return result['name']
+
+    def test_remux_hybrid_before_hdr_codec_after_audio(self):
+        """Hybrid must sit next to HDR; video codec must come after audio."""
+        meta = _meta_base()
+        name = self._run(meta)
+        # Hybrid.DV.HDR must appear together after REMUX
+        assert 'REMUX.Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        # Video codec (HEVC) must be after audio, right before group tag
+        assert name.endswith('HEVC-SGF'), f"HEVC not at end: {name}"
+        # Audio must come before HEVC
+        idx_audio = name.find('DTSX.7.1')
+        idx_codec = name.find('HEVC-SGF')
+        assert idx_audio < idx_codec, f"Audio not before video codec: {name}"
+
+    def test_remux_no_hybrid(self):
+        """Without Hybrid, HDR sits directly after REMUX."""
+        meta = _meta_base(webdv='')
+        name = self._run(meta)
+        assert 'REMUX.DV.HDR' in name, f"HDR not after REMUX: {name}"
+        assert name.endswith('HEVC-SGF'), f"HEVC not at end: {name}"
+
+    def test_disc_bdmv_hybrid_before_hdr_codec_after_audio(self):
+        """BDMV disc: same ordering rules as REMUX."""
+        meta = _meta_base(type='DISC', is_disc='BDMV')
+        name = self._run(meta)
+        assert 'Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        idx_audio = name.find('DTSX.7.1')
+        idx_codec = name.find('HEVC')
+        assert idx_audio < idx_codec, f"Audio not before video codec: {name}"
+
+    def test_encode_hybrid_before_hdr(self):
+        """ENCODE: Hybrid must be right before HDR, video encode at end."""
+        meta = _meta_base(
+            type='ENCODE',
+            video_encode='x265',
+            video_codec='',
+            source='BluRay',
+        )
+        name = self._run(meta)
+        # Hybrid should be near HDR, not before language
+        assert 'Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        assert name.endswith('x265-SGF'), f"Video encode not at end: {name}"
+
+    def test_webdl_hybrid_before_hdr(self):
+        """WEB-DL: Hybrid must be right before HDR."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            video_encode='H265',
+            video_codec='',
+            service='NF',
+        )
+        name = self._run(meta)
+        assert 'Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        assert name.endswith('H265-SGF'), f"Video encode not at end: {name}"
+
+    def test_tv_remux_hybrid_before_hdr_codec_after_audio(self):
+        """TV REMUX: same ordering as MOVIE REMUX."""
+        meta = _meta_base(
+            category='TV',
+            season='S01',
+            episode='E01',
+        )
+        name = self._run(meta)
+        assert 'REMUX.Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        assert name.endswith('HEVC-SGF'), f"HEVC not at end: {name}"
+
+    def test_harry_potter_exact_case(self):
+        """Reproduce the exact rejection from G3MINI staff."""
+        meta = _meta_base(
+            has_audiodesc=True,
+            mediainfo={
+                'media': {
+                    'track': [
+                        {'@type': 'Audio', 'Language': 'en'},
+                        {'@type': 'Audio', 'Language': 'fr', 'Format': 'DTS', 'Format_AdditionalFeatures': 'XLL X'},
+                    ],
+                },
+            },
+        )
+        name = self._run(meta)
+        # Must NOT have Hybrid before MULTi
+        assert '.Hybrid.AD.' not in name and '.Hybrid.MULTi' not in name, f"Hybrid misplaced: {name}"
+        # Hybrid.DV.HDR must appear together
+        assert 'REMUX.Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        # HEVC at end before tag
+        assert name.endswith('HEVC-SGF'), f"HEVC not at end: {name}"
+        # Audio before video codec
+        assert 'DTSX.7.1' in name or 'DTS' in name, f"Audio missing: {name}"

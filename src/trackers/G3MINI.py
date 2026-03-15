@@ -232,44 +232,44 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         if meta["category"] == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk
                 if meta["is_disc"] == "BDMV":
-                    name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
+                    name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {region} {uhd} {source} {hybrid} {hdr} {audio} {video_codec}"
                 elif meta["is_disc"] == "DVD":
                     name = f"{title} {year} {repack} {edition} {region} {source} {dvd_size} {audio}"
                 elif meta["is_disc"] == "HDDVD":
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay/HDDVD Remux
-                name = f"{title} {year} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"
+                name = f"{title} {year} {three_d} {edition} {repack} {language} {resolution} {uhd} {source} REMUX {hybrid} {hdr} {audio} {video_codec}"
             elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
                 name = f"{title} {year} {edition} {repack} {source} REMUX  {audio}"
             elif type == "ENCODE":  # Encode
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {source} {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {service} WEB-DL {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {year} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {service} WEBRip {hybrid} {hdr} {audio} {video_encode}"
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type == "DVDRIP":
-                name = f"{title} {year} {source} {video_encode} DVDRip {audio}"
+                name = f"{title} {year} {source} DVDRip {audio} {video_encode}"
 
         elif meta["category"] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
                 if meta["is_disc"] == "BDMV":
-                    name = f"{title} {year} {season}{episode} {three_d} {edition} {hybrid} {repack} {language} {resolution} {region} {uhd} {source} {hdr} {video_codec} {audio}"
+                    name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {language} {resolution} {region} {uhd} {source} {hybrid} {hdr} {audio} {video_codec}"
                 if meta["is_disc"] == "DVD":
                     name = f"{title} {year} {season}{episode}{three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
                 elif meta["is_disc"] == "HDDVD":
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {video_codec} {audio}"
+                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux
-                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} REMUX {hdr} {video_codec} {audio}"  # SOURCE
+                name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {repack} {language} {resolution} {uhd} {source} REMUX {hybrid} {hdr} {audio} {video_codec}"  # SOURCE
             elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {source} REMUX {audio}"  # SOURCE
             elif type == "ENCODE":  # Encode
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"  # SOURCE
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {uhd} {source} {hybrid} {hdr} {audio} {video_encode}"  # SOURCE
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {uhd} {service} WEB-DL {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {year} {season}{episode} {part} {edition} {hybrid} {repack} {language} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {uhd} {service} WEBRip {hybrid} {hdr} {audio} {video_encode}"
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type == "DVDRIP":
