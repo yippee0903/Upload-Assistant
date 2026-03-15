@@ -185,3 +185,34 @@ class TestGetName:
         assert name.endswith('HEVC-SGF'), f"HEVC not at end: {name}"
         # Audio before video codec
         assert 'DTSX.7.1' in name or 'DTS' in name, f"Audio missing: {name}"
+
+    def test_tv_hddvd_includes_season_episode(self):
+        """TV HDDVD DISC must include season/episode in the name."""
+        meta = _meta_base(
+            category='TV',
+            type='DISC',
+            is_disc='HDDVD',
+            source='HDDVD',
+            season='S02',
+            episode='E05',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'S02E05' in name, f"Season/episode missing: {name}"
+        assert name.endswith('HEVC-SGF'), f"Video codec not at end: {name}"
+
+    def test_webrip_type_handling(self):
+        """WEBRIP: WEBRip tag present, Hybrid before HDR, encode at end."""
+        meta = _meta_base(
+            type='WEBRIP',
+            source='WEB',
+            video_encode='H265',
+            video_codec='',
+            service='AMZN',
+        )
+        name = self._run(meta)
+        assert 'WEBRip' in name, f"WEBRip tag missing: {name}"
+        assert 'Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
+        assert name.endswith('H265-SGF'), f"Video encode not at end: {name}"

@@ -259,7 +259,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                 if meta["is_disc"] == "DVD":
                     name = f"{title} {year} {season}{episode}{three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
                 elif meta["is_disc"] == "HDDVD":
-                    name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
+                    name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux
                 name = f"{title} {year} {season}{episode} {part} {three_d} {edition} {repack} {language} {resolution} {uhd} {source} REMUX {hybrid} {hdr} {audio} {video_codec}"  # SOURCE
             elif type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):  # DVD Remux
