@@ -250,7 +250,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type == "DVDRIP":
-                name = f"{title} {year} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {language} {source} DVDRip {audio} {video_encode}"
 
         elif meta["category"] == "TV":  # TV SPECIFIC
             if type == "DISC":  # Disk
@@ -273,7 +273,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {season}{episode} {part} {edition} {repack} {language} {resolution} {source} {audio} {video_encode}"
             elif type == "DVDRIP":
-                name = f"{title} {year} {season} {source} DVDRip {audio} {video_encode}"
+                name = f"{title} {year} {season} {language} {source} DVDRip {audio} {video_encode}"
 
         try:
             name = " ".join(name.split())

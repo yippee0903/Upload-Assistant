@@ -216,3 +216,20 @@ class TestGetName:
         assert 'WEBRip' in name, f"WEBRip tag missing: {name}"
         assert 'Hybrid.DV.HDR' in name, f"Hybrid not next to HDR: {name}"
         assert name.endswith('H265-SGF'), f"Video encode not at end: {name}"
+
+    def test_dvdrip_type_handling(self):
+        """DVDRIP: language tag must be present in the name."""
+        meta = _meta_base(
+            type='DVDRIP',
+            source='DVD',
+            video_encode='x264',
+            video_codec='',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'DVDRip' in name, f"DVDRip tag missing: {name}"
+        # Language tag (MULTi) must appear
+        assert 'MULTi' in name, f"Language tag missing: {name}"
+        assert name.endswith('x264-SGF'), f"Video encode not at end: {name}"
