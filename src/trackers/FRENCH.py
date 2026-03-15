@@ -372,6 +372,10 @@ class FrenchTrackerMixin:
     # Set to False for trackers that want the service only in the description.
     INCLUDE_SERVICE_IN_NAME: bool = True
 
+    # Whether to include the "AD" (Audio Description) prefix in release names.
+    # Set to False for trackers that only consider FR tracks for naming tags.
+    INCLUDE_AD_IN_NAME: bool = True
+
     # Whether to prefer the original-language title in release names.
     # When True and the movie is not originally French, the English/original
     # title is used instead of the French TMDB translation.
@@ -786,7 +790,7 @@ class FrenchTrackerMixin:
             language = _fr_precision()
 
         # ── Audio Description prefix ──
-        if language and has_audiodesc:
+        if language and has_audiodesc and self.INCLUDE_AD_IN_NAME:
             language = f"AD.{language}"
 
         return language
