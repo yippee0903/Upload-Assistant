@@ -881,14 +881,14 @@ class FrenchTrackerMixin:
         dvd_size = ""
 
         if meta.get("is_disc") == "BDMV":
-            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265")
+            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
             region = meta.get("region", "") or ""
         elif meta.get("is_disc") == "DVD":
             region = meta.get("region", "") or ""
             dvd_size = meta.get("dvd_size", "")
         else:
-            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265")
-            video_encode = meta.get("video_encode", "").replace("H.264", "H264").replace("H.265", "H265")
+            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
+            video_encode = meta.get("video_encode", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
 
         if category == "TV":
             year = meta["year"] if meta.get("search_year", "") != "" else ""

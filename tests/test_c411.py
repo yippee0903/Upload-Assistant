@@ -804,6 +804,18 @@ class TestCodecCleanup:
         assert 'H265' in name
         assert 'H.265' not in name
 
+    def test_vc1_cleaned(self):
+        """VC-1 must appear as VC1 (no hyphen, no dot)."""
+        meta = _meta_base(
+            title='Test', year='2024', type='REMUX', source='BluRay',
+            resolution='1080p', video_codec='VC-1',
+            mediainfo=_mi([_audio_track('fr')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert 'VC1' in name
+        assert 'VC-1' not in name
+        assert 'VC.1' not in name
+
     def test_hdr10plus_cleaned(self):
         meta = _meta_base(
             title='Test', year='2024', type='WEBDL', source='WEB',
