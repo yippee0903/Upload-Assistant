@@ -106,6 +106,8 @@ def _expected_single(tracker: Any) -> str:
 
 
 def _expected_multi(tracker: Any) -> str:
+    if tracker.tracker == "GF":
+        return "MULTI.VFF"
     return "AD.MULTi" if tracker.tracker in {"TOS", "G3MINI"} else "AD.MULTI.VFF"
 
 

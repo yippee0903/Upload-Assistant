@@ -407,21 +407,45 @@ class TestLanguageDetection:
         meta = _meta_base(original_language='en', mediainfo=_mi([_audio_track('fr', Title='VFQ')]))
         assert _run(gf._build_audio_string(meta)) == 'VFQ'
 
-    def test_audio_description_single_french_prefixes_ad_before_variant(self, gf):
+    def test_audio_description_non_french_ad_excluded(self, gf):
+        """GF excludes AD when release has FR audio and AD is not French."""
         meta = _meta_base(
             original_language='en',
             has_audiodesc=True,
             mediainfo=_mi([_audio_track('fr')]),
         )
-        assert _run(gf._build_audio_string(meta)) == 'AD.VFF'
+        assert _run(gf._build_audio_string(meta)) == 'VFF'
 
-    def test_audio_description_multi_french_prefixes_ad_before_multi(self, gf):
+    def test_audio_description_non_french_ad_multi_excluded(self, gf):
+        """GF excludes AD for MULTI when AD is not French."""
         meta = _meta_base(
             original_language='en',
             has_audiodesc=True,
             mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
         )
-        assert _run(gf._build_audio_string(meta)) == 'AD.MULTI.VFF'
+        assert _run(gf._build_audio_string(meta)) == 'MULTI.VFF'
+
+    def test_audio_description_french_ad_kept(self, gf):
+        """GF keeps AD when the AD track is French."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([
+                _audio_track('fr', Title='Main Audio'),
+                _audio_track('fr', Title='Audio Description'),
+            ]),
+        )
+        assert _run(gf._build_audio_string(meta)) == 'AD.VFF'
+
+    def test_audio_description_vostfr_kept(self, gf):
+        """GF keeps AD on VOSTFR releases (no FR main audio)."""
+        meta = _meta_base(
+            original_language='en',
+            mediainfo=_mi([
+                _audio_track('en', Title='Main Audio'),
+                _audio_track('fr', Title='Audio Description'),
+            ], [_sub_track('fr')]),
+        )
+        assert _run(gf._build_audio_string(meta)) == 'AD.VOSTFR'
 
     # ── SUBFRENCH filename fallback ──
 

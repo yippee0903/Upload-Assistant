@@ -423,6 +423,13 @@ class FrenchTrackerMixin:
             audio = [t for t in audio if "commentary" not in str(t.get("Title", "")).lower() and "comment" not in str(t.get("Title", "")).lower()]
         return audio
 
+    def _should_include_ad_prefix(self, has_french_audio: bool, ad_audio_langs: list[str]) -> bool:
+        """Whether to include the ``AD.`` prefix in the release name.
+
+        Subclasses may override for tracker-specific rules.
+        """
+        return True
+
     @staticmethod
     def _is_audio_desc_track(track: dict[str, Any]) -> bool:
         """Return True when an audio track is an audio-description track."""
@@ -795,7 +802,7 @@ class FrenchTrackerMixin:
             language = _fr_precision()
 
         # ── Audio Description prefix ──
-        if language and has_audiodesc:
+        if language and has_audiodesc and self._should_include_ad_prefix(has_french_audio, ad_audio_langs):
             language = f"AD.{language}"
 
         return language
@@ -890,14 +897,14 @@ class FrenchTrackerMixin:
         dvd_size = ""
 
         if meta.get("is_disc") == "BDMV":
-            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265")
+            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
             region = meta.get("region", "") or ""
         elif meta.get("is_disc") == "DVD":
             region = meta.get("region", "") or ""
             dvd_size = meta.get("dvd_size", "")
         else:
-            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265")
-            video_encode = meta.get("video_encode", "").replace("H.264", "H264").replace("H.265", "H265")
+            video_codec = meta.get("video_codec", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
+            video_encode = meta.get("video_encode", "").replace("H.264", "H264").replace("H.265", "H265").replace("VC-1", "VC1")
 
         if category == "TV":
             year = meta["year"] if meta.get("search_year", "") != "" else ""

@@ -85,6 +85,10 @@ class GF(FrenchTrackerMixin, UNIT3D):
 
     WEB_LABEL: str = "WEB"
 
+    def _should_include_ad_prefix(self, has_french_audio: bool, ad_audio_langs: list[str]) -> bool:
+        """GF excludes AD when the release has French audio and the AD track is not French."""
+        return not (has_french_audio and "FRA" not in ad_audio_langs)
+
     # ──────────────────────────────────────────────────────────
     #  Category / Type / Resolution mappings
     # ──────────────────────────────────────────────────────────
