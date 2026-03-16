@@ -102,13 +102,13 @@ def tracker(request: pytest.FixtureRequest):
 
 
 def _expected_single(tracker: Any) -> str:
-    return "AD.FRENCH" if tracker.tracker in {"TOS", "G3MINI"} else "AD.VFF"
+    return "AD.FRENCH" if tracker.tracker in {"TOS"} else "AD.VFF"
 
 
 def _expected_multi(tracker: Any) -> str:
     if tracker.tracker == "GF":
         return "MULTI.VFF"
-    return "AD.MULTi" if tracker.tracker in {"TOS", "G3MINI"} else "AD.MULTI.VFF"
+    return "AD.MULTi" if tracker.tracker in {"TOS"} else "AD.MULTI.VFF"
 
 
 def _normalize_name(value: str) -> str:
