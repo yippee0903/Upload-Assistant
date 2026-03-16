@@ -502,13 +502,15 @@ class FrenchTrackerMixin:
                 fr_variants.append("fr-fr")
             elif ll in ("fr-ca", "fr-qc") and "fr-ca" not in fr_variants:
                 fr_variants.append("fr-ca")
-            elif ll in ("fr-be", "fr-ch"):
+            elif ll == "fr-be" and "fr-be" not in fr_variants:
+                fr_variants.append("fr-be")
+            elif ll == "fr-ch":
                 if "fr-fr" not in fr_variants:
-                    fr_variants.append("fr-fr")  # Belgium/Switzerland → treat as VFF
+                    fr_variants.append("fr-fr")  # Swiss French → treat as VFF
             elif ll in ("fr", "fre", "fra", "french", "français", "francais"):
-                # Generic French — check Title for explicit VFF/VFQ or region keywords
+                # Generic French — check Title for explicit VFF/VFQ/VFB or region keywords
                 title = str(track.get("Title", "")).upper()
-                # Canadian French indicators: VFQ, CANADA, CANADIEN, QUÉBEC, (CA), or standalone "CA"
+                # Canadian French indicators
                 is_canadian = (
                     "VFQ" in title
                     or "CANADA" in title
@@ -518,9 +520,14 @@ class FrenchTrackerMixin:
                     or "(CA)" in title
                     or re.search(r"\bCA\b", title)  # "FR CA 5.1" → matches CA as word
                 )
+                # Belgian French indicators
+                is_belgian = "VFB" in title or "BELGE" in title or "BELGIQUE" in title or "(BE)" in title
                 if is_canadian:
                     if "fr-ca" not in fr_variants:
                         fr_variants.append("fr-ca")
+                elif is_belgian:
+                    if "fr-be" not in fr_variants:
+                        fr_variants.append("fr-be")
                 elif "VFF" in title or "(FR)" in title or "FRANCE" in title:
                     if "fr-fr" not in fr_variants:
                         fr_variants.append("fr-fr")
@@ -533,21 +540,17 @@ class FrenchTrackerMixin:
         n = len(fr_variants)
         if n == 0:
             return None
-        if n > 2:
+        if n >= 2:
             return f"VF{n}"
 
-        has_vff = "fr-fr" in fr_variants
         has_vfq = "fr-ca" in fr_variants
-        has_generic_fr = "fr" in fr_variants
+        has_vfb = "fr-be" in fr_variants
+        has_vff = "fr-fr" in fr_variants
 
-        # VF2 = two distinct French variants (France + Canada)
-        if has_vff and has_vfq:
-            return "VF2"
-        # Generic French + Canadian = 2 distinct versions → VF2
-        if has_generic_fr and has_vfq:
-            return "VF2"
         if has_vfq:
             return "VFQ"
+        if has_vfb:
+            return "VFB"
         if has_vff:
             return "VFF"
         return None  # generic 'fr' only — no suffix
@@ -707,6 +710,15 @@ class FrenchTrackerMixin:
         return False
 
     @staticmethod
+    def _detect_vfb(meta: Meta) -> bool:
+        """Check if the release path/name indicates VFB (Belgian French)."""
+        for field in ("uuid", "name", "path"):
+            val = str(meta.get(field, "")).upper()
+            if re.search(r"(?:^|[\.\-_\s])VFB(?:[\.\-_\s]|$)", val):
+                return True
+        return False
+
+    @staticmethod
     def _detect_subfrench(meta: Meta) -> bool:
         """Check if the release path/name indicates SUBFRENCH or VOSTFR.
 
@@ -762,6 +774,7 @@ class FrenchTrackerMixin:
         is_truefrench = self._detect_truefrench(meta)
         is_vfi = self._detect_vfi(meta)
         is_vfq_filename = self._detect_vfq(meta)
+        is_vfb_filename = self._detect_vfb(meta)
         is_vff_filename = self._detect_vff(meta)
         is_vf2_filename = self._detect_vf2(meta)
 
@@ -778,11 +791,15 @@ class FrenchTrackerMixin:
                 return "VFI"
             if fr_suffix == "VFQ":
                 return "VFQ"
+            if fr_suffix == "VFB":
+                return "VFB"
             if fr_suffix == "VFF":
                 return "VFF"
             # MediaInfo has generic 'fr' without region — check filename
             if is_vfq_filename:
                 return "VFQ"
+            if is_vfb_filename:
+                return "VFB"
             if is_vff_filename or is_truefrench:
                 return "VFF"
             # Generic 'fr' without region — conservative default

@@ -108,7 +108,9 @@ def _expected_single(tracker: Any) -> str:
 def _expected_multi(tracker: Any) -> str:
     if tracker.tracker == "GF":
         return "MULTI.VFF"
-    return "AD.MULTi" if tracker.tracker in {"TOS"} else "AD.MULTI.VFF"
+    if tracker.tracker == "TOS":
+        return "AD.MULTi"
+    return "AD.MULTI.VFF"
 
 
 def _normalize_name(value: str) -> str:

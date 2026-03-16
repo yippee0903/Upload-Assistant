@@ -123,8 +123,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             resolution = ""
         audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "")
         language = await self._build_audio_string(meta)
-        if "MULTI" in language:
-            language = language.replace("MULTI", "MULTi")
+        language = language.replace("MULTI", "MULTi").replace("VFI", "VFF")
         service = meta.get("service", "")
         season = meta.get("season", "")
         episode = meta.get("episode", "")

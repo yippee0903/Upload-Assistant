@@ -252,3 +252,36 @@ class TestGetName:
         assert 'S01E03' in name, f"Season+episode missing: {name}"
         assert 'DVDRip' in name, f"DVDRip tag missing: {name}"
         assert name.endswith('x264-SGF'), f"Video encode not at end: {name}"
+
+    # ── Language suffix tests ────────────────────────────────
+
+    def test_multi_includes_vff_suffix(self):
+        """MULTi must always carry a precision suffix (e.g. MULTi.VFF)."""
+        meta = _meta_base()  # en + fr audio → MULTI.VFF → MULTi.VFF
+        name = self._run(meta)
+        assert 'MULTi.VFF' in name, f"MULTi.VFF missing: {name}"
+
+    def test_belgian_french_detected_as_vfb(self):
+        """A fr-be audio track must produce MULTi.VFB."""
+        meta = _meta_base(
+            mediainfo={
+                'media': {
+                    'track': [
+                        {'@type': 'Audio', 'Language': 'en'},
+                        {'@type': 'Audio', 'Language': 'fr-be'},
+                    ],
+                },
+            },
+        )
+        name = self._run(meta)
+        assert 'MULTi.VFB' in name, f"MULTi.VFB missing: {name}"
+
+    def test_vfi_replaced_by_vff(self):
+        """VFI in the filename must be normalised to VFF for G3MINI."""
+        meta = _meta_base(
+            uuid='Some.Movie.VFI.1080p',
+            name='Some.Movie.VFI.1080p',
+        )
+        name = self._run(meta)
+        assert 'VFF' in name, f"VFF missing after VFI normalisation: {name}"
+        assert 'VFI' not in name, f"VFI should not appear: {name}"
