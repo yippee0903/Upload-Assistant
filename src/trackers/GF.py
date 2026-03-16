@@ -80,6 +80,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
             "SUNS3T",
             "TireXo",
             "Zone80",
+            "k0RE",
         ]
         self.source_flag = "GF"
 

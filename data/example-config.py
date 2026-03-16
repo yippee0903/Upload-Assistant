@@ -933,14 +933,14 @@ config = {
         "TORR9": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # torr9.xyz — French private tracker (custom REST API)
+            # torr9.net — French private tracker (custom REST API)
             # Login credentials — used to obtain a Bearer JWT automatically
             "username": "",
             "password": "",
             # Or supply a static Bearer token directly (alternative to username/password)
             # "api_key": "",
             # Announce URL with your passkey — found in your Torr9 profile
-            "announce_url": "https://tracker.torr9.xyz/announce/YOUR_PASSKEY",
+            "announce_url": "https://tracker.torr9.net/announce/YOUR_PASSKEY",
             # Upload anonymously
             "anon": False,
             # Include screenshots in the upload description (default: False)
