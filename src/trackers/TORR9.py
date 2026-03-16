@@ -1,8 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 """
-torr9.xyz — French private tracker (custom REST API)
+torr9.net — French private tracker (custom REST API)
 
-Upload endpoint:  POST https://api.torr9.xyz/api/v1/torrents/upload
+Upload endpoint:  POST https://api.torr9.net/api/v1/torrents/upload
 Authentication:   Bearer token
 Content-Type:     multipart/form-data
 
@@ -53,16 +53,16 @@ FRENCH_MONTHS: list[str] = [
 
 
 class TORR9(FrenchTrackerMixin):
-    """torr9.xyz tracker — French private tracker with custom REST API."""
+    """torr9.net tracker — French private tracker with custom REST API."""
 
-    LOGIN_URL: str = "https://api.torr9.xyz/api/v1/auth/login"
+    LOGIN_URL: str = "https://api.torr9.net/api/v1/auth/login"
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.tracker: str = "TORR9"
         self.source_flag: str = "TORR9"
-        self.upload_url: str = "https://api.torr9.xyz/api/v1/torrents/upload"
-        self.torrent_url: str = "https://torr9.xyz/torrents/"
+        self.upload_url: str = "https://api.torr9.net/api/v1/torrents/upload"
+        self.torrent_url: str = "https://torr9.net/torrents/"
         tracker_cfg = self.config["TRACKERS"].get(self.tracker, {})
         self.username: str = str(tracker_cfg.get("username", "")).strip()
         self.password: str = str(tracker_cfg.get("password", "")).strip()
@@ -82,7 +82,7 @@ class TORR9(FrenchTrackerMixin):
     async def _login(self) -> Optional[str]:
         """Authenticate via the login API and return a Bearer token.
 
-        POST https://api.torr9.xyz/api/v1/auth/login
+        POST https://api.torr9.net/api/v1/auth/login
           Body: {"username": "...", "password": "...", "remember_me": true}
           Response: {"token": "<jwt>", "user": {"passkey": "...", ...}}
         """
@@ -633,9 +633,9 @@ class TORR9(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
-        """Upload torrent to torr9.xyz.
+        """Upload torrent to torr9.net.
 
-        POST https://api.torr9.xyz/api/v1/torrents/upload
+        POST https://api.torr9.net/api/v1/torrents/upload
           Authorization: Bearer <api_key>
           Content-Type:  multipart/form-data
 
@@ -715,8 +715,8 @@ class TORR9(FrenchTrackerMixin):
         headers: dict[str, str] = {
             "Authorization": f"Bearer {token}",
             "Accept": "*/*",
-            "Origin": "https://torr9.xyz",
-            "Referer": "https://torr9.xyz",
+            "Origin": "https://torr9.net",
+            "Referer": "https://torr9.net",
         }
 
         try:
@@ -890,7 +890,7 @@ class TORR9(FrenchTrackerMixin):
             if download_url:
                 # Make absolute if the API returns a relative path
                 if download_url.startswith("/"):
-                    download_url = f"https://api.torr9.xyz{download_url}"
+                    download_url = f"https://api.torr9.net{download_url}"
                 try:
                     async with (
                         httpx.AsyncClient(
@@ -978,7 +978,7 @@ class TORR9(FrenchTrackerMixin):
                 for search_term in search_queries:
                     try:
                         response = await client.get(
-                            "https://api.torr9.xyz/api/v1/torrents/search",
+                            "https://api.torr9.net/api/v1/torrents/search",
                             headers=headers,
                             params={"q": search_term},
                         )
