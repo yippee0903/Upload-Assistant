@@ -343,6 +343,7 @@ FRENCH_LANG_HIERARCHY: dict[str, int] = {
     "MULTI": 7,
     "VFF": 6,
     "VFQ": 6,
+    "VFB": 6,
     "VF2": 6,
     "VOF": 5,
     "TRUEFRENCH": 4,
