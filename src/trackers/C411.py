@@ -44,7 +44,7 @@ class C411(FrenchTrackerMixin):
         self.torrent_url: str = "https://c411.org/torrents/"
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
         self.tmdb_manager = TmdbManager(config)
-        self.banned_groups: list[str] = [""]
+        self.banned_groups: list[str] = ["k0RE"]
 
     # ──────────────────────────────────────────────────────────
     #  Audio / naming / French title — inherited from FrenchTrackerMixin
