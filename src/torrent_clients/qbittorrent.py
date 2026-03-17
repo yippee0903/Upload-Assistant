@@ -856,7 +856,7 @@ class QbittorrentClientMixin:
             return
 
         # Wait for torrent to be added
-        timeout = 30
+        timeout = 180
         for _ in range(timeout):
             try:
                 if proxy_url:
@@ -875,7 +875,7 @@ class QbittorrentClientMixin:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
                     torrents_info = await self.retry_qbt_operation(
-                        lambda: asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=torrent.infohash), "Check torrent addition", initial_timeout=10.0
+                        lambda: asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=torrent.infohash), "Check torrent addition"
                     )
                     if len(torrents_info) > 0:
                         break
