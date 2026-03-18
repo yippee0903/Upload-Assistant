@@ -856,7 +856,7 @@ class QbittorrentClientMixin:
             return
 
         # Wait for torrent to be added
-        timeout = 30
+        timeout = 180
         for _ in range(timeout):
             try:
                 if proxy_url:
@@ -875,7 +875,7 @@ class QbittorrentClientMixin:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
                     torrents_info = await self.retry_qbt_operation(
-                        lambda: asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=torrent.infohash), "Check torrent addition", max_retries=1, initial_timeout=10.0
+                        lambda: asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=torrent.infohash), "Check torrent addition"
                     )
                     if len(torrents_info) > 0:
                         break
@@ -1821,7 +1821,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "tl": ["tracker.tleechreload", "tracker.torrentleech"],
         "tlz": ["https://tlzdigital.com/"],
         "tos": ["https://theoldschool.cc"],
-        "torr9": ["tracker.torr9.xyz"],
+        "torr9": ["tracker.torr9.xyz", "tracker.torr9.net"],
         "ttr": ["https://torrenteros.org"],
         "tvc": ["https://tvchaosuk.com"],
         "ulcx": ["https://upload.cx"],

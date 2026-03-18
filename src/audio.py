@@ -27,6 +27,95 @@ TrackDict = dict[str, Any]
 # Compiled pattern shared with src/trackers/FRENCH.py — keep in sync.
 AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:|\(AD\)", re.IGNORECASE)
 
+# ── Shared codec mapping tables ──────────────────────────────────────
+# Used by both _get_audio_v2 (global meta['audio']) and
+# codec_info_from_track (per-track for French trackers).
+AUDIO_CODEC_MAP: dict[str, str] = {
+    "DTS": "DTS",
+    "AAC": "AAC",
+    "AAC LC": "AAC",
+    "AC-3": "DD",
+    "E-AC-3": "DD+",
+    "A_EAC3": "DD+",
+    "Enhanced AC-3": "DD+",
+    "MLP FBA": "TrueHD",
+    "FLAC": "FLAC",
+    "Opus": "Opus",
+    "Vorbis": "VORBIS",
+    "PCM": "LPCM",
+    "LPCM Audio": "LPCM",
+    "Dolby Digital Audio": "DD",
+    "Dolby Digital Plus Audio": "DD+",
+    "Dolby Digital Plus": "DD+",
+    "Dolby TrueHD Audio": "TrueHD",
+    "DTS Audio": "DTS",
+    "DTS-HD Master Audio": "DTS-HD MA",
+    "DTS-HD High-Res Audio": "DTS-HD HRA",
+    "DTS:X Master Audio": "DTS:X",
+}
+AUDIO_EXTRA: dict[str, str] = {"XLL": "-HD MA", "XLL X": ":X", "ES": "-ES"}
+FORMAT_EXTRA: dict[str, str] = {"JOC": " Atmos", "16-ch": " Atmos", "Atmos Audio": " Atmos"}
+FORMAT_SETTINGS_EXTRA: dict[str, str] = {"Dolby Surround EX": "EX"}
+COMMERCIAL_NAMES: dict[str, str] = {
+    "Dolby Digital": "DD",
+    "Dolby Digital Plus": "DD+",
+    "Dolby TrueHD": "TrueHD",
+    "DTS-ES": "DTS-ES",
+    "DTS-HD High": "DTS-HD HRA",
+    "Free Lossless Audio Codec": "FLAC",
+    "DTS-HD Master Audio": "DTS-HD MA",
+}
+
+
+def _resolve_codec(
+    format_str: str,
+    additional_str: str,
+    commercial_str: str,
+    format_settings: str,
+    format_profile: str,
+    chan: str,
+) -> tuple[str, str, str]:
+    """Determine codec, format-settings suffix, and extra tag from raw fields.
+
+    Returns ``(codec, format_settings, extra)``.
+    Shared by :func:`_get_audio_v2` and :func:`codec_info_from_track`.
+    """
+    codec = ""
+    extra = ""
+    search_format = True
+
+    if commercial_str:
+        for key, value in COMMERCIAL_NAMES.items():
+            if key in commercial_str:
+                codec = value
+                search_format = False
+            if "Atmos" in commercial_str or FORMAT_EXTRA.get(additional_str, "") == " Atmos":
+                extra = " Atmos"
+
+    if search_format:
+        codec = AUDIO_CODEC_MAP.get(format_str, "") + AUDIO_EXTRA.get(additional_str, "")
+        extra = FORMAT_EXTRA.get(additional_str, "")
+
+    fs = FORMAT_SETTINGS_EXTRA.get(format_settings, "")
+    fs = "EX" if fs == "EX" and chan == "5.1" else ""
+
+    if not codec:
+        codec = format_str
+
+    if format_str.startswith("DTS") and additional_str and additional_str.endswith("X"):
+        codec = "DTS:X"
+
+    if format_str == "MPEG Audio":
+        if format_profile == "Layer 2":
+            codec = "MP2"
+        elif format_profile == "Layer 3":
+            codec = "MP3"
+
+    if codec == "DD" and chan == "7.1":
+        codec = "DD+"
+
+    return codec, fs, extra
+
 
 class AudioManager:
     def __init__(self, config: dict[str, Any]) -> None:
@@ -472,54 +561,6 @@ async def _get_audio_v2(
                     console.print(traceback.format_exc())
                     pass
 
-    # Convert commercial name to naming conventions
-    audio_codec_map = {
-        "DTS": "DTS",
-        "AAC": "AAC",
-        "AAC LC": "AAC",
-        "AC-3": "DD",
-        "E-AC-3": "DD+",
-        "A_EAC3": "DD+",
-        "Enhanced AC-3": "DD+",
-        "MLP FBA": "TrueHD",
-        "FLAC": "FLAC",
-        "Opus": "Opus",
-        "Vorbis": "VORBIS",
-        "PCM": "LPCM",
-        "LPCM Audio": "LPCM",
-        "Dolby Digital Audio": "DD",
-        "Dolby Digital Plus Audio": "DD+",
-        "Dolby Digital Plus": "DD+",
-        "Dolby TrueHD Audio": "TrueHD",
-        "DTS Audio": "DTS",
-        "DTS-HD Master Audio": "DTS-HD MA",
-        "DTS-HD High-Res Audio": "DTS-HD HRA",
-        "DTS:X Master Audio": "DTS:X",
-    }
-    audio_extra = {
-        "XLL": "-HD MA",
-        "XLL X": ":X",
-        "ES": "-ES",
-    }
-    format_extra = {
-        "JOC": " Atmos",
-        "16-ch": " Atmos",
-        "Atmos Audio": " Atmos",
-    }
-    format_settings_extra = {"Dolby Surround EX": "EX"}
-
-    commercial_names = {
-        "Dolby Digital": "DD",
-        "Dolby Digital Plus": "DD+",
-        "Dolby TrueHD": "TrueHD",
-        "DTS-ES": "DTS-ES",
-        "DTS-HD High": "DTS-HD HRA",
-        "Free Lossless Audio Codec": "FLAC",
-        "DTS-HD Master Audio": "DTS-HD MA",
-    }
-
-    search_format = True
-
     if isinstance(additional, dict):
         additional = ""  # Set empty string if additional is a dictionary
 
@@ -527,36 +568,17 @@ async def _get_audio_v2(
     format_str = str(format or "")
     commercial_str = str(commercial or "")
 
-    if commercial_str:
-        for key, value in commercial_names.items():
-            if key in commercial_str:
-                codec = value
-                search_format = False
-            if "Atmos" in commercial_str or format_extra.get(additional_str, "") == " Atmos":
-                extra = " Atmos"
+    codec, format_settings, extra = _resolve_codec(
+        format_str,
+        additional_str,
+        commercial_str,
+        format_settings,
+        format_profile,
+        chan,
+    )
 
-    if search_format:
-        codec = audio_codec_map.get(format_str, "") + audio_extra.get(additional_str, "")
-        extra = format_extra.get(additional_str, "")
-
-    format_settings = format_settings_extra.get(format_settings, "")
-    format_settings = "EX" if format_settings == "EX" and chan == "5.1" else ""
-
-    if codec == "":
-        codec = format_str
-
-    if format_str.startswith("DTS") and additional_str and additional_str.endswith("X"):
-        codec = "DTS:X"
-
-    if format_str == "MPEG Audio":
-        if format_profile == "Layer 2":
-            codec = "MP2"
-        elif format_profile == "Layer 3":
-            codec = "MP3"
-
-    if codec == "DD" and chan == "7.1":
+    if codec == "DD+" and chan == "7.1" and format_str == "AC-3":
         console.print("[warning] Detected codec is DD but channel count is 7.1, correcting to DD+")
-        codec = "DD+"
 
     if not extra and is_auro3d:
         extra = " Auro3D"
@@ -564,6 +586,52 @@ async def _get_audio_v2(
     audio = f"{dual} {codec or ''} {format_settings or ''} {chan or ''}{extra or ''}"
     audio = " ".join(audio.split())
     return audio, chan, has_commentary, has_audiodesc
+
+
+def codec_info_from_track(track: Mapping[str, Any]) -> str:
+    """Compute the audio codec + channels string for a single MediaInfo track.
+
+    Returns e.g. ``DTS-HD MA 5.1``, ``DTS:X 7.1``, ``DD+ 5.1 Atmos``.
+
+    Used by French trackers to determine the audio portion of the release
+    name from a specific track (e.g. the first French audio track) rather
+    than from the global ``meta['audio']`` which always reflects the first
+    track in stream order.
+    """
+    format_str = str(track.get("Format", "") or "")
+    commercial_str = str(track.get("Format_Commercial", "") or track.get("Format_Commercial_IfAny", "") or "")
+    additional: Any = track.get("Format_AdditionalFeatures", "")
+    if isinstance(additional, dict):
+        additional = ""
+    additional_str = str(additional or "")
+
+    fmt_settings = str(track.get("Format_Settings") or "")
+    if fmt_settings in ("Explicit",):
+        fmt_settings = ""
+    format_profile = str(track.get("Format_Profile", "") or "")
+
+    # Channels
+    channels = track.get("Channels_Original", track.get("Channels"))
+    if not str(channels).isnumeric():
+        channels = track.get("Channels")
+    try:
+        channel_layout = str(track.get("ChannelLayout", "") or "") or str(track.get("ChannelLayout_Original", "") or "") or str(track.get("ChannelPositions", "") or "")
+    except Exception:
+        channel_layout = ""
+
+    chan = determine_channel_count(channels, channel_layout, additional_str, format_str)
+
+    codec, fs, extra = _resolve_codec(
+        format_str,
+        additional_str,
+        commercial_str,
+        fmt_settings,
+        format_profile,
+        chan,
+    )
+
+    audio = f"{codec or ''} {fs or ''} {chan or ''}{extra or ''}"
+    return " ".join(audio.split())
 
 
 def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng_original_with_non_eng: bool = False) -> None:

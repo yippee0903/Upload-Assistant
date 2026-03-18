@@ -560,6 +560,101 @@ class TestGetName:
         assert '.DTS:X.' not in name
         assert '.DTSX.' not in name
 
+    def test_french_track_audio_used_over_first_track(self):
+        """When FR track exists, its codec/channels must appear in the name."""
+        meta = _meta_base(
+            title='Harry Potter Et La Coupe De Feu',
+            year='2005',
+            type='REMUX',
+            source='BluRay',
+            resolution='2160p',
+            uhd='UHD',
+            hdr='DV HDR',
+            video_codec='HEVC',
+            audio='DTS:X 7.1',
+            tag='-SGF',
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Format_AdditionalFeatures='XLL X',
+                             Channels='8'),
+                _audio_track('fr', Format='DTS',
+                             Format_AdditionalFeatures='XLL',
+                             Channels='6'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # FR track is DTS-HD MA 5.1, NOT the English DTS:X 7.1
+        assert 'DTS.HD.MA.5.1' in name, f"Expected FR track audio DTS.HD.MA.5.1: {name}"
+        assert 'DTS.X' not in name, f"English DTS:X leaked into name: {name}"
+
+    def test_french_track_ddp_vs_truehd(self):
+        """FR track DD+ 5.1 must be used even when first track is TrueHD Atmos."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='TrueHD Atmos 7.1',
+            mediainfo=_mi([
+                _audio_track('en', Format='MLP FBA',
+                             Format_AdditionalFeatures='16-ch',
+                             Channels='8'),
+                _audio_track('fr', Format='E-AC-3',
+                             Channels='6'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert 'DDP.5.1' in name, f"Expected FR track DDP.5.1: {name}"
+        assert 'TrueHD' not in name and 'TRUEHD' not in name, f"English TrueHD leaked: {name}"
+
+    def test_no_french_track_keeps_meta_audio(self):
+        """Without FR tracks, meta['audio'] (first track) is used."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DTS:X 7.1',
+            mediainfo=_mi([_audio_track('en', Format='DTS',
+                                        Format_AdditionalFeatures='XLL X',
+                                        Channels='8')]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert 'DTS.X.7.1' in name, f"Expected meta audio DTS.X.7.1: {name}"
+
+    def test_french_only_release_uses_french_track(self):
+        """Single FR track (no EN): codec is still derived from MediaInfo."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DTS-HD MA 5.1',
+            mediainfo=_mi([
+                _audio_track('fr', Format='DTS',
+                             Format_AdditionalFeatures='XLL',
+                             Channels='6'),
+            ]),
+            original_language='fr',
+        )
+        name = self._run(meta)
+        assert 'DTS.HD.MA.5.1' in name, f"Expected DTS.HD.MA.5.1: {name}"
+
+    def test_french_track_missing_format_uses_meta_audio(self):
+        """FR track present but without Format key → fall back to meta['audio']."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DTS:X 7.1',
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Format_AdditionalFeatures='XLL X',
+                             Channels='8'),
+                _audio_track('fr', Channels='6'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # No Format on FR track → falls back to meta['audio'] which is DTS:X 7.1
+        assert 'DTS.X.7.1' in name, f"Expected fallback to meta audio DTS.X.7.1: {name}"
+
     def test_title_middle_dot_preserved_as_separator(self):
         """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""
         meta = _meta_base(
@@ -803,6 +898,18 @@ class TestCodecCleanup:
         name = self._run(meta)
         assert 'H265' in name
         assert 'H.265' not in name
+
+    def test_vc1_cleaned(self):
+        """VC-1 must appear as VC1 (no hyphen, no dot)."""
+        meta = _meta_base(
+            title='Test', year='2024', type='REMUX', source='BluRay',
+            resolution='1080p', video_codec='VC-1',
+            mediainfo=_mi([_audio_track('fr')]), original_language='en',
+        )
+        name = self._run(meta)
+        assert 'VC1' in name
+        assert 'VC-1' not in name
+        assert 'VC.1' not in name
 
     def test_hdr10plus_cleaned(self):
         meta = _meta_base(

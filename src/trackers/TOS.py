@@ -33,6 +33,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             "Slay3R",
             "3T3AM",
             "BARBiE",
+            "Freek911",
+            "k0RE",
         ]
         pass
 

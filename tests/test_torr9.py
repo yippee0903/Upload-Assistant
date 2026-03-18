@@ -1,4 +1,4 @@
-# Tests for TORR9 tracker — torr9.xyz
+# Tests for TORR9 tracker — torr9.net
 """
 Test suite for the TORR9 tracker implementation.
 Covers: language detection, naming, category mapping,
@@ -24,7 +24,7 @@ def _config(extra_tracker: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build a minimal config dict for TORR9."""
     tracker_cfg: dict[str, Any] = {
         'api_key': 'test-bearer-token-123',
-        'announce_url': 'https://tracker.torr9.xyz/announce/FAKE_PASSKEY',
+        'announce_url': 'https://tracker.torr9.net/announce/FAKE_PASSKEY',
     }
     if extra_tracker:
         tracker_cfg.update(extra_tracker)
@@ -119,8 +119,8 @@ class TestTorr9Init:
         assert t.api_key == 'test-bearer-token-123'
         assert t.username == ''
         assert t.password == ''
-        assert t.upload_url == 'https://api.torr9.xyz/api/v1/torrents/upload'
-        assert t.torrent_url == 'https://torr9.xyz/torrents/'
+        assert t.upload_url == 'https://api.torr9.net/api/v1/torrents/upload'
+        assert t.torrent_url == 'https://torr9.net/torrents/'
 
     def test_missing_api_key(self):
         t = TORR9({'TRACKERS': {}, 'DEFAULT': {'tmdb_api': 'fake'}})
