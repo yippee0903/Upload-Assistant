@@ -18,7 +18,7 @@ from typing import Any, Optional, Union
 
 import aiofiles
 import httpx
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -85,6 +85,9 @@ class HDF(FrenchTrackerMixin):
     # HDF naming examples: "The.Box.2009.MULTi.VFi.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-HDForever"
     # HDF wants streaming service in name: "The.Box.2009.MULTi.VFi.1080p.AMZN.WEB-DL.H264.DDP.5.1-HDForever"
     INCLUDE_SERVICE_IN_NAME: bool = True
+
+    # HDF uses original (English) titles, not French translations
+    PREFER_ORIGINAL_TITLE: bool = True
 
     # HDF uses "WEB-DL" (not "WEB") per their naming rules
     WEB_LABEL: str = "WEB-DL"
@@ -631,33 +634,32 @@ class HDF(FrenchTrackerMixin):
 
         dupes: list[dict[str, Union[str, None]]] = []
 
-        # Search by TMDB ID first, fallback to title
+        # Search by TMDB ID (preferred), fallback to title text search
         tmdb_id = meta.get("tmdb", "")
-        search_term = str(tmdb_id) if tmdb_id else str(meta.get("title", ""))
-        if not search_term:
-            console.print(f"[yellow]{self.tracker}: No TMDB ID or title for dupe search[/yellow]")
-            return dupes
+        if tmdb_id:
+            params: dict[str, str] = {"tmdbid": str(tmdb_id)}
+        else:
+            title = str(meta.get("title", ""))
+            if not title:
+                console.print(f"[yellow]{self.tracker}: No TMDB ID or title for dupe search[/yellow]")
+                return dupes
+            params = {"search": title, "cat": "0"}
 
-        search_url = f"{self.base_url}/browse.php"
-        params: dict[str, str] = {"search": search_term, "cat": "0"}
+        search_url = f"{self.base_url}/torrents.php"
 
         try:
-            response = await self.session.get(search_url, params=params)
+            response = await self.session.get(search_url, params=params, follow_redirects=True)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Look for torrent links in results table
-            torrent_links = soup.find_all("a", href=re.compile(r"details\.php\?id=\d+"))
-
-            for link in torrent_links:
-                if not isinstance(link, Tag):
-                    continue
-                name = link.get_text(strip=True)
-                href = link.get("href", "")
-                if not name or not href:
-                    continue
-                full_url = f"{self.base_url}/{href}" if not str(href).startswith("http") else str(href)
-                dupes.append({"name": name, "size": None, "link": full_url})
+            # HDF is Gazelle-based: the group page shows each torrent's
+            # file name in a <tr class="torrent_filename_row"> row.
+            for row in soup.find_all("tr", class_="torrent_filename_row"):
+                td = row.find("td")
+                if td:
+                    name = td.get_text(strip=True)
+                    if name:
+                        dupes.append({"name": name, "size": None, "link": None})
 
         except Exception as e:
             console.print(f"[bold red]{self.tracker}: Error searching for duplicates: {e}[/bold red]")
@@ -688,6 +690,8 @@ class HDF(FrenchTrackerMixin):
           release_desc          — release description (BBCode)
           album_desc            — movie/album description (BBCode)
           image                 — poster URL
+          artists[]             — actor/director names (at least one actor required)
+          importance[]          — role type per artist (1=Acteur, 2=Producteur, 4=Réalisateur)
         """
         name_result = await self.get_name(meta)
         # get_name populates meta["name"]; the torrent name is embedded in the .torrent file
@@ -723,6 +727,45 @@ class HDF(FrenchTrackerMixin):
         # Poster
         poster = meta.get("poster", "") or ""
 
+        # ── Fetch TMDB credits for artists[] fields ──
+        artists_names: list[str] = []
+        artists_roles: list[str] = []  # 1=Acteur, 4=Réalisateur
+        with contextlib.suppress(Exception):
+            fr_data = (
+                await self.tmdb_manager.get_tmdb_localized_data(
+                    meta,
+                    data_type="main",
+                    language="fr",
+                    append_to_response="credits",
+                )
+                or {}
+            )
+            tmdb_credits = fr_data.get("credits", {})
+            crew = tmdb_credits.get("crew", []) if isinstance(tmdb_credits, dict) else []
+            cast = tmdb_credits.get("cast", []) if isinstance(tmdb_credits, dict) else []
+            # Directors first (importance=4)
+            for p in crew:
+                if isinstance(p, dict) and p.get("job") == "Director" and p.get("name"):
+                    artists_names.append(p["name"])
+                    artists_roles.append("4")
+            # Then actors (importance=1), up to 5
+            for p in cast[:5]:
+                if isinstance(p, dict) and p.get("name"):
+                    artists_names.append(p["name"])
+                    artists_roles.append("1")
+        # Fallback to meta if TMDB fetch failed
+        if not artists_names:
+            for name in meta.get("tmdb_directors", [])[:2]:
+                n = name.get("name", name) if isinstance(name, dict) else str(name)
+                if n:
+                    artists_names.append(n)
+                    artists_roles.append("4")
+            for name in meta.get("tmdb_cast", [])[:5]:
+                n = name.get("name", name) if isinstance(name, dict) else str(name)
+                if n:
+                    artists_names.append(n)
+                    artists_roles.append("1")
+
         data: dict[str, Any] = {
             "submit": "true",
             "auth": HDF.secret_token,
@@ -738,6 +781,11 @@ class HDF(FrenchTrackerMixin):
             "album_desc": mi_text,
             "image": poster,
         }
+
+        # Artists (at least one actor is required by HDF)
+        if artists_names:
+            data["artists[]"] = artists_names
+            data["importance[]"] = artists_roles
 
         # Scene checkbox
         if meta.get("scene", False):

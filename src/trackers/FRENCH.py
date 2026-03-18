@@ -1041,18 +1041,18 @@ class FrenchTrackerMixin:
         """Strip accents and non-filename characters.
 
         French elided articles (l', d', qu', etc.) are expanded so that
-        ``l'Ordre`` becomes ``L Ordre`` (→ ``L.Ordre`` after dot-formatting),
-        matching French-tracker naming conventions.
+        the apostrophe becomes a space while preserving the original case:
+        ``l'autre`` → ``l autre``, ``L'Ordre`` → ``L Ordre``.
         """
         for char, repl in FrenchTrackerMixin._TITLE_CHAR_MAP.items():
             text = text.replace(char, repl)
         text = unidecode(text)
         # Replace apostrophes / RIGHT SINGLE QUOTATION MARK / backticks
-        # that follow a French elided article with a space, and uppercase
-        # the article letter:  l'Ordre → L Ordre,  d'Artagnan → D Artagnan
+        # that follow a French elided article with a space, preserving
+        # the original case:  l'autre → l autre,  L'Ordre → L Ordre
         text = re.sub(
             r"\b([lLdDnNsScCjJmM]|[Qq]u|[Jj]usqu|[Ll]orsqu|[Pp]uisqu)['\u2019`]",
-            lambda m: m.group(1).capitalize() + " ",
+            lambda m: m.group(1) + " ",
             text,
         )
         return re.sub(r"[^a-zA-Z0-9 .+\-]", "", text)

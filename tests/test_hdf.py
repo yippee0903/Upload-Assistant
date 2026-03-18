@@ -585,3 +585,196 @@ class TestGetDataPayload:
         data = asyncio.run(tracker.get_data(meta))
         assert data.get("MULTI") == "1"
         assert data.get("VOF") == "1"
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Additional codec mappings
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetCodecIdExtended:
+    """Extra codec mapping cases."""
+
+    @pytest.mark.parametrize(
+        "video_codec,video_encode,expected",
+        [
+            ("VC-1", "", "VC-1"),
+            ("VC1", "", "VC-1"),
+            ("MPEG-2", "", "MPEG-2"),
+            ("MPEG2", "", "MPEG-2"),
+            ("HEVC", "", "HEVC"),
+            ("AVC", "", "AVC"),
+        ],
+    )
+    def test_codec(self, video_codec: str, video_encode: str, expected: str):
+        result = HDF._get_codec_id(_meta_base(video_codec=video_codec, video_encode=video_encode))
+        assert result == expected
+
+
+# ═══════════════════════════════════════════════════════════════
+#   3D resolution mapping
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestResolution3D:
+    """3D resolution should prefix '3D '."""
+
+    def test_3d_1080p(self):
+        result = HDF._get_resolution_id(_meta_base(resolution="1080p", **{"3D": "3D"}))
+        assert result == "3D 1080p"
+
+    def test_3d_720p(self):
+        result = HDF._get_resolution_id(_meta_base(resolution="720p", **{"3D": "3D"}))
+        assert result == "3D 720p"
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Language flags — extended
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestLanguageFlagsExtended:
+    """Extra language flag cases."""
+
+    def _tracker(self) -> HDF:
+        return HDF(_config())
+
+    def test_truefrench(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "TRUEFRENCH")
+        assert flags["VFF"] is True
+
+    def test_vo_only(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "VO")
+        assert flags["VO"] is True
+        assert flags["MULTi"] is False
+
+    def test_empty_tag(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "")
+        assert not any(flags.values())
+
+    def test_multi_vof_sets_both(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "MULTI.VOF")
+        assert flags["MULTi"] is True
+        assert flags["VOF"] is True
+        assert flags["VFF"] is False
+
+    def test_subtitles_from_mediainfo(self):
+        """French subtitles in mediainfo should set subtitles flag."""
+        meta = _meta_base(
+            mediainfo={
+                "media": {
+                    "track": [
+                        {"@type": "Text", "Language": "fr"},
+                    ]
+                }
+            }
+        )
+        flags = self._tracker()._compute_language_flags(meta, "VO")
+        assert flags["VO"] is True
+        assert flags["subtitles"] is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Versions — extended
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetVersionsExtended:
+    """Additional edition/version flag tests."""
+
+    def test_uncut(self):
+        assert "UnCut" in HDF._get_versions(_meta_base(edition="Uncut"))
+
+    def test_unrated(self):
+        assert "UnRated" in HDF._get_versions(_meta_base(edition="Unrated"))
+
+    def test_2in1(self):
+        assert "2in1" in HDF._get_versions(_meta_base(edition="2in1"))
+
+    def test_multiple_versions(self):
+        """Edition with multiple flags should return all of them."""
+        versions = HDF._get_versions(_meta_base(edition="Director's Cut Remaster", hdr="DV HDR10+", service="NF"))
+        assert "Director's Cut" in versions
+        assert "Remaster" in versions
+        assert "HDR10+" in versions
+        assert "Dolby Vision" in versions
+        assert "Source Netflix" in versions
+
+
+# ═══════════════════════════════════════════════════════════════
+#   get_data payload — extended
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetDataPayloadExtended:
+    """Extended payload regression tests."""
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_scene_flag(self, mock_mi: AsyncMock, mock_desc: AsyncMock, mock_title: AsyncMock):
+        """Scene release should set scene=1 in payload."""
+        tracker = HDF(_config())
+        meta = _meta_base(scene=True, service="", hdr="", edition="")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "en"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        assert data.get("scene") == "1"
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_anonymous_flag(self, mock_mi: AsyncMock, mock_desc: AsyncMock, mock_title: AsyncMock):
+        """Anonymous upload should set anonymous=1."""
+        tracker = HDF(_config())
+        meta = _meta_base(anon=True, service="", hdr="", edition="")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "en"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        assert data.get("anonymous") == "1"
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_vostfr_sets_srt_and_vo(self, mock_mi: AsyncMock, mock_desc: AsyncMock, mock_title: AsyncMock):
+        """VOSTFR release should set VO=1 and SRT=1 in payload."""
+        tracker = HDF(_config())
+        meta = _meta_base(original_language="en", service="", hdr="", edition="")
+        # No French audio → VOSTFR expected when French subs present
+        meta["mediainfo"] = {
+            "media": {
+                "track": [
+                    {"@type": "Audio", "Language": "en"},
+                    {"@type": "Text", "Language": "fr"},
+                ]
+            }
+        }
+        data = asyncio.run(tracker.get_data(meta))
+        assert data.get("VO") == "1"
+        assert data.get("SRT") == "1"
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_version_form_values(self, mock_mi: AsyncMock, mock_desc: AsyncMock, mock_title: AsyncMock):
+        """Versions should map to correct form values in releaseVersion[]."""
+        tracker = HDF(_config())
+        meta = _meta_base(edition="Director's Cut", hdr="HDR", service="NF")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "en"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        versions = data.get("releaseVersion[]", [])
+        assert "DC" in versions
+        assert "HDR" in versions
+        assert "NF" in versions
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Category — TV documentary
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestCategoryDocumentaryTV:
+    """TV documentary should still map to 6 (Documentaire)."""
+
+    def test_tv_documentary(self):
+        tracker = HDF(_config())
+        meta = _meta_base(category="TV", genres="Documentary")
+        assert asyncio.run(tracker.get_category_id(meta)) == 6

@@ -603,18 +603,6 @@ config = {
             "announce_url": "https://generation-free.org/announce/PasskeyHere",
             "anon": False,
         },
-        "HDF": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # hdf.world — HD-Forever (French private tracker, cookie-based)
-            # Export cookies from https://hdf.world/ using a browser extension (e.g. "cookies.txt" for Firefox).
-            # Cookies must be in Netscape format and saved to data/cookies/HDF.txt
-            # Your personal announce URL is on hdf.world/upload.php (labelled "Votre annonce URL personnelle")
-            "announce_url": "https://hdf.world/announce.php?passkey=<PASSKEY>",
-            "anon": False,
-            # Include screenshots in the upload description (default: False)
-            "include_screenshots": False,
-        },
         "GPW": {
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
@@ -637,6 +625,18 @@ config = {
             "passkey": "",
             "announce_url": "https://hdbits.org/announce/Custom_Announce_URL",
             "img_rehost": True,
+        },
+        "HDF": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # hdf.world — HD-Forever (French private tracker, cookie-based)
+            # Export cookies from https://hdf.world/ using a browser extension (e.g. "cookies.txt" for Firefox).
+            # Cookies must be in Netscape format and saved to data/cookies/HDF.txt
+            # Your personal announce URL is on hdf.world/upload.php (labelled "Votre annonce URL personnelle")
+            "announce_url": "https://tracker.hdf.world:2443/<PASSKEY>/announce",
+            "anon": False,
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
         },
         "HDS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
