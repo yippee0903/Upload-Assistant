@@ -78,7 +78,7 @@ class C411(FrenchTrackerMixin):
         """
         from src.audio import codec_info_from_track
 
-        lossless_additionnal_features = ["XLL", "HD MA", ":X", "Atmos", "16-ch", "MLP FBA"]
+        lossless_additionnal_features = ["XLL", "HD MA", ":X", "16-ch", "MLP FBA"]
         audio_tracks = self._get_audio_tracks(meta)
         main_tracks = [
             t
