@@ -78,7 +78,7 @@ class C411(FrenchTrackerMixin):
         """
         from src.audio import codec_info_from_track
 
-        lossless_additionnal_features = ["XLL", "HD MA", ":X", "16-ch", "MLP FBA"]
+        lossless_additional_features = ["XLL", "HD MA", ":X", "16-ch", "MLP FBA"]
         audio_tracks = self._get_audio_tracks(meta)
         main_tracks = [
             t
@@ -98,8 +98,8 @@ class C411(FrenchTrackerMixin):
 
         is_lossless = (
             most_channels.get("Compression_Mode") == "Lossless"
-            or any(f in str(most_channels.get("Format_AdditionalFeatures", "")) for f in lossless_additionnal_features)
-            or any(f in str(most_channels.get("Format_Commercial_IfAny", "")) for f in lossless_additionnal_features)
+            or any(f in str(most_channels.get("Format_AdditionalFeatures", "")) for f in lossless_additional_features)
+            or any(f in str(most_channels.get("Format_Commercial_IfAny", "")) for f in lossless_additional_features)
         )
 
         if is_lossless:
