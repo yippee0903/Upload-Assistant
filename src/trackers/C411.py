@@ -28,7 +28,6 @@ from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
-from src.audio import AUDIO_EXTRA
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -81,33 +80,34 @@ class C411(FrenchTrackerMixin):
 
         lossless_additionnal_features = ["XLL", "HD MA", ":X", "Atmos", "16-ch", "MLP FBA"]
         audio_tracks = self._get_audio_tracks(meta)
-        main_tracks = [t for t in audio_tracks if not self._is_audio_desc_track(t)
-                       and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower()
-                       and t.get("Channels")
-                       and t.get("Format")]
+        main_tracks = [
+            t
+            for t in audio_tracks
+            if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower() and t.get("Channels") and t.get("Format")
+        ]
 
         if not main_tracks:
             return super()._get_audio_for_name(meta)
 
         def most_channels_priority(t):
-            channels = int(t.get('Channels', '0'))
+            channels = int(t.get("Channels", "0"))
             is_french = 1 if self._map_language(str(t.get("Language", ""))) == "FRA" else 0
             return (channels, is_french)
 
-        most_channels = max(main_tracks, key=most_channels_priority) 
+        most_channels = max(main_tracks, key=most_channels_priority)
 
         is_lossless = (
-            most_channels.get("Compression_Mode") == "Lossless" or
-            any(f in str(most_channels.get("Format_AdditionalFeatures", "")) for f in lossless_additionnal_features) or
-            any(f in str(most_channels.get("Format_Commercial_IfAny", "")) for f in lossless_additionnal_features)
-        )        
+            most_channels.get("Compression_Mode") == "Lossless"
+            or any(f in str(most_channels.get("Format_AdditionalFeatures", "")) for f in lossless_additionnal_features)
+            or any(f in str(most_channels.get("Format_Commercial_IfAny", "")) for f in lossless_additionnal_features)
+        )
 
         if is_lossless:
             return codec_info_from_track(most_channels).replace("DD+", "DDP")
 
         fra_tracks = [t for t in main_tracks if self._map_language(str(t.get("Language", ""))) == "FRA"]
         if fra_tracks:
-            best_fra = max(fra_tracks, key=lambda x: int(x.get('Channels', '0')))
+            best_fra = max(fra_tracks, key=lambda x: int(x.get("Channels", "0")))
             return codec_info_from_track(best_fra).replace("DD+", "DDP")
 
         return super()._get_audio_for_name(meta)
@@ -169,7 +169,7 @@ class C411(FrenchTrackerMixin):
         # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
         # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
         dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
-        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels 
+        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
         dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
 
         # Find where the title ends: first 4-digit year or SXX pattern
