@@ -536,7 +536,7 @@ class TestGetDataPayload:
         # TMDB URL in allocine_url field
         allocine_url = data.get("allocine_url", "")
         host = urlparse(allocine_url).hostname or ""
-        assert host.endswith("themoviedb.org")
+        assert host == "themoviedb.org" or host.endswith(".themoviedb.org")
 
     @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
     @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
