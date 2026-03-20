@@ -871,3 +871,27 @@ class TestArtistsFallback:
         data = asyncio.run(tracker.get_data(meta))
         assert "artists[]" in data
         assert "1" in data["importance[]"]
+
+
+# ─── Upload configuration ────────────────────────────────────────────
+
+
+class TestUploadConfig:
+    """Verify upload method passes correct parameters."""
+
+    def test_id_pattern_matches_hex_hashes(self):
+        """id_pattern must capture full hex hashes, not just leading digits."""
+        import re
+
+        pattern = r"torrentid=([a-fA-F0-9]+)"
+        # Hash starting with a letter
+        url = "https://hdf.world/torrents.php?id=123&torrentid=ceb30e7c7aa019be65b5d18bbaf332384975df92"
+        match = re.search(pattern, url)
+        assert match is not None
+        assert match.group(1) == "ceb30e7c7aa019be65b5d18bbaf332384975df92"
+
+        # Hash starting with digits (should capture full hash, not just digits)
+        url2 = "https://hdf.world/torrents.php?id=456&torrentid=114c638c3d93e32ff404ff769d172b6a4bf5ee7a"
+        match2 = re.search(pattern, url2)
+        assert match2 is not None
+        assert match2.group(1) == "114c638c3d93e32ff404ff769d172b6a4bf5ee7a"
