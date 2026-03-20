@@ -57,6 +57,7 @@ from src.trackers.LT import LT
 from src.trackers.LUME import LUME
 from src.trackers.MTV import MTV
 from src.trackers.NBL import NBL
+from src.trackers.NST import NST
 from src.trackers.OE import OE
 from src.trackers.OTW import OTW
 from src.trackers.PHD import PHD
@@ -1365,6 +1366,7 @@ tracker_class_map: dict[str, type[Any]] = {
     "LUME": LUME,
     "MTV": MTV,
     "NBL": NBL,
+    "NST": NST,
     "OE": OE,
     "OTW": OTW,
     "PHD": PHD,
@@ -1421,6 +1423,7 @@ api_trackers = {
     "LST",
     "LT",
     "LUME",
+    "NST",
     "OE",
     "OTW",
     "PT",
@@ -1454,7 +1457,7 @@ nfo_skip_trackers = frozenset({"DP", "FNP", "HHD", "LST", "LUME", "STC", "ULCX"}
 notag_labels: dict[str, str] = {"C411": "NOTAG", "FNP": "NOGROUP", "G3MINI": "NoGrP", "GF": "NoTag"}
 
 # Trackers that skip the English audio/subtitle requirement check
-english_check_skip_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "TOS", "TORR9"})
+english_check_skip_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "NST", "TOS", "TORR9"})
 
 # Trackers that require French audio or subtitles (warn if neither is detected)
-french_check_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "TOS", "TORR9"})
+french_check_trackers = frozenset({"C411", "G3MINI", "GF", "HDF", "NST", "TOS", "TORR9"})
