@@ -522,16 +522,16 @@ class TestGetName:
         assert '.TrueHD.' not in name
 
     def test_truehd_atmos(self):
-        """TrueHD Atmos must have ATMOS before TRUEHD for C411."""
+        """TrueHD Atmos must have ATMOS after TRUEHD for C411."""
         meta = _meta_base(
             type='REMUX',
             source='BluRay',
-            audio='TrueHD Atmos 7.1',
+            audio='Atmos TrueHD 7.1',
             mediainfo=_mi([_audio_track('en')]),
             original_language='en',
         )
         name = self._run(meta)
-        assert '.ATMOS.TRUEHD.' in name or 'ATMOS.TRUEHD.7.1' in name
+        assert '.TRUEHD.ATMOS' in name or 'TRUEHD.ATMOS.7.1' in name
 
     def test_dts_hd_ma_dots(self):
         """DTS-HD MA must become DTS.HD.MA for C411."""
@@ -560,8 +560,36 @@ class TestGetName:
         assert '.DTS:X.' not in name
         assert '.DTSX.' not in name
 
-    def test_french_track_audio_used_over_first_track(self):
-        """When FR track exists, its codec/channels must appear in the name."""
+    def test_most_channel_track_audio_used(self):
+        """When FR track exists, its codec/channels must appear in the name if it's the same channel number."""
+        meta = _meta_base(
+            title='Harry Potter Et La Coupe De Feu',
+            year='2005',
+            type='REMUX',
+            source='BluRay',
+            resolution='2160p',
+            uhd='UHD',
+            hdr='DV HDR',
+            video_codec='HEVC',
+            audio='DTS:X 7.1',
+            tag='-SGF',
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Format_AdditionalFeatures='XLL X',
+                             Channels='8'),
+                _audio_track('fr', Format='MLP FBA',
+                             Format_AdditionalFeatures='16-ch',
+                             Channels='8'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        # FR track is DTS-HD MA 5.1, NOT the English DTS:X 7.1
+        assert 'TRUEHD.ATMOS.7.1' in name, f"Expected FR track audio TRUEHD.ATMOS.7.1: {name}"
+        assert 'DTS.X' not in name, f"English DTS:X leaked into name: {name}"
+
+    def test_lossless_higher_channel(self):
+        """When lossless tracks exists, the one with more channels must appear in the name."""
         meta = _meta_base(
             title='Harry Potter Et La Coupe De Feu',
             year='2005',
@@ -585,11 +613,11 @@ class TestGetName:
         )
         name = self._run(meta)
         # FR track is DTS-HD MA 5.1, NOT the English DTS:X 7.1
-        assert 'DTS.HD.MA.5.1' in name, f"Expected FR track audio DTS.HD.MA.5.1: {name}"
-        assert 'DTS.X' not in name, f"English DTS:X leaked into name: {name}"
+        assert 'DTS.X' in name, f"Expected EN track audio DTS:X: {name}"
+        assert 'DTS.HD.MA.5.1' not in name, f"FR track audio with the least channels leaked into name: {name}"
 
     def test_french_track_ddp_vs_truehd(self):
-        """FR track DD+ 5.1 must be used even when first track is TrueHD Atmos."""
+        """EN track TrueHD Atmos must be used event if FR track DD+ 5.1 exist (Lossless and channels priority)."""
         meta = _meta_base(
             type='REMUX',
             source='BluRay',
@@ -604,8 +632,8 @@ class TestGetName:
             original_language='en',
         )
         name = self._run(meta)
-        assert 'DDP.5.1' in name, f"Expected FR track DDP.5.1: {name}"
-        assert 'TrueHD' not in name and 'TRUEHD' not in name, f"English TrueHD leaked: {name}"
+        assert 'TRUEHD' in name, f"Expected EN track DDP.5.1: {name}"
+        assert 'DDP.5.1' not in name, f"French DD+ 5.1 leaked: {name}"
 
     def test_no_french_track_keeps_meta_audio(self):
         """Without FR tracks, meta['audio'] (first track) is used."""
@@ -645,8 +673,7 @@ class TestGetName:
             audio='DTS:X 7.1',
             mediainfo=_mi([
                 _audio_track('en', Format='DTS',
-                             Format_AdditionalFeatures='XLL X',
-                             Channels='8'),
+                             Channels='6'),
                 _audio_track('fr', Channels='6'),
             ]),
             original_language='en',
@@ -654,6 +681,42 @@ class TestGetName:
         name = self._run(meta)
         # No Format on FR track → falls back to meta['audio'] which is DTS:X 7.1
         assert 'DTS.X.7.1' in name, f"Expected fallback to meta audio DTS.X.7.1: {name}"
+
+    def test_lossy_audio_track_fr_priority(self):
+        """For lossy tracks, must always pick FR track."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DDP 5.1',
+            mediainfo=_mi([
+                _audio_track('en', Format='E-AC-3',
+                             Channels='6'),
+                _audio_track('fr', Format='E-AC-3',
+                             Channels='2'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert 'DDP.2.0' in name, f"Expected FR track DDP.2.0: {name}"
+        assert 'DDP.5.1' not in name, f"English DD+ 5.1 leaked: {name}"
+
+    def test_lossy_audio_track_fr_most_channels_priority(self):
+        """For lossy tracks, must always pick FR track with most channels."""
+        meta = _meta_base(
+            type='REMUX',
+            source='BluRay',
+            audio='DDP 5.1',
+            mediainfo=_mi([
+                _audio_track('fr', Format='E-AC-3',
+                             Channels='2'),
+                _audio_track('fr', Format='E-AC-3',
+                             Channels='6'),
+            ]),
+            original_language='en',
+        )
+        name = self._run(meta)
+        assert 'DDP.5.1' in name, f"Expected FR track DDP.5.1: {name}"
+        assert 'DDP.2.0' not in name, f"French DD+ 2.0 leaked: {name}"
 
     def test_title_middle_dot_preserved_as_separator(self):
         """WALL·E (middle dot U+00B7) must become WALL.E (not WALLE)."""

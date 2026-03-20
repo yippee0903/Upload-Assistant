@@ -69,18 +69,46 @@ class C411(FrenchTrackerMixin):
         the MediaInfo of the French audio tracks.  When the first track
         is English (e.g. DTS:X 7.1) but the French track is different
         (e.g. DTS-HD MA 5.1), the name must reflect the French track.
+        Lossy Codecs: The TAG for the French audio track with the most
+                      channels must be included in the title
+        Lossless Codecs: The TAG for the audio track with the most channels
+                         must be included in the title, regardless of its
+                         language (since lossless codecs are often used for
+                         the original audio)
         """
         from src.audio import codec_info_from_track
 
+        lossless_additional_features = ["XLL", "HD MA", ":X", "16-ch", "MLP FBA"]
         audio_tracks = self._get_audio_tracks(meta)
-        main_tracks = [t for t in audio_tracks if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower()]
-        for track in main_tracks:
-            raw_lang = str(track.get("Language", "")).strip().lower()
-            mapped = self._map_language(raw_lang)
-            if mapped == "FRA":
-                if not track.get("Format"):
-                    break  # No detailed format info — fall back to meta['audio']
-                return codec_info_from_track(track).replace("DD+", "DDP")
+        main_tracks = [
+            t
+            for t in audio_tracks
+            if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower() and t.get("Channels") and t.get("Format")
+        ]
+
+        if not main_tracks:
+            return super()._get_audio_for_name(meta)
+
+        def most_channels_priority(t):
+            channels = int(t.get("Channels", "0"))
+            is_french = 1 if self._map_language(str(t.get("Language", ""))) == "FRA" else 0
+            return (channels, is_french)
+
+        most_channels = max(main_tracks, key=most_channels_priority)
+
+        is_lossless = (
+            most_channels.get("Compression_Mode") == "Lossless"
+            or any(f in str(most_channels.get("Format_AdditionalFeatures", "")) for f in lossless_additional_features)
+            or any(f in str(most_channels.get("Format_Commercial_IfAny", "")) for f in lossless_additional_features)
+        )
+
+        if is_lossless:
+            return codec_info_from_track(most_channels).replace("DD+", "DDP")
+
+        fra_tracks = [t for t in main_tracks if self._map_language(str(t.get("Language", ""))) == "FRA"]
+        if fra_tracks:
+            best_fra = max(fra_tracks, key=lambda x: int(x.get("Channels", "0")))
+            return codec_info_from_track(best_fra).replace("DD+", "DDP")
 
         return super()._get_audio_for_name(meta)
 
@@ -138,11 +166,11 @@ class C411(FrenchTrackerMixin):
         # Atmos capitalization
         dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
         dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
-        # ATMOS must appear BEFORE the audio codec entirely: DDP.5.1.ATMOS → ATMOS.DDP.5.1
-        # Pattern 1: codec.channels.ATMOS → ATMOS.codec.channels
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
-        # Pattern 2: codec.ATMOS.channels → ATMOS.codec.channels (in case already partially moved)
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.ATMOS\.(\d\.\d)([.-])", r".ATMOS.\1.\2\3", dot_name, flags=re.IGNORECASE)
+        # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
+        # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
+        dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split(".")
