@@ -520,9 +520,8 @@ class TestGetDataPayload:
         assert data["bitrate"] == "1080p"
         assert data["media"] == "WEB-DL"
 
-        # Name is generated via get_name but stored in torrent, not a form field;
-        # verify description was set
-        assert data.get("release_desc")
+        # release_desc = MediaInfo (empty in test), album_desc = BBCode description
+        assert data.get("album_desc")
 
         # Language flags — _build_audio_string produces MULTI.VFF for en-original
         # with fr track titled "VOF" (VFF is the conservative default)
@@ -554,6 +553,23 @@ class TestGetDataPayload:
         meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "ja"}]}}
         data = asyncio.run(tracker.get_data(meta))
         assert data["type"] == "5"
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_tv_season_in_tmdb_url(
+        self,
+        mock_mi: AsyncMock,
+        mock_desc: AsyncMock,
+        mock_title: AsyncMock,
+    ):
+        """TV content should include /season/N in the TMDB URL."""
+        tracker = HDF(_config())
+        meta = _meta_base(category="TV", service="", hdr="", edition="")
+        meta["season_int"] = 3
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "fr"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        assert data["allocine_url"].endswith("/season/3")
 
     @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
     @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")

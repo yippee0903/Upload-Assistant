@@ -72,7 +72,7 @@ class HDF(FrenchTrackerMixin):
         self.source_flag: str = "HDF"
         self.base_url: str = "https://hdf.world"
         self.upload_url: str = f"{self.base_url}/upload.php"
-        self.torrent_url: str = f"{self.base_url}/details.php?id="
+        self.torrent_url: str = f"{self.base_url}/torrents.php?torrentid="
         self.banned_groups: list[str] = _BANNED_GROUPS
         self.tmdb_manager = TmdbManager(config)
         self.session = httpx.AsyncClient(
@@ -715,8 +715,14 @@ class HDF(FrenchTrackerMixin):
 
         # TMDB URL (form field is allocine_url but accepts any URL)
         tmdb_id = meta.get("tmdb", "")
-        tmdb_cat = "movie" if str(meta.get("category", "")).upper() != "TV" else "tv"
+        is_tv = str(meta.get("category", "")).upper() == "TV"
+        tmdb_cat = "tv" if is_tv else "movie"
         tmdb_url = f"https://www.themoviedb.org/{tmdb_cat}/{tmdb_id}" if tmdb_id else ""
+        # Append season path for TV so HDF can identify the correct season
+        if is_tv and tmdb_url:
+            season_int = meta.get("season_int", 0)
+            if season_int and int(season_int) > 0:
+                tmdb_url += f"/season/{int(season_int)}"
 
         # Team / release group
         team = self._get_release_group(meta)
@@ -777,8 +783,8 @@ class HDF(FrenchTrackerMixin):
             "bitrate": self._get_resolution_id(meta),
             "media": self._get_file_type(meta),
             "team": team,
-            "release_desc": description,
-            "album_desc": mi_text,
+            "release_desc": mi_text,
+            "album_desc": description,
             "image": poster,
         }
 
@@ -863,7 +869,7 @@ class HDF(FrenchTrackerMixin):
             upload_cookies=self.session.cookies,
             upload_url=self.upload_url,
             hash_is_id=True,
-            success_text="details.php?id=",
+            success_text="torrents.php?id=",
         )
 
         return is_uploaded
