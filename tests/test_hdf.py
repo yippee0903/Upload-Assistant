@@ -435,12 +435,12 @@ class TestNaming:
 
 
 # ═══════════════════════════════════════════════════════════════
-#   Category — Spectacles (category 6)
+#   Category — Spectacles (category 2)
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestSpectaclesCategory:
-    """Ensure spectacle-related genres/keywords return category 6."""
+    """Ensure spectacle-related genres/keywords return category 2 (Spectacle)."""
 
     @pytest.mark.parametrize(
         "genres,keywords",
@@ -451,7 +451,7 @@ class TestSpectaclesCategory:
             ("", "one-man-show"),
         ],
     )
-    def test_spectacles_returns_6(self, genres: str, keywords: str):
+    def test_spectacles_returns_2(self, genres: str, keywords: str):
         tracker = HDF(_config())
         meta = _meta_base(category="MOVIE", genres=genres, keywords=keywords)
         assert asyncio.run(tracker.get_category_id(meta)) == 2
