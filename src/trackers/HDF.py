@@ -868,7 +868,7 @@ class HDF(FrenchTrackerMixin):
             torrent_field_name="file_input",
             upload_cookies=self.session.cookies,
             upload_url=self.upload_url,
-            hash_is_id=True,
+            id_pattern=r"torrentid=(\d+)",
             success_text="torrents.php?id=",
         )
 
