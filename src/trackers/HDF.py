@@ -90,7 +90,7 @@ class HDF(FrenchTrackerMixin):
     PREFER_ORIGINAL_TITLE: bool = True
 
     # HDF uses "WEB-DL" (not "WEB") per their naming rules
-    WEB_LABEL: str = "WEB-DL"
+    WEB_LABEL: str = "WEB"
 
     # ──────────────────────────────────────────────────────────
     #  Authentication
