@@ -467,9 +467,9 @@ class HDF(FrenchTrackerMixin):
 
         # External links
         ext_links: list[str] = []
-        imdb_id = meta.get("imdb_id", 0)
-        if imdb_id and int(imdb_id) > 0:
-            ext_links.append(f"[url=https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/]IMDb[/url]")
+        imdb_id = str(meta.get("imdb_id", "0")).lstrip("t")
+        if imdb_id.isdigit() and int(imdb_id) > 0:
+            ext_links.append(f"[url=https://www.imdb.com/title/tt{imdb_id.zfill(7)}/]IMDb[/url]")
         tmdb_id_val = meta.get("tmdb", "")
         if tmdb_id_val:
             tmdb_cat = "movie" if meta.get("category", "").upper() != "TV" else "tv"
@@ -797,12 +797,13 @@ class HDF(FrenchTrackerMixin):
 
         # Artists (at least one actor is required by HDF)
         if artists_names and "1" not in artists_roles:
-            # HDF requires at least one actor — add "Unknown" placeholder
             artists_names.append("Unknown")
             artists_roles.append("1")
-        if artists_names:
-            data["artists[]"] = artists_names
-            data["importance[]"] = artists_roles
+        if not artists_names:
+            artists_names.append("Unknown")
+            artists_roles.append("1")
+        data["artists[]"] = artists_names
+        data["importance[]"] = artists_roles
 
         # Scene checkbox
         if meta.get("scene", False):

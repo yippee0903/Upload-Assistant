@@ -817,3 +817,57 @@ class TestCategoryDocumentaryTV:
         tracker = HDF(_config())
         meta = _meta_base(category="TV", genres="Documentary")
         assert asyncio.run(tracker.get_category_id(meta)) == 6
+
+
+# ═══════════════════════════════════════════════════════════════
+#   IMDb ID — various formats
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestImdbIdFormats:
+    """_build_description should handle various imdb_id formats."""
+
+    def _tracker(self):
+        return HDF(_config())
+
+    @pytest.mark.parametrize(
+        "imdb_id,expected_in_output",
+        [
+            (1234567, "tt1234567"),
+            ("1234567", "tt1234567"),
+            ("tt1234567", "tt1234567"),
+            (0, None),
+            ("", None),
+        ],
+    )
+    def test_imdb_link(self, imdb_id, expected_in_output):
+        tracker = self._tracker()
+        meta = _meta_base()
+        meta["imdb_id"] = imdb_id
+        desc = asyncio.run(tracker._build_description(meta))
+        if expected_in_output:
+            assert expected_in_output in desc
+        else:
+            assert "imdb.com" not in desc
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Artists fallback — always at least one actor
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestArtistsFallback:
+    """get_data should always include at least one actor."""
+
+    @patch.object(HDF, "_get_french_title", new_callable=AsyncMock, return_value="")
+    @patch.object(HDF, "_build_description", new_callable=AsyncMock, return_value="[center]Test[/center]")
+    @patch.object(HDF, "_get_mediainfo_text", new_callable=AsyncMock, return_value="")
+    def test_empty_credits_still_has_actor(self, mock_mi: AsyncMock, mock_desc: AsyncMock, mock_title: AsyncMock):
+        tracker = HDF(_config())
+        meta = _meta_base()
+        meta["tmdb_directors"] = []
+        meta["tmdb_cast"] = []
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Audio", "Language": "en"}]}}
+        data = asyncio.run(tracker.get_data(meta))
+        assert "artists[]" in data
+        assert "1" in data["importance[]"]
