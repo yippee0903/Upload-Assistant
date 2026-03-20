@@ -109,8 +109,10 @@ class TestGetCategoryId:
             ("MOVIE", "Documentary", "", False, 6),
             # Documentaries via keywords
             ("MOVIE", "", "documentary", False, 6),
-            # Concerts
-            ("MOVIE", "Music", "", False, 3),
+            # Concerts via keyword
+            ("MOVIE", "", "concert", False, 3),
+            # Music genre alone → Film (not Concert)
+            ("MOVIE", "Music", "", False, 0),
         ],
     )
     def test_category_mapping(
@@ -688,6 +690,27 @@ class TestLanguageFlagsExtended:
         flags = self._tracker()._compute_language_flags(meta, "VO")
         assert flags["VO"] is True
         assert flags["subtitles"] is True
+
+    def test_vf_generic(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "VF")
+        assert flags["VF"] is True
+        assert flags["VFF"] is False
+
+    def test_voq(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "VOQ")
+        assert flags["VOQ"] is True
+        assert flags["VO"] is False
+
+    def test_multi_without_specific_variant_sets_vf(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "MULTI")
+        assert flags["MULTi"] is True
+        assert flags["VF"] is True
+
+    def test_multi_voq(self):
+        flags = self._tracker()._compute_language_flags(_meta_base(), "MULTI.VOQ")
+        assert flags["MULTi"] is True
+        assert flags["VOQ"] is True
+        assert flags["VF"] is False
 
 
 # ═══════════════════════════════════════════════════════════════

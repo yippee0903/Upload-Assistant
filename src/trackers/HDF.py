@@ -89,7 +89,7 @@ class HDF(FrenchTrackerMixin):
     # HDF uses original (English) titles, not French translations
     PREFER_ORIGINAL_TITLE: bool = True
 
-    # HDF uses "WEB-DL" (not "WEB") per their naming rules
+    # HDF uses "WEB" per their naming rules
     WEB_LABEL: str = "WEB"
 
     # ──────────────────────────────────────────────────────────
@@ -101,13 +101,17 @@ class HDF(FrenchTrackerMixin):
         self.session.cookies.clear()
         if cookies is not None:
             self.session.cookies.update(cookies)
-        return await self.cookie_validator.cookie_validation(
+        result = await self.cookie_validator.cookie_validation(
             meta=meta,
             tracker=self.tracker,
             test_url=self.upload_url,
             error_text="login.php",
             token_pattern=r'name="auth" value="([^"]+)"',  # nosec B106
         )
+        if result:
+            # Copy class-level token (set by cookie_auth) to instance
+            self.secret_token = HDF.secret_token
+        return result
 
     # ──────────────────────────────────────────────────────────
     #  Category mapping
@@ -131,7 +135,7 @@ class HDF(FrenchTrackerMixin):
         if "documentary" in genres or "documentary" in keywords:
             return 6  # Documentaire
 
-        if "music" in genres or "concert" in keywords:
+        if "concert" in keywords or "live" in keywords:
             return 3  # Concert
 
         _SPECTACLE_TOKENS = {"spectacle", "spectacles", "show", "theatre", "theater", "stage", "performance", "one-man-show", "stand-up", "humour", "humor"}
@@ -258,6 +262,10 @@ class HDF(FrenchTrackerMixin):
                 flags["VFI"] = True
             if "VOF" in tag:
                 flags["VOF"] = True
+            if "VOQ" in tag:
+                flags["VOQ"] = True
+            if not any(flags[k] for k in ("VFF", "VFQ", "VFI", "VOF", "VOQ")):
+                flags["VF"] = True
         elif "VOF" in tag:
             flags["VOF"] = True
         elif "VFF" in tag or "TRUEFRENCH" in tag:
@@ -266,9 +274,13 @@ class HDF(FrenchTrackerMixin):
             flags["VFQ"] = True
         elif "VFI" in tag:
             flags["VFI"] = True
+        elif "VOQ" in tag:
+            flags["VOQ"] = True
         elif "VOSTFR" in tag:
             flags["VO"] = True
             flags["subtitles"] = True
+        elif "VF" in tag:
+            flags["VF"] = True
         elif "MUET" in tag:
             flags["muet"] = True
         elif "VO" in tag:
@@ -769,7 +781,7 @@ class HDF(FrenchTrackerMixin):
 
         data: dict[str, Any] = {
             "submit": "true",
-            "auth": HDF.secret_token,
+            "auth": self.secret_token,
             "type": str(category_id),
             "allocine_url": tmdb_url,
             "title": str(meta.get("title", "")),
@@ -784,6 +796,10 @@ class HDF(FrenchTrackerMixin):
         }
 
         # Artists (at least one actor is required by HDF)
+        if artists_names and "1" not in artists_roles:
+            # HDF requires at least one actor — add "Unknown" placeholder
+            artists_names.append("Unknown")
+            artists_roles.append("1")
         if artists_names:
             data["artists[]"] = artists_names
             data["importance[]"] = artists_roles
