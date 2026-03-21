@@ -10,7 +10,7 @@ from unidecode import unidecode
 from src.console import console
 from src.nfo_generator import SceneNfoGenerator
 from src.trackers.COMMON import COMMON
-from src.trackers.FRENCH import FRENCH_LANG_VALUES, FrenchTrackerMixin
+from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.UNIT3D import UNIT3D, QueryValue
 
 
