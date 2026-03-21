@@ -187,6 +187,10 @@ class COMMON:
             try:
                 async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0, follow_redirects=True) as session, session.stream("GET", downurl) as r:
                     r.raise_for_status()
+                    content_type = r.headers.get("content-type", "")
+                    if "text/html" in content_type:
+                        console.print("[yellow]Warning: Torrent download returned HTML instead of a torrent file (possible auth/redirect issue).[/yellow]")
+                        return None
                     async with aiofiles.open(path, "wb") as f:
                         async for chunk in r.aiter_bytes():
                             await f.write(chunk)

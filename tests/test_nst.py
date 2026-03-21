@@ -406,11 +406,8 @@ class TestSanitizeBBCode:
             "[center][url=https://imgbox.com/a][img=350]https://images2.imgbox.com/a/b/abc_o.png[/img][/url][/center]"
         )
         result = NST._sanitize_bbcode(bbcode)
-        assert "[img=300]" not in result
-        assert "[img=350]" not in result
-        assert "/original/" not in result
-        assert "w300/" in result
-        assert "thumbs2.imgbox.com" in result
-        assert "_t.png" in result
-        assert "[center]" in result
-        assert "[url=" in result
+        expected = (
+            "[center][img]https://image.tmdb.org/t/p/w300/poster.png[/img][/center]\n"
+            "[center][url=https://imgbox.com/a][img]https://thumbs2.imgbox.com/a/b/abc_t.png[/img][/url][/center]"
+        )
+        assert result == expected
