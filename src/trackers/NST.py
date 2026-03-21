@@ -305,7 +305,8 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("")
 
         # ── Captures d'écran ──
-        image_list: list[dict[str, Any]] = meta.get("image_list", [])
+        include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
+        image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
         if image_list:
             parts.append(f"[b][color={C}]Captures d'écran[/color][/b]")
             parts.append("")
