@@ -16,8 +16,7 @@ from typing import Any, Optional, Union
 
 from unidecode import unidecode
 
-from src.audio import AD_TRACK_RE
-from src.audio import codec_info_from_track
+from src.audio import AD_TRACK_RE, codec_info_from_track
 
 Meta = dict[str, Any]
 

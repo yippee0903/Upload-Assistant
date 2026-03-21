@@ -463,90 +463,21 @@ class GF(FrenchTrackerMixin, UNIT3D):
         When the release MULTi audio tracks, GF wants the audio tag only
         if it's the same between VO and VF tracks.
         """
-        from src.audio import determine_channel_count
+        from src.audio import codec_info_from_track
 
+        all_tracks = []
         audio_tracks = self._get_audio_tracks(meta)
         if not audio_tracks:
             return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
-        def get_label(track):
-            # ── codec determination (mirrors src/audio.py logic) ──
-            _CODEC_MAP = {
-                "DTS": "DTS",
-                "AAC": "AAC",
-                "AAC LC": "AAC",
-                "AC-3": "DD",
-                "E-AC-3": "DD+",
-                "A_EAC3": "DD+",
-                "Enhanced AC-3": "DD+",
-                "MLP FBA": "TrueHD",
-                "FLAC": "FLAC",
-                "Opus": "Opus",
-                "Vorbis": "VORBIS",
-                "PCM": "LPCM",
-                "LPCM Audio": "LPCM",
-                "Dolby Digital Audio": "DD",
-                "Dolby Digital Plus Audio": "DD+",
-                "Dolby Digital Plus": "DD+",
-                "Dolby TrueHD Audio": "TrueHD",
-                "DTS Audio": "DTS",
-                "DTS-HD Master Audio": "DTS-HD MA",
-                "DTS-HD High-Res Audio": "DTS-HD HRA",
-                "DTS:X Master Audio": "DTS:X",
-            }
-            _EXTRA = {"XLL": "-HD MA", "XLL X": ":X", "ES": "-ES"}
-            _ATMOS = {"JOC": " Atmos", "16-ch": " Atmos", "Atmos Audio": " Atmos"}
-            _COMMERCIAL = {
-                "Dolby Digital": "DD",
-                "Dolby Digital Plus": "DD+",
-                "Dolby TrueHD": "TrueHD",
-                "DTS-ES": "DTS-ES",
-                "DTS-HD High": "DTS-HD HRA",
-                "Free Lossless Audio Codec": "FLAC",
-                "DTS-HD Master Audio": "DTS-HD MA",
-            }
-
-            fmt = str(track.get("Format", ""))
-            commercial = str(track.get("Format_Commercial", "") or track.get("Format_Commercial_IfAny", ""))
-            additional = str(track.get("Format_AdditionalFeatures", "") or "")
-            channels_raw = track.get("Channels_Original", track.get("Channels"))
-            channel_layout = str(track.get("ChannelLayout", "") or track.get("ChannelLayout_Original", "") or track.get("ChannelPositions", ""))
-
-            codec = ""
-            extra = ""
-            search_format = True
-
-            if commercial:
-                for key, value in _COMMERCIAL.items():
-                    if key in commercial:
-                        codec = value
-                        search_format = False
-                    if "Atmos" in commercial or _ATMOS.get(additional, "") == " Atmos":
-                        extra = " Atmos"
-            if search_format:
-                codec = _CODEC_MAP.get(fmt, "") + _EXTRA.get(additional, "")
-                extra = _ATMOS.get(additional, "")
-            if not codec:
-                codec = fmt
-            if fmt.startswith("DTS") and additional and additional.endswith("X"):
-                codec = "DTS:X"
-
-            chan = determine_channel_count(channels_raw, channel_layout, additional, fmt)
-            if chan == "Unknown":
-                chan = ""
-
-            return f"{codec} {chan}{extra}".strip()
-
-        all_tracks = []
-        fr_track = ""
-
         for t in audio_tracks:
             if self._is_audio_desc_track(t):
                 continue
-            all_tracks.append(get_label(t))
-            lang = str(t.get("Language", "")).lower().strip()
-            if not fr_track and (lang in FRENCH_LANG_VALUES or lang.startswith("fr")):
-                fr_track = get_label(t)
+            codec = codec_info_from_track(t).replace("DD+", "DDP")
+            if not codec or "Unknown" in codec:
+                codec = ""
+            all_tracks.append(codec)
+
         if not all_tracks or (len(set(all_tracks)) == 1 and not all_tracks[0]):  # all_tracks empty or label generated is empty
             return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
         elif len(set(all_tracks)) == 1:  # If elements are the same, set() remove double then len == 1
