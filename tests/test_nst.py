@@ -94,24 +94,18 @@ class TestGetCategoryId:
     @pytest.mark.parametrize(
         "category,genres,keywords,anime,expected_id",
         [
-            # Standard movie
-            ("MOVIE", "", "", False, "2020"),
-            # Standard TV
-            ("TV", "", "", False, "5040"),
-            # Documentary movie
-            ("MOVIE", "Documentary", "", False, "2030"),
-            # Documentary TV
-            ("TV", "Documentary", "", False, "2030"),
-            # Anime movie
-            ("MOVIE", "", "", True, "2010"),
-            # Anime TV
-            ("TV", "", "", True, "5070"),
-            # Concert
-            ("MOVIE", "", "concert", False, "2060"),
-            # Live
-            ("MOVIE", "", "live", False, "2060"),
-            # Sport TV
-            ("TV", "", "sport", False, "5060"),
+            # Standard movie → numeric 1 (film)
+            ("MOVIE", "", "", False, "1"),
+            # Standard TV → numeric 2 (serie-tv)
+            ("TV", "", "", False, "2"),
+            # Documentary movie → numeric 5 (documentaire)
+            ("MOVIE", "Documentary", "", False, "5"),
+            # Documentary TV → numeric 5 (documentaire)
+            ("TV", "Documentary", "", False, "5"),
+            # Anime movie → numeric 3 (animation)
+            ("MOVIE", "", "", True, "3"),
+            # Anime TV → numeric 4 (animation-serie)
+            ("TV", "", "", True, "4"),
         ],
     )
     def test_category_mapping(
@@ -130,12 +124,12 @@ class TestGetCategoryId:
     def test_mapping_only(self):
         tracker = NST(_config())
         result = asyncio.run(tracker.get_category_id(_meta_base(), mapping_only=True))
-        assert result == {"MOVIE": "2020", "TV": "5040"}
+        assert result == {"MOVIE": "1", "TV": "2"}
 
     def test_reverse(self):
         tracker = NST(_config())
         result = asyncio.run(tracker.get_category_id(_meta_base(), reverse=True))
-        assert result == {"2020": "MOVIE", "5040": "TV"}
+        assert result == {"1": "MOVIE", "2": "TV"}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -214,7 +208,7 @@ class TestTrackerIdentity:
         assert tracker.source_flag == "NST"
 
     def test_web_label(self):
-        assert NST.WEB_LABEL == "WEB-DL"
+        assert NST.WEB_LABEL == "WEB"
 
     def test_prefer_original_title(self):
         assert NST.PREFER_ORIGINAL_TITLE is True
@@ -233,10 +227,150 @@ class TestDocumentaryKeywords:
         tracker = NST(_config())
         meta = _meta_base(category="MOVIE", keywords="documentary")
         result = asyncio.run(tracker.get_category_id(meta))
-        assert result == {"category_id": "2030"}
+        assert result == {"category_id": "5"}
 
-    def test_sport_keyword_tv(self):
+    def test_documentary_keyword_tv(self):
         tracker = NST(_config())
-        meta = _meta_base(category="TV", keywords="sport")
+        meta = _meta_base(category="TV", keywords="documentary")
         result = asyncio.run(tracker.get_category_id(meta))
-        assert result == {"category_id": "5060"}
+        assert result == {"category_id": "5"}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Category slug resolution (used by search_existing)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestResolveCategorySlug:
+    def test_movie_slug(self):
+        tracker = NST(_config())
+        assert tracker._resolve_category_slug(_meta_base(category="MOVIE")) == "film"
+
+    def test_tv_slug(self):
+        tracker = NST(_config())
+        assert tracker._resolve_category_slug(_meta_base(category="TV")) == "serie-tv"
+
+    def test_anime_movie_slug(self):
+        tracker = NST(_config())
+        assert tracker._resolve_category_slug(_meta_base(category="MOVIE", anime=True)) == "animation"
+
+    def test_anime_tv_slug(self):
+        tracker = NST(_config())
+        assert tracker._resolve_category_slug(_meta_base(category="TV", anime=True)) == "animation-serie"
+
+    def test_documentary_slug(self):
+        tracker = NST(_config())
+        assert tracker._resolve_category_slug(_meta_base(category="MOVIE", genres="Documentary")) == "documentaire"
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Torrent ID extraction (UUID from upload-assistant response)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTorrentId:
+    def test_uuid_from_download_url(self):
+        tracker = NST(_config())
+        response_data = {"data": "http://nostradamus.foo/api/upload-assistant/torrents/580bb336-3a06-489a-b874-a0bfa01d396e/download"}
+        result = asyncio.run(tracker.get_torrent_id(response_data))
+        assert result == "580bb336-3a06-489a-b874-a0bfa01d396e"
+
+    def test_uuid_from_https_url(self):
+        tracker = NST(_config())
+        response_data = {"data": "https://nostradamus.foo/api/upload-assistant/torrents/3f2c8893-2484-4f65-86c6-a79d9ac32aec/download"}
+        result = asyncio.run(tracker.get_torrent_id(response_data))
+        assert result == "3f2c8893-2484-4f65-86c6-a79d9ac32aec"
+
+    def test_empty_on_missing_data(self):
+        tracker = NST(_config())
+        result = asyncio.run(tracker.get_torrent_id({}))
+        assert result == ""
+
+    def test_empty_on_no_uuid(self):
+        tracker = NST(_config())
+        response_data = {"data": "http://nostradamus.foo/some/other/path"}
+        result = asyncio.run(tracker.get_torrent_id(response_data))
+        assert result == ""
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Additional data (description_format)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetAdditionalData:
+    def test_returns_bbcode_format(self):
+        tracker = NST(_config())
+        result = asyncio.run(tracker.get_additional_data({}))
+        assert result == {"description_format": "bbcode"}
+
+
+# ═══════════════════════════════════════════════════════════════
+#   BBCode sanitization (strip unsupported extensions)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestSanitizeBBCode:
+    def test_strip_img_size(self):
+        assert "[img]https://example.com/img.png[/img]" in NST._sanitize_bbcode("[img=300]https://example.com/img.png[/img]")
+
+    def test_strip_img_size_350(self):
+        assert "[img]" in NST._sanitize_bbcode("[img=350]https://example.com/img.png[/img]")
+
+    def test_plain_img_unchanged(self):
+        assert "[img]https://example.com/img.png[/img]" in NST._sanitize_bbcode("[img]https://example.com/img.png[/img]")
+
+    def test_tmdb_poster_downscaled(self):
+        result = NST._sanitize_bbcode("[img]https://image.tmdb.org/t/p/original/abc.jpg[/img]")
+        assert "image.tmdb.org/t/p/w300/abc.jpg" in result
+        assert "/original/" not in result
+
+    def test_imgbox_uses_thumbnails(self):
+        result = NST._sanitize_bbcode("[img]https://images2.imgbox.com/64/45/ebZ94hUP_o.png[/img]")
+        assert "thumbs2.imgbox.com" in result
+        assert "_t.png" in result
+        assert "images2.imgbox.com" not in result
+        assert "_o.png" not in result
+
+    def test_strip_size_tags(self):
+        assert NST._sanitize_bbcode("[size=4]big text[/size]") == "big text"
+
+    def test_pre_to_code(self):
+        assert NST._sanitize_bbcode("[pre]some text[/pre]") == "[code]some text[/code]"
+
+    def test_center_unchanged(self):
+        assert NST._sanitize_bbcode("[center]text[/center]") == "[center]text[/center]"
+
+    def test_url_unchanged(self):
+        assert NST._sanitize_bbcode("[url=https://example.com]link[/url]") == "[url=https://example.com]link[/url]"
+
+    def test_ptscreens_uses_medium(self):
+        result = NST._sanitize_bbcode("[img]https://ptscreens.com/images/2025/03/21/abc123.png[/img]")
+        assert "abc123.md.png" in result
+        assert "ptscreens.com" in result
+
+    def test_onlyimage_uses_medium(self):
+        result = NST._sanitize_bbcode("[img]https://onlyimage.org/images/2025/03/21/xyz789.jpg[/img]")
+        assert "xyz789.md.jpg" in result
+        assert "onlyimage.org" in result
+
+    def test_pixhost_uses_thumbnails(self):
+        result = NST._sanitize_bbcode("[img]https://img75.pixhost.to/images/123/456_abcdef.png[/img]")
+        assert "t75.pixhost.to/thumbs/" in result
+        assert "img75.pixhost.to" not in result
+
+    def test_typical_description(self):
+        """Test a typical UA description fragment."""
+        bbcode = (
+            "[center][img=300]https://image.tmdb.org/t/p/original/poster.png[/img][/center]\n"
+            "[center][url=https://imgbox.com/a][img=350]https://images2.imgbox.com/a/b/abc_o.png[/img][/url][/center]"
+        )
+        result = NST._sanitize_bbcode(bbcode)
+        assert "[img=300]" not in result
+        assert "[img=350]" not in result
+        assert "/original/" not in result
+        assert "w300/" in result
+        assert "thumbs2.imgbox.com" in result
+        assert "_t.png" in result
+        assert "[center]" in result
+        assert "[url=" in result

@@ -185,7 +185,7 @@ class COMMON:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent" if cross else f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if downurl:
             try:
-                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0) as session, session.stream("GET", downurl) as r:
+                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0, follow_redirects=True) as session, session.stream("GET", downurl) as r:
                     r.raise_for_status()
                     async with aiofiles.open(path, "wb") as f:
                         async for chunk in r.aiter_bytes():
