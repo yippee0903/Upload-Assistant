@@ -235,8 +235,35 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data: dict[str, Any] = {"description_format": "bbcode"}
-        # Send audio languages so NST can tag Multi / VFF / etc.
-        audio_langs = meta.get("audio_languages") or []
-        if audio_langs:
-            data["langue"] = audio_langs
+        # Map the language tag already computed by FrenchTrackerMixin to
+        # NST's fixed "langue" choices: Multi, Français, Anglais, VOSTFR,
+        # VFSTFR, Muet.
+        data["langue"] = self._detect_nst_langue(meta)
         return data
+
+    @staticmethod
+    def _detect_nst_langue(meta: dict[str, Any]) -> str:
+        """Derive the NST langue tag from the release name / audio metadata."""
+        name = meta.get("name", "")
+        upper = name.upper()
+
+        # FrenchTrackerMixin embeds MULTI.VFF / VOSTFR / etc. in the name
+        if ".MULTI." in upper or upper.startswith("MULTI.") or upper.endswith(".MULTI"):
+            return "Multi"
+        if ".VOSTFR." in upper or upper.endswith(".VOSTFR"):
+            return "VOSTFR"
+        if ".SUBFRENCH." in upper or upper.endswith(".SUBFRENCH"):
+            return "VOSTFR"
+
+        # Fallback: inspect audio_languages when no tag in name
+        audio = [lang.lower() for lang in (meta.get("audio_languages") or [])]
+        has_fr = any(la in ("french", "français", "fra", "fre", "fr") for la in audio)
+        has_en = any(la in ("english", "eng", "en") for la in audio)
+
+        if len(audio) >= 2 and has_fr:
+            return "Multi"
+        if has_fr:
+            return "Français"
+        if has_en:
+            return "Anglais"
+        return ""

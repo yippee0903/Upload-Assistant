@@ -304,21 +304,41 @@ class TestGetAdditionalData:
         result = asyncio.run(tracker.get_additional_data({}))
         assert result["description_format"] == "bbcode"
 
-    def test_sends_langue_from_audio_languages(self):
+
+class TestDetectNstLangue:
+    def test_multi_in_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}) == "Multi"
+
+    def test_vostfr_in_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VOSTFR.1080p.WEB.H264-GRP"}) == "VOSTFR"
+
+    def test_subfrench_maps_to_vostfr(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.SUBFRENCH.720p.WEB-GRP"}) == "VOSTFR"
+
+    def test_multi_from_audio_languages(self):
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French", "English"]}
+        assert NST._detect_nst_langue(meta) == "Multi"
+
+    def test_francais_from_audio_languages(self):
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French"]}
+        assert NST._detect_nst_langue(meta) == "Français"
+
+    def test_anglais_from_audio_languages(self):
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["English"]}
+        assert NST._detect_nst_langue(meta) == "Anglais"
+
+    def test_empty_when_no_data(self):
+        assert NST._detect_nst_langue({}) == ""
+
+    def test_name_takes_priority_over_audio(self):
+        meta = {"name": "Movie.2026.VOSTFR.1080p.WEB-GRP", "audio_languages": ["English"]}
+        assert NST._detect_nst_langue(meta) == "VOSTFR"
+
+    def test_langue_sent_in_additional_data(self):
         tracker = NST(_config())
-        meta = {"audio_languages": ["French", "English"]}
+        meta = {"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}
         result = asyncio.run(tracker.get_additional_data(meta))
-        assert result["langue"] == ["French", "English"]
-
-    def test_no_langue_when_no_audio_languages(self):
-        tracker = NST(_config())
-        result = asyncio.run(tracker.get_additional_data({}))
-        assert "langue" not in result
-
-    def test_no_langue_when_empty_audio_languages(self):
-        tracker = NST(_config())
-        result = asyncio.run(tracker.get_additional_data({"audio_languages": []}))
-        assert "langue" not in result
+        assert result["langue"] == "Multi"
 
 
 # ═══════════════════════════════════════════════════════════════
