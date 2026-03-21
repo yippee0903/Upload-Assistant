@@ -185,8 +185,12 @@ class COMMON:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent" if cross else f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if downurl:
             try:
-                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0) as session, session.stream("GET", downurl) as r:
+                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0, follow_redirects=True) as session, session.stream("GET", downurl) as r:
                     r.raise_for_status()
+                    content_type = r.headers.get("content-type", "")
+                    if "text/html" in content_type:
+                        console.print("[yellow]Warning: Torrent download returned HTML instead of a torrent file (possible auth/redirect issue).[/yellow]")
+                        return None
                     async with aiofiles.open(path, "wb") as f:
                         async for chunk in r.aiter_bytes():
                             await f.write(chunk)

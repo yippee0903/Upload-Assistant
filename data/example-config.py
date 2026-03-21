@@ -761,6 +761,19 @@ config = {
             "api_key": "",
             "announce_url": "https://tracker.nebulance.io/insertyourpasskeyhere/announce",
         },
+        "NST": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # nostradamus.foo — Nostradamus (French private tracker, API-based)
+            # Use the bulk importer token from https://nostradamus.foo/settings (not the Indexer API key)
+            # This token must be activated by staff for your account
+            "api_key": "",
+            # Find the announce URL on https://nostradamus.foo/upload
+            "announce_url": "https://tracker.nostradamus.foo/<PASSKEY>/announce",
+            "anon": False,
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
+        },
         "OE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",

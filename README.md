@@ -1,6 +1,6 @@
 > **⚠️ This is a fork of [Upload Assistant](https://github.com/Audionut/Upload-Assistant), originally created by [Audionut](https://github.com/Audionut) and [L4G](https://github.com/L4GSP1KE).**
 >
-> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers** (C411, TORR9, GF, G3MINI, HDF, TOS).
+> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers** (C411, TORR9, GF, G3MINI, HDF, NST, TOS).
 >
 > For the original project, please refer to the [upstream repository](https://github.com/Audionut/Upload-Assistant).
 
@@ -77,7 +77,8 @@ Many thanks to all who have contributed.
 |Lat-Team|LT|Locadora|LCD|
 |LST|LST|Luminarr|LUME|
 |MoreThanTV|MTV|Nebulance|NBL|
-|OldToonsWorld|OTW|OnlyEncodes+|OE|
+|Nostradamus|NST|OldToonsWorld|OTW|
+|OnlyEncodes+|OE|||
 |PassThePopcorn|PTP|PolishTorrent|PTT|
 |Portugas|PT|PrivateHD|PHD|
 |PTerClub|PTER|PTSKIT|PTS|
