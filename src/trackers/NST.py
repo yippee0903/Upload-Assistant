@@ -1,6 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import os
 import re
 from typing import Any
+
+import aiofiles
 
 from src.console import console
 from src.rehostimages import RehostImagesManager
@@ -215,8 +218,131 @@ class NST(FrenchTrackerMixin, UNIT3D):
         return s
 
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
-        desc = await super().get_description(meta)
-        return {"description": self._sanitize_bbcode(desc["description"])}
+        desc = await self._build_description(meta)
+        return {"description": self._sanitize_bbcode(desc)}
+
+    # ── Custom description (technical focus — NST header has synopsis) ─
+
+    async def _build_description(self, meta: dict[str, Any]) -> str:
+        """Build a concise BBCode description for NST.
+
+        NST's torrent page already displays the poster, synopsis, genres,
+        external links (IMDb/TMDB), and quality badge.  The description
+        therefore focuses on technical details, audio/subtitle tracks,
+        release metadata, and screenshots.
+        """
+        C = "#3d85c6"
+        parts: list[str] = []
+        mi_text = await self._get_mediainfo_text(meta)
+
+        # ── Informations techniques ──
+        parts.append(f"[b][color={C}]Informations techniques[/color][/b]")
+        tech: list[str] = []
+        type_label = self._get_type_label(meta)
+        if type_label:
+            tech.append(f"[b][color={C}]Type :[/color][/b] {type_label}")
+        source = meta.get("source", "") or meta.get("type", "")
+        if source:
+            tech.append(f"[b][color={C}]Source :[/color][/b] {source}")
+        service = meta.get("service", "")
+        if service:
+            tech.append(f"[b][color={C}]Service :[/color][/b] {service}")
+        resolution = meta.get("resolution", "")
+        if resolution:
+            tech.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}")
+        container = self._format_container(mi_text)
+        if container:
+            tech.append(f"[b][color={C}]Format vidéo :[/color][/b] {container}")
+        video_codec = (meta.get("video_encode", "").strip() or meta.get("video_codec", "")).strip()
+        video_codec = video_codec.replace("H.264", "H264").replace("H.265", "H265")
+        raw_codec = meta.get("video_codec", "").strip()
+        if video_codec and raw_codec and raw_codec != video_codec:
+            video_codec = f"{video_codec} ({raw_codec})"
+        if video_codec:
+            tech.append(f"[b][color={C}]Codec vidéo :[/color][/b] {video_codec}")
+        hdr_dv = self._format_hdr_dv_bbcode(meta)
+        if hdr_dv:
+            tech.append(f"[b][color={C}]HDR :[/color][/b] {hdr_dv}")
+        if mi_text:
+            vbr_m = re.search(r"(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)", mi_text)
+            if vbr_m:
+                tech.append(f"[b][color={C}]Débit vidéo :[/color][/b] {vbr_m.group(1).strip()}")
+        parts.extend(tech)
+        parts.append("")
+
+        # ── Audio(s) ──
+        parts.append(f"[b][color={C}]Audio(s)[/color][/b]")
+        audio_lines = self._format_audio_bbcode(mi_text, meta)
+        if audio_lines:
+            parts.extend(f"[i]{al}[/i]" for al in audio_lines)
+        else:
+            parts.append("[i]Non spécifié[/i]")
+        parts.append("")
+
+        # ── Sous-titre(s) ──
+        parts.append(f"[b][color={C}]Sous-titre(s)[/color][/b]")
+        sub_lines = self._format_subtitle_bbcode(mi_text, meta)
+        if sub_lines:
+            parts.extend(f"[i]{sl}[/i]" for sl in sub_lines)
+        else:
+            parts.append("[i]Aucun[/i]")
+        parts.append("")
+
+        # ── Release ──
+        parts.append(f"[b][color={C}]Release[/color][/b]")
+        size_str = self._get_total_size(meta, mi_text)
+        if size_str:
+            parts.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}")
+        file_count = self._count_files(meta)
+        if file_count:
+            parts.append(f"[b][color={C}]Nombre de fichier(s) :[/color][/b] {file_count}")
+        group = self._get_release_group(meta)
+        if group:
+            parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
+        personal_note = meta.get("personal_note", "")
+        if personal_note:
+            parts.append(f"[b][color={C}]Note :[/color][/b] {personal_note}")
+        parts.append("")
+
+        # ── Captures d'écran ──
+        image_list: list[dict[str, Any]] = meta.get("image_list", [])
+        if image_list:
+            parts.append(f"[b][color={C}]Captures d'écran[/color][/b]")
+            parts.append("")
+            img_lines: list[str] = []
+            for img in image_list:
+                raw = img.get("raw_url", "")
+                web = img.get("web_url", "")
+                if raw:
+                    img_lines.append(f"[url={web}][img]{raw}[/img][/url]" if web else f"[img]{raw}[/img]")
+            if img_lines:
+                parts.append("[center]")
+                parts.append("\n".join(img_lines))
+                parts.append("[/center]")
+            parts.append("")
+
+        # ── Signature ──
+        ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
+        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
+
+        return "\n".join(parts)
+
+    async def _get_mediainfo_text(self, meta: dict[str, Any]) -> str:
+        """Read MediaInfo text from temp files."""
+        base = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
+        for fname in ("MEDIAINFO_CLEANPATH.txt", "MEDIAINFO.txt"):
+            fpath = os.path.join(base, fname)
+            if os.path.exists(fpath):
+                async with aiofiles.open(fpath, encoding="utf-8") as f:
+                    content = await f.read()
+                    if content.strip():
+                        return content
+        if meta.get("bdinfo") is not None:
+            bd_path = os.path.join(base, "BD_SUMMARY_00.txt")
+            if os.path.exists(bd_path):
+                async with aiofiles.open(bd_path, encoding="utf-8") as f:
+                    return await f.read()
+        return str(meta.get("mediainfo_text") or "")
 
     async def get_torrent_id(self, response_data: dict[str, Any]) -> str:
         """Extract UUID torrent ID from NST's upload-assistant download URL.
