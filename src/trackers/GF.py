@@ -454,103 +454,105 @@ class GF(FrenchTrackerMixin, UNIT3D):
         return self._title_case(title)
 
     # ──────────────────────────────────────────────────────────
-    #  Audio codec from the French audio track
+    #  Audio codec from audio track
     # ──────────────────────────────────────────────────────────
 
-    def _get_french_audio_label(self, meta: dict[str, Any]) -> str:
-        """Build an audio codec + channel string from the French audio track.
+    def _get_audio_for_name(self, meta: dict[str, Any]) -> str:
+        """Build an audio codec + channel string.
 
-        When the release contains French audio, GF wants the audio tag to
-        reflect that track's codec (e.g. ``DTS 5.1``) rather than the
-        first track's codec (which is often English DTS-HD MA 7.1).
-
-        Returns the label for the first French track found, or an empty
-        string if there is no French audio.
+        When the release MULTi audio tracks, GF wants the audio tag only
+        if it's the same between VO and VF tracks.
         """
         from src.audio import determine_channel_count
 
         audio_tracks = self._get_audio_tracks(meta)
         if not audio_tracks:
-            return ""
+            return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
-        # find first French audio track
-        fr_track: dict[str, Any] | None = None
+        def get_label(track):
+            # ── codec determination (mirrors src/audio.py logic) ──
+            _CODEC_MAP = {
+                "DTS": "DTS",
+                "AAC": "AAC",
+                "AAC LC": "AAC",
+                "AC-3": "DD",
+                "E-AC-3": "DD+",
+                "A_EAC3": "DD+",
+                "Enhanced AC-3": "DD+",
+                "MLP FBA": "TrueHD",
+                "FLAC": "FLAC",
+                "Opus": "Opus",
+                "Vorbis": "VORBIS",
+                "PCM": "LPCM",
+                "LPCM Audio": "LPCM",
+                "Dolby Digital Audio": "DD",
+                "Dolby Digital Plus Audio": "DD+",
+                "Dolby Digital Plus": "DD+",
+                "Dolby TrueHD Audio": "TrueHD",
+                "DTS Audio": "DTS",
+                "DTS-HD Master Audio": "DTS-HD MA",
+                "DTS-HD High-Res Audio": "DTS-HD HRA",
+                "DTS:X Master Audio": "DTS:X",
+            }
+            _EXTRA = {"XLL": "-HD MA", "XLL X": ":X", "ES": "-ES"}
+            _ATMOS = {"JOC": " Atmos", "16-ch": " Atmos", "Atmos Audio": " Atmos"}
+            _COMMERCIAL = {
+                "Dolby Digital": "DD",
+                "Dolby Digital Plus": "DD+",
+                "Dolby TrueHD": "TrueHD",
+                "DTS-ES": "DTS-ES",
+                "DTS-HD High": "DTS-HD HRA",
+                "Free Lossless Audio Codec": "FLAC",
+                "DTS-HD Master Audio": "DTS-HD MA",
+            }
+
+            fmt = str(track.get("Format", ""))
+            commercial = str(track.get("Format_Commercial", "") or track.get("Format_Commercial_IfAny", ""))
+            additional = str(track.get("Format_AdditionalFeatures", "") or "")
+            channels_raw = track.get("Channels_Original", track.get("Channels"))
+            channel_layout = str(track.get("ChannelLayout", "") or track.get("ChannelLayout_Original", "") or track.get("ChannelPositions", ""))
+
+            codec = ""
+            extra = ""
+            search_format = True
+
+            if commercial:
+                for key, value in _COMMERCIAL.items():
+                    if key in commercial:
+                        codec = value
+                        search_format = False
+                    if "Atmos" in commercial or _ATMOS.get(additional, "") == " Atmos":
+                        extra = " Atmos"
+            if search_format:
+                codec = _CODEC_MAP.get(fmt, "") + _EXTRA.get(additional, "")
+                extra = _ATMOS.get(additional, "")
+            if not codec:
+                codec = fmt
+            if fmt.startswith("DTS") and additional and additional.endswith("X"):
+                codec = "DTS:X"
+
+            chan = determine_channel_count(channels_raw, channel_layout, additional, fmt)
+            if chan == "Unknown":
+                chan = ""
+
+            return f"{codec} {chan}{extra}".strip()
+
+        all_tracks = []
+        fr_track = ""
+
         for t in audio_tracks:
+            if self._is_audio_desc_track(t):
+                continue
+            all_tracks.append(get_label(t))
             lang = str(t.get("Language", "")).lower().strip()
-            if lang in FRENCH_LANG_VALUES or lang.startswith("fr"):
-                fr_track = t
-                break
-
-        if fr_track is None:
+            if not fr_track and (lang in FRENCH_LANG_VALUES or lang.startswith("fr")):
+                fr_track = get_label(t)
+        if not all_tracks or (len(set(all_tracks)) == 1 and not all_tracks[0]):  # all_tracks empty or label generated is empty
+            return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+        elif len(set(all_tracks)) == 1:  # If elements are the same, set() remove double then len == 1
+            return all_tracks[0]
+        else:
             return ""
-
-        # ── codec determination (mirrors src/audio.py logic) ──
-        _CODEC_MAP = {
-            "DTS": "DTS",
-            "AAC": "AAC",
-            "AAC LC": "AAC",
-            "AC-3": "DD",
-            "E-AC-3": "DD+",
-            "A_EAC3": "DD+",
-            "Enhanced AC-3": "DD+",
-            "MLP FBA": "TrueHD",
-            "FLAC": "FLAC",
-            "Opus": "Opus",
-            "Vorbis": "VORBIS",
-            "PCM": "LPCM",
-            "LPCM Audio": "LPCM",
-            "Dolby Digital Audio": "DD",
-            "Dolby Digital Plus Audio": "DD+",
-            "Dolby Digital Plus": "DD+",
-            "Dolby TrueHD Audio": "TrueHD",
-            "DTS Audio": "DTS",
-            "DTS-HD Master Audio": "DTS-HD MA",
-            "DTS-HD High-Res Audio": "DTS-HD HRA",
-            "DTS:X Master Audio": "DTS:X",
-        }
-        _EXTRA = {"XLL": "-HD MA", "XLL X": ":X", "ES": "-ES"}
-        _ATMOS = {"JOC": " Atmos", "16-ch": " Atmos", "Atmos Audio": " Atmos"}
-        _COMMERCIAL = {
-            "Dolby Digital": "DD",
-            "Dolby Digital Plus": "DD+",
-            "Dolby TrueHD": "TrueHD",
-            "DTS-ES": "DTS-ES",
-            "DTS-HD High": "DTS-HD HRA",
-            "Free Lossless Audio Codec": "FLAC",
-            "DTS-HD Master Audio": "DTS-HD MA",
-        }
-
-        fmt = str(fr_track.get("Format", ""))
-        commercial = str(fr_track.get("Format_Commercial", "") or fr_track.get("Format_Commercial_IfAny", ""))
-        additional = str(fr_track.get("Format_AdditionalFeatures", "") or "")
-        channels_raw = fr_track.get("Channels_Original", fr_track.get("Channels"))
-        channel_layout = str(fr_track.get("ChannelLayout", "") or fr_track.get("ChannelLayout_Original", "") or fr_track.get("ChannelPositions", ""))
-
-        codec = ""
-        extra = ""
-        search_format = True
-
-        if commercial:
-            for key, value in _COMMERCIAL.items():
-                if key in commercial:
-                    codec = value
-                    search_format = False
-                if "Atmos" in commercial or _ATMOS.get(additional, "") == " Atmos":
-                    extra = " Atmos"
-        if search_format:
-            codec = _CODEC_MAP.get(fmt, "") + _EXTRA.get(additional, "")
-            extra = _ATMOS.get(additional, "")
-        if not codec:
-            codec = fmt
-        if fmt.startswith("DTS") and additional and additional.endswith("X"):
-            codec = "DTS:X"
-
-        chan = determine_channel_count(channels_raw, channel_layout, additional, fmt)
-        if chan == "Unknown":
-            chan = ""
-
-        label = f"{codec} {chan}{extra}".strip()
-        return label
 
     # ──────────────────────────────────────────────────────────
     #  Release naming override — GF-specific rules
@@ -558,7 +560,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
     #  Differences from the base FrenchTrackerMixin:
     #  - REMUX: Hybrid tag is suppressed
     #  - HDR/DV is placed right after the resolution
-    #  - Audio codec reflects the French track (not the first track)
+    #  - Audio codec is optional and must not appear when the VF and VO codec differ
     # ──────────────────────────────────────────────────────────
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
@@ -575,13 +577,9 @@ class GF(FrenchTrackerMixin, UNIT3D):
         resolution = meta.get("resolution", "")
         if resolution == "OTHER":
             resolution = ""
-        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
-        # ── GF: prefer French audio track's codec when French audio exists ──
-        fr_audio_label = self._get_french_audio_label(meta)
-        if fr_audio_label:
-            audio = fr_audio_label.replace("DD+", "DDP")
-
+        # From GF Wiki : Optional audio codec (AAC / AC3 / FLAC / or no codec if the VO and VF versions differ...)
+        audio = self._get_audio_for_name(meta)
         service = meta.get("service", "") if self.INCLUDE_SERVICE_IN_NAME else ""
         season = meta.get("season", "")
         episode = meta.get("episode", "")

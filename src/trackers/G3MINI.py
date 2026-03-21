@@ -121,7 +121,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         resolution = meta.get("resolution", "")
         if resolution == "OTHER":
             resolution = ""
-        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "")
+        audio = self._get_audio_for_name(meta)  # From G3MINI wiki "Primary audio codec and/or channels number"
         language = await self._build_audio_string(meta)
         language = language.replace("MULTI", "MULTi").replace("VFI", "VFF")
         service = meta.get("service", "")

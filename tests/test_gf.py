@@ -510,12 +510,19 @@ class TestNaming:
         assert 'WEB' in name
         assert name.endswith('-GF')
 
-    def test_movie_encode_multi(self, gf):
+    def test_movie_encode_multi_same_audio_codec(self, gf):
         meta = _meta_base(
             type='ENCODE', title='The Batman', year='2022',
             resolution='2160p', source='BluRay', video_encode='x265',
             audio='DTS-HD MA 5.1', hdr='HDR', uhd='UHD', tag='-TeamX',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Format_AdditionalFeatures='XLL',
+                             Channels='6'),
+                _audio_track('fr', Format='DTS',
+                             Format_AdditionalFeatures='XLL',
+                             Channels='6'),
+            ]),
         )
         result = _run(gf.get_name(meta))
         name = result['name']
@@ -523,7 +530,29 @@ class TestNaming:
         assert '2022' in name
         assert 'MULTI' in name
         assert '2160p' in name
-        assert '5.1' in name  # dot in audio channels preserved
+        assert 'DTS-HD MA 5.1' in name  # dot in audio channels preserved
+        assert name.endswith('-TeamX')
+
+    def test_movie_encode_multi_different_audio_codec(self, gf):
+        meta = _meta_base(
+            type='ENCODE', title='The Batman', year='2022',
+            resolution='2160p', source='BluRay', video_encode='x265',
+            audio='DTS-HD MA 5.1', hdr='HDR', uhd='UHD', tag='-TeamX',
+            mediainfo=_mi([
+                _audio_track('en', Format='DTS',
+                             Channels='6'),
+                _audio_track('fr', Format='DTS',
+                             Format_AdditionalFeatures='XLL',
+                             Channels='6'),
+            ]),
+        )
+        result = _run(gf.get_name(meta))
+        name = result['name']
+        assert 'The Batman' in name
+        assert '2022' in name
+        assert 'MULTI' in name
+        assert '2160p' in name
+        assert 'DTS' not in name, f"MULTI file with different codec (must not appear): {name}"
         assert name.endswith('-TeamX')
 
     def test_tv_season_webdl(self, gf):
