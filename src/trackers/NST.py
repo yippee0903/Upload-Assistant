@@ -233,5 +233,10 @@ class NST(FrenchTrackerMixin, UNIT3D):
         console.print("[yellow]Could not parse torrent UUID from NST response.[/yellow]")
         return ""
 
-    async def get_additional_data(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"description_format": "bbcode"}
+    async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
+        data: dict[str, Any] = {"description_format": "bbcode"}
+        # Send audio languages so NST can tag Multi / VFF / etc.
+        audio_langs = meta.get("audio_languages") or []
+        if audio_langs:
+            data["langue"] = audio_langs
+        return data

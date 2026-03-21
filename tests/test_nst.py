@@ -302,7 +302,23 @@ class TestGetAdditionalData:
     def test_returns_bbcode_format(self):
         tracker = NST(_config())
         result = asyncio.run(tracker.get_additional_data({}))
-        assert result == {"description_format": "bbcode"}
+        assert result["description_format"] == "bbcode"
+
+    def test_sends_langue_from_audio_languages(self):
+        tracker = NST(_config())
+        meta = {"audio_languages": ["French", "English"]}
+        result = asyncio.run(tracker.get_additional_data(meta))
+        assert result["langue"] == ["French", "English"]
+
+    def test_no_langue_when_no_audio_languages(self):
+        tracker = NST(_config())
+        result = asyncio.run(tracker.get_additional_data({}))
+        assert "langue" not in result
+
+    def test_no_langue_when_empty_audio_languages(self):
+        tracker = NST(_config())
+        result = asyncio.run(tracker.get_additional_data({"audio_languages": []}))
+        assert "langue" not in result
 
 
 # ═══════════════════════════════════════════════════════════════
