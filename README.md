@@ -77,7 +77,8 @@ Many thanks to all who have contributed.
 |Lat-Team|LT|Locadora|LCD|
 |LST|LST|Luminarr|LUME|
 |MoreThanTV|MTV|Nebulance|NBL|
-|OldToonsWorld|OTW|OnlyEncodes+|OE|
+|Nostradamus|NST|OldToonsWorld|OTW|
+|OnlyEncodes+|OE|||
 |PassThePopcorn|PTP|PolishTorrent|PTT|
 |Portugas|PT|PrivateHD|PHD|
 |PTerClub|PTER|PTSKIT|PTS|

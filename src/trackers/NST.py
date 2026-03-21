@@ -194,8 +194,12 @@ class NST(FrenchTrackerMixin, UNIT3D):
         # TMDB poster: /original/ → /w300/  (keep poster small)
         s = re.sub(r"(image\.tmdb\.org/t/p/)original/", r"\1w300/", s)
         # imgbox screenshots: full-size _o.png → thumbnail _t.png
-        s = s.replace("images2.imgbox.com", "thumbs2.imgbox.com")
-        s = s.replace("_o.png", "_t.png")
+        s = re.sub(
+            r"(\[img\]https?://)images(2\.imgbox\.com/.+?)_o\.png(\[/img\])",
+            r"\1thumbs\2_t.png\3",
+            s,
+            flags=re.IGNORECASE,
+        )
         # ptscreens / onlyimage (Chevereto): foo.png → foo.md.png (medium)
         s = re.sub(
             r"(\[img\]https?://(?:ptscreens\.com|onlyimage\.org)/images/.+?)(\.\w+)(\[/img\])",
@@ -385,11 +389,18 @@ class NST(FrenchTrackerMixin, UNIT3D):
             return "VOSTFR"
 
         # Fallback: inspect audio_languages when no tag in name
-        audio = [lang.lower() for lang in (meta.get("audio_languages") or [])]
-        has_fr = any(la in ("french", "français", "fra", "fre", "fr") for la in audio)
-        has_en = any(la in ("english", "eng", "en") for la in audio)
+        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca"}
+        en_aliases = {"english", "eng", "en"}
+        raw_audio = [lang.lower().strip() for lang in (meta.get("audio_languages") or [])]
 
-        if len(audio) >= 2 and has_fr:
+        # Normalize region codes (e.g. "fr-fr" → "fr") for counting distinct languages
+        normalized = {la.split("-")[0] if "-" in la else la for la in raw_audio}
+        has_fr = any(la in fr_aliases for la in raw_audio)
+        has_en = any(la in en_aliases for la in raw_audio)
+
+        # "Multi" only when genuinely different languages are present
+        non_fr = normalized - {"fr", "fra", "fre", "french", "français", "francais"}
+        if has_fr and non_fr:
             return "Multi"
         if has_fr:
             return "Français"

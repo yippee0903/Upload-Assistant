@@ -334,6 +334,16 @@ class TestDetectNstLangue:
         meta = {"name": "Movie.2026.VOSTFR.1080p.WEB-GRP", "audio_languages": ["English"]}
         assert NST._detect_nst_langue(meta) == "VOSTFR"
 
+    def test_region_coded_french_is_francais(self):
+        """Multiple region-coded French tracks (fr-fr, fr-ca) are still Français, not Multi."""
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["fr-fr", "fr-ca"]}
+        assert NST._detect_nst_langue(meta) == "Français"
+
+    def test_multiple_french_tracks_is_francais(self):
+        """Two 'French' audio tracks should not be inferred as Multi."""
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French", "French"]}
+        assert NST._detect_nst_langue(meta) == "Français"
+
     def test_langue_sent_in_additional_data(self):
         tracker = NST(_config())
         meta = {"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}
@@ -363,10 +373,7 @@ class TestSanitizeBBCode:
 
     def test_imgbox_uses_thumbnails(self):
         result = NST._sanitize_bbcode("[img]https://images2.imgbox.com/64/45/ebZ94hUP_o.png[/img]")
-        assert "thumbs2.imgbox.com" in result
-        assert "_t.png" in result
-        assert "images2.imgbox.com" not in result
-        assert "_o.png" not in result
+        assert result == "[img]https://thumbs2.imgbox.com/64/45/ebZ94hUP_t.png[/img]"
 
     def test_strip_size_tags(self):
         assert NST._sanitize_bbcode("[size=4]big text[/size]") == "big text"
@@ -382,18 +389,15 @@ class TestSanitizeBBCode:
 
     def test_ptscreens_uses_medium(self):
         result = NST._sanitize_bbcode("[img]https://ptscreens.com/images/2025/03/21/abc123.png[/img]")
-        assert "abc123.md.png" in result
-        assert "ptscreens.com" in result
+        assert result == "[img]https://ptscreens.com/images/2025/03/21/abc123.md.png[/img]"
 
     def test_onlyimage_uses_medium(self):
         result = NST._sanitize_bbcode("[img]https://onlyimage.org/images/2025/03/21/xyz789.jpg[/img]")
-        assert "xyz789.md.jpg" in result
-        assert "onlyimage.org" in result
+        assert result == "[img]https://onlyimage.org/images/2025/03/21/xyz789.md.jpg[/img]"
 
     def test_pixhost_uses_thumbnails(self):
         result = NST._sanitize_bbcode("[img]https://img75.pixhost.to/images/123/456_abcdef.png[/img]")
-        assert "t75.pixhost.to/thumbs/" in result
-        assert "img75.pixhost.to" not in result
+        assert result == "[img]https://t75.pixhost.to/thumbs/123/456_abcdef.png[/img]"
 
     def test_typical_description(self):
         """Test a typical UA description fragment."""
