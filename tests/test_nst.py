@@ -358,13 +358,13 @@ class TestDetectNstLangue:
 
 class TestSanitizeBBCode:
     def test_strip_img_size(self):
-        assert "[img]https://example.com/img.png[/img]" in NST._sanitize_bbcode("[img=300]https://example.com/img.png[/img]")
+        assert NST._sanitize_bbcode("[img=300]https://example.com/img.png[/img]") == "[img]https://example.com/img.png[/img]"
 
     def test_strip_img_size_350(self):
-        assert "[img]" in NST._sanitize_bbcode("[img=350]https://example.com/img.png[/img]")
+        assert NST._sanitize_bbcode("[img=350]https://example.com/img.png[/img]") == "[img]https://example.com/img.png[/img]"
 
     def test_plain_img_unchanged(self):
-        assert "[img]https://example.com/img.png[/img]" in NST._sanitize_bbcode("[img]https://example.com/img.png[/img]")
+        assert NST._sanitize_bbcode("[img]https://example.com/img.png[/img]") == "[img]https://example.com/img.png[/img]"
 
     def test_tmdb_poster_downscaled(self):
         result = NST._sanitize_bbcode("[img]https://image.tmdb.org/t/p/original/abc.jpg[/img]")
