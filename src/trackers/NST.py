@@ -276,7 +276,9 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("[b]Audio(s)[/b]")
         audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
+            parts.append("[center]")
             parts.extend(f"[i]{al}[/i]" for al in audio_lines)
+            parts.append("[/center]")
         else:
             parts.append("[i]Non spécifié[/i]")
         parts.append("")
@@ -285,7 +287,9 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("[b]Sous-titre(s)[/b]")
         sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
+            parts.append("[center]")
             parts.extend(f"[i]{sl}[/i]" for sl in sub_lines)
+            parts.append("[/center]")
         else:
             parts.append("[i]Aucun[/i]")
         parts.append("")
