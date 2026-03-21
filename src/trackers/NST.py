@@ -234,7 +234,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         therefore focuses on technical details, audio/subtitle tracks,
         release metadata, and screenshots.
         """
-        parts: list[str] = []
+        parts: list[str] = ["[center]"]
         mi_text = await self._get_mediainfo_text(meta)
 
         # ── Informations techniques ──
@@ -276,9 +276,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("[b]Audio(s)[/b]")
         audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
-            parts.append("[center]")
             parts.extend(f"[i]{al}[/i]" for al in audio_lines)
-            parts.append("[/center]")
         else:
             parts.append("[i]Non spécifié[/i]")
         parts.append("")
@@ -287,9 +285,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("[b]Sous-titre(s)[/b]")
         sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
-            parts.append("[center]")
             parts.extend(f"[i]{sl}[/i]" for sl in sub_lines)
-            parts.append("[/center]")
         else:
             parts.append("[i]Aucun[/i]")
         parts.append("")
@@ -323,14 +319,14 @@ class NST(FrenchTrackerMixin, UNIT3D):
                 if raw:
                     img_lines.append(f"[url={web}][img]{raw}[/img][/url]" if web else f"[img]{raw}[/img]")
             if img_lines:
-                parts.append("[center]")
                 parts.append("\n".join(img_lines))
-                parts.append("[/center]")
             parts.append("")
+
+        parts.append("[/center]")
 
         # ── Signature ──
         ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
-        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{ua_sig}[/size][/url][/right]")
+        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant]{ua_sig}[/url][/right]")
 
         return "\n".join(parts)
 
