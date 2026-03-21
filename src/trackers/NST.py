@@ -212,6 +212,9 @@ class NST(FrenchTrackerMixin, UNIT3D):
         )
         # [size=N]text[/size] → text  (strip, not supported)
         s = re.sub(r"\[/?size(?:=\d+)?\]", "", s, flags=re.IGNORECASE)
+        # [color=X]text[/color] → text  (strip, not supported)
+        s = re.sub(r"\[color=[^\]]*\]", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"\[/color\]", "", s, flags=re.IGNORECASE)
         # [pre]text[/pre] → [code]text[/code]
         s = re.sub(r"\[pre\]", "[code]", s, flags=re.IGNORECASE)
         s = re.sub(r"\[/pre\]", "[/code]", s, flags=re.IGNORECASE)
@@ -231,47 +234,46 @@ class NST(FrenchTrackerMixin, UNIT3D):
         therefore focuses on technical details, audio/subtitle tracks,
         release metadata, and screenshots.
         """
-        C = "#3d85c6"
         parts: list[str] = []
         mi_text = await self._get_mediainfo_text(meta)
 
         # ── Informations techniques ──
-        parts.append(f"[b][color={C}]Informations techniques[/color][/b]")
+        parts.append("[b]Informations techniques[/b]")
         tech: list[str] = []
         type_label = self._get_type_label(meta)
         if type_label:
-            tech.append(f"[b][color={C}]Type :[/color][/b] {type_label}")
+            tech.append(f"[b]Type :[/b] {type_label}")
         source = meta.get("source", "") or meta.get("type", "")
         if source:
-            tech.append(f"[b][color={C}]Source :[/color][/b] {source}")
+            tech.append(f"[b]Source :[/b] {source}")
         service = meta.get("service", "")
         if service:
-            tech.append(f"[b][color={C}]Service :[/color][/b] {service}")
+            tech.append(f"[b]Service :[/b] {service}")
         resolution = meta.get("resolution", "")
         if resolution:
-            tech.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}")
+            tech.append(f"[b]Résolution :[/b] {resolution}")
         container = self._format_container(mi_text)
         if container:
-            tech.append(f"[b][color={C}]Format vidéo :[/color][/b] {container}")
+            tech.append(f"[b]Format vidéo :[/b] {container}")
         video_codec = (meta.get("video_encode", "").strip() or meta.get("video_codec", "")).strip()
         video_codec = video_codec.replace("H.264", "H264").replace("H.265", "H265")
         raw_codec = meta.get("video_codec", "").strip()
         if video_codec and raw_codec and raw_codec != video_codec:
             video_codec = f"{video_codec} ({raw_codec})"
         if video_codec:
-            tech.append(f"[b][color={C}]Codec vidéo :[/color][/b] {video_codec}")
+            tech.append(f"[b]Codec vidéo :[/b] {video_codec}")
         hdr_dv = self._format_hdr_dv_bbcode(meta)
         if hdr_dv:
-            tech.append(f"[b][color={C}]HDR :[/color][/b] {hdr_dv}")
+            tech.append(f"[b]HDR :[/b] {hdr_dv}")
         if mi_text:
             vbr_m = re.search(r"(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)", mi_text)
             if vbr_m:
-                tech.append(f"[b][color={C}]Débit vidéo :[/color][/b] {vbr_m.group(1).strip()}")
+                tech.append(f"[b]Débit vidéo :[/b] {vbr_m.group(1).strip()}")
         parts.extend(tech)
         parts.append("")
 
         # ── Audio(s) ──
-        parts.append(f"[b][color={C}]Audio(s)[/color][/b]")
+        parts.append("[b]Audio(s)[/b]")
         audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
             parts.extend(f"[i]{al}[/i]" for al in audio_lines)
@@ -280,7 +282,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("")
 
         # ── Sous-titre(s) ──
-        parts.append(f"[b][color={C}]Sous-titre(s)[/color][/b]")
+        parts.append("[b]Sous-titre(s)[/b]")
         sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
             parts.extend(f"[i]{sl}[/i]" for sl in sub_lines)
@@ -289,26 +291,26 @@ class NST(FrenchTrackerMixin, UNIT3D):
         parts.append("")
 
         # ── Release ──
-        parts.append(f"[b][color={C}]Release[/color][/b]")
+        parts.append("[b]Release[/b]")
         size_str = self._get_total_size(meta, mi_text)
         if size_str:
-            parts.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}")
+            parts.append(f"[b]Taille totale :[/b] {size_str}")
         file_count = self._count_files(meta)
         if file_count:
-            parts.append(f"[b][color={C}]Nombre de fichier(s) :[/color][/b] {file_count}")
+            parts.append(f"[b]Nombre de fichier(s) :[/b] {file_count}")
         group = self._get_release_group(meta)
         if group:
-            parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
+            parts.append(f"[b]Groupe :[/b] {group}")
         personal_note = meta.get("personal_note", "")
         if personal_note:
-            parts.append(f"[b][color={C}]Note :[/color][/b] {personal_note}")
+            parts.append(f"[b]Note :[/b] {personal_note}")
         parts.append("")
 
         # ── Captures d'écran ──
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
         image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
         if image_list:
-            parts.append(f"[b][color={C}]Captures d'écran[/color][/b]")
+            parts.append("[b]Captures d'écran[/b]")
             parts.append("")
             img_lines: list[str] = []
             for img in image_list:
