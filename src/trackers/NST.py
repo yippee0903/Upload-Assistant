@@ -148,16 +148,16 @@ class NST(FrenchTrackerMixin, UNIT3D):
             self.get_category_id = original  # type: ignore[assignment]
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        french_languages = ["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca"]
+        # NST requires at least one VF audio track (any variant: VFF, VFQ, VFB, …)
+        french_languages = ["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"]
         if not await self.common.check_language_requirements(
             meta,
             self.tracker,
             languages_to_check=french_languages,
             check_audio=True,
-            check_subtitle=True,
-            require_both=False,
+            check_subtitle=False,
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            console.print(f"[bold red]{self.tracker} requiert au moins une piste audio VF.[/bold red]")
             return False
         return True
 
@@ -389,7 +389,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
             return "VOSTFR"
 
         # Fallback: inspect audio_languages when no tag in name
-        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca"}
+        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"}
         en_aliases = {"english", "eng", "en"}
         raw_audio = [lang.lower().strip() for lang in (meta.get("audio_languages") or [])]
 
