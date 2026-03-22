@@ -378,7 +378,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         """Derive the NST langue tag from the release name / audio metadata.
 
         NST accepts: Français, VF, VFF, VFI, VFQ.
-        FrenchTrackerMixin embeds VFF/VFQ/VFI/VF2/VOF etc. in the name.
+        FrenchTrackerMixin embeds VFF/VFQ/VFI/VF/VF2/VF3/VOF etc. in the name.
         """
         name = meta.get("name", "")
         upper = name.upper()
@@ -388,8 +388,8 @@ class NST(FrenchTrackerMixin, UNIT3D):
             if f".{tag}." in upper or upper.endswith(f".{tag}"):
                 return tag
 
-        # VF2 (dual VFF+VFQ) → generic VF
-        if ".VF2." in upper or upper.endswith(".VF2"):
+        # Generic VF with optional digits (VF, VF2, VF3, VF4 …) → "VF"
+        if re.search(r"\.VF\d*(\.|$)", upper):
             return "VF"
 
         # VOF (original French) → Français

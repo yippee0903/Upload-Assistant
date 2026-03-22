@@ -318,6 +318,15 @@ class TestDetectNstLangue:
     def test_vf2_maps_to_vf(self):
         assert NST._detect_nst_langue({"name": "Movie.2026.VF2.1080p.WEB.H264-GRP"}) == "VF"
 
+    def test_plain_vf_maps_to_vf(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF.1080p.WEB.H264-GRP"}) == "VF"
+
+    def test_vf3_maps_to_vf(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF3.1080p.WEB.H264-GRP"}) == "VF"
+
+    def test_vf_at_end_of_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.1080p.WEB.VF"}) == "VF"
+
     def test_vof_maps_to_francais(self):
         assert NST._detect_nst_langue({"name": "Movie.2026.VOF.1080p.WEB.H264-GRP"}) == "Français"
 
