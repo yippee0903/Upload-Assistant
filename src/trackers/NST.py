@@ -130,7 +130,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
     # ── Search override (filter needs slugs, not numeric IDs) ─────────
 
-    async def search_existing(self, meta: dict[str, Any], disctype: Any) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: dict[str, Any], _: Any) -> list[dict[str, Any]]:
         """Use category slugs for the filter endpoint, then delegate to UNIT3D."""
         # Temporarily stash the slug so the parent's search_existing sends it
         # instead of the numeric upload ID.
@@ -143,7 +143,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
         self.get_category_id = _slug_category_id  # type: ignore[assignment]
         try:
-            return await super().search_existing(meta, disctype)
+            return await super().search_existing(meta, _)
         finally:
             self.get_category_id = original  # type: ignore[assignment]
 
