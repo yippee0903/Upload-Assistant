@@ -368,42 +368,50 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data: dict[str, Any] = {"description_format": "bbcode"}
-        # Map the language tag already computed by FrenchTrackerMixin to
-        # NST's fixed "langue" choices: Multi, Français, Anglais, VOSTFR,
-        # VFSTFR, Muet.
+        # Map VF variant from the release name to NST's fixed "langue"
+        # choices: Français, VF, VFF, VFI, VFQ.
         data["langue"] = self._detect_nst_langue(meta)
         return data
 
     @staticmethod
     def _detect_nst_langue(meta: dict[str, Any]) -> str:
-        """Derive the NST langue tag from the release name / audio metadata."""
+        """Derive the NST langue tag from the release name / audio metadata.
+
+        NST accepts: Français, VF, VFF, VFI, VFQ.
+        FrenchTrackerMixin embeds VFF/VFQ/VFI/VF2/VOF etc. in the name.
+        """
         name = meta.get("name", "")
         upper = name.upper()
 
-        # FrenchTrackerMixin embeds MULTI.VFF / VOSTFR / etc. in the name
-        if ".MULTI." in upper or upper.startswith("MULTI.") or upper.endswith(".MULTI"):
-            return "Multi"
-        if ".VOSTFR." in upper or upper.endswith(".VOSTFR"):
-            return "VOSTFR"
-        if ".SUBFRENCH." in upper or upper.endswith(".SUBFRENCH"):
-            return "VOSTFR"
+        # Exact VF variant tags embedded by FrenchTrackerMixin
+        for tag in ("VFF", "VFQ", "VFI"):
+            if f".{tag}." in upper or upper.endswith(f".{tag}"):
+                return tag
 
-        # Fallback: inspect audio_languages when no tag in name
-        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"}
-        en_aliases = {"english", "eng", "en"}
-        raw_audio = [lang.lower().strip() for lang in (meta.get("audio_languages") or [])]
+        # VF2 (dual VFF+VFQ) → generic VF
+        if ".VF2." in upper or upper.endswith(".VF2"):
+            return "VF"
 
-        # Normalize region codes (e.g. "fr-fr" → "fr") for counting distinct languages
-        normalized = {la.split("-")[0] if "-" in la else la for la in raw_audio}
-        has_fr = any(la in fr_aliases for la in raw_audio)
-        has_en = any(la in en_aliases for la in raw_audio)
-
-        # "Multi" only when genuinely different languages are present
-        non_fr = normalized - {"fr", "fra", "fre", "french", "français", "francais"}
-        if has_fr and non_fr:
-            return "Multi"
-        if has_fr:
+        # VOF (original French) → Français
+        if ".VOF." in upper or upper.endswith(".VOF"):
             return "Français"
-        if has_en:
-            return "Anglais"
+
+        # Generic FRENCH / TRUEFRENCH tag → Français
+        if ".FRENCH." in upper or upper.endswith(".FRENCH"):
+            return "Français"
+        if ".TRUEFRENCH." in upper or upper.endswith(".TRUEFRENCH"):
+            return "Français"
+
+        # MULTI with a VF variant → extract it; plain MULTI → VF
+        if ".MULTI." in upper or upper.startswith("MULTI.") or upper.endswith(".MULTI"):
+            for tag in ("VFF", "VFQ", "VFI"):
+                if f".{tag}." in upper or upper.endswith(f".{tag}"):
+                    return tag
+            return "VF"
+
+        # Fallback: inspect audio_languages
+        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"}
+        raw_audio = [lang.lower().strip() for lang in (meta.get("audio_languages") or [])]
+        if any(la in fr_aliases for la in raw_audio):
+            return "Français"
         return ""

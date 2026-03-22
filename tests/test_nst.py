@@ -306,49 +306,58 @@ class TestGetAdditionalData:
 
 
 class TestDetectNstLangue:
-    def test_multi_in_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}) == "Multi"
+    def test_vff_in_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFF.1080p.WEB.H264-GRP"}) == "VFF"
 
-    def test_vostfr_in_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VOSTFR.1080p.WEB.H264-GRP"}) == "VOSTFR"
+    def test_vfq_in_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFQ.1080p.WEB.H264-GRP"}) == "VFQ"
 
-    def test_subfrench_maps_to_vostfr(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.SUBFRENCH.720p.WEB-GRP"}) == "VOSTFR"
+    def test_vfi_in_name(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFI.1080p.WEB.H264-GRP"}) == "VFI"
 
-    def test_multi_from_audio_languages(self):
-        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French", "English"]}
-        assert NST._detect_nst_langue(meta) == "Multi"
+    def test_vf2_maps_to_vf(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF2.1080p.WEB.H264-GRP"}) == "VF"
+
+    def test_vof_maps_to_francais(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.VOF.1080p.WEB.H264-GRP"}) == "Français"
+
+    def test_french_tag_maps_to_francais(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.FRENCH.1080p.WEB-GRP"}) == "Français"
+
+    def test_truefrench_maps_to_francais(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.TRUEFRENCH.1080p.WEB-GRP"}) == "Français"
+
+    def test_multi_vff_returns_vff(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFF.HDR.2160p.WEB.H265-GRP"}) == "VFF"
+
+    def test_multi_vfq_returns_vfq(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFQ.1080p.WEB-GRP"}) == "VFQ"
+
+    def test_multi_plain_returns_vf(self):
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}) == "VF"
 
     def test_francais_from_audio_languages(self):
         meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French"]}
         assert NST._detect_nst_langue(meta) == "Français"
 
-    def test_anglais_from_audio_languages(self):
-        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["English"]}
-        assert NST._detect_nst_langue(meta) == "Anglais"
-
     def test_empty_when_no_data(self):
         assert NST._detect_nst_langue({}) == ""
 
-    def test_name_takes_priority_over_audio(self):
-        meta = {"name": "Movie.2026.VOSTFR.1080p.WEB-GRP", "audio_languages": ["English"]}
-        assert NST._detect_nst_langue(meta) == "VOSTFR"
-
     def test_region_coded_french_is_francais(self):
-        """Multiple region-coded French tracks (fr-fr, fr-ca) are still Français, not Multi."""
+        """Region-coded French tracks (fr-fr, fr-ca) map to Français."""
         meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["fr-fr", "fr-ca"]}
         assert NST._detect_nst_langue(meta) == "Français"
 
-    def test_multiple_french_tracks_is_francais(self):
-        """Two 'French' audio tracks should not be inferred as Multi."""
-        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French", "French"]}
-        assert NST._detect_nst_langue(meta) == "Français"
+    def test_english_only_returns_empty(self):
+        """English-only releases get empty langue (NST requires VF)."""
+        meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["English"]}
+        assert NST._detect_nst_langue(meta) == ""
 
     def test_langue_sent_in_additional_data(self):
         tracker = NST(_config())
-        meta = {"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}
+        meta = {"name": "Movie.2026.MULTi.VFF.HDR.2160p.WEB.H265-GRP"}
         result = asyncio.run(tracker.get_additional_data(meta))
-        assert result["langue"] == "Multi"
+        assert result["langue"] == "VFF"
 
 
 # ═══════════════════════════════════════════════════════════════
