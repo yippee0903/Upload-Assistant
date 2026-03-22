@@ -110,12 +110,14 @@ class BBCODE:
         url_img_matches: list[tuple[str, str]] = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
         for web_url, img_url in url_img_matches:
             # Skip HDBits images
-            if "hdbits.org" in web_url.lower() or "hdbits.org" in img_url.lower():
+            web_host = urllib.parse.urlparse(web_url).hostname or ""
+            img_host = urllib.parse.urlparse(img_url).hostname or ""
+            if web_host == "hdbits.org" or img_host == "hdbits.org":
                 desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", "")
                 continue
 
             raw_url = img_url
-            if "thumbs2.imgbox.com" in img_url:
+            if img_host == "thumbs2.imgbox.com":
                 raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com")
                 raw_url = raw_url.replace("_t.png", "_o.png")
 
