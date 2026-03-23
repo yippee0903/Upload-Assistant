@@ -101,6 +101,8 @@ class NST(FrenchTrackerMixin, UNIT3D):
             "WEBDL": "4",
             "WEBRIP": "5",
             "HDTV": "6",
+            "ISO": "7",
+            "DVDRIP": "8",
         }
         if mapping_only:
             return type_id
@@ -127,6 +129,60 @@ class NST(FrenchTrackerMixin, UNIT3D):
             return {v: k for k, v in resolution_id.items()}
         r = resolution or meta.get("resolution", "")
         return {"resolution_id": resolution_id.get(r, "10")}
+
+    def get_quality(self, meta: dict[str, Any]) -> str:
+        """Return quality string to sent to API (qualite: Type Resolution) ."""
+        t = meta.get("type", "")
+        r = meta.get("resolution", "")
+        source = meta.get("source", "").upper()
+
+        if t == "ENCODE" and "WEB" in source:
+            t = "WEBRIP"
+
+        quality_map = {
+            # DISC
+            ("DISC", "2160p"): "Bluray 4K",
+            ("DISC", "1080p"): "Bluray Full",
+            ("DISC", "720p"): "Bluray Full",
+            ("DISC", ""): "Bluray Full",
+            # REMUX
+            ("REMUX", "2160p"): "Bluray Remux",
+            ("REMUX", "1080p"): "Bluray Remux",
+            ("REMUX", "720p"): "Bluray Remux",
+            ("REMUX", "576p"): "Bluray Remux",
+            ("REMUX", "480p"): "Bluray Remux",
+            ("REMUX", ""): "Bluray Remux",
+            # ENCODE (Bluray source)
+            ("ENCODE", "2160p"): "Bluray 4K",
+            ("ENCODE", "1080p"): "Bluray 1080p",
+            ("ENCODE", "720p"): "Bluray 720p",
+            ("ENCODE", "576p"): "Bluray 576p",
+            ("ENCODE", "480p"): "Bluray 480p",
+            ("ENCODE", ""): "Bluray 1080p",
+            # WEBDL
+            ("WEBDL", "2160p"): "WEB-DL 4K",
+            ("WEBDL", "1080p"): "WEB-DL 1080p",
+            ("WEBDL", "720p"): "WEB-DL 720p",
+            ("WEBDL", "576p"): "WEB-DL 576p",
+            ("WEBDL", "480p"): "WEB-DL 480p",
+            ("WEBDL", ""): "WEB-DL",
+            # WEBRIP
+            ("WEBRIP", "2160p"): "WEBRip 4K",
+            ("WEBRIP", "1080p"): "WEBRip 1080p",
+            ("WEBRIP", "720p"): "WEBRip 720p",
+            ("WEBRIP", "576p"): "WEBRip 576p",
+            ("WEBRIP", "480p"): "WEBRip 480p",
+            ("WEBRIP", ""): "WEBRip",
+            # HDTV
+            ("HDTV", "2160p"): "TVRip 4K",
+            ("HDTV", "1080p"): "TVRip 1080p",
+            ("HDTV", "720p"): "TVRip 720p",
+            ("HDTV", "576p"): "TVRip 576p",
+            ("HDTV", "480p"): "TVRip 480p",
+            ("HDTV", ""): "TVRip",
+        }
+
+        return quality_map.get((t, r), "")
 
     # ── Search override (filter needs slugs, not numeric IDs) ─────────
 
@@ -371,6 +427,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         # Map VF variant from the release name to NST's fixed "langue"
         # choices: Français, VF, VFF, VFI, VFQ.
         data["langue"] = self._detect_nst_langue(meta)
+        data["qualite"] = self.get_quality(meta)
         return data
 
     @staticmethod
@@ -380,38 +437,70 @@ class NST(FrenchTrackerMixin, UNIT3D):
         NST accepts: Français, VF, VFF, VFI, VFQ.
         FrenchTrackerMixin embeds VFF/VFQ/VFI/VF/VF2/VF3/VOF etc. in the name.
         """
-        name = meta.get("name", "")
-        upper = name.upper()
+        name = meta.get("uuid") or meta.get("name", "")  # More precise on UUID, UA remove Multi etc when forging name
+        upper = name.upper().replace(" ", ".")
+        langs = []
 
-        # Exact VF variant tags embedded by FrenchTrackerMixin
-        for tag in ("VFF", "VFQ", "VFI"):
-            if f".{tag}." in upper or upper.endswith(f".{tag}"):
-                return tag
+        # New regex
+        if re.search(r"(?:^|\.)(TRUEFRENCH|FRENCH|VOF|VOB|VOQ|VF\S*)(?:\.|$)", upper):
+            langs.append("Français")
 
-        # Generic VF with optional digits (VF, VF2, VF3, VF4 …) → "VF"
-        if re.search(r"\.VF\d*(\.|$)", upper):
-            return "VF"
+        if re.search(r"(?:^|\.)(VF\d|VFF)(?:\.|$)", upper):
+            langs.append("VFF")
 
-        # VOF (original French) → Français
-        if ".VOF." in upper or upper.endswith(".VOF"):
-            return "Français"
+        if re.search(r"(?:^|\.)(VFI)(?:\.|$)", upper):
+            langs.append("VFI")
 
-        # Generic FRENCH / TRUEFRENCH tag → Français
-        if ".FRENCH." in upper or upper.endswith(".FRENCH"):
-            return "Français"
-        if ".TRUEFRENCH." in upper or upper.endswith(".TRUEFRENCH"):
-            return "Français"
+        if re.search(r"(?:^|\.)(VFQ)(?:\.|$)", upper):
+            langs.append("VFQ")
 
-        # MULTI with a VF variant → extract it; plain MULTI → VF
-        if ".MULTI." in upper or upper.startswith("MULTI.") or upper.endswith(".MULTI"):
-            for tag in ("VFF", "VFQ", "VFI"):
-                if f".{tag}." in upper or upper.endswith(f".{tag}"):
-                    return tag
-            return "VF"
+        if re.search(r"(?:^|\.)(VOSTFR)(?:\.|$)", upper):
+            langs.append("VOSTFR")
 
-        # Fallback: inspect audio_languages
-        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"}
-        raw_audio = [lang.lower().strip() for lang in (meta.get("audio_languages") or [])]
-        if any(la in fr_aliases for la in raw_audio):
-            return "Français"
-        return ""
+        if re.search(r"(?:^|\.)(VFSTFR)(?:\.|$)", upper):
+            langs.extend(["Français", "VFSTFR"])
+
+        if re.search(r"(?:^|\.)(MULTI)(?:\.|$)", upper):
+            langs.append("Multi")
+
+        if re.search(r"(?:^|\.)(MUTE|MUET)(?:\.|$)", upper):
+            langs.append("Muet")
+
+        # Fallback: inspect Mediainfo
+
+        tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+        langs_mi = [t for t in tracks if t.get("@type") == "Audio"]
+        langs_all = langs_mi if langs_mi else (meta.get("audio_languages") or [])  # Ultimate fallback
+
+        fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr"}
+        qc_aliases = {"fr-ca", "qc", "fr-qc"}
+        be_aliases = {"fr-be", "be"}
+        en_aliases = {"english", "eng", "en", "en-us", "en-gb"}
+
+        detected_langs = set()
+
+        for t in langs_all:
+            lang = (t.get("Language") or "").lower().strip() if langs_mi else t.lower().strip()
+            if lang in qc_aliases:
+                detected_langs.add("VFQ")
+            elif lang in be_aliases:
+                detected_langs.add("VFF")  # franco-belge -> VFF
+            elif lang in fr_aliases:
+                detected_langs.add("Français")
+            elif lang in en_aliases:
+                detected_langs.add("Anglais")
+
+        # MULTI if more than one audiotrack
+        if len(detected_langs) > 1 and "Multi" not in langs:
+            langs.append("Multi")
+
+        # Add tag if not already inside
+        for tag in ("VFF", "VFQ", "Français", "Anglais"):
+            if tag in detected_langs and tag not in langs:
+                langs.append(tag)
+
+        # If Anglais without Multi, return empty
+        if "Anglais" in detected_langs and "Multi" not in detected_langs:
+            return ""
+
+        return ", ".join(langs)
