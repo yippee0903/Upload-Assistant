@@ -458,7 +458,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
             langs.append("VOSTFR")
 
         if re.search(r"(?:^|\.)(VFSTFR)(?:\.|$)", upper):
-            langs.extend(["Français", "VFSTFR"])
+            langs.append("VFSTFR")
 
         if re.search(r"(?:^|\.)(MULTI)(?:\.|$)", upper):
             langs.append("Multi")
@@ -500,7 +500,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
                 langs.append(tag)
 
         # If Anglais without Multi, return empty
-        if "Anglais" in detected_langs and "Multi" not in detected_langs:
+        if "Anglais" in detected_langs and "Multi" not in langs:
             return ""
 
         return ", ".join(langs)
