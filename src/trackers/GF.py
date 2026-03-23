@@ -343,7 +343,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
     # ──────────────────────────────────────────────────────────
     #  Release naming override — GF-specific rules
     #
-    #  The name msut be the same as te folder/file name 
+    #  The name msut be the same as te folder/file name
     # ──────────────────────────────────────────────────────────
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
@@ -392,7 +392,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
         clean = re.sub(r" {2,}", " ", clean).strip()
 
         # Remove DIRFIX
-        clean = re.sub(r"dirfix","", clean, flags=re.I)
+        clean = re.sub(r"dirfix", "", clean, flags=re.I)
 
         # TODO MATCH -GROUP or append meta("group")
 
