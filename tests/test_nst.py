@@ -355,7 +355,7 @@ class TestDetectNstLangue:
     def test_region_coded_french_is_francais(self):
         """Region-coded French tracks (fr-fr, fr-ca) map to Français."""
         meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["fr-fr", "fr-ca"]}
-        assert NST._detect_nst_langue(meta) == "Multi, VFQ, Français"
+        assert NST._detect_nst_langue(meta) == "VFQ, Français"
 
     def test_english_only_returns_empty(self):
         """English-only releases get empty langue (NST requires VF)."""

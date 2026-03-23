@@ -379,8 +379,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
     def _detect_nst_langue(meta: dict[str, Any]) -> str:
         """Derive the NST langue tag from the release name / audio metadata.
 
-        NST accepts: Français, VF, VFF, VFI, VFQ.
-        FrenchTrackerMixin embeds VFF/VFQ/VFI/VF/VF2/VF3/VOF etc. in the name.
+        NST accepts: Français, VFF, VFI, VFQ, VOSTFR, VFSTFR, Multi, Muet, Anglais.
         """
         name = meta.get("uuid") or meta.get("name", "")  # More precise on UUID, UA remove Multi etc when forging name
         upper = name.upper().replace(" ", ".")
@@ -434,9 +433,11 @@ class NST(FrenchTrackerMixin, UNIT3D):
                 detected_langs.add("Français")
             elif lang in en_aliases:
                 detected_langs.add("Anglais")
+            else:
+                detected_langs.add("Autre")
 
         # MULTI if more than one audiotrack
-        if len(detected_langs) > 1 and "Multi" not in langs:
+        if len(langs_all) > 1 and "Multi" not in langs and "Autre" in detected_langs:
             langs.append("Multi")
 
         # Add tag if not already inside
