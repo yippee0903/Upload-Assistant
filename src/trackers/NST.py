@@ -130,60 +130,6 @@ class NST(FrenchTrackerMixin, UNIT3D):
         r = resolution or meta.get("resolution", "")
         return {"resolution_id": resolution_id.get(r, "10")}
 
-    def get_quality(self, meta: dict[str, Any]) -> str:
-        """Return quality string to sent to API (qualite: Type Resolution) ."""
-        t = meta.get("type", "")
-        r = meta.get("resolution", "")
-        source = meta.get("source", "").upper()
-
-        if t == "ENCODE" and "WEB" in source:
-            t = "WEBRIP"
-
-        quality_map = {
-            # DISC
-            ("DISC", "2160p"): "Bluray 4K",
-            ("DISC", "1080p"): "Bluray Full",
-            ("DISC", "720p"): "Bluray Full",
-            ("DISC", ""): "Bluray Full",
-            # REMUX
-            ("REMUX", "2160p"): "Bluray Remux",
-            ("REMUX", "1080p"): "Bluray Remux",
-            ("REMUX", "720p"): "Bluray Remux",
-            ("REMUX", "576p"): "Bluray Remux",
-            ("REMUX", "480p"): "Bluray Remux",
-            ("REMUX", ""): "Bluray Remux",
-            # ENCODE (Bluray source)
-            ("ENCODE", "2160p"): "Bluray 4K",
-            ("ENCODE", "1080p"): "Bluray 1080p",
-            ("ENCODE", "720p"): "Bluray 720p",
-            ("ENCODE", "576p"): "Bluray 576p",
-            ("ENCODE", "480p"): "Bluray 480p",
-            ("ENCODE", ""): "Bluray 1080p",
-            # WEBDL
-            ("WEBDL", "2160p"): "WEB-DL 4K",
-            ("WEBDL", "1080p"): "WEB-DL 1080p",
-            ("WEBDL", "720p"): "WEB-DL 720p",
-            ("WEBDL", "576p"): "WEB-DL 576p",
-            ("WEBDL", "480p"): "WEB-DL 480p",
-            ("WEBDL", ""): "WEB-DL",
-            # WEBRIP
-            ("WEBRIP", "2160p"): "WEBRip 4K",
-            ("WEBRIP", "1080p"): "WEBRip 1080p",
-            ("WEBRIP", "720p"): "WEBRip 720p",
-            ("WEBRIP", "576p"): "WEBRip 576p",
-            ("WEBRIP", "480p"): "WEBRip 480p",
-            ("WEBRIP", ""): "WEBRip",
-            # HDTV
-            ("HDTV", "2160p"): "TVRip 4K",
-            ("HDTV", "1080p"): "TVRip 1080p",
-            ("HDTV", "720p"): "TVRip 720p",
-            ("HDTV", "576p"): "TVRip 576p",
-            ("HDTV", "480p"): "TVRip 480p",
-            ("HDTV", ""): "TVRip",
-        }
-
-        return quality_map.get((t, r), "")
-
     # ── Search override (filter needs slugs, not numeric IDs) ─────────
 
     async def search_existing(self, meta: dict[str, Any], _: Any) -> list[dict[str, Any]]:
@@ -427,7 +373,6 @@ class NST(FrenchTrackerMixin, UNIT3D):
         # Map VF variant from the release name to NST's fixed "langue"
         # choices: Français, VF, VFF, VFI, VFQ.
         data["langue"] = self._detect_nst_langue(meta)
-        data["qualite"] = self.get_quality(meta)
         return data
 
     @staticmethod
