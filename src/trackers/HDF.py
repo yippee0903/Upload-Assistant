@@ -24,7 +24,7 @@ from src.console import console
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
-from src.trackers.FRENCH import FrenchTrackerMixin
+from src.trackers.FRENCH import LANG_MAP, LANG_NAMES_FR, FrenchTrackerMixin
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -630,6 +630,109 @@ class HDF(FrenchTrackerMixin):
         return await nfo_gen.generate_nfo(meta, self.tracker)
 
     # ──────────────────────────────────────────────────────────
+    #  Additional checks — language requirements & bloat detection
+    # ──────────────────────────────────────────────────────────
+
+    _BLOAT_CHECK_TYPES = frozenset({"REMUX", "ENCODE", "WEBDL", "WEBRIP"})
+
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        """Warn about superfluous audio/subtitle tracks.
+
+        HDF rules discourage excessive non-VF/VO tracks on
+        Remux/Encode/WEB releases.
+        This is a warning only — it never blocks the upload.
+        """
+        # Bloat detection (warning only — does not block upload)
+        release_type = str(meta.get("type", "")).upper()
+        if release_type in self._BLOAT_CHECK_TYPES:
+            try:
+                self._warn_superfluous_tracks(meta)
+            except Exception as exc:
+                console.print(f"[yellow]{self.tracker}: bloat check skipped ({exc})[/yellow]")
+
+        # Auto-generate NFO if not provided
+        if not meta.get("nfo") and not meta.get("auto_nfo"):
+            try:
+                nfo_path = await self._get_or_generate_nfo(meta)
+                if nfo_path:
+                    meta["nfo"] = nfo_path
+                    meta["auto_nfo"] = True
+            except Exception as exc:
+                console.print(f"[yellow]{self.tracker}: NFO generation skipped ({exc})[/yellow]")
+
+        return True
+
+    def _warn_superfluous_tracks(self, meta: Meta) -> None:
+        """Print a warning when audio/subtitle tracks are not VF or VO.
+
+        Allowed languages:
+        - French (any variant)
+        - Original language (from TMDB)
+        - English (tolerated when VO is not English — e.g. anime dubs)
+        Commentary tracks are ignored.
+        """
+        orig_lang = (meta.get("original_language") or "").lower().strip()
+        # Build the set of allowed 3-letter codes
+        allowed: set[str] = {"FRA"}  # French always allowed
+        if orig_lang:
+            orig_mapped = LANG_MAP.get(orig_lang, orig_lang.upper()[:3])
+            allowed.add(orig_mapped)
+            # Tolerate English dub when VO is not English
+            if orig_mapped != "ENG":
+                allowed.add("ENG")
+
+        # -- Audio tracks --
+        audio_tracks = self._get_audio_tracks(meta, filter_commentary=True)
+        extra_audio: list[str] = []
+        for track in audio_tracks:
+            raw = str(track.get("Language", "")).strip().lower()
+            mapped = LANG_MAP.get(raw, raw.upper()[:3] if raw else "")
+            if mapped and mapped not in allowed:
+                fr_name = self._lang_display_name(raw, mapped)
+                if fr_name not in extra_audio:
+                    extra_audio.append(fr_name)
+
+        # -- Subtitle tracks --
+        mediainfo = meta.get("mediainfo") or {}
+        media = mediainfo.get("media") if isinstance(mediainfo, dict) else {}
+        all_tracks = (media.get("track") if isinstance(media, dict) else None) or []
+        sub_tracks = [t for t in all_tracks if isinstance(t, dict) and t.get("@type") == "Text"]
+        extra_subs: list[str] = []
+        for track in sub_tracks:
+            raw = str(track.get("Language", "")).strip().lower()
+            mapped = LANG_MAP.get(raw, raw.upper()[:3] if raw else "")
+            if mapped and mapped not in allowed:
+                fr_name = self._lang_display_name(raw, mapped)
+                if fr_name not in extra_subs:
+                    extra_subs.append(fr_name)
+
+        if extra_audio:
+            console.print(
+                f"[bold yellow]{self.tracker}: {len(extra_audio)} langue(s) audio non pertinente(s) "
+                f"détectée(s) ({', '.join(extra_audio)}) — "
+                f"seules VF et VO sont attendues.[/bold yellow]"
+            )
+        if extra_subs:
+            console.print(f"[bold yellow]{self.tracker}: {len(extra_subs)} langue(s) de sous-titres non pertinente(s) détectée(s) ({', '.join(extra_subs)}).[/bold yellow]")
+
+        if extra_audio or extra_subs:
+            console.print(f"[bold red]{self.tracker}: Pistes audio et sous-titres surabondants formellement interdits sur HDF.[/bold red]")
+
+    @staticmethod
+    def _lang_display_name(raw_code: str, mapped_code: str) -> str:
+        """Return a human-readable French name for a language code."""
+        # Try the full raw code first (e.g. "spanish"), then 2-letter prefix
+        name = LANG_NAMES_FR.get(raw_code)
+        if name:
+            return name
+        # Try common long forms from LANG_NAMES_FR keys
+        for key, val in LANG_NAMES_FR.items():
+            code = LANG_MAP.get(key, "")
+            if code == mapped_code:
+                return val
+        return mapped_code  # fallback to 3-letter code
+
+    # ──────────────────────────────────────────────────────────
     #  Dupe search
     # ──────────────────────────────────────────────────────────
 
@@ -640,6 +743,11 @@ class HDF(FrenchTrackerMixin):
             self.session.cookies.update(cookies)
 
         dupes: list[dict[str, Union[str, None]]] = []
+
+        should_continue = await self.get_additional_checks(meta)
+        if not should_continue:
+            meta["skipping"] = self.tracker
+            return dupes
 
         # Search by TMDB ID (preferred), fallback to title text search
         tmdb_id = meta.get("tmdb", "")

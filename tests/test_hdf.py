@@ -6,6 +6,7 @@ Covers: category mapping, codec mapping, resolution mapping,
 """
 
 import asyncio
+import re
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
@@ -895,3 +896,242 @@ class TestUploadConfig:
         match2 = re.search(pattern, url2)
         assert match2 is not None
         assert match2.group(1) == "114c638c3d93e32ff404ff769d172b6a4bf5ee7a"
+
+
+# ═══════════════════════════════════════════════════════════════
+#   Additional checks — French audio & bloat detection
+# ═══════════════════════════════════════════════════════════════
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from Rich console output."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+class TestAdditionalChecks:
+    """get_additional_checks: always returns True (warning only, never blocks)."""
+
+    @pytest.fixture()
+    def hdf(self):
+        return HDF(_config())
+
+    def test_always_passes_even_without_french_audio(self, hdf):
+        """HDF does NOT require French audio — check must not block."""
+        meta = _meta_base(
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "en"},
+            ]}},
+        )
+        assert _run(hdf.get_additional_checks(meta)) is True
+
+    def test_passes_with_french_audio(self, hdf):
+        """Normal case with French audio still passes."""
+        meta = _meta_base(
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+            ]}},
+        )
+        assert _run(hdf.get_additional_checks(meta)) is True
+
+    def test_passes_with_empty_tracks(self, hdf):
+        """No tracks at all → still passes (no blocking)."""
+        meta = _meta_base(mediainfo={"media": {"track": []}})
+        assert _run(hdf.get_additional_checks(meta)) is True
+
+    def test_survives_warn_exception(self, hdf):
+        """If _warn_superfluous_tracks raises, get_additional_checks still returns True."""
+        meta = _meta_base(type="REMUX")
+        with patch.object(hdf, "_warn_superfluous_tracks", side_effect=RuntimeError("boom")):
+            assert _run(hdf.get_additional_checks(meta)) is True
+
+    def test_survives_nfo_exception(self, hdf):
+        """If _get_or_generate_nfo raises, meta is not mutated and returns True."""
+        meta = _meta_base()
+        with patch.object(hdf, "_get_or_generate_nfo", side_effect=RuntimeError("boom")):
+            assert _run(hdf.get_additional_checks(meta)) is True
+            assert "nfo" not in meta or not meta["nfo"]
+
+    def test_nfo_generated_when_missing(self, hdf):
+        """When meta has no NFO, _get_or_generate_nfo is called and meta is updated."""
+        meta = _meta_base()
+        with patch.object(hdf, "_get_or_generate_nfo", new_callable=AsyncMock, return_value="/tmp/test.nfo"):
+            _run(hdf.get_additional_checks(meta))
+        assert meta["nfo"] == "/tmp/test.nfo"
+        assert meta["auto_nfo"] is True
+
+    def test_nfo_not_regenerated_when_present(self, hdf):
+        """When meta already has an NFO, _get_or_generate_nfo is not called."""
+        meta = _meta_base(nfo="/existing/nfo.txt")
+        with patch.object(hdf, "_get_or_generate_nfo") as mock_nfo:
+            _run(hdf.get_additional_checks(meta))
+            mock_nfo.assert_not_called()
+        assert meta["nfo"] == "/existing/nfo.txt"
+
+    def test_bloat_skipped_for_disc(self, hdf):
+        """Bloat warning is not run for DISC releases."""
+        meta = _meta_base(type="DISC")
+        with patch.object(hdf, "_warn_superfluous_tracks") as mock_warn:
+            _run(hdf.get_additional_checks(meta))
+            mock_warn.assert_not_called()
+
+    def test_bloat_runs_for_remux(self, hdf):
+        """Bloat warning runs for REMUX releases."""
+        meta = _meta_base(type="REMUX")
+        with patch.object(hdf, "_warn_superfluous_tracks") as mock_warn:
+            _run(hdf.get_additional_checks(meta))
+            mock_warn.assert_called_once()
+
+
+class TestBloatDetection:
+    """_warn_superfluous_tracks: detect non-VF/VO audio and subtitle tracks."""
+
+    @pytest.fixture()
+    def hdf(self):
+        return HDF(_config())
+
+    def test_no_warning_vf_vo_only(self, hdf, capsys):
+        """FR + EN (VO) on an English-original film → no warning."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        assert capsys.readouterr().out == ""
+
+    def test_warns_extra_audio_spanish_on_english_film(self, hdf, capsys):
+        """Spanish audio on an English-original film → warning."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "es"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = capsys.readouterr().out
+        assert "Espagnol" in out or "SPA" in out
+
+    def test_warns_multiple_extra_audio(self, hdf, capsys):
+        """German + Italian on English-original → warning lists both."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "de"},
+                {"@type": "Audio", "Language": "it"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = _strip_ansi(capsys.readouterr().out)
+        assert "2 langue(s) audio" in out
+
+    def test_english_tolerated_on_non_english_original(self, hdf, capsys):
+        """FR + EN + JA on a Japanese film → EN is tolerated, no extra audio."""
+        meta = _meta_base(
+            original_language="ja",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "ja"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        assert capsys.readouterr().out == ""
+
+    def test_warns_extra_on_non_english_original(self, hdf, capsys):
+        """FR + EN + JA + DE on Japanese film → DE is extra."""
+        meta = _meta_base(
+            original_language="ja",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "ja"},
+                {"@type": "Audio", "Language": "de"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = capsys.readouterr().out
+        assert "Allemand" in out or "DEU" in out
+
+    def test_warns_extra_subtitles(self, hdf, capsys):
+        """Extra subtitle languages trigger a separate warning."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Text", "Language": "fr"},
+                {"@type": "Text", "Language": "en"},
+                {"@type": "Text", "Language": "es"},
+                {"@type": "Text", "Language": "de"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = _strip_ansi(capsys.readouterr().out)
+        assert "sous-titres" in out
+        assert "2 langue(s)" in out
+
+    def test_commentary_tracks_ignored(self, hdf, capsys):
+        """Commentary audio tracks are ignored (not counted as bloat)."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "en", "Title": "Commentary"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        assert capsys.readouterr().out == ""
+
+    def test_no_original_language_only_french_allowed(self, hdf, capsys):
+        """When original_language is empty, only French is allowed."""
+        meta = _meta_base(
+            original_language="",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = capsys.readouterr().out
+        assert "Anglais" in out or "ENG" in out
+
+    def test_deduplicates_extra_languages(self, hdf, capsys):
+        """Two Spanish audio tracks → only one 'Espagnol' in warning."""
+        meta = _meta_base(
+            original_language="en",
+            mediainfo={"media": {"track": [
+                {"@type": "Audio", "Language": "fr"},
+                {"@type": "Audio", "Language": "en"},
+                {"@type": "Audio", "Language": "es"},
+                {"@type": "Audio", "Language": "es"},
+            ]}},
+        )
+        hdf._warn_superfluous_tracks(meta)
+        out = _strip_ansi(capsys.readouterr().out)
+        assert "1 langue(s) audio" in out
+
+
+class TestLangDisplayName:
+    """_lang_display_name: French display names for language codes."""
+
+    def test_known_raw_code(self):
+        assert HDF._lang_display_name("spanish", "SPA") == "Espagnol"
+
+    def test_reverse_lookup_by_mapped_code(self):
+        assert HDF._lang_display_name("es", "SPA") == "Espagnol"
+
+    def test_fallback_to_mapped_code(self):
+        """Unknown language code returns the 3-letter mapped code."""
+        assert HDF._lang_display_name("xx", "XXX") == "XXX"
