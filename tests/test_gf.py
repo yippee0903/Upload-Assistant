@@ -488,179 +488,69 @@ class TestLanguageDetection:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Release naming
+#  Release naming — GF uses the source filename as-is
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestNaming:
-    """Test space-separated release names following GF naming conventions."""
+    """GF get_name must faithfully reproduce the source filename (dots→spaces)."""
 
-    def test_movie_webdl_french(self, gf):
-        meta = _meta_base(
-            type='WEBDL', title='Le Prenom', year='2012',
-            resolution='1080p', video_encode='x264', tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
+    def test_uuid_is_source(self, gf):
+        """Release name comes from uuid, not from metadata fields."""
+        meta = _meta_base(uuid='Birthday.Girl.2001.MULTi.1080p.WEB.x264-FW.mkv')
         result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Le Prenom' in name
-        assert '2012' in name
-        assert 'VOF' in name  # original_language='fr' → VOF
-        assert '1080p' in name
-        assert 'WEB' in name
-        assert name.endswith('-GF')
+        assert result['name'] == 'Birthday Girl 2001 MULTi 1080p WEB x264-FW'
 
-    def test_movie_encode_multi(self, gf):
-        meta = _meta_base(
-            type='ENCODE', title='The Batman', year='2022',
-            resolution='2160p', source='BluRay', video_encode='x265',
-            audio='DTS-HD MA 5.1', hdr='HDR', uhd='UHD', tag='-TeamX',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'The Batman' in name
-        assert '2022' in name
-        assert 'MULTI' in name
-        assert '2160p' in name
-        assert '5.1' in name  # dot in audio channels preserved
-        assert name.endswith('-TeamX')
+    def test_strip_mkv_extension(self, gf):
+        meta = _meta_base(uuid='Movie.2025.FRENCH.720p.WEB.H265-GRP.mkv')
+        assert _run(gf.get_name(meta))['name'] == 'Movie 2025 FRENCH 720p WEB H265-GRP'
 
-    def test_tv_season_webdl(self, gf):
-        meta = _meta_base(
-            category='TV', type='WEBDL', title='Stranger Things',
-            year='2016', search_year='2016', season='S03', episode='',
-            resolution='2160p', video_encode='x265', audio='AAC',
-            tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Stranger Things' in name
-        assert '2016' in name
-        assert 'S03' in name
-        assert 'VOF' in name  # original_language='fr' → VOF
-        assert name.endswith('-GF')
+    def test_strip_mp4_extension(self, gf):
+        meta = _meta_base(uuid='Movie.2025.FRENCH.720p.WEB.H265-GRP.mp4')
+        assert _run(gf.get_name(meta))['name'] == 'Movie 2025 FRENCH 720p WEB H265-GRP'
 
-    def test_tv_episode(self, gf):
-        meta = _meta_base(
-            category='TV', type='WEBDL', title='The Last of Us',
-            year='', search_year='', season='S01', episode='E01',
-            resolution='1080p', video_encode='x265', audio='AC3',
-            tag='-NoTag',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        # GF title-case: "Us" is last word → capitalised
-        assert 'The Last of Us' in name
-        assert 'S01E01' in name
-        assert 'MULTI' in name
-        assert name.endswith('-NoTag')
+    def test_strip_avi_extension(self, gf):
+        meta = _meta_base(uuid='Movie.2025.FRENCH.DVDRip.XviD-GRP.avi')
+        assert _run(gf.get_name(meta))['name'] == 'Movie 2025 FRENCH DVDRip XviD-GRP'
 
-    def test_no_special_chars(self, gf):
+    def test_no_extension(self, gf):
+        """Folder names (season packs) have no extension."""
+        meta = _meta_base(uuid='Stranger.Things.S03.FRENCH.2160p.WEBRip.x265-GRP')
+        assert _run(gf.get_name(meta))['name'] == 'Stranger Things S03 FRENCH 2160p WEBRip x265-GRP'
+
+    def test_preserves_multi_without_suffix(self, gf):
+        """MULTi in the source stays MULTi — nothing added or removed."""
+        meta = _meta_base(uuid='Birthday.Girl.2001.MULTi.1080p.WEB.x264-FW')
+        name = _run(gf.get_name(meta))['name']
+        assert 'MULTi' in name
+        assert 'VFF' not in name
+
+    def test_no_audio_codec_added(self, gf):
+        """Even if meta has audio info, it must NOT appear in the name."""
         meta = _meta_base(
-            type='WEBDL', title="L'Étoile du Nord",
-            year='2020', resolution='1080p', video_encode='x264',
-            tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
+            uuid='Jimmy.and.Stiggs.2025.VOSTFR.1080p.WEB.H265-TyHD',
+            audio='DDP 5.1',
         )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        # No accents or apostrophes should remain
-        assert "'" not in name
-        assert 'É' not in name
-        # Spaces are used as separators (GF convention)
-        assert ' ' in name
+        name = _run(gf.get_name(meta))['name']
+        assert 'DDP' not in name
+        assert '5.1' not in name
+        assert name == 'Jimmy and Stiggs 2025 VOSTFR 1080p WEB H265-TyHD'
 
     def test_no_double_spaces(self, gf):
-        meta = _meta_base(
-            type='WEBDL', title='Test', year='2020',
-            resolution='1080p', video_encode='x264', tag='-GF',
-            edition='', repack='', service='',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        assert '  ' not in result['name']
+        meta = _meta_base(uuid='Movie.2025..FRENCH.1080p.WEB-GRP')
+        assert '  ' not in _run(gf.get_name(meta))['name']
 
-    def test_remux_naming(self, gf):
-        meta = _meta_base(
-            type='REMUX', title='Dune', year='2021',
-            resolution='2160p', source='BluRay', uhd='UHD',
-            video_codec='HEVC', audio='DTS-HD MA 7.1',
-            hdr='HDR', tag='-HDTeam',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Dune' in name
-        assert 'REMUX' in name
-        assert 'MULTI' in name
-        # GF: Hybrid is suppressed for REMUX
-        assert 'Hybrid' not in name
+    def test_preserves_channel_dots(self, gf):
+        """Dots between digits (5.1, 7.1) are preserved."""
+        meta = _meta_base(uuid='Movie.2025.FRENCH.1080p.WEB.DDP.5.1.H265-GRP')
+        name = _run(gf.get_name(meta))['name']
+        assert '5.1' in name
 
-    def test_remux_no_hybrid(self, gf):
-        """GF moderation rule: REMUX cannot be Hybrid."""
-        meta = _meta_base(
-            type='REMUX', title='Dune', year='2021',
-            resolution='2160p', source='BluRay', uhd='UHD',
-            video_codec='HEVC', audio='DTS-HD MA 7.1',
-            hdr='HDR', webdv='Hybrid', tag='-GF',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'REMUX' in name
-        assert 'Hybrid' not in name
-
-    def test_movie_dvdrip(self, gf):
-        meta = _meta_base(
-            type='DVDRIP', title='La Chtite Famille', year='2018',
-            resolution='480p', source='DVD', video_encode='x264',
-            audio='AC3', tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'DVDRip' in name
-
-    def test_hybrid_flag(self, gf):
-        meta = _meta_base(
-            type='WEBDL', title='Avatar', year='2022',
-            resolution='2160p', video_encode='x265',
-            webdv='Hybrid', tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Hybrid' in name
-
-    def test_ddplus_becomes_ddp(self, gf):
-        """DD+ contains a special char (+), GF requires DDP instead."""
-        meta = _meta_base(
-            type='WEBDL', title='Test', year='2023',
-            resolution='1080p', video_encode='x265',
-            audio='DD+ 5.1', tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'DD+' not in name
-        assert 'DDP' in name
-
-    def test_hdr10plus_becomes_hdr10plus(self, gf):
-        """HDR10+ contains a special char (+), GF requires HDR10PLUS."""
-        meta = _meta_base(
-            type='ENCODE', title='Test', year='2023',
-            resolution='2160p', video_encode='x265', source='BluRay',
-            audio='DTS', hdr='HDR10+', tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'HDR10+' not in name
-        assert 'HDR10PLUS' in name
-        assert '+' not in name
+    def test_preserves_title_hyphens(self, gf):
+        """Title-internal hyphens (Spider-Man, WALL-E) are preserved."""
+        meta = _meta_base(uuid='Spider-Man.2002.MULTi.1080p.BluRay.x264-GRP')
+        name = _run(gf.get_name(meta))['name']
+        assert 'Spider-Man' in name
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -707,75 +597,39 @@ class TestAdditionalChecks:
 
 
 class TestGFExamples:
-    """Verify release names match the examples from GF's naming guide."""
+    """Verify release names match the examples from GF's naming guide (issue #97).
 
-    def test_example_batman_4k(self, gf):
-        """The Batman 2022 LiMiTED MULTI.VOF 2160p UHD BluRay HDR AC3 x265-GF"""
-        meta = _meta_base(
-            type='ENCODE', title='The Batman', year='2022',
-            resolution='2160p', source='BluRay', video_encode='x265',
-            audio='AC3', hdr='HDR', uhd='UHD', edition='LiMiTED',
-            tag='-GF',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert name.startswith('The Batman 2022')
-        assert 'MULTI' in name
-        assert '2160p' in name
-        assert name.endswith('-GF')
+    The name must exactly match the source filename (dots→spaces, extension stripped).
+    """
 
-    def test_example_everything_everywhere(self, gf):
-        """Everything Everywhere All at Once 2022 VOF 1080p WEB AAC x264-NoTag"""
-        meta = _meta_base(
-            type='WEBDL', title='Everything Everywhere All at Once', year='2022',
-            resolution='1080p', video_encode='x264', audio='AAC',
-            tag='-NoTag',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Everything Everywhere' in name
-        assert 'VOF' in name  # original_language='fr' → VOF
-        assert '1080p' in name
-        assert 'WEB' in name
-        assert name.endswith('-NoTag')
+    def test_jimmy_stiggs_vostfr(self, gf):
+        """Jimmy and Stiggs 2025 VOSTFR 1080p WEB H265-TyHD"""
+        meta = _meta_base(uuid='Jimmy.and.Stiggs.2025.VOSTFR.1080p.WEB.H265-TyHD.mkv')
+        assert _run(gf.get_name(meta))['name'] == 'Jimmy and Stiggs 2025 VOSTFR 1080p WEB H265-TyHD'
 
-    def test_example_last_of_us_s01e01(self, gf):
-        """The Last of us S01E01 MULTI.VOF HDR 1080p WEB AC3 x265-NoTag"""
-        meta = _meta_base(
-            category='TV', type='WEBDL',
-            title='The Last of Us', year='', search_year='',
-            season='S01', episode='E01',
-            resolution='1080p', video_encode='x265', audio='AC3',
-            hdr='HDR', tag='-NoTag',
-            mediainfo=_mi([_audio_track('fr'), _audio_track('en')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        # GF title-case: "Us" is last word → capitalised
-        assert 'The Last of Us' in name
-        assert 'S01E01' in name
-        assert 'MULTI' in name
-        assert name.endswith('-NoTag')
+    def test_bienvenue_chez_les_rozes(self, gf):
+        """Bienvenue Chez les Rozes 2003 FRENCH 1080p WEB x264-FW"""
+        meta = _meta_base(uuid='Bienvenue.Chez.les.Rozes.2003.FRENCH.1080p.WEB.x264-FW.mkv')
+        assert _run(gf.get_name(meta))['name'] == 'Bienvenue Chez les Rozes 2003 FRENCH 1080p WEB x264-FW'
 
-    def test_example_stranger_things_s03(self, gf):
-        """Stranger Things 2016 S03 VOF 2160p WEBRip AAC x265-GF"""
-        meta = _meta_base(
-            category='TV', type='WEBRIP',
-            title='Stranger Things', year='2016', search_year='2016',
-            season='S03', episode='',
-            resolution='2160p', video_encode='x265', audio='AAC',
-            tag='-GF',
-            mediainfo=_mi([_audio_track('fr')]),
-        )
-        result = _run(gf.get_name(meta))
-        name = result['name']
-        assert 'Stranger Things' in name
-        assert '2016' in name
-        assert 'S03' in name
-        assert 'VOF' in name  # original_language='fr' → VOF
-        assert name.endswith('-GF')
+    def test_birthday_girl_multi(self, gf):
+        """Birthday Girl 2001 MULTi 1080p WEB x264-FW — no VFF/audio codec added."""
+        meta = _meta_base(uuid='Birthday.Girl.2001.MULTi.1080p.WEB.x264-FW.mkv')
+        name = _run(gf.get_name(meta))['name']
+        assert name == 'Birthday Girl 2001 MULTi 1080p WEB x264-FW'
+        assert 'VFF' not in name
+        assert 'DDP' not in name
+
+    def test_danger_in_the_house_multi_no_extras(self, gf):
+        """Danger in the House 2022 MULTI 1080p WEB H264-FW — no VFF or AAC added."""
+        meta = _meta_base(uuid='Danger.in.the.House.2022.MULTI.1080p.WEB.H264-FW.mkv')
+        name = _run(gf.get_name(meta))['name']
+        assert name == 'Danger in the House 2022 MULTI 1080p WEB H264-FW'
+
+    def test_conners_vostfr(self, gf):
+        """The Conners S03E01 VOSTFR 1080p WEB H265-TyHD"""
+        meta = _meta_base(uuid='The.Conners.S03E01.VOSTFR.1080p.WEB.H265-TyHD.mkv')
+        assert _run(gf.get_name(meta))['name'] == 'The Conners S03E01 VOSTFR 1080p WEB H265-TyHD'
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -803,7 +657,7 @@ class TestFrenchMixin:
         assert mixin_idx < unit3d_idx
 
     def test_get_name_overridden(self, gf):
-        """GF overrides get_name for REMUX no-Hybrid, HDR-after-resolution, and French audio codec."""
+        """GF overrides get_name to use the source filename as-is."""
         assert 'get_name' in GF.__dict__
 
     def test_build_audio_inherited(self, gf):
@@ -835,3 +689,4 @@ class TestFrenchMixin:
     def test_fr_clean_strips_accents(self, gf):
         """GF _fr_clean uses unidecode to strip accents."""
         assert gf._fr_clean('Étoile résumé') == 'Etoile resume'
+

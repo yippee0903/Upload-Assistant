@@ -87,7 +87,7 @@ class C411(FrenchTrackerMixin):
         ]
 
         if not main_tracks:
-            return super()._get_audio_for_name(meta)
+            return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
         def most_channels_priority(t):
             channels = int(t.get("Channels", "0"))
@@ -110,7 +110,7 @@ class C411(FrenchTrackerMixin):
             best_fra = max(fra_tracks, key=lambda x: int(x.get("Channels", "0")))
             return codec_info_from_track(best_fra).replace("DD+", "DDP")
 
-        return super()._get_audio_for_name(meta)
+        return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """C411 override: enforce correct codec for WEB sources.

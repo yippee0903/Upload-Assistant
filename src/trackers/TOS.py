@@ -209,7 +209,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         if resolution == "OTHER":
             resolution = ""
 
-        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "")
+        audio = meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "")  # Audio codec for the first track
         language = await self._build_audio_string(meta)
         service = meta.get("service", "")
         season = meta.get("season", "")
