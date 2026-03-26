@@ -10,13 +10,14 @@ to share a single, canonical implementation of:
   · Release naming (dot-separated, French-tracker conventions)
 """
 
+import glob
 import os
 import re
 from typing import Any, Optional, Union
 
 from unidecode import unidecode
 
-from src.audio import AD_TRACK_RE
+from src.audio import AD_TRACK_RE, codec_info_from_track
 
 Meta = dict[str, Any]
 
@@ -444,6 +445,42 @@ class FrenchTrackerMixin:
         order).  Subclasses may override to pick a different track, e.g.
         the first French audio track for French-tracker NFO validation.
         """
+
+        lossless_additional_features = ["XLL", "HD MA", ":X", "16-ch", "MLP FBA"]
+        lossless_tracks = []
+        lossy_tracks = []
+        audio_tracks = self._get_audio_tracks(meta)
+
+        main_tracks = [
+            t
+            for t in audio_tracks
+            if not self._is_audio_desc_track(t) and "compatibility" not in str(t.get("Title", t.get("title", ""))).lower() and t.get("Channels") and t.get("Format")
+        ]
+
+        if not main_tracks:  # Fallback if no "main tracks" was found
+            return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+
+        def most_channels_priority(t):
+            channels = int(t.get("Channels", "0"))
+            is_french = 1 if self._map_language(str(t.get("Language", ""))) == "FRA" else 0
+            return (channels, is_french)
+
+        for t in main_tracks:
+            is_lossless = (
+                t.get("Compression_Mode") == "Lossless"
+                or any(f in str(t.get("Format_AdditionalFeatures", "")) for f in lossless_additional_features)
+                or any(f in str(t.get("Format_Commercial_IfAny", "")) for f in lossless_additional_features)
+            )
+            if is_lossless:
+                lossless_tracks.append(t)
+            else:
+                lossy_tracks.append(t)
+
+        if lossless_tracks:
+            return codec_info_from_track(max(lossless_tracks, key=most_channels_priority)).replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+        elif lossy_tracks:
+            return codec_info_from_track(max(lossy_tracks, key=most_channels_priority)).replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
+
         return meta.get("audio", "").replace("Dual-Audio", "").replace("Dubbed", "").replace("DD+", "DDP")
 
     @staticmethod
@@ -1276,11 +1313,10 @@ class FrenchTrackerMixin:
                 return size_match.group(1).strip()
         return ""
 
-    # Extensions included in the torrent (video files only).
+    # Extensions included in the torrent (video files).
     _TORRENT_EXTENSIONS: frozenset[str] = frozenset((".mkv", ".mp4", ".ts", ".m2ts", ".vob", ".avi"))
 
-    @staticmethod
-    def _count_files(meta: dict) -> str:
+    def _count_files(self, meta: dict) -> str:
         """Count files actually included in the torrent.
 
         Only video extensions are counted (matching torrent creation logic
@@ -1291,7 +1327,7 @@ class FrenchTrackerMixin:
             return ""
         if os.path.isfile(path):
             return "1"
-        exts = FrenchTrackerMixin._TORRENT_EXTENSIONS
+        exts = self._TORRENT_EXTENSIONS
         count = sum(1 for _, _, files in os.walk(path) for f in files if os.path.splitext(f)[1].lower() in exts)
         return str(count) if count else ""
 
@@ -1742,3 +1778,12 @@ class FrenchTrackerMixin:
                 parts.append(f" ({qualifier})")
             lines.append("".join(parts))
         return lines
+
+    def _get_nfo_files(self, meta: Meta) -> list[str]:
+        """Get NFO files in folder.
+
+        Used for C411 to get and include NFO files in .torrent"""
+        nfo_files = glob.glob(os.path.join(str(meta.get("path", "")), "*.nfo"))
+        if nfo_files:
+            meta["keep_nfo"] = True
+        return nfo_files
