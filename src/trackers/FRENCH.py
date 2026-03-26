@@ -1783,7 +1783,7 @@ class FrenchTrackerMixin:
         """Get NFO files in folder.
 
         Used for C411 to get and include NFO files in .torrent"""
-        nfo_files = glob.glob(os.path.join(str(meta["path"]), "*.nfo"))
+        nfo_files = glob.glob(os.path.join(str(meta.get("path", "")), "*.nfo"))
         if nfo_files:
             meta["keep_nfo"] = True
         return nfo_files
