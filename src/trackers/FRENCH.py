@@ -12,6 +12,7 @@ to share a single, canonical implementation of:
 
 import os
 import re
+import glob
 from typing import Any, Optional, Union
 
 from unidecode import unidecode
@@ -1312,11 +1313,10 @@ class FrenchTrackerMixin:
                 return size_match.group(1).strip()
         return ""
 
-    # Extensions included in the torrent (video files only).
+    # Extensions included in the torrent (video files).
     _TORRENT_EXTENSIONS: frozenset[str] = frozenset((".mkv", ".mp4", ".ts", ".m2ts", ".vob", ".avi"))
 
-    @staticmethod
-    def _count_files(meta: dict) -> str:
+    def _count_files(self, meta: dict) -> str:
         """Count files actually included in the torrent.
 
         Only video extensions are counted (matching torrent creation logic
@@ -1327,7 +1327,7 @@ class FrenchTrackerMixin:
             return ""
         if os.path.isfile(path):
             return "1"
-        exts = FrenchTrackerMixin._TORRENT_EXTENSIONS
+        exts = self._TORRENT_EXTENSIONS
         count = sum(1 for _, _, files in os.walk(path) for f in files if os.path.splitext(f)[1].lower() in exts)
         return str(count) if count else ""
 
@@ -1778,3 +1778,12 @@ class FrenchTrackerMixin:
                 parts.append(f" ({qualifier})")
             lines.append("".join(parts))
         return lines
+
+    def _get_nfo_files(self, meta: Meta) -> str:
+        """Get NFO files in folder.
+
+        Used for C411 to get and include NFO files in .torrent"""
+        nfo_files = glob.glob(os.path.join(str(meta["path"]), "*.nfo"))
+        if nfo_files:
+            meta["keep_nfo"] = True
+        return nfo_files
