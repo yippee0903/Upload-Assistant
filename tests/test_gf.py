@@ -546,6 +546,15 @@ class TestNaming:
         name = _run(gf.get_name(meta))['name']
         assert '5.1' in name
 
+    def test_dot_between_season_and_resolution(self, gf):
+        """S01.2160p must become 'S01 2160p', H.265 → H265, 5.1 preserved."""
+        meta = _meta_base(uuid='Boyfriend.on.Demand.S01.2160p.NF.WEB-DL.DDP.5.1.Atmos.HDR10.H.265-CHDWEB')
+        name = _run(gf.get_name(meta))['name']
+        assert 'S01 2160p' in name
+        assert '5.1' in name
+        assert 'H265' in name
+        assert 'H 265' not in name
+
     def test_preserves_title_hyphens(self, gf):
         """Title-internal hyphens (Spider-Man, WALL-E) are preserved."""
         meta = _meta_base(uuid='Spider-Man.2002.MULTi.1080p.BluRay.x264-GRP')
@@ -689,4 +698,3 @@ class TestFrenchMixin:
     def test_fr_clean_strips_accents(self, gf):
         """GF _fr_clean uses unidecode to strip accents."""
         assert gf._fr_clean('Étoile résumé') == 'Etoile resume'
-

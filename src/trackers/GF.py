@@ -378,8 +378,14 @@ class GF(FrenchTrackerMixin, UNIT3D):
         """
         clean = self._fr_clean(raw_name)
 
-        # Replace dots NOT between digits (keep 5.1, 7.1, 2.0 …)
-        clean = re.sub(r"(?<!\d)\.(?=\d)|(?<=\d)\.(?!\d)|(?<=\D)\.(?=\D)", " ", clean)
+        # Protect audio channel patterns (e.g. 5.1, 7.1, 2.0, 7.1.2)
+        # and codec patterns (H.264, H.265, x.264, x.265)
+        # before replacing all dots with spaces.
+        clean = re.sub(r"(?<=\b[257])\.([0124])(?=\b)", r"CHDOT\1", clean)
+        clean = re.sub(r"\b([HhXx])\.([23]6[45])\b", r"\1CDDOT\2", clean)
+        clean = clean.replace(".", " ")
+        clean = clean.replace("CHDOT", ".")
+        clean = clean.replace("CDDOT", "")
 
         # Keep only the LAST hyphen (group-tag separator).
         # Hyphens flanked by word chars (e.g. WALL-E, Spider-Man) are
