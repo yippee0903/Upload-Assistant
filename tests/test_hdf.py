@@ -276,8 +276,18 @@ class TestGetVersions:
         versions = HDF._get_versions(_meta_base(edition="Remaster"))
         assert "Remaster" in versions
 
+    def test_remastered_stripped_by_edition_py(self):
+        """edition.py strips 'Remastered' from edition; uuid fallback catches it."""
+        versions = HDF._get_versions(_meta_base(edition="", uuid="Movie.1999.REMASTERED.1080p.BluRay.x264-GRP"))
+        assert "Remaster" in versions
+
     def test_extended(self):
         versions = HDF._get_versions(_meta_base(edition="Extended"))
+        assert "Version Longue" in versions
+
+    def test_version_longue_stripped_by_edition_py(self):
+        """edition.py strips 'version' from edition; uuid fallback catches it."""
+        versions = HDF._get_versions(_meta_base(edition="", uuid="Movie.2001.VERSION.LONGUE.1080p.BluRay.x264-GRP"))
         assert "Version Longue" in versions
 
     def test_hdr_dv(self):
@@ -318,6 +328,16 @@ class TestGetVersions:
         assert "Source AppleTV" in versions
 
     def test_hybrid(self):
+        # webdv flag (normal path — edition is stripped by edition.py)
+        versions = HDF._get_versions(_meta_base(webdv="Hybrid"))
+        assert "Custom / HYBRiD" in versions
+
+    def test_custom(self):
+        versions = HDF._get_versions(_meta_base(webdv="Custom"))
+        assert "Custom / HYBRiD" in versions
+
+    def test_hybrid_fallback_edition(self):
+        # Fallback: if "hybrid" still appears in edition somehow
         versions = HDF._get_versions(_meta_base(edition="HYBRiD"))
         assert "Custom / HYBRiD" in versions
 

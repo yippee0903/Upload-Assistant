@@ -306,12 +306,16 @@ class HDF(FrenchTrackerMixin):
         """
         versions: list[str] = []
         edition = str(meta.get("edition", "")).lower()
+        # edition.py strips some words ("remastered", "version") from
+        # meta["edition"], so fall back to the original folder/file name
+        # stored in meta["uuid"] for markers that may have been removed.
+        uuid_upper = str(meta.get("uuid", "")).upper().replace(".", " ")
 
-        if "remaster" in edition:
+        if "remaster" in edition or "REMASTER" in uuid_upper:
             versions.append("Remaster")
         if "director" in edition:
             versions.append("Director's Cut")
-        if "extended" in edition or "version longue" in edition:
+        if "extended" in edition or "version longue" in edition or ("VERSION" in uuid_upper and "LONGUE" in uuid_upper):
             versions.append("Version Longue")
         if "uncut" in edition:
             versions.append("UnCut")
@@ -321,7 +325,8 @@ class HDF(FrenchTrackerMixin):
             versions.append("2in1")
         if "criterion" in edition:
             versions.append("Criterion")
-        if "hybrid" in edition or "custom" in edition:
+        webdv = str(meta.get("webdv", "")).lower()
+        if webdv in ("hybrid", "custom") or "hybrid" in edition or "custom" in edition:
             versions.append("Custom / HYBRiD")
         if "imax" in edition:
             versions.append("IMAX")
