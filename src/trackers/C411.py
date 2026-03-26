@@ -1315,7 +1315,7 @@ class C411(FrenchTrackerMixin):
 
         common = COMMON(config=self.config)
 
-        # If NFO file exist, include it in torrent file by recreate .torren
+        # If NFO file exist, include it in torrent file by recreate .torrent
         nfo_files = self._get_nfo_files(meta)
         if nfo_files:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})

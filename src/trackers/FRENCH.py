@@ -1779,7 +1779,7 @@ class FrenchTrackerMixin:
             lines.append("".join(parts))
         return lines
 
-    def _get_nfo_files(self, meta: Meta) -> str:
+    def _get_nfo_files(self, meta: Meta) -> list[str]:
         """Get NFO files in folder.
 
         Used for C411 to get and include NFO files in .torrent"""
