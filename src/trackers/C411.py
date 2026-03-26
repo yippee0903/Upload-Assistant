@@ -26,9 +26,9 @@ from unidecode import unidecode
 from src.console import console
 from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
+from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
-from src.torrentcreate import TorrentCreator
 
 Meta = dict[str, Any]
 Config = dict[str, Any]

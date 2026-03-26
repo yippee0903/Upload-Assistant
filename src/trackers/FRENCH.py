@@ -10,9 +10,9 @@ to share a single, canonical implementation of:
   · Release naming (dot-separated, French-tracker conventions)
 """
 
+import glob
 import os
 import re
-import glob
 from typing import Any, Optional, Union
 
 from unidecode import unidecode
