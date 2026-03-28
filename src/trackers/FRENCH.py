@@ -1165,6 +1165,8 @@ class FrenchTrackerMixin:
                     current["channel_layout"] = val
                 elif key == "Title":
                     current["title"] = val
+                elif key == "Default":
+                    current["default"] = val
 
         if current:
             tracks.append(current)
@@ -1205,6 +1207,8 @@ class FrenchTrackerMixin:
                     current["forced"] = val
                 elif key == "Default":
                     current["default"] = val
+                elif key == "Count of elements":
+                    current["element_count"] = val
 
         if current:
             tracks.append(current)
@@ -1443,6 +1447,7 @@ class FrenchTrackerMixin:
             except (AttributeError, TypeError):
                 pass
 
+        default_found = False
         for i, at in enumerate(tracks):
             lang = at.get("language", "Unknown")
             flag = self._lang_to_flag(lang)
@@ -1567,6 +1572,11 @@ class FrenchTrackerMixin:
                 elif lang_region == "hans":
                     name = "Cantonais (simplifié)"
 
+            # ── Default track detection ──
+            is_default = at.get("default", "").lower() == "yes" and not default_found
+            if is_default:
+                default_found = True
+
             # ── Audio Description detection ──
             is_audio_desc = self._is_audio_desc_track(at)
 
@@ -1602,6 +1612,8 @@ class FrenchTrackerMixin:
                 parts.append(" [AD]")
             if commentary_tag:
                 parts.append(f" [{commentary_tag}]")
+            if is_default:
+                parts.append(" (piste par défaut)")
             if layout:
                 parts.append(f" [{layout}]")
             codec = commercial or fmt
@@ -1641,6 +1653,7 @@ class FrenchTrackerMixin:
             except (AttributeError, TypeError):
                 pass
 
+        default_found = False
         for i, st in enumerate(tracks):
             lang = st.get("language", "") or "Unknown"
             flag = self._lang_to_flag(lang)
@@ -1648,6 +1661,10 @@ class FrenchTrackerMixin:
             fmt = st.get("format", "")
             fmt_short = self._sub_format_short(fmt) if fmt else ""
             forced = st.get("forced", "").lower() == "yes"
+            is_default = st.get("default", "").lower() == "yes" and not default_found
+            if is_default:
+                default_found = True
+            element_count = st.get("element_count", "")
             title = st.get("title", "")
 
             # Detect forced from title field too
@@ -1771,11 +1788,29 @@ class FrenchTrackerMixin:
             if is_commentary:
                 qualifier += ", commentaire"
 
-            parts: list[str] = [f"{flag} {name}"]
-            if fmt_short:
-                parts.append(f" : {fmt_short} ({qualifier})")
+            # Default / forced status indicator
+            if is_default and forced:
+                status = " (piste par défaut et forcée)"
+            elif is_default:
+                status = " (piste par défaut)"
+            elif forced:
+                status = " (piste forcée)"
             else:
-                parts.append(f" ({qualifier})")
+                status = ""
+
+            # Element count display
+            count_part = f", {element_count} éléments" if element_count else ""
+
+            # Parenthesized info after format: (qualifier, N éléments)
+            paren_inner = f"{qualifier}{count_part}"
+
+            parts: list[str] = [f"{flag} {name}"]
+            if status:
+                parts.append(status)
+            if fmt_short:
+                parts.append(f" : {fmt_short} ({paren_inner})" if paren_inner else f" : {fmt_short}")
+            elif paren_inner:
+                parts.append(f" ({paren_inner})")
             lines.append("".join(parts))
         return lines
 

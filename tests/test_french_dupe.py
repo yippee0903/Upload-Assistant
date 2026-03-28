@@ -1295,6 +1295,56 @@ class TestFormatAudioBbcode:
         c = C411(_config())
         assert c._format_audio_bbcode('') == []
 
+    def test_default_track_indicator(self):
+        mi = (
+            "Audio #1\n"
+            "Language                                 : French\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 6 channels\n"
+            "Bit rate                                 : 384 kb/s\n"
+            "Default                                  : Yes\n"
+            "\nAudio #2\n"
+            "Language                                 : English\n"
+            "Commercial name                          : AC3\n"
+            "Channel(s)                               : 6 channels\n"
+            "Bit rate                                 : 384 kb/s\n"
+            "Default                                  : No\n"
+        )
+        c = C411(_config())
+        lines = c._format_audio_bbcode(mi)
+        assert len(lines) == 2
+        assert '(piste par d\u00e9faut)' in lines[0]
+        assert '(piste par d\u00e9faut)' not in lines[1]
+
+    def test_default_only_first_yes(self):
+        """Only the first track with Default=Yes gets the indicator."""
+        mi = (
+            "Audio #1\n"
+            "Language                                 : French\n"
+            "Commercial name                          : AC3\n"
+            "Default                                  : Yes\n"
+            "\nAudio #2\n"
+            "Language                                 : English\n"
+            "Commercial name                          : AC3\n"
+            "Default                                  : Yes\n"
+        )
+        c = C411(_config())
+        lines = c._format_audio_bbcode(mi)
+        assert '(piste par d\u00e9faut)' in lines[0]
+        assert '(piste par d\u00e9faut)' not in lines[1]
+
+    def test_no_default_track(self):
+        """When no track has Default=Yes, no indicator is shown."""
+        mi = (
+            "Audio\n"
+            "Language                                 : French\n"
+            "Commercial name                          : AC3\n"
+            "Default                                  : No\n"
+        )
+        c = C411(_config())
+        lines = c._format_audio_bbcode(mi)
+        assert '(piste par d\u00e9faut)' not in lines[0]
+
 
 class TestFormatSubtitleBbcode:
     """Test _format_subtitle_bbcode from the mixin."""
@@ -1354,6 +1404,98 @@ class TestFormatSubtitleBbcode:
     def test_empty_mi(self):
         c = C411(_config())
         assert c._format_subtitle_bbcode('') == []
+
+    def test_element_count(self):
+        mi = (
+            "Text\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Forced                                   : No\n"
+            "Count of elements                        : 858\n"
+        )
+        c = C411(_config())
+        lines = c._format_subtitle_bbcode(mi)
+        assert len(lines) == 1
+        assert '858 \u00e9l\u00e9ments' in lines[0]
+
+    def test_default_and_forced_subtitle(self):
+        mi = (
+            "Text\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Default                                  : Yes\n"
+            "Forced                                   : Yes\n"
+            "Count of elements                        : 49\n"
+        )
+        c = C411(_config())
+        lines = c._format_subtitle_bbcode(mi)
+        assert len(lines) == 1
+        assert 'piste par d\u00e9faut et forc\u00e9e' in lines[0]
+        assert 'forc\u00e9s' in lines[0]
+        assert '49 \u00e9l\u00e9ments' in lines[0]
+
+    def test_forced_but_not_default_subtitle(self):
+        mi = (
+            "Text\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Default                                  : No\n"
+            "Forced                                   : Yes\n"
+        )
+        c = C411(_config())
+        lines = c._format_subtitle_bbcode(mi)
+        assert 'piste forc\u00e9e' in lines[0]
+        assert 'piste par d\u00e9faut' not in lines[0]
+
+    def test_default_not_forced_subtitle(self):
+        mi = (
+            "Text\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Default                                  : Yes\n"
+            "Forced                                   : No\n"
+        )
+        c = C411(_config())
+        lines = c._format_subtitle_bbcode(mi)
+        assert 'piste par d\u00e9faut)' in lines[0]
+        assert 'forc\u00e9e' not in lines[0]
+
+    def test_full_subtitle_example(self):
+        """Test the complete GoodFellas-like scenario from issue #111."""
+        mi = (
+            "Text #1\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Title                                    : Forced\n"
+            "Default                                  : Yes\n"
+            "Forced                                   : Yes\n"
+            "Count of elements                        : 49\n"
+            "\nText #2\n"
+            "Language                                 : French\n"
+            "Format                                   : UTF-8\n"
+            "Default                                  : No\n"
+            "Forced                                   : No\n"
+            "Count of elements                        : 858\n"
+            "\nText #3\n"
+            "Language                                 : English\n"
+            "Format                                   : UTF-8\n"
+            "Default                                  : No\n"
+            "Forced                                   : No\n"
+            "Count of elements                        : 823\n"
+        )
+        c = C411(_config())
+        lines = c._format_subtitle_bbcode(mi)
+        assert len(lines) == 3
+        # Track 1: French forced + default
+        assert 'forc\u00e9s' in lines[0]
+        assert 'piste par d\u00e9faut et forc\u00e9e' in lines[0]
+        assert '49 \u00e9l\u00e9ments' in lines[0]
+        # Track 2: French complets
+        assert 'complets' in lines[1]
+        assert '858 \u00e9l\u00e9ments' in lines[1]
+        # Track 3: English complets
+        assert 'Anglais' in lines[2]
+        assert '823 \u00e9l\u00e9ments' in lines[2]
 
 
 class TestFormatHdrDvBbcode:
