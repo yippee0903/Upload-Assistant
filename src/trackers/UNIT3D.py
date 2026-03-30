@@ -408,7 +408,7 @@ class UNIT3D:
         specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
         nfo_files = glob.glob(specified_dir_path)
         if not nfo_files and meta.get("keep_nfo", False) and (meta.get("keep_folder", False) or meta.get("isdir", False)):
-            search_dir = os.path.dirname(meta["path"])
+            search_dir = os.path.join(str(meta.get("path", "")))
             nfo_files = glob.glob(os.path.join(search_dir, "*.nfo"))
 
         if nfo_files:
@@ -420,7 +420,7 @@ class UNIT3D:
 
     async def upload(self, meta: dict[str, Any], _: Any) -> bool:
         data = await self.get_data(meta)
-        torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent"
+        torrent_file_path = meta.get("upload_torrent_path", f"{meta['base_dir']}/tmp/{meta['uuid']}/BASE.torrent")
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
         files = {"torrent": ("torrent.torrent", torrent_bytes, "application/x-bittorrent")}
