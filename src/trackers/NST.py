@@ -379,7 +379,10 @@ class NST(FrenchTrackerMixin, UNIT3D):
             if cooldown > 0:
                 await asyncio.sleep(cooldown)
             await TorrentCreator.create_torrent(meta, str(meta["path"]), torrent_create, tracker_url=tracker_url)
-            meta["upload_torrent_path"] = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
+            upload_torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
+            if not os.path.exists(upload_torrent_path):
+                raise FileNotFoundError(f"Failed to create {upload_torrent_path}")
+            meta["upload_torrent_path"] = upload_torrent_path
             return nfo_files[0]
         else:
             return ""
