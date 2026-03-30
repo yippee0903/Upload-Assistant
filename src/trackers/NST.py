@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import os
 import re
 from typing import Any
@@ -7,6 +8,7 @@ import aiofiles
 
 from src.console import console
 from src.rehostimages import RehostImagesManager
+from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.UNIT3D import UNIT3D
@@ -25,6 +27,9 @@ class NST(FrenchTrackerMixin, UNIT3D):
         "animation-serie": "4",
         "documentaire": "5",
     }
+
+    # Overloading TORRENT_EXTENSIONS to add .nfo
+    _TORRENT_EXTENSIONS: frozenset[str] = frozenset((".mkv", ".mp4", ".ts", ".m2ts", ".vob", ".avi", ".nfo"))
 
     def __init__(self, config):
         super().__init__(config, tracker_name="NST")
@@ -336,6 +341,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
         return "\n".join(parts)
 
+    # Get mediainfo to complete description
     async def _get_mediainfo_text(self, meta: dict[str, Any]) -> str:
         """Read MediaInfo text from temp files."""
         base = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
@@ -352,6 +358,34 @@ class NST(FrenchTrackerMixin, UNIT3D):
                 async with aiofiles.open(bd_path, encoding="utf-8") as f:
                     return await f.read()
         return str(meta.get("mediainfo_text") or "")
+
+    # Get or generate NFO/Mediainfo to send for upload
+    async def _recreated_torrent_if_nfo(self, meta: dict[str, Any]) -> str:
+        """Re-create a .torrent if NFO is provided.
+
+        NST requires the NFO if provided by releaser.
+        We generated a .torrent with it if needed
+        and send the NFO file through NST API.
+        """
+        nfo_files = self._get_nfo_files(meta)
+        if nfo_files:
+            tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+            tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
+            torrent_create = f"[{self.tracker}]"
+            try:
+                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
+            except (ValueError, TypeError):
+                cooldown = 0
+            if cooldown > 0:
+                await asyncio.sleep(cooldown)
+            await TorrentCreator.create_torrent(meta, str(meta["path"]), torrent_create, tracker_url=tracker_url)
+            upload_torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
+            if not os.path.exists(upload_torrent_path):
+                raise FileNotFoundError(f"Failed to create {upload_torrent_path}")
+            meta["upload_torrent_path"] = upload_torrent_path
+            return nfo_files[0]
+        else:
+            return ""
 
     async def get_torrent_id(self, response_data: dict[str, Any]) -> str:
         """Extract UUID torrent ID from NST's upload-assistant download URL.
@@ -373,13 +407,14 @@ class NST(FrenchTrackerMixin, UNIT3D):
         # Map VF variant from the release name to NST's fixed "langue"
         # choices: Français, VF, VFF, VFI, VFQ.
         data["langue"] = self._detect_nst_langue(meta)
+        await self._recreated_torrent_if_nfo(meta)
         return data
 
     @staticmethod
     def _detect_nst_langue(meta: dict[str, Any]) -> str:
         """Derive the NST langue tag from the release name / audio metadata.
 
-        NST accepts: Français, VFF, VFI, VFQ, VOSTFR, VFSTFR, Multi, Muet, Anglais.
+        NST accepts: VF, VOF, VFF, VFI, VFQ, VOSTFR, VFSTFR, Multi, Muet.
         """
         name = meta.get("uuid") or meta.get("name", "")  # More precise on UUID, UA remove Multi etc when forging name
         upper = name.upper().replace(" ", ".")
@@ -387,9 +422,16 @@ class NST(FrenchTrackerMixin, UNIT3D):
 
         # New regex
         if re.search(r"(?:^|\.)(TRUEFRENCH|FRENCH|VOF|VOB|VOQ|VF\S*)(?:\.|$)", upper):
-            langs.append("Français")
+            langs.append("VF")
 
-        if re.search(r"(?:^|\.)(VF\d|VFF)(?:\.|$)", upper):
+        if re.search(r"(?:^|\.)(VOF)(?:\.|$)", upper):
+            langs.append("VOF")
+
+        if re.search(r"(?:^|\.)(VF2)(?:\.|$)", upper):
+            langs.append("VFF")
+            langs.append("VFQ")
+
+        if re.search(r"(?:^|\.)(VFF)(?:\.|$)", upper):
             langs.append("VFF")
 
         if re.search(r"(?:^|\.)(VFI)(?:\.|$)", upper):
@@ -419,7 +461,6 @@ class NST(FrenchTrackerMixin, UNIT3D):
         fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr"}
         qc_aliases = {"fr-ca", "qc", "fr-qc"}
         be_aliases = {"fr-be", "be"}
-        en_aliases = {"english", "eng", "en", "en-us", "en-gb"}
 
         detected_langs = set()
 
@@ -430,9 +471,8 @@ class NST(FrenchTrackerMixin, UNIT3D):
             elif lang in be_aliases:
                 detected_langs.add("VFF")  # franco-belge -> VFF
             elif lang in fr_aliases:
-                detected_langs.add("Français")
-            elif lang in en_aliases:
-                detected_langs.add("Anglais")
+                detected_langs.add("VF")
+                detected_langs.add("VFF")
             else:
                 detected_langs.add("Autre")
 
@@ -441,12 +481,12 @@ class NST(FrenchTrackerMixin, UNIT3D):
             langs.append("Multi")
 
         # Add tag if not already inside
-        for tag in ("VFF", "VFQ", "Français", "Anglais"):
+        for tag in ("VFF", "VFQ", "VF", "VFF"):
             if tag in detected_langs and tag not in langs:
                 langs.append(tag)
 
         # If Anglais without Multi, return empty
-        if "Anglais" in detected_langs and "Multi" not in langs:
+        if "Autre" in detected_langs and "Multi" not in langs:
             return ""
 
         return ", ".join(langs)
