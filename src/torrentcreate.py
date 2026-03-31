@@ -224,7 +224,6 @@ class TorrentCreator:
                         console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
-                        meta["mkbrr"] = False
                     elif not meta.get("tv_pack", False):
                         folder_name = os.path.basename(str(path))
                         include = [f"{folder_name}/{os.path.basename(f)}" for f in meta["filelist"]]
@@ -235,7 +234,6 @@ class TorrentCreator:
                         console.print("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
-                        meta["mkbrr"] = False
                     elif meta.get("is_disc", False):
                         include = []
                         exclude = []
@@ -309,6 +307,9 @@ class TorrentCreator:
                         if not meta.get("is_disc", False):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), meta["filelist"])
                             cmd.extend(["--exclude", exclude_str])
+                            if include:
+                                include_str = ",".join(sorted(include))
+                                cmd.extend(["--include", include_str])
 
                         cmd.extend(["-o", output_path])
                         if meta["debug"]:
