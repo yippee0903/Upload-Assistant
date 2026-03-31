@@ -25,6 +25,9 @@ class LUME(UNIT3D):
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups: list[str] = []
 
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        return {}
+
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
@@ -49,10 +52,6 @@ class LUME(UNIT3D):
                     return False
             else:
                 return False
-
-        if meta["is_disc"] not in ["BDMV", "DVD"] and meta.get("container", "") != "mkv":
-            console.print(f"[bold red]{self.tracker} only allows MKV containers for non-disc uploads.[/bold red]")
-            return False
 
         if not meta["valid_mi_settings"]:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")

@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# import discord
 import os
 import platform
 import re
@@ -149,7 +150,7 @@ class TL:
 
         # Signature
         desc_parts.append(
-            f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/Audionut/Upload-Assistant">{meta.get("ua_signature", "")}</a></div>"""
+            f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/yippee0903/Upload-Assistant">{meta.get("ua_signature", "")}</a></div>"""
         )
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
@@ -160,7 +161,7 @@ class TL:
         description = re.sub(r"\[c\](.*?)\[/c\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)
         description = re.sub(r"\[hr\]", "---", description, flags=re.IGNORECASE)
         description = re.sub(r'\[img=[\d"x]+\]', "[img]", description, flags=re.IGNORECASE)
-        description = description.replace("[*] ", "• ").replace("[*]", "• ").replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "")
+        description = description.replace("[*] ", "• ").replace("[*]", "• ")
         description = bbcode.remove_list(description)
         description = bbcode.convert_comparison_to_centered(description, 1000)
         description = bbcode.remove_spoiler(description)
@@ -310,6 +311,25 @@ class TL:
 
         return results
 
+    async def get_anilist_id(self, meta: Meta) -> Optional[int]:
+        url = "https://graphql.anilist.co"
+        query = """
+        query ($idMal: Int) {
+        Media(idMal: $idMal, type: ANIME) {
+            id
+        }
+        }
+        """
+        variables = {"idMal": meta.get("mal_id")}
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, json={"query": query, "variables": variables})
+            response.raise_for_status()
+            data = cast(dict[str, Any], response.json())
+
+            media = cast(dict[str, Any], data.get("data", {})).get("Media")
+            return media["id"] if media else None
+
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
@@ -335,8 +355,10 @@ class TL:
             "nonscene": "on" if not meta.get("scene") else "off",
         }
 
-        if meta.get("anime", False) and meta.get("anilist_id", 0) != 0:
-            data.update({"animeid": f"https://anilist.co/anime/{meta.get('anilist_id')}"})
+        if meta.get("anime", False):
+            anilist_id = await self.get_anilist_id(meta)
+            if anilist_id:
+                data.update({"animeid": f"https://anilist.co/anime/{anilist_id}"})
 
         else:
             if meta.get("category") == "MOVIE":

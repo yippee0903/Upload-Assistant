@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# import discord
 from typing import Any, Optional
 
 import cli_ui
@@ -74,48 +75,55 @@ class A4K(UNIT3D):
         # check bitrate requirements for A4K uploads, but only if it's not a disc upload since discs can have variable bitrates and A4K doesn't specify bitrate requirements for disc uploads
         if not meta["is_disc"] and meta["type"] in ["ENCODE", "WEBDL"]:
             tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
-            for track in tracks:
-                if track.get("@type") == "Video":
-                    encoding_settings = track.get("Encoded_Library_Settings", {})
-
-                    if encoding_settings:
-                        bit_rate = track.get("BitRate")
-                        if bit_rate:
-                            try:
-                                bit_rate_num = int(bit_rate)
-                            except (ValueError, TypeError):
-                                bit_rate_num = None
-
-                            if bit_rate_num is not None:
-                                bit_rate_kbps = bit_rate_num / 1000
-                                if meta.get("category") == "MOVIE" and bit_rate_kbps < 15000:
-                                    if not meta.get("unattended", False):
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
-                                    return False
-                                elif meta.get("category") == "TV" and bit_rate_kbps < 10000:
-                                    if not meta.get("unattended", False):
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
-                                    return False
-                            else:
-                                if not self._confirm_unknown_bitrate(meta):
-                                    return False
-                        else:
-                            if not self._confirm_unknown_bitrate(meta):
-                                return False
-                    else:
-                        if not self._confirm_unknown_bitrate(meta):
-                            return False
-                    break  # Only check the first video track
-            else:
-                # No video track found in mediainfo
-                if not self._confirm_unknown_bitrate(meta):
+            video_track = next((t for t in tracks if t.get("@type") == "Video"), None)
+            if video_track is None:
+                console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                        return False
+                else:
                     return False
+            else:
+                bit_rate = video_track.get("BitRate")
+                if bit_rate:
+                    try:
+                        bit_rate_num = int(bit_rate)
+                    except (ValueError, TypeError):
+                        bit_rate_num = None
+
+                    if bit_rate_num is not None:
+                        bit_rate_kbps = bit_rate_num / 1000
+                        if meta.get("category") == "MOVIE" and bit_rate_kbps < 15000:
+                            if not meta.get("unattended", False):
+                                console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
+                            return False
+                        elif meta.get("category") == "TV" and bit_rate_kbps < 10000:
+                            if not meta.get("unattended", False):
+                                console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
+                            return False
+                    else:
+                        console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                        console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                        if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                return False
+                        else:
+                            return False
+                else:
+                    console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                    console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                    if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+                        if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                            return False
+                    else:
+                        return False
 
         return should_continue
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
-            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+            "modq": await self.get_flag(meta, "modq"),
         }
 
         return data
@@ -139,13 +147,6 @@ class A4K(UNIT3D):
         )
         return
 
-    def _confirm_unknown_bitrate(self, meta: dict[str, Any]) -> bool:
-        if not meta.get("unattended", False) or (meta.get("unattended", False) and meta.get("unattended_confirm", False)):
-            console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-            console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
-            return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
-        return False
-
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         a4k_name: str = meta["name"]
         if not meta.get("language_checked", False):
@@ -155,5 +156,4 @@ class A4K(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             if meta.get("is_disc") != "BDMV":
                 a4k_name = a4k_name.replace(meta["resolution"], f"{foreign_lang} {meta['resolution']}", 1)
-        console.print(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
         return {"name": a4k_name}

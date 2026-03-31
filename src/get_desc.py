@@ -301,7 +301,7 @@ class DescriptionBuilder:
         if meta.get("is_disc") == "BDMV":
             return ""
 
-        if self.tracker_config.get("full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)) or meta.get("is_disc"):
+        if self.tracker_config.get("full_mediainfo", self.config["DEFAULT"].get("full_mediainfo", False)):
             mi_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
@@ -564,6 +564,11 @@ class DescriptionBuilder:
         # Description from file/pastebin link
         desc_parts.append(await self.get_user_description(meta))
 
+        # Personal note (with -n/--note args)
+        personal_note = meta.get("personal_note")
+        if personal_note:
+            desc_parts.append(f"[b]Note:[/b] {personal_note}")
+
         # Menu Screenshots
         desc_parts.append(await self.menu_section(meta))
 
@@ -579,7 +584,7 @@ class DescriptionBuilder:
 
         # UA Signature
         if not signature:
-            signature = f"[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
+            signature = f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]"
             if self.tracker == "HUNO":
                 signature = signature.replace("[size=4]", "[size=8]")
         desc_parts.append(signature)

@@ -248,7 +248,7 @@ class OE(UNIT3D):
                     await descfile.write(f"[url={web_url}][img=350]{raw_url}[/img][/url]")
                 await descfile.write("[/center]")
 
-            await descfile.write(f"\n[right][url=https://github.com/Audionut/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]")
+            await descfile.write(f"\n[right][url=https://github.com/yippee0903/Upload-Assistant][size=4]{meta['ua_signature']}[/size][/url][/right]")
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             desc = await f.read()
@@ -325,7 +325,7 @@ class OE(UNIT3D):
             "DISC": "19",
             "REMUX": "20",
             "WEBDL": "21",
-        }.get(type, "16")
+        }.get(type, "0")
         if type == "WEBRIP":
             if video_codec == "HEVC":
                 # x265 Encode

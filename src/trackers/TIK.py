@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# import discord
 import os
 import re
 import urllib.request
@@ -43,7 +44,7 @@ class TIK(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+            "modq": await self.get_flag(meta, "modq"),
         }
 
         return data

@@ -165,6 +165,8 @@ class BLU(UNIT3D):
 
         if webdv:
             blu_name = blu_name.replace("HYBRID ", "", 1)
+            blu_name = blu_name.replace("Custom ", "", 1)
+            blu_name = blu_name.replace("CUSTOM ", "", 1)
 
         if meta["tracker_status"][self.tracker].get("other", False):
             blu_name = blu_name.replace(f"{meta['resolution']}", f"{meta['resolution']} DVP5/DVP8", 1)
@@ -173,7 +175,7 @@ class BLU(UNIT3D):
 
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data = {
-            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+            "modq": await self.get_flag(meta, "modq"),
         }
 
         return data

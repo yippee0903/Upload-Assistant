@@ -379,7 +379,7 @@ config = {
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
-            # Send uploads to Aura4K modq for staff approval
+            # Send uploads to Aither modq for staff approval
             "modq": False,
             # Tracker-specific options like skip_dupe_asking and inject_delay can be set here to override global defaults
             # "skip_dupe_asking": True,

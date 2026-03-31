@@ -382,7 +382,7 @@ class BJS:
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
         # Signature
-        desc_parts.append(f"[align=center][url=https://github.com/Audionut/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]")
+        desc_parts.append(f"[align=center][url=https://github.com/yippee0903/Upload-Assistant]Upload realizado via {meta['ua_name']} {meta['current_version']}[/url][/align]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
@@ -955,18 +955,20 @@ class BJS:
 
         return results
 
-    def get_runtime(self, meta: dict[str, Any]) -> tuple[int, int]:
+    def get_runtime(self, meta: dict[str, Any]) -> dict[str, int]:
         """
         Extracts runtime from metadata and converts total minutes into hours and minutes.
         """
-        raw_duration = meta.get("video_duration", 0)
+        raw_runtime = meta.get("runtime", 0)
+
         try:
-            total_minutes = max(0, int(float(raw_duration or 0)))
+            total_minutes = max(0, int(raw_runtime))
         except (ValueError, TypeError):
             total_minutes = 0
+
         hours, minutes = divmod(total_minutes, 60)
 
-        return hours, minutes
+        return {"hours": hours, "minutes": minutes}
 
     def get_release_date(self) -> str:
         raw_date_string = self.main_tmdb_data.get("first_air_date") or self.main_tmdb_data.get("release_date")
@@ -1191,7 +1193,6 @@ class BJS:
         category = meta["category"]
         original_title, brazilian_title = self.get_title(meta)
         width, height = self.get_resolution(meta)
-        hours, minutes = self.get_runtime(meta)
 
         data: dict[str, Any] = {}
 
@@ -1202,8 +1203,8 @@ class BJS:
                 "auth": BJS.secret_token,
                 "codecaudio": self.get_audio_codec(meta),
                 "codecvideo": self.get_video_codec(meta),
-                "duracaoHR": str(hours),
-                "duracaoMIN": str(minutes),
+                "duracaoHR": self.get_runtime(meta).get("hours"),
+                "duracaoMIN": self.get_runtime(meta).get("minutes"),
                 "duracaotipo": "selectbox",
                 "fichatecnica": await self.build_description(meta),
                 "formato": self.get_container(meta),

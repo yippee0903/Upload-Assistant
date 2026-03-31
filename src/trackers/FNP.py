@@ -20,6 +20,9 @@ class FNP(UNIT3D):
         self.banned_groups = ["4K4U", "BiTOR", "d3g", "FGT", "FRDS", "FTUApps", "GalaxyRG", "LAMA", "MeGusta", "NeoNoir", "PSA", "RARBG", "YAWNiX", "YTS", "YIFY", "x0r"]
         pass
 
+    async def get_additional_files(self, meta: dict[str, Any]) -> dict[str, tuple[str, bytes, str]]:
+        return {}
+
     async def get_resolution_id(
         self,
         meta: dict[str, Any],
@@ -41,7 +44,7 @@ class FNP(UNIT3D):
 
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data = {
-            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+            "modq": await self.get_flag(meta, "modq"),
         }
 
         return data

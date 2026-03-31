@@ -185,7 +185,7 @@ class HDT:
             desc_parts.append("[center]\n" + screenshots_block + "[/center]")
 
         # Signature
-        desc_parts.append(f"[right][url=https://github.com/Audionut/Upload-Assistant][size=1]{meta.get('ua_signature', '')}[/size][/url][/right]")
+        desc_parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=1]{meta.get('ua_signature', '')}[/size][/url][/right]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
@@ -217,7 +217,7 @@ class HDT:
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Optional[str]]]:
         if str(meta.get("resolution", "")) not in ["2160p", "1080p", "1080i", "720p"]:
-            console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
+            console.print("[bold red]Resolution must be at least 720p resolution for HDT.")
             meta["skipping"] = f"{self.tracker}"
             return []
 

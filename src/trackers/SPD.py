@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# import discord
 import base64
 import glob
 import os
@@ -45,9 +46,9 @@ class SPD:
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
-        subtitle_langs = cast(list[Any], meta.get("subtitle_languages") or [])
-        audio_langs = cast(list[Any], meta.get("audio_languages") or [])
-        langs = [str(lang).lower() for lang in (subtitle_langs + audio_langs)]
+        subtitle_langs = cast(list[Any], meta.get("subtitle_languages", []))
+        audio_langs = cast(list[Any], meta.get("audio_languages", []))
+        langs = [str(lang).lower() for lang in subtitle_langs + audio_langs]
         romanian = "romanian" in langs
 
         origin_countries = cast(list[Any], meta.get("origin_country", []))
@@ -224,16 +225,13 @@ class SPD:
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
         # Signature
-        desc_parts.append(f"[url=https://github.com/Audionut/Upload-Assistant]{meta.get('ua_signature', '')}[/url]")
+        desc_parts.append(f"[url=https://github.com/yippee0903/Upload-Assistant]{meta.get('ua_signature', '')}[/url]")
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
         bbcode = BBCODE()
         description = bbcode.remove_img_resize(description)
         description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
-        description = description.replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "").replace("[*]", "• ")
-        description = bbcode.remove_spoiler(description)
-        description = bbcode.remove_list(description)
         description = bbcode.remove_extra_lines(description)
 
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
