@@ -1295,6 +1295,20 @@ class C411(FrenchTrackerMixin):
         if nfo_files:
             return nfo_files[0]
         else:
+            return await self._get_or_generate_mediainfo_as_nfo(meta)
+
+    async def _get_or_generate_mediainfo_as_nfo(self, meta: Meta) -> Union[str, None]:
+        """Sub-function of _get_or_generate_nfo to get MI file if exists
+        Else, generate a NFO
+        """
+        mi_dir = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
+        mi_clean = os.path.join(mi_dir, "MEDIAINFO_CLEANPATH.txt")
+        mi = os.path.join(mi_dir, "MEDIAINFO.txt")
+        if os.path.isfile(mi_clean):
+            return mi_clean
+        elif os.path.isfile(mi):
+            return mi
+        else:
             nfo_gen = SceneNfoGenerator(self.config)
             return await nfo_gen.generate_nfo(meta, self.tracker)
 
@@ -1438,6 +1452,56 @@ class C411(FrenchTrackerMixin):
                                 meta["tracker_status"][self.tracker]["status_message"] = "data error: C411 JSON decode error"
                                 return False
 
+                        # ── If NFO from release rejected with 400 error, resend with mediainfo concatenated with NFO ──
+                        # (eg : Error 400 : Le titre contient MULTI mais le NFO ne déclare qu'une seule piste audio)
+                        elif response.status_code == 400 and nfo_files:
+                            error_detail: Any = ""
+                            api_message: str = ""
+                            try:
+                                error_detail = response.json()
+                                if isinstance(error_detail, dict):
+                                    api_message = error_detail.get("message", "")
+                            except Exception:
+                                error_detail = response.text[:500]
+                            if api_message:
+                                meta["tracker_status"][self.tracker]["status_message"] = f"C411: {api_message}"
+                            else:
+                                meta["tracker_status"][self.tracker]["status_message"] = {
+                                    "error": f"HTTP {response.status_code}",
+                                    "detail": error_detail,
+                                }
+                            if attempt < max_retries - 1:
+                                console.print(f"[yellow]C411: HTTP {response.status_code}, retrying in {retry_delay}s… (attempt {attempt + 1}/{max_retries})[/yellow]")
+                                if api_message:
+                                    console.print(f"[yellow]C411 — {api_message}[/yellow]")
+                                else:
+                                    console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
+                                    if error_detail:
+                                        console.print(f"[dim]{error_detail}[/dim]")
+                                console.print("[yellow]C411 - API can't use NFO to validate torrent - Will add mediainfo to our NFO and send it again")
+                                await asyncio.sleep(retry_delay)
+                                mi_append_to_nfo = await self._get_or_generate_mediainfo_as_nfo(meta)
+                                if mi_append_to_nfo:
+                                    async with aiofiles.open(mi_append_to_nfo, "rb") as f:
+                                        nfo_bytes = nfo_bytes + b"\n" + await f.read()
+                                    # Patch "Complete name" in NFO to match the tracker release name
+                                    if title and nfo_bytes:
+                                        try:
+                                            nfo_text = nfo_bytes.decode("utf-8", errors="replace")
+                                            nfo_text = self._patch_mi_filename(nfo_text, title)
+                                            nfo_bytes = nfo_text.encode("utf-8")
+                                        except Exception:
+                                            pass
+                                    files["nfo"] = ("release.nfo", nfo_bytes, "application/octet-stream")
+                                continue
+                            else:
+                                if api_message:
+                                    console.print(f"[yellow]C411 — {api_message}[/yellow]")
+                                else:
+                                    console.print(f"[red]C411 upload failed: HTTP {response.status_code}[/red]")
+                                    if error_detail:
+                                        console.print(f"[dim]{error_detail}[/dim]")
+                                return False
                         # ── Non-retriable HTTP errors ──
                         elif response.status_code in (400, 401, 403, 404, 422):
                             error_detail: Any = ""
