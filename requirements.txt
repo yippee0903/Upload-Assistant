@@ -25,7 +25,7 @@ Jinja2==3.1.6
 keyring==25.7.0
 langcodes==3.5.1
 language-data==1.4.0
-lxml==6.0.3
+lxml==6.0.4
 nest_asyncio==1.6.0
 packaging<27,>=26
 Pillow==12.2.0
