@@ -645,15 +645,13 @@ class TORR9(FrenchTrackerMixin):
         Data fields:   title, description, nfo (plain-text), category, subcategory
         Optional data: tags, is_exclusive, is_anonymous
         """
-        common = COMMON(config=self.config)
-
         # If an NFO file exists alongside the release, include it in the torrent
         # so qBittorrent seeds the whole folder (mkv + nfo) and hardlinks accordingly.
         nfo_files = self._get_nfo_files(meta)
         if nfo_files:
             await self._recreated_torrent_if_nfo(meta, self.common, self.config, self.tracker, self.source_flag)
         else:
-            await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+            await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         # ── Build release name ──
         name_result = await self.get_name(meta)
@@ -843,7 +841,7 @@ class TORR9(FrenchTrackerMixin):
                 console.print(f"  Anonymous:   {anon}")
                 console.print(f"  Description: {description[:500]}…")
                 meta["tracker_status"][self.tracker]["status_message"] = "Debug mode, not uploaded."
-                await common.create_torrent_for_upload(
+                await self.common.create_torrent_for_upload(
                     meta,
                     f"{self.tracker}_DEBUG",
                     f"{self.tracker}_DEBUG",
