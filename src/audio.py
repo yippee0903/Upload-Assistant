@@ -25,7 +25,7 @@ TrackDict = dict[str, Any]
 
 
 # Compiled pattern shared with src/trackers/FRENCH.py — keep in sync.
-AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\s*:|\(AD\)", re.IGNORECASE)
+AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\b", re.IGNORECASE)
 
 # ── Shared codec mapping tables ──────────────────────────────────────
 # Used by both _get_audio_v2 (global meta['audio']) and
