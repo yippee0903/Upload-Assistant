@@ -25,7 +25,10 @@ TrackDict = dict[str, Any]
 
 
 # Compiled pattern shared with src/trackers/FRENCH.py — keep in sync.
-AD_TRACK_RE = re.compile(r"\baudio[\s_-]?description\b|\b[a-z]{2}\s+AD\b|\bAD\b", re.IGNORECASE)
+# `AD` must be uppercase to avoid matching the lowercase word "ad"
+# (e.g. Italian "ad alta voce", English noun "Ad"). Only the
+# "audio description" alternative is case-insensitive.
+AD_TRACK_RE = re.compile(r"(?i:\baudio[\s_-]?description\b)|\bAD\b")
 
 # ── Shared codec mapping tables ──────────────────────────────────────
 # Used by both _get_audio_v2 (global meta['audio']) and
