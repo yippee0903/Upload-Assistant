@@ -56,7 +56,6 @@ def _meta_base(**overrides: Any) -> dict[str, Any]:
         "imdb_id": 1234567,
         "tmdb": 42,
         "debug": False,
-        "mediainfo": {},
         "mediainfo": {
            'media': {
               'track': []
