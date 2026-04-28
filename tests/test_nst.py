@@ -57,10 +57,25 @@ def _meta_base(**overrides: Any) -> dict[str, Any]:
         "tmdb": 42,
         "debug": False,
         "mediainfo": {},
+        "mediainfo": {
+           'media': {
+              'track': []
+           }
+        }
     }
     m.update(overrides)
     return m
 
+def _audio_track(lang: str = 'fr', **kw: Any) -> dict[str, Any]:
+    t: dict[str, Any] = {'@type': 'Audio', 'Language': lang}
+    t.update(kw)
+    return t
+
+def _mi(audio: list[dict[str, Any]], subs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    tracks = list(audio)
+    if subs:
+        tracks.extend(subs)
+    return {'media': {'track': tracks}}
 
 # ═══════════════════════════════════════════════════════════════
 #   URL Configuration
@@ -307,47 +322,54 @@ class TestGetAdditionalData:
 
 class TestDetectNstLangue:
     def test_vff_in_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VFF.1080p.WEB.H264-GRP"}) == "VF, VFF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFF.1080p.WEB.H264-GRP"}) == "VFF"
 
     def test_vfq_in_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VFQ.1080p.WEB.H264-GRP"}) == "VF, VFQ"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFQ.1080p.WEB.H264-GRP"}) == "VFQ"
 
     def test_vfi_in_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VFI.1080p.WEB.H264-GRP"}) == "VF, VFI"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VFI.1080p.WEB.H264-GRP"}) == "VFI"
 
     def test_vf2_maps_to_vf(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VF2.1080p.WEB.H264-GRP"}) == "VF, VFF, VFQ"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF2.1080p.WEB.H264-GRP"}) == "VFQ, VFF"
 
     def test_plain_vf_maps_to_vf(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VF.1080p.WEB.H264-GRP"}) == "VF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF.1080p.WEB.H264-GRP"}) == "VFF"
 
     def test_vf3_maps_to_vf(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VF3.1080p.WEB.H264-GRP"}) == "VF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VF3.1080p.WEB.H264-GRP"}) == "VFF"
 
     def test_vf_at_end_of_name(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.1080p.WEB.VF"}) == "VF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.1080p.WEB.VF"}) == "VFF"
 
     def test_vof_maps_to_francais(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.VOF.1080p.WEB.H264-GRP"}) == "VF, VOF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.VOF.1080p.WEB.H264-GRP"}) == "VOF"
 
     def test_french_tag_maps_to_francais(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.FRENCH.1080p.WEB-GRP"}) == "VF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.FRENCH.1080p.WEB-GRP"}) == "VOF"
 
     def test_truefrench_maps_to_francais(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.TRUEFRENCH.1080p.WEB-GRP"}) == "VF"
+        assert NST._detect_nst_langue({"name": "Movie.2026.TRUEFRENCH.1080p.WEB-GRP"}) == "VOF"
 
     def test_multi_vff_returns_vff(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFF.HDR.2160p.WEB.H265-GRP"}) == "VF, VFF, Multi"
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFF.HDR.2160p.WEB.H265-GRP"}) == "VFF, VO"
 
     def test_multi_vfq_returns_vfq(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFQ.1080p.WEB-GRP"}) == "VF, VFQ, Multi"
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.VFQ.1080p.WEB-GRP"}) == "VFQ, VO"
 
     def test_multi_plain_returns_vf(self):
-        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}) == "Multi"
+        assert NST._detect_nst_langue({"name": "Movie.2026.MULTi.HDR.2160p.WEB.H265-GRP"}) == "VO"
 
     def test_francais_from_audio_languages(self):
         meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["French"]}
-        assert NST._detect_nst_langue(meta) == "VFF, VF"
+        assert NST._detect_nst_langue(meta) == "VFF"
+
+    def test_french_ad_from_mediainfo(self):
+        meta = {
+            "name": "Movie.2026.1080p.WEB-GRP",
+            "mediainfo":_mi([_audio_track('fr-fr', Title="French (AD)")],
+                            [_audio_track('fr-fr', Title="French")]) }
+        assert NST._detect_nst_langue(meta) == "VFF"
 
     def test_empty_when_no_data(self):
         assert NST._detect_nst_langue({}) == ""
@@ -355,7 +377,7 @@ class TestDetectNstLangue:
     def test_region_coded_french_is_francais(self):
         """Region-coded French tracks (fr-fr, fr-ca) map to VF."""
         meta = {"name": "Movie.2026.1080p.WEB-GRP", "audio_languages": ["fr-fr", "fr-ca"]}
-        assert NST._detect_nst_langue(meta) == "VFF, VFQ, VF"
+        assert NST._detect_nst_langue(meta) == "VFF, VFQ"
 
     def test_english_only_returns_empty(self):
         """English-only releases get empty langue (NST requires VF)."""
@@ -366,7 +388,7 @@ class TestDetectNstLangue:
         tracker = NST(_config())
         meta = {"name": "Movie.2026.MULTi.VFF.HDR.2160p.WEB.H265-GRP"}
         result = asyncio.run(tracker.get_additional_data(meta))
-        assert result["langue"] == "VF, VFF, Multi"
+        assert result["langue"] == "VFF, VO"
 
 
 # ═══════════════════════════════════════════════════════════════

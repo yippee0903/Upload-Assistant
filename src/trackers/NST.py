@@ -380,7 +380,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
     async def get_additional_data(self, meta: dict[str, Any]) -> dict[str, Any]:
         data: dict[str, Any] = {"description_format": "bbcode"}
         # Map VF variant from the release name to NST's fixed "langue"
-        # choices: Français, VF, VFF, VFI, VFQ.
+        # choices: VOF, VFF, VFI, VFQ, VO.
         data["langue"] = self._detect_nst_langue(meta)
         return data
 
@@ -388,22 +388,21 @@ class NST(FrenchTrackerMixin, UNIT3D):
     def _detect_nst_langue(meta: dict[str, Any]) -> str:
         """Derive the NST langue tag from the release name / audio metadata.
 
-        NST accepts: VF, VOF, VFF, VFI, VFQ, VOSTFR, VFSTFR, Multi, Muet.
+        NST accepts: VOF, VFF, VFI, VFQ, VO.
         """
         name = meta.get("uuid") or meta.get("name", "")  # More precise on UUID, UA remove Multi etc when forging name
         upper = name.upper().replace(" ", ".")
         langs = []
 
         # New regex
-        if re.search(r"(?:^|\.)(TRUEFRENCH|FRENCH|VOF|VOB|VOQ|VF\S*)(?:\.|$)", upper):
-            langs.append("VF")
-
-        if re.search(r"(?:^|\.)(VOF)(?:\.|$)", upper):
+        if re.search(r"(?:^|\.)(TRUEFRENCH|FRENCH|VOF|VOB|VOQ)(?:\.|$)", upper):
             langs.append("VOF")
 
         if re.search(r"(?:^|\.)(VF2)(?:\.|$)", upper):
-            langs.append("VFF")
             langs.append("VFQ")
+
+        if re.search(r"(?:^|\.)(VF\d*)(?:\.|$)", upper):
+            langs.append("VFF")
 
         if re.search(r"(?:^|\.)(VFF)(?:\.|$)", upper):
             langs.append("VFF")
@@ -414,22 +413,13 @@ class NST(FrenchTrackerMixin, UNIT3D):
         if re.search(r"(?:^|\.)(VFQ)(?:\.|$)", upper):
             langs.append("VFQ")
 
-        if re.search(r"(?:^|\.)(VOSTFR)(?:\.|$)", upper):
-            langs.append("VOSTFR")
-
-        if re.search(r"(?:^|\.)(VFSTFR)(?:\.|$)", upper):
-            langs.append("VFSTFR")
-
         if re.search(r"(?:^|\.)(MULTI)(?:\.|$)", upper):
-            langs.append("Multi")
-
-        if re.search(r"(?:^|\.)(MUTE|MUET)(?:\.|$)", upper):
-            langs.append("Muet")
+            langs.append("VO")
 
         # Fallback: inspect Mediainfo
 
         tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
-        langs_mi = [t for t in tracks if t.get("@type") == "Audio"]
+        langs_mi = [t for t in tracks if t.get("@type") == "Audio" and not FrenchTrackerMixin._is_audio_desc_track(t)]
         langs_all = langs_mi if langs_mi else (meta.get("audio_languages") or [])  # Ultimate fallback
 
         fr_aliases = {"french", "français", "francais", "fra", "fre", "fr", "fr-fr"}
@@ -445,22 +435,21 @@ class NST(FrenchTrackerMixin, UNIT3D):
             elif lang in be_aliases:
                 detected_langs.add("VFF")  # franco-belge -> VFF
             elif lang in fr_aliases:
-                detected_langs.add("VF")
                 detected_langs.add("VFF")
             else:
                 detected_langs.add("Autre")
 
-        # MULTI if more than one audiotrack
-        if len(langs_all) > 1 and "Multi" not in langs and "Autre" in detected_langs:
-            langs.append("Multi")
+        # VO if more than one audiotrack (MULTi implies the original language)
+        if len(langs_all) > 1 and "VO" not in langs and "Autre" in detected_langs:
+            langs.append("VO")
 
         # Add tag if not already inside
-        for tag in ("VFF", "VFQ", "VF", "VFF"):
+        for tag in ("VFF", "VFQ"):
             if tag in detected_langs and tag not in langs:
                 langs.append(tag)
 
-        # If Anglais without Multi, return empty
-        if "Autre" in detected_langs and "Multi" not in langs:
+        # If not French without VO, return empty
+        if "Autre" in detected_langs and "VO" not in langs:
             return ""
 
         return ", ".join(langs)
