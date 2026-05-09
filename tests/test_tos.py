@@ -197,7 +197,7 @@ class TestTosSpecificDupes:
         result = t._check_tos_specific_dupes([d], [d], _season_meta())
         assert result.count(d) == 1
 
-    def test_internal_groups_banned_list_contains_all_expected(self):
+    def test_internal_groups_all_present_in_class_attribute(self):
         t = self._t()
         expected = ["zYz", "ZKB", "UwU", "Tsundere-Raws", "THESYNDiCATE", "SUPPLY",
                     "SowHD", "SHADOW", "RiFiFi", "REBiRTH", "pERsO", "Oldschool",
@@ -205,4 +205,6 @@ class TestTosSpecificDupes:
                     "CHiLL", "BTT", "BraD", "A3L"]
         for grp in expected:
             assert grp in t._TOS_INTERNAL_GROUPS, f"{grp} missing from _TOS_INTERNAL_GROUPS"
-            assert grp in t.banned_groups, f"{grp} missing from banned_groups"
+            # Internal groups must NOT be in banned_groups (which blocks uploading *from* those
+            # groups). They only block dupes via _check_tos_specific_dupes.
+            assert grp not in t.banned_groups, f"{grp} should not be in banned_groups"

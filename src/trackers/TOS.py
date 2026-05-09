@@ -32,37 +32,17 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             "BARBiE",
             "Freek911",
             "k0RE",
-            # TOS internal teams — do not upload releases from these groups
-            "zYz",
-            "ZKB",
-            "UwU",
-            "Tsundere-Raws",
-            "THESYNDiCATE",
-            "SUPPLY",
-            "SowHD",
-            "SHADOW",
-            "RiFiFi",
-            "REBiRTH",
-            "pERsO",
-            "Oldschool",
-            "NoNE",
-            "NLX5",
-            "NEO",
-            "HeavyWeight",
-            "DELiRiUS",
-            "COLL3CTiF",
-            "CHiLL",
-            "BTT",
-            "BraD",
-            "A3L",
         ]
         pass
 
     # TOS accepts NOTAG
     notag_label: str = "NOTAG"
 
-    # TOS internal production groups — existing releases from these groups always block
-    # uploads, regardless of French-language filtering.
+    # TOS internal production groups — if an existing torrent on TOS comes from
+    # one of these groups, it always blocks the upload (dupe), regardless of the
+    # French-language filter.  Note: these are NOT in banned_groups; we are not
+    # blocking uploads *by* these groups, only blocking uploads when a *dupe*
+    # from these groups already exists on the tracker.
     _TOS_INTERNAL_GROUPS: frozenset[str] = frozenset(
         [
             "zYz",
