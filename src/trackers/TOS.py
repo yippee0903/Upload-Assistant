@@ -32,11 +32,63 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             "BARBiE",
             "Freek911",
             "k0RE",
+            # TOS internal teams — do not upload releases from these groups
+            "zYz",
+            "ZKB",
+            "UwU",
+            "Tsundere-Raws",
+            "THESYNDiCATE",
+            "SUPPLY",
+            "SowHD",
+            "SHADOW",
+            "RiFiFi",
+            "REBiRTH",
+            "pERsO",
+            "Oldschool",
+            "NoNE",
+            "NLX5",
+            "NEO",
+            "HeavyWeight",
+            "DELiRiUS",
+            "COLL3CTiF",
+            "CHiLL",
+            "BTT",
+            "BraD",
+            "A3L",
         ]
         pass
 
     # TOS accepts NOTAG
     notag_label: str = "NOTAG"
+
+    # TOS internal production groups — existing releases from these groups always block
+    # uploads, regardless of French-language filtering.
+    _TOS_INTERNAL_GROUPS: frozenset[str] = frozenset(
+        [
+            "zYz",
+            "ZKB",
+            "UwU",
+            "Tsundere-Raws",
+            "THESYNDiCATE",
+            "SUPPLY",
+            "SowHD",
+            "SHADOW",
+            "RiFiFi",
+            "REBiRTH",
+            "pERsO",
+            "Oldschool",
+            "NoNE",
+            "NLX5",
+            "NEO",
+            "HeavyWeight",
+            "DELiRiUS",
+            "COLL3CTiF",
+            "CHiLL",
+            "BTT",
+            "BraD",
+            "A3L",
+        ]
+    )
 
     async def get_category_id(
         self,
@@ -77,6 +129,53 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 "HDTV": "6",
             }.get(meta["type"], "0")
         return {"type_id": type_id}
+
+    def _check_tos_specific_dupes(
+        self,
+        all_dupes: list[dict[str, Any]],
+        filtered: list[dict[str, Any]],
+        meta: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Re-inject dupes that must always block a TOS upload.
+
+        Two extra rules on top of the French-language filter:
+
+        1. **Internal team releases** — if an existing torrent's group tag
+           belongs to :attr:`_TOS_INTERNAL_GROUPS`, it is kept in the dupe
+           list even if the French-language filter would have dropped it.
+
+        2. **iNTEGRALE for season packs** — when uploading a season pack and
+           an existing torrent's name contains "integrale" (case-insensitive),
+           that torrent is kept as a blocking dupe regardless of language.
+        """
+        import re as _re
+
+        is_season_pack = meta.get("tv_pack", False) and meta.get("category") == "TV"
+        result = list(filtered)
+
+        for dupe in all_dupes:
+            if not isinstance(dupe, dict):
+                continue
+            name = dupe.get("name", "")
+
+            # Extract group tag: the part after the last '-' in the release name
+            # (dots are used as word separators in TOS names, e.g. "Title.2025-GRP")
+            m = _re.search(r"-([A-Za-z0-9]+)\s*$", name.replace(".", " "))
+            group = m.group(1) if m else ""
+
+            is_internal = group in self._TOS_INTERNAL_GROUPS
+            is_integrale = is_season_pack and "integrale" in name.lower()
+
+            if is_internal or is_integrale:
+                if dupe not in result:
+                    result.append(dupe)
+                flags: list[str] = dupe.setdefault("flags", [])
+                if is_internal and "tos_internal" not in flags:
+                    flags.append("tos_internal")
+                if is_integrale and "integrale_supersede" not in flags:
+                    flags.append("integrale_supersede")
+
+        return result
 
     async def search_existing(self, meta: dict[str, Any], _: Any = None) -> list[dict[str, Any]]:
         """Search for existing torrents on TOS.
@@ -178,7 +277,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         except Exception as e:
             console.print(f"[bold red]{self.tracker}: Error searching for existing torrents — {e}[/bold red]")
 
-        return await self._check_french_lang_dupes(dupes, meta)
+        filtered = await self._check_french_lang_dupes(dupes, meta)
+        return self._check_tos_specific_dupes(dupes, filtered, meta)
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         """Build TOS-compliant dot-separated release name.
@@ -330,6 +430,21 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         return {"name": name}
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
+        import os
+        import re as _re
+
+        # TOS rejects filenames with special characters (e.g. parentheses).
+        # Check both the release folder name and all individual files.
+        _SAFE_FILENAME = _re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
+        path_basename = os.path.basename(str(meta.get("path", "")))
+        candidate_names = [path_basename] + [os.path.basename(f) for f in meta.get("filelist", [])]
+        problem_files = [n for n in candidate_names if n and not _SAFE_FILENAME.match(n)]
+        if problem_files:
+            console.print(f"[bold red]{self.tracker}: Release contains filename(s) with special characters not accepted by TOS.[/bold red]")
+            for f in problem_files[:3]:
+                console.print(f"[bold yellow]  → {f}[/bold yellow]")
+            return False
+
         # Check language requirements: must be French audio OR original audio with French subtitles
         french_languages = ["french", "fre", "fra", "fr", "français", "francais"]
         if not await self.common.check_language_requirements(
