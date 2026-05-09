@@ -605,7 +605,11 @@ class Prep:
         except (ValueError, TypeError):
             meta["tvmaze_id"] = 0
 
-        if not meta.get("category"):
+        manual_cat = meta.get("manual_category")
+        if manual_cat:
+            # --category flag always wins over auto-detected / previously set category
+            meta["category"] = manual_cat.upper() if isinstance(manual_cat, str) else meta.get("category", "").upper()
+        elif not meta.get("category"):
             meta["category"] = await self.get_cat(video, meta)
         else:
             meta["category"] = meta["category"].upper()
