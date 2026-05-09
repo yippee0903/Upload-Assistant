@@ -245,21 +245,138 @@ class IHD(UNIT3D):
         return False
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        ihd_name = str(meta.get("name", ""))
-        resolution = str(meta.get("resolution", ""))
+        """Build an IHD-compliant release name following the naming guide.
 
+        Full Disc / REMUX:
+          Name Year S##E## REPACK Resolution Edition Region 3D SOURCE [REMUX] HDR VCodec Dub Audio-Tag
+
+        Encode / WEB-DL / WEBRip / HDTV:
+          Name Year S##E## REPACK Resolution Edition 3D SOURCE TYPE Dub Audio Hi10P HDR VCodec-Tag
+
+        ``meta["audio"]`` already contains ``ACodec Channels [Object]`` (e.g. "DD+ 5.1 Atmos").
+        ``meta["video_encode"]`` may carry a "Hi10P" prefix (e.g. "Hi10P x264");
+        it is split so Hi10P can be placed after Audio for encode/web types.
+        """
+        title = str(meta.get("title", ""))
+        alt_title = str(meta.get("alt_title", "") or "")
+        if alt_title and alt_title != title:
+            title = f"{title} AKA {alt_title}"
+
+        year = str(meta.get("year", ""))
+        if int(meta.get("manual_year") or 0) > 0:
+            year = str(meta.get("manual_year"))
+
+        resolution = str(meta.get("resolution", ""))
+        if resolution == "OTHER":
+            resolution = ""
+
+        season = str(meta.get("season") or "")
+        episode = str(meta.get("episode") or "")
+        if meta.get("category") == "TV":
+            if not meta.get("search_year", ""):
+                year = ""
+            if meta.get("manual_date"):
+                season = ""
+                episode = ""
+        if meta.get("no_season", False):
+            season = ""
+        if meta.get("no_year", False):
+            year = ""
+        if meta.get("tv_pack", False):
+            episode = ""
+
+        repack = str(meta.get("repack", ""))
+        three_d = str(meta.get("3D", ""))
+        hdr = str(meta.get("hdr", ""))
+        uhd = str(meta.get("uhd", ""))
+        hybrid = str(meta.get("webdv", "")) if meta.get("webdv") else ""
+        source = str(meta.get("source", ""))
+        service = str(meta.get("service", ""))
+        audio = str(meta.get("audio", ""))
+        tag = str(meta.get("tag") or "-NOGROUP")
+        release_type = str(meta.get("type", ""))
+
+        edition = str(meta.get("edition", "") or "")
+        if "hybrid" in edition.upper():
+            edition = re.sub(r"\bHybrid\b", "", edition, flags=re.IGNORECASE).strip()
+
+        region = ""
+        video_codec = ""
+        video_encode_raw = str(meta.get("video_encode", "") or "")
+        hi10p = ""
+
+        if meta.get("is_disc") == "BDMV":
+            video_codec = str(meta.get("video_codec", ""))
+            region = str(meta.get("region", "") or "")
+        elif meta.get("is_disc") == "DVD":
+            region = str(meta.get("region", "") or "")
+        elif release_type in ("DISC", "REMUX"):
+            # Non-disc remux: codec is stored in video_codec (e.g. HEVC, AVC)
+            video_codec = str(meta.get("video_codec", "") or meta.get("video_encode", "") or "")
+        else:
+            # Separate "Hi10P" prefix from the actual codec token for encode/web types
+            parts = video_encode_raw.split()
+            if parts and parts[0] == "Hi10P":
+                hi10p = "Hi10P"
+                video_codec = " ".join(parts[1:])
+            else:
+                video_codec = video_encode_raw
+
+        # Dub tag derived from audio languages (Dual-Audio / Dubbed / Multi)
+        dub = ""
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         audio_languages_value = meta.get("audio_languages", [])
-        audio_languages: list[str] = []
         if isinstance(audio_languages_value, list):
             audio_languages_list = cast(list[Any], audio_languages_value)
-            audio_languages = [str(item) for item in audio_languages_list]
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = str(audio_languages[0]).upper()
-            ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
+            al = [str(x) for x in audio_languages_list if str(x).strip()]
+            unique_al = list(dict.fromkeys(al))
+            if len(unique_al) > 1:
+                dub = "Multi"
+            elif "Dual-Audio" in audio:
+                dub = "Dual-Audio"
+            elif "Dubbed" in audio:
+                dub = "Dubbed"
 
-        return {"name": ihd_name}
+        # Strip dub tokens from audio string to avoid duplication
+        audio_clean = re.sub(r"\b(Dual-Audio|Dubbed|Multi)\b", "", audio).strip()
+        audio_clean = re.sub(r"\s{2,}", " ", audio_clean)
+
+        if release_type in ("DISC", "REMUX"):
+            type_token = "REMUX" if release_type == "REMUX" else ""
+            name = (
+                f"{title} {year} {season}{episode} {repack} {resolution} {uhd} "
+                f"{edition} {region} {three_d} {source} {type_token} "
+                f"{hybrid} {hdr} {video_codec} {dub} {audio_clean}"
+            )
+        else:
+            if release_type == "WEBDL":  # nosec B105
+                type_token = "WEB-DL"  # nosec B105
+                source_token = service
+            elif release_type == "WEBRIP":  # nosec B105
+                type_token = "WEBRip"  # nosec B105
+                source_token = service
+            elif release_type == "HDTV":  # nosec B105
+                type_token = "HDTV"  # nosec B105
+                source_token = ""  # nosec B105
+            elif release_type == "ENCODE":  # nosec B105
+                type_token = ""  # nosec B105
+                source_token = source
+            elif release_type == "DVDRIP":  # nosec B105
+                type_token = "DVDRip"  # nosec B105
+                source_token = source
+            else:
+                type_token = release_type
+                source_token = source
+
+            name = (
+                f"{title} {year} {season}{episode} {repack} {resolution} {uhd} "
+                f"{edition} {three_d} {source_token} {type_token} "
+                f"{dub} {audio_clean} {hi10p} {hybrid} {hdr} {video_codec}"
+            )
+
+        name = " ".join(name.split()) + tag
+        return {"name": name}
 
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         return {}
