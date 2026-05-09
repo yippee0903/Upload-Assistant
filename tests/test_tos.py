@@ -94,6 +94,14 @@ class TestTosSpecialCharRejection:
         result = _run(t.get_additional_checks(meta))
         assert result is True
 
+    def test_trailing_slash_path_is_still_checked(self):
+        """A path ending with '/' must not bypass the basename check."""
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/My.Movie.(2025).1080p.WEB-DL-GRP/")
+        result = _run(t.get_additional_checks(meta))
+        assert result is False
+
     def test_path_with_parentheses_is_rejected(self):
         t = TOS(_config())
         self._patch_lang_ok(t)
@@ -149,6 +157,14 @@ class TestTosSpecificDupes:
 
     def _t(self) -> TOS:
         return TOS(_config())
+
+    def test_internal_group_with_hyphen_in_tag_is_detected(self):
+        """Group tags containing hyphens (e.g. Tsundere-Raws) must be detected."""
+        t = self._t()
+        d = _dupe("Serie.S01.2025.MULTI.VFF.1080p.WEB-Tsundere-Raws")
+        result = t._check_tos_specific_dupes([d], [], _season_meta())
+        assert d in result
+        assert "tos_internal" in d.get("flags", [])
 
     def test_internal_group_dupe_is_kept_even_if_filtered(self):
         t = self._t()

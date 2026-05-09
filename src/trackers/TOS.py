@@ -140,7 +140,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
 
             # Extract group tag: the part after the last '-' in the release name
             # (dots are used as word separators in TOS names, e.g. "Title.2025-GRP")
-            m = _re.search(r"-([A-Za-z0-9]+)\s*$", name.replace(".", " "))
+            m = _re.search(r"-([A-Za-z0-9][A-Za-z0-9\-]*)\s*$", name.replace(".", " "))
             group = m.group(1) if m else ""
 
             is_internal = group in self._TOS_INTERNAL_GROUPS
@@ -416,7 +416,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         # TOS rejects filenames with special characters (e.g. parentheses).
         # Check both the release folder name and all individual files.
         _SAFE_FILENAME = _re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
-        path_basename = os.path.basename(str(meta.get("path", "")))
+        path_basename = os.path.basename(os.path.normpath(str(meta.get("path", ""))))
         candidate_names = [path_basename] + [os.path.basename(f) for f in meta.get("filelist", [])]
         problem_files = [n for n in candidate_names if n and not _SAFE_FILENAME.match(n)]
         if problem_files:
