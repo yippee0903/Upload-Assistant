@@ -180,19 +180,29 @@ class DP(UNIT3D):
                     # Find the language that is NOT the original language of the content.
                     # meta["original_language"] is an ISO 639-1/2 code (e.g. "en", "de").
                     orig_code = str(meta.get("original_language") or "").strip().lower()
-                    orig_name = ""
+                    orig_canonical = ""
                     if orig_code:
                         try:
                             lang_obj = pycountry.languages.get(alpha_2=orig_code) or pycountry.languages.get(alpha_3=orig_code)
                             if lang_obj:
-                                orig_name = lang_obj.name.lower()
+                                orig_canonical = getattr(lang_obj, "alpha_2", None) or getattr(lang_obj, "alpha_3", None) or getattr(lang_obj, "bibliographic", None) or ""
                         except Exception:
-                            orig_name = orig_code
-                    # Pick the language whose name does NOT match the original
-                    non_orig = next(
-                        (lang for lang in unique_languages if orig_name and orig_name not in lang.lower()),
-                        unique_languages[1],  # fallback: second track
-                    )
+                            orig_canonical = orig_code
+                    # Pick the language whose canonical ISO code differs from the original's.
+                    # Fall back to unique_languages[1] if lookup fails or nothing differs.
+                    non_orig = unique_languages[1]
+                    if orig_canonical:
+                        for lang in unique_languages:
+                            try:
+                                obj = pycountry.languages.lookup(lang)
+                                code = getattr(obj, "alpha_2", None) or getattr(obj, "alpha_3", None) or getattr(obj, "bibliographic", None) or ""
+                                if code != orig_canonical:
+                                    non_orig = lang
+                                    break
+                            except LookupError:
+                                if lang.lower() != orig_canonical:
+                                    non_orig = lang
+                                    break
                     display = non_orig[0].upper() + non_orig[1:]
                     languages_result = f"{display} MULTi"
             else:
