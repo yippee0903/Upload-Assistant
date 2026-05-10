@@ -2,6 +2,7 @@
 from typing import Any, cast
 
 import cli_ui
+import pycountry
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
@@ -160,22 +161,63 @@ class DP(UNIT3D):
         audio_languages = meta.get("audio_languages")
         if isinstance(audio_languages, list):
             audio_languages_list = cast(list[Any], audio_languages)
-            normalized_languages = {str(lang).strip() for lang in audio_languages_list if str(lang).strip()}
+            # Deduplicate while preserving track order (first = primary)
+            seen: set[str] = set()
+            unique_languages: list[str] = []
+            for lang in audio_languages_list:
+                s = str(lang).strip()
+                if s and s not in seen:
+                    seen.add(s)
+                    unique_languages.append(s)
 
-            if len(normalized_languages) > 2:
+            if len(unique_languages) > 2:
                 languages_result = "MULTi"
-            elif len(normalized_languages) > 1:
-                languages_result = "Dual-Audio"
+            elif len(unique_languages) == 2:
+                has_french = await languages_manager.has_french_language(unique_languages)
+                if has_french:
+                    languages_result = "French MULTi"
+                else:
+                    # Find the language that is NOT the original language of the content.
+                    # meta["original_language"] is an ISO 639-1/2 code (e.g. "en", "de").
+                    orig_code = str(meta.get("original_language") or "").strip().lower()
+                    orig_canonical = ""
+                    if orig_code:
+                        try:
+                            lang_obj = pycountry.languages.get(alpha_2=orig_code) or pycountry.languages.get(alpha_3=orig_code)
+                            if lang_obj:
+                                orig_canonical = getattr(lang_obj, "alpha_2", None) or getattr(lang_obj, "alpha_3", None) or getattr(lang_obj, "bibliographic", None) or ""
+                        except Exception:
+                            orig_canonical = orig_code
+                    # Pick the language whose canonical ISO code differs from the original's.
+                    # Fall back to unique_languages[1] if lookup fails or nothing differs.
+                    non_orig = unique_languages[1]
+                    if orig_canonical:
+                        for lang in unique_languages:
+                            try:
+                                obj = pycountry.languages.lookup(lang)
+                                code = getattr(obj, "alpha_2", None) or getattr(obj, "alpha_3", None) or getattr(obj, "bibliographic", None) or ""
+                                if code != orig_canonical:
+                                    non_orig = lang
+                                    break
+                            except LookupError:
+                                if lang.lower() != orig_canonical:
+                                    non_orig = lang
+                                    break
+                    display = non_orig[0].upper() + non_orig[1:]
+                    languages_result = f"{display} MULTi"
             else:
-                languages_result = str(next(iter(normalized_languages), "SKIPPED"))
+                languages_result = str(next(iter(unique_languages), "SKIPPED"))
 
-        return f"{languages_result}"
+        return languages_result
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         dp_name = str(meta.get("name", ""))
 
         audio = await self.get_audio(meta)
-        if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
-            dp_name = dp_name.replace("Dual-Audio", audio)
+        if audio and audio != "SKIPPED":
+            if "Dual-Audio" in dp_name:
+                dp_name = dp_name.replace("Dual-Audio", audio)
+            elif "MULTi" in dp_name and audio not in dp_name:
+                dp_name = dp_name.replace("MULTi", audio)
 
         return {"name": dp_name}
