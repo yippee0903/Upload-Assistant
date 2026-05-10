@@ -297,7 +297,7 @@ class IHD(UNIT3D):
         release_type = str(meta.get("type", ""))
 
         edition = str(meta.get("edition", "") or "")
-        if "hybrid" in edition.upper():
+        if "HYBRID" in edition.upper():
             edition = re.sub(r"\bHybrid\b", "", edition, flags=re.IGNORECASE).strip()
 
         region = ""

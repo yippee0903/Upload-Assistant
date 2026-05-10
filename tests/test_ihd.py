@@ -221,3 +221,15 @@ class TestIhdGetNameTag:
         t = _ihd(meta)
         result = _run(t.get_name(meta))
         assert result["name"].endswith("-NOGROUP")
+
+
+class TestIhdGetNameEdition:
+    def test_edition_hybrid_removed(self):
+        """'Hybrid' in edition must be stripped from the name; unrelated tokens survive."""
+        meta = _base_meta(edition="Hybrid", video_encode="Hi10P x264")
+        t = _ihd(meta)
+        result = _run(t.get_name(meta))
+        name = result["name"]
+        assert "Hybrid" not in name
+        assert "Hi10P" in name
+        assert "  " not in name  # no double whitespace from the removal
