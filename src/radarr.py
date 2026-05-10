@@ -114,7 +114,9 @@ class RadarrManager:
                     movie = item
                     break
             else:
-                return None
+                # No exact file path match (expected for lookup-by-term results).
+                # Fall back to the top result, which Radarr orders by relevance.
+                movie = items[0]
         else:
             movie = items[0]
 
