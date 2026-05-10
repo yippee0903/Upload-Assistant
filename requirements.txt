@@ -35,7 +35,7 @@ pyimgbox==1.0.7
 pymediainfo==7.0.1
 pyotp==2.9.0
 qbittorrent-api==2026.5.1
-regex==2026.4.4
+regex==2026.5.9
 requests==2.33.1
 rich==15.0.0
 setuptools==82.0.1
