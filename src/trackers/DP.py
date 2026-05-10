@@ -207,7 +207,7 @@ class DP(UNIT3D):
         if audio and audio != "SKIPPED":
             if "Dual-Audio" in dp_name:
                 dp_name = dp_name.replace("Dual-Audio", audio)
-            elif "MULTi" in dp_name and audio == "French MULTi":
+            elif "MULTi" in dp_name and audio not in dp_name:
                 dp_name = dp_name.replace("MULTi", audio)
 
         return {"name": dp_name}

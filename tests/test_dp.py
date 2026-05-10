@@ -176,8 +176,8 @@ class TestDpGetName:
         result = _run(dp.get_name(meta))
         assert "French MULTi" in result["name"]
 
-    def test_multi_not_replaced_when_non_french_two_langs(self) -> None:
-        """When audio resolves to e.g. 'Swedish MULTi', existing 'MULTi' is NOT replaced."""
+    def test_multi_replaced_by_swedish_multi(self) -> None:
+        """When audio resolves to 'Swedish MULTi', existing 'MULTi' is replaced."""
         dp = _dp()
         meta = _base_meta(
             name="Movie 2024 MULTi 1080p WEB-DL H.264-TAG",
@@ -185,8 +185,8 @@ class TestDpGetName:
             original_language="en",
         )
         result = _run(dp.get_name(meta))
-        # Only "French MULTi" triggers MULTi replacement
-        assert result["name"] == meta["name"]
+        assert "Swedish MULTi" in result["name"]
+        assert result["name"].count("MULTi") == 1
 
     def test_name_unchanged_when_single_language(self) -> None:
         """Single language: no Dual-Audio or MULTi token, name is returned as-is."""
@@ -195,3 +195,16 @@ class TestDpGetName:
         meta = _base_meta(name=original_name, audio_languages=["English"])
         result = _run(dp.get_name(meta))
         assert result["name"] == original_name
+
+    def test_no_duplicate_when_name_already_has_french_multi(self) -> None:
+        """Regression: if name already contains 'French MULTi', do not insert it again."""
+        dp = _dp()
+        original_name = "Movie 2024 French MULTi 1080p WEB-DL H.264-TAG"
+        meta = _base_meta(
+            name=original_name,
+            audio_languages=["English", "French"],
+            original_language="en",
+        )
+        result = _run(dp.get_name(meta))
+        assert result["name"] == original_name
+        assert result["name"].count("French MULTi") == 1
