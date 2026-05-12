@@ -285,3 +285,105 @@ class TestGetName:
         name = self._run(meta)
         assert 'VFF' in name, f"VFF missing after VFI normalisation: {name}"
         assert 'VFI' not in name, f"VFI should not appear: {name}"
+
+    # ── Season pack / COMPLETE ───────────────────────────────
+
+    def test_tv_season_pack_includes_complete(self):
+        """A full season pack (tv_pack=1, no episode) must include COMPLETE."""
+        meta = _meta_base(
+            category='TV',
+            type='WEBDL',
+            source='WEB',
+            video_encode='H265',
+            video_codec='',
+            service='NF',
+            season='S01',
+            episode='',
+            tv_pack=1,
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'S01.COMPLETE' in name, f"COMPLETE missing for season pack: {name}"
+
+    def test_tv_episode_does_not_include_complete(self):
+        """A single episode must NOT include COMPLETE."""
+        meta = _meta_base(
+            category='TV',
+            type='WEBDL',
+            source='WEB',
+            video_encode='H265',
+            video_codec='',
+            service='NF',
+            season='S01',
+            episode='E03',
+            tv_pack=0,
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'COMPLETE' not in name, f"COMPLETE must not appear for single episode: {name}"
+        assert 'S01E03' in name, f"S01E03 missing: {name}"
+
+    def test_tv_season_pack_remux_includes_complete(self):
+        """Season pack also works for REMUX type."""
+        meta = _meta_base(
+            category='TV',
+            type='REMUX',
+            source='BluRay',
+            season='S02',
+            episode='',
+            tv_pack=1,
+        )
+        name = self._run(meta)
+        assert 'S02.COMPLETE' in name, f"COMPLETE missing for REMUX season pack: {name}"
+
+    # ── H.264 / H.265 conversion ─────────────────────────────
+
+    def test_webdl_h265_dot_converted(self):
+        """H.265 from prep (with dot) must be normalised to H265 in the name."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            video_encode='H.265',
+            video_codec='',
+            service='NF',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'H265' in name, f"H265 (no dot) expected: {name}"
+        assert 'H.265' not in name, f"H.265 with dot must not appear: {name}"
+
+    def test_webdl_h264_dot_converted(self):
+        """H.264 from prep (with dot) must be normalised to H264 in the name."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            video_encode='H.264',
+            video_codec='',
+            service='NF',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert 'H264' in name, f"H264 (no dot) expected: {name}"
+        assert 'H.264' not in name, f"H.264 with dot must not appear: {name}"
+
+    def test_encode_x265_unchanged(self):
+        """x265 for encodes must pass through unchanged."""
+        meta = _meta_base(
+            type='ENCODE',
+            source='BluRay',
+            video_encode='x265',
+            video_codec='',
+            webdv='',
+            hdr='',
+            uhd='',
+        )
+        name = self._run(meta)
+        assert name.endswith('x265-SGF'), f"x265 not at end: {name}"
