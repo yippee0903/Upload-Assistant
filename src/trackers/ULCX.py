@@ -129,6 +129,20 @@ class ULCX(UNIT3D):
             console.print(f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
             return False
 
+        if meta.get("has_disallowed_compat_track", False):
+            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
+                console.print(
+                    f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}.\n"
+                    "[yellow]Only TrueHD audio tracks may include a compatibility track.[/yellow][/bold red]"
+                )
+                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    pass
+                else:
+                    return False
+            else:
+                console.print(f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}. Skipping.[/bold red]")
+                return False
+
         if meta.get("discs_missing_certificate", []):
             console.print(f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
             return False

@@ -555,6 +555,9 @@ async def _get_audio_v2(
                         # Check all non-English, non-original languages for bloat
                         bloated_check(meta, non_eng_non_orig_languages, is_eng_original_with_non_eng=is_eng_original)
 
+                    # Check for disallowed compatibility tracks (same language, different codec)
+                    check_disallowed_compat_tracks(meta, audio_tracks)
+
                     if ((eng and (orig or non_en_non_commentary)) or (orig and non_en_non_commentary)) and len(audio_tracks) > 1 and not meta.get("no_dual", False):
                         dual = "Dual-Audio"
                         meta["dual_audio"] = True
@@ -635,6 +638,63 @@ def codec_info_from_track(track: Mapping[str, Any]) -> str:
 
     audio = f"{codec or ''} {fs or ''} {chan or ''}{extra or ''}"
     return " ".join(audio.split())
+
+
+def check_disallowed_compat_tracks(meta: Meta, audio_tracks: list[TrackDict]) -> None:
+    """Detect audio tracks that function as compatibility tracks but are not allowed.
+
+    A "compatibility track" here is defined by codec pattern: when multiple audio tracks
+    share the same language and one uses a simplified codec (AAC, AC-3) alongside a
+    higher-quality codec, the simpler one is acting as a compatibility/downmix track.
+
+    The only allowed case: TrueHD (Format "MLP FBA") as main track + AC-3 compat track.
+    Every other same-language multi-track combination involving a compat codec is flagged.
+
+    Sets meta["has_disallowed_compat_track"] = True if such tracks are found.
+    """
+    # Codecs typically used as compatibility/downmix tracks
+    COMPAT_FORMATS = {"AAC", "AC-3"}
+    # TrueHD format as reported by MediaInfo
+    TRUEHD_FORMAT = "MLP FBA"
+
+    # Group tracks by language
+    lang_groups: dict[str, list[TrackDict]] = {}
+    for track in audio_tracks:
+        lang = str(track.get("Language") or "").lower().strip()
+        if not lang:
+            lang = "__unknown__"
+        lang_groups.setdefault(lang, []).append(track)
+
+    for lang, tracks_in_lang in lang_groups.items():
+        if len(tracks_in_lang) < 2:
+            continue
+
+        formats = [str(t.get("Format") or "").strip() for t in tracks_in_lang]
+
+        has_compat_codec = any(f in COMPAT_FORMATS for f in formats)
+        if not has_compat_codec:
+            continue
+
+        non_compat_formats = [f for f in formats if f not in COMPAT_FORMATS]
+        compat_formats_present = [f for f in formats if f in COMPAT_FORMATS]
+
+        if not non_compat_formats:
+            # All tracks use compat codecs - unusual, not a compat track issue
+            continue
+
+        # Allowed: TrueHD (MLP FBA) as main track + AC-3 as the only compat codec
+        all_main_are_truehd = all(f == TRUEHD_FORMAT for f in non_compat_formats)
+        all_compat_are_ac3 = all(f == "AC-3" for f in compat_formats_present)
+
+        if all_main_are_truehd and all_compat_are_ac3:
+            # Standard TrueHD + AC-3 compatibility track - allowed
+            continue
+
+        # Disallowed compatibility track detected
+        meta["has_disallowed_compat_track"] = True
+        if meta.get("debug"):
+            console.print(f"[yellow]DEBUG: Disallowed compat track detected for language '{lang}': formats = {formats}[/yellow]")
+        return  # No need to check further languages
 
 
 def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng_original_with_non_eng: bool = False) -> None:
