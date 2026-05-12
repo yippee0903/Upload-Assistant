@@ -95,7 +95,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             if "integrale" in dupe.get("name", "").lower():
                 if dupe not in result:
                     result.append(dupe)
-                flags: list[str] = dupe.setdefault("flags", [])
+                stored = next(x for x in result if x == dupe)
+                flags: list[str] = stored.setdefault("flags", [])
                 if "integrale_supersede" not in flags:
                     flags.append("integrale_supersede")
         return result

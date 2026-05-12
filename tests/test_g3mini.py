@@ -486,3 +486,20 @@ class TestG3MiniIntegraleDupes:
         dupe = {'name': 'Show.iNTEGRALE.VFF.1080p-GRP', 'flags': []}
         result = g._check_g3mini_specific_dupes([dupe], [dupe], meta)
         assert result.count(dupe) == 1
+
+    def test_flag_set_on_stored_object_not_local_copy(self):
+        """integrale_supersede must be set on the object stored in result,
+        even when filtered holds an equal-but-distinct copy of the dupe."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        dupe_in_all = {'name': 'Show.iNTEGRALE.VFF.1080p-GRP', 'flags': []}
+        # filtered holds a shallow copy — equal by value, distinct by identity
+        dupe_in_filtered = dict(dupe_in_all)
+        dupe_in_filtered['flags'] = []
+        assert dupe_in_filtered is not dupe_in_all  # distinct objects
+        result = g._check_g3mini_specific_dupes([dupe_in_all], [dupe_in_filtered], meta)
+        # The entry in result must carry the flag
+        assert len(result) == 1
+        assert 'integrale_supersede' in result[0]['flags'], (
+            "flag must be on the stored result object, not only on the local dupe"
+        )
