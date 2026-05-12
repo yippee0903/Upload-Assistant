@@ -72,6 +72,42 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             resolved_id = resolution_id.get(meta_resolution, "10")
             return {"resolution_id": resolved_id}
 
+    def _check_g3mini_specific_dupes(
+        self,
+        all_dupes: list[dict[str, Any]],
+        filtered: list[dict[str, Any]],
+        meta: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Re-inject integrale dupes that must always block a G3MINI season-pack upload.
+
+        When uploading a season pack and an existing torrent's name contains
+        "integrale" (case-insensitive), that torrent is kept as a blocking dupe
+        regardless of language (same rule as TOS).
+        """
+        is_season_pack = meta.get("tv_pack", False) and meta.get("category") == "TV"
+        if not is_season_pack:
+            return filtered
+
+        result = list(filtered)
+        for dupe in all_dupes:
+            if not isinstance(dupe, dict):
+                continue
+            if "integrale" in dupe.get("name", "").lower():
+                if dupe not in result:
+                    result.append(dupe)
+                flags: list[str] = dupe.setdefault("flags", [])
+                if "integrale_supersede" not in flags:
+                    flags.append("integrale_supersede")
+        return result
+
+    async def search_existing(self, meta: dict[str, Any], _: Any = None) -> list[dict[str, Any]]:
+        """Wrap the standard French dupe check with G3MINI's integrale rule."""
+        from src.trackers.UNIT3D import UNIT3D as _UNIT3D
+
+        raw_dupes = await _UNIT3D.search_existing(self, meta, _)
+        filtered = await self._check_french_lang_dupes(raw_dupes, meta)
+        return self._check_g3mini_specific_dupes(raw_dupes, filtered, meta)
+
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         french_languages = ["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca"]
         # check or ignore audio req config
@@ -196,7 +232,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                 if meta["is_disc"] == "BDMV":
                     name = f"{title} {year} {season_ep} {three_d} {edition} {repack} {language} {resolution} {region} {uhd} {source} {hybrid} {hdr} {audio} {video_codec}"
                 if meta["is_disc"] == "DVD":
-                    name = f"{title} {year} {season_ep}{three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
+                    name = f"{title} {year} {season_ep} {three_d} {repack} {edition} {region} {source} {dvd_size} {audio}"
                 elif meta["is_disc"] == "HDDVD":
                     name = f"{title} {year} {season_ep} {three_d} {edition} {repack} {language} {resolution} {source} {audio} {video_codec}"
             elif type == "REMUX" and source in ("BluRay", "HDDVD"):  # BluRay Remux

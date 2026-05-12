@@ -387,3 +387,102 @@ class TestGetName:
         )
         name = self._run(meta)
         assert name.endswith('x265-SGF'), f"x265 not at end: {name}"
+
+    def test_tv_dvd_disc_3d_has_space_before(self):
+        """DVD DISC season_ep and three_d must be separated (not concatenated as S01E013D)."""
+        meta = _meta_base(
+            category='TV',
+            type='DISC',
+            is_disc='DVD',
+            source='DVD',
+            season='S01',
+            episode='E01',
+            **{'3D': '3D'},
+            video_encode='',
+            video_codec='',
+            webdv='',
+            hdr='',
+            uhd='',
+            region='',
+            dvd_size='',
+        )
+        name = self._run(meta)
+        # Before the fix, season_ep+three_d were concatenated → 'S01E013D'
+        assert 'S01E013D' not in name, f"season_ep and 3D must not be merged: {name}"
+        assert 'S01E01' in name, f"season_ep missing: {name}"
+        assert '3D' in name, f"3D tag missing: {name}"
+
+
+# ─── Integrale dupe check ─────────────────────────────────────
+
+
+class TestG3MiniIntegraleDupes:
+    """_check_g3mini_specific_dupes must re-inject integrale releases
+    when uploading a season pack."""
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def test_integrale_dupe_blocks_season_pack(self):
+        """An existing 'integrale' release must be kept in the dupe list."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        all_dupes = [{'name': 'Breaking.Bad.iNTEGRALE.MULTi.1080p.BluRay.x264-GRP', 'flags': []}]
+        filtered: list = []  # French filter dropped it
+        result = g._check_g3mini_specific_dupes(all_dupes, filtered, meta)
+        assert len(result) == 1
+        assert 'integrale_supersede' in result[0]['flags']
+
+    def test_integrale_flag_not_duplicated(self):
+        """integrale_supersede should appear only once even if called twice."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        dupe = {'name': 'Show.iNTEGRALE.VFF.1080p-GRP', 'flags': ['integrale_supersede']}
+        result = g._check_g3mini_specific_dupes([dupe], [dupe], meta)
+        assert result[0]['flags'].count('integrale_supersede') == 1
+
+    def test_non_integrale_dupe_not_reinjected(self):
+        """A regular (non-integrale) dupe dropped by the French filter stays dropped."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        all_dupes = [{'name': 'Breaking.Bad.S01.MULTi.1080p.BluRay.x264-GRP', 'flags': []}]
+        filtered: list = []
+        result = g._check_g3mini_specific_dupes(all_dupes, filtered, meta)
+        assert result == []
+
+    def test_non_season_pack_ignored(self):
+        """Integrale check must not fire for single-episode uploads."""
+        g = self._g3()
+        meta = {'tv_pack': 0, 'category': 'TV'}
+        all_dupes = [{'name': 'Show.iNTEGRALE.VFF.1080p-GRP', 'flags': []}]
+        filtered: list = []
+        result = g._check_g3mini_specific_dupes(all_dupes, filtered, meta)
+        assert result == []
+
+    def test_movie_upload_ignored(self):
+        """Integrale check must not fire for movie uploads."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'MOVIE'}
+        all_dupes = [{'name': 'Movie.iNTEGRALE.1080p-GRP', 'flags': []}]
+        filtered: list = []
+        result = g._check_g3mini_specific_dupes(all_dupes, filtered, meta)
+        assert result == []
+
+    def test_integrale_case_insensitive(self):
+        """Match must be case-insensitive: INTEGRALE, integrale, iNTEGRALE."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        for name_variant in ['Show.INTEGRALE.VFF-GRP', 'Show.integrale.VFF-GRP', 'Show.iNTEGRALE.VFF-GRP']:
+            dupe = {'name': name_variant, 'flags': []}
+            result = g._check_g3mini_specific_dupes([dupe], [], meta)
+            assert len(result) == 1, f"integrale not matched in: {name_variant}"
+            assert 'integrale_supersede' in result[0]['flags']
+
+    def test_already_in_filtered_not_duplicated(self):
+        """A dupe that's already in filtered must appear only once in result."""
+        g = self._g3()
+        meta = {'tv_pack': 1, 'category': 'TV'}
+        dupe = {'name': 'Show.iNTEGRALE.VFF.1080p-GRP', 'flags': []}
+        result = g._check_g3mini_specific_dupes([dupe], [dupe], meta)
+        assert result.count(dupe) == 1
