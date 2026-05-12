@@ -162,10 +162,17 @@ class TestDisallowedCases:
         check_disallowed_compat_tracks(meta, tracks)
         assert meta.get("has_disallowed_compat_track") is True
 
+    def test_ac3_plus_dts_same_lang(self):
+        """AC-3 compat alongside plain DTS — disallowed."""
+        meta = _meta()
+        tracks = [_track("DTS", "en"), _track("AC-3", "en")]
+        check_disallowed_compat_tracks(meta, tracks)
+        assert meta.get("has_disallowed_compat_track") is True
+
     def test_ac3_plus_dts_hdma_same_lang(self):
         """AC-3 compat alongside DTS-HD MA — disallowed."""
         meta = _meta()
-        tracks = [_track("DTS", "en"), _track("AC-3", "en")]
+        tracks = [_track("DTS-HD MA", "en"), _track("AC-3", "en")]
         check_disallowed_compat_tracks(meta, tracks)
         assert meta.get("has_disallowed_compat_track") is True
 
