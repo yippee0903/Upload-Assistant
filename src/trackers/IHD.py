@@ -279,7 +279,9 @@ class IHD(UNIT3D):
             should_continue = False
 
         if not meta.get("source", ""):
-            console.print(f"[bold yellow]Warning: Source is missing for {self.tracker}. Please check source information.[/bold yellow]")
+            if not meta["unattended"] or meta["debug"]:
+                console.print(f"[bold red]Source is missing, skipping {self.tracker} upload.[/bold red]")
+            should_continue = False
 
         if meta["is_disc"] != "BDMV":
             if not meta.get("language_checked", False):
