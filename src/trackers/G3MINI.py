@@ -193,7 +193,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             edition = edition.replace("Hybrid", "").strip()
 
         if meta["category"] == "TV":
-            year = meta["year"] if meta["search_year"] != "" else ""
+            year = meta.get("year", "") or ""
             if meta.get("manual_date"):
                 # Ignore season and year for --daily flagged shows, just use manual date stored in episode_name
                 season = ""
