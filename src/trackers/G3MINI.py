@@ -43,10 +43,12 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             return {"category_id": category_id.get(category, "0")}
         else:
             meta_category = meta.get("category", "")
-            is_anime = bool(meta.get("anime"))
-            if meta_category == "TV" and is_anime:
+            is_anime = bool(meta.get("anime")) or bool(meta.get("mal_id"))
+            genres = str(meta.get("genres", "")).lower()
+            is_animation = is_anime or "animation" in genres
+            if meta_category == "TV" and is_animation:
                 resolved_id = category_id["TV_ANIM"]
-            elif meta_category == "MOVIE" and is_anime:
+            elif meta_category == "MOVIE" and is_animation:
                 resolved_id = category_id["MOVIE_ANIM"]
             else:
                 resolved_id = category_id.get(meta_category, "0")
