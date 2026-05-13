@@ -32,8 +32,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         category_id = {
             "MOVIE": "1",
             "TV": "2",
-            # Film anim 7
-            # anim 6
+            "MOVIE_ANIM": "7",  # Film Animation
+            "TV_ANIM": "6",  # Séries Animations
         }
         if mapping_only:
             return category_id
@@ -43,7 +43,13 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             return {"category_id": category_id.get(category, "0")}
         else:
             meta_category = meta.get("category", "")
-            resolved_id = category_id.get(meta_category, "0")
+            is_anime = bool(meta.get("anime"))
+            if meta_category == "TV" and is_anime:
+                resolved_id = category_id["TV_ANIM"]
+            elif meta_category == "MOVIE" and is_anime:
+                resolved_id = category_id["MOVIE_ANIM"]
+            else:
+                resolved_id = category_id.get(meta_category, "0")
             return {"category_id": resolved_id}
 
     async def get_type_id(self, meta: dict[str, Any], type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
@@ -155,8 +161,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         language = await self._build_audio_string(meta)
         language = language.replace("MULTI", "MULTi").replace("VFI", "VFF")
         service = meta.get("service", "")
-        season = meta.get("season", "")
-        episode = meta.get("episode", "")
+        season = meta.get("season") or ""
+        episode = meta.get("episode") or ""
         part = meta.get("part", "")
         repack = meta.get("repack", "")
         three_d = meta.get("3D", "")
