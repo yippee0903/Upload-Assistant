@@ -257,7 +257,8 @@ class IHD(UNIT3D):
             audio_languages = [str(item) for item in audio_languages_list]
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = str(audio_languages[0]).upper()
-            ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
+            if resolution and resolution in ihd_name:
+                ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
 
         return {"name": ihd_name}
 
