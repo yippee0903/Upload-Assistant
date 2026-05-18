@@ -192,7 +192,7 @@ class ULCX(UNIT3D):
             if aka:
                 ulcx_name = ulcx_name.replace(f"{aka} ", "", 1)
             ulcx_name = ulcx_name.replace(f"{meta['title']}", imdb_name, 1)
-            if imdb_aka and imdb_aka.strip() and imdb_aka != imdb_name and not meta.get("no_aka", False) and not meta.get("anime", False):
+            if imdb_aka and imdb_aka.strip() and imdb_aka.casefold() != imdb_name.casefold() and not meta.get("no_aka", False) and not meta.get("anime", False):
                 ulcx_name = ulcx_name.replace(f"{imdb_name}", f"{imdb_name} AKA {imdb_aka}", 1)
         if ("Hybrid" in ulcx_name or "Custom" in ulcx_name) and meta.get("type") == "WEBDL":
             ulcx_name = ulcx_name.replace("Hybrid ", "", 1)
