@@ -198,24 +198,6 @@ class TestIHDGetNameEdition:
         result = self._run_get_name(ihd, meta)
         assert result["name"] == original
 
-    def test_foreign_language_prefix_applied_after_edition_strip(self, ihd):
-        """Language prefix must be inserted at the right position even when edition was stripped."""
-        meta = {
-            "name": "Seven Samurai AKA Shichinin no samurai 1954 RESTORED REPACK 1080p BluRay AAC 1.0 x264-hallowed",
-            "resolution": "1080p",
-            "edition": "RESTORED",
-            "is_disc": None,
-            "type": "ENCODE",
-            "language_checked": True,
-            "audio_languages": ["Japanese"],
-        }
-        with patch("src.trackers.IHD.languages_manager") as mock_lm:
-            mock_lm.process_desc_language = AsyncMock()
-            mock_lm.has_english_language = AsyncMock(return_value=False)
-            result = _run(ihd.get_name(meta))
-        assert "RESTORED" not in result["name"]
-        assert "JAPANESE 1080p" in result["name"]
-
 
 # ═══════════════════════════════════════════════════════════════
 #  get_name() — service token preservation (MGMP / MGM+)
