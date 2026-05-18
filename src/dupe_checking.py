@@ -342,6 +342,8 @@ class DupeChecker:
                 skip_file_match_for_pack = is_tv_pack and dupe_is_episode
                 for file in filenames:
                     if tracker_name in ["MTV", "AR", "RTF"]:
+                        if skip_file_match_for_pack:
+                            break  # defer to the season/episode check below
                         # MTV: check if any dupe file is a substring of our file (ignoring extension)
                         if any(f.lower() in file.lower() for f in files):
                             meta["filename_match"] = f"{entry.get('name')} = {entry.get('link', None)}"

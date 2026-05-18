@@ -414,6 +414,7 @@ class TestSeasonPackVsEpisodeGuard:
 
         dupes = _run(_checker().filter_dupes([entry], meta, "DP"))
 
+        assert not dupes, "the episode entry must be filtered out — it is not a dupe of the season pack"
         assert not meta.get("filename_match"), (
             "filename_match must NOT be set when a season-pack upload matches "
             "an individual-episode file — they are not the same release"
@@ -433,6 +434,7 @@ class TestSeasonPackVsEpisodeGuard:
 
         dupes = _run(_checker().filter_dupes([entry], meta, "LST"))
 
+        assert not dupes, "the episode entry must be filtered out — it is not a dupe of the season pack"
         assert not meta.get("filename_match"), (
             "filename_match must NOT be set via name-similarity fallback when "
             "a season-pack upload is compared against a single-episode entry"
