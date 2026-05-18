@@ -799,3 +799,54 @@ class TestAdditionalChecksRemuxEnglishSubs:
             subtitle_languages=["Korean"],
         )
         assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — FLAC multichannel on REMUX
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksFlacMultichannel:
+    """Multichannel FLAC on REMUX is prohibited; only mono/stereo FLAC is allowed."""
+
+    def test_remux_flac_51_is_rejected(self):
+        """A REMUX with FLAC 5.1 audio must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_flac_71_is_rejected(self):
+        """A REMUX with FLAC 7.1 audio must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 7.1", channels="7.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_flac_20_is_allowed(self):
+        """A REMUX with FLAC 2.0 (stereo) must be allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 2.0", channels="2.0",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_flac_10_is_allowed(self):
+        """A REMUX with FLAC 1.0 (mono) must be allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 1.0", channels="1.0",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_dtshd_51_is_allowed(self):
+        """A REMUX with DTS-HD MA 5.1 is perfectly fine."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_flac_no_channels_is_permissive(self):
+        """If channels metadata is missing we cannot judge — allow it."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC", channels="",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True

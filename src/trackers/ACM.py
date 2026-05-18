@@ -374,6 +374,24 @@ class ACM:
                     "[red]Exception: English dub is only permitted for animation content.[/red]"
                 )
 
+        # ── FLAC multichannel on REMUX ────────────────────────────────────────────
+        # Lossless mono/stereo may stay as FLAC, but multichannel tracks must be
+        # converted to DTS-HD MA using DTS-HD Master Audio Suite, not FLAC.
+        if release_type == "REMUX":
+            audio_codec_upper = str(meta.get("audio", "") or "").upper()
+            channels_str = str(meta.get("channels", "") or "")
+            if audio_codec_upper.startswith("FLAC") and channels_str:
+                try:
+                    main_ch = int(channels_str.split(".")[0])
+                except ValueError:
+                    main_ch = 0
+                if main_ch > 2:
+                    return _deny(
+                        f"[bold red]{self.tracker}: Multichannel FLAC ({channels_str}) is not allowed on REMUX.[/bold red]\n"
+                        "[red]Multichannel tracks must be converted to DTS-HD MA (DTS-HD Master Audio Suite).[/red]\n"
+                        "[red]Only mono/stereo FLAC (≤2 channels) is permitted.[/red]"
+                    )
+
         # ── REMUX must include English subtitles ─────────────────────────────────
         # Remux releases from non-English sources must include English subtitles.
         # Exception: if the original disc did not contain English subtitles (cannot
