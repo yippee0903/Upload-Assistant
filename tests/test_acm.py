@@ -546,3 +546,307 @@ class TestGetNameRealFiles:
             _run(acm.get_name(meta))
             == "Hunter x Hunter / HUNTER×HUNTER S01 REPACK 1080p CR WEB-DL DD+2.0 H.264-Kitsune"
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — dubbed WEB-DL on non-animation
+# ═══════════════════════════════════════════════════════════════
+
+
+def _checks_meta(**overrides: Any) -> dict[str, Any]:
+    """Minimal meta for get_additional_checks() tests (Asian, non-encode WEB-DL)."""
+    m: dict[str, Any] = {
+        "origin_country": ["KR"],
+        "production_countries": [],
+        "original_language": "ko",
+        "type": "WEBDL",
+        "audio": "DD+ 5.1",
+        "genres": "Action, Drama",
+        "unattended": True,
+        "tracker_status": {"ACM": {}},
+    }
+    m.update(overrides)
+    return m
+
+
+class TestAdditionalChecksDubbedWEBDL:
+    """Non-original language audio on REMUX/WEB-DL is only permitted for animation."""
+
+    def test_dubbed_webdl_non_animation_is_rejected(self):
+        """A dubbed live-action WEB-DL must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Action, Drama")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dual_audio_webdl_non_animation_is_rejected(self):
+        """A dual-audio (original + foreign) live-action WEB-DL must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dual-Audio DD+ 5.1", genres="Action, Drama")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dubbed_remux_non_animation_is_rejected(self):
+        """A dubbed live-action REMUX must be blocked (rule covers REMUX too)."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed DTS-HD MA 5.1", genres="Action, Drama", type="REMUX")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dual_audio_remux_non_animation_is_rejected(self):
+        """A dual-audio live-action REMUX must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dual-Audio TrueHD 7.1", genres="Action, Drama", type="REMUX")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dubbed_animation_webdl_is_allowed(self):
+        """A dubbed WEB-DL is OK when the genre includes Animation."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Animation, Action")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_dubbed_animation_remux_is_allowed(self):
+        """A dubbed animation REMUX must also pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed TrueHD 5.1", genres="Animation", type="REMUX",
+                            subtitle_languages=["Japanese", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_non_dubbed_non_animation_is_allowed(self):
+        """An original-audio live-action WEB-DL must pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="DD+ 5.1", genres="Action, Drama")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_dubbed_disc_type_is_not_blocked(self):
+        """The non-original-audio restriction only applies to REMUX/WEB-DL;
+        a full DISC upload with dubbed audio must not be caught by this check
+        (the disc ISO check may still block it separately)."""
+        acm = ACM(_config())
+        # is_disc=None so the ISO check also won't fire
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Action, Drama", type="DISC")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_dubbed_animation_single_genre(self):
+        """Animation as the only genre with dubbed audio must still pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed AAC 2.0", genres="Animation")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — adult content (hentai / porn / JAV)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksAdultContent:
+    """Adult, hentai, and JAV content is prohibited at ACM."""
+
+    def test_hentai_genre_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(combined_genres="Animation, Hentai", keywords="")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_porn_keyword_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(combined_genres="", keywords="porn, explicit")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_jav_keyword_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(combined_genres="Drama", keywords="jav")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_normal_animation_is_not_rejected(self):
+        """The word 'animation' alone must not trigger the adult-content check."""
+        acm = ACM(_config())
+        meta = _checks_meta(combined_genres="Animation, Action", keywords="school, magic")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — full Blu-ray disc (ISO/BDMV)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksISO:
+    """Full BD ISO/BDMV uploads are only allowed for 3D Blu-rays and DVDs."""
+
+    def test_bdmv_non_3d_is_rejected(self):
+        """A non-3D Blu-ray DISC upload must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="DISC", is_disc="BDMV")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_bdmv_3d_is_allowed(self):
+        """A 3D Blu-ray DISC upload must be allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="DISC", is_disc="BDMV", **{"3D": True})
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_dvd_disc_is_always_allowed(self):
+        """A DVD DISC upload is always allowed (DVDs are exempt)."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="DISC", is_disc="DVD")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_from_bdmv_is_not_blocked(self):
+        """A REMUX sourced from a BDMV is fine — only raw DISC type is restricted."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", is_disc="BDMV",
+                            subtitle_languages=["Japanese", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — R5 BDs, upscales, URL groups
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksMiscProhibited:
+    """R5 BDs, upscales, and URL-embedded group names are prohibited."""
+
+    def test_r5_in_name_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 R5 1080p BluRay DD+ 5.1 H.264-GRP")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_r5_in_source_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 1080p DD+ 5.1 H.264-GRP", source="R5")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_regular_release_not_r5(self):
+        """A name containing '5' in other contexts must not trigger R5 check."""
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 1080p BluRay DTS-HD MA 5.1 H.264-GRP", source="Blu-ray")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_upscale_in_name_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 Upscaled 4K WEB-DL DD+ 5.1 H.264-GRP")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_url_dot_com_in_name_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 1080p WEB-DL HDWebMovies.com DD+ 5.1 H.264")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_url_dot_net_in_tag_is_rejected(self):
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 1080p WEB-DL DD+ 5.1 H.264-XDMovies.net",
+                            tag="-XDMovies.net")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_clean_group_tag_is_not_rejected(self):
+        """A normal group tag without a URL must pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(name="Show 2020 1080p WEB-DL DD+ 5.1 H.264-FLUX", tag="-FLUX")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — REMUX English subtitle requirement
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksRemuxEnglishSubs:
+    """REMUX releases from non-English sources must include English subtitles."""
+
+    def test_remux_non_english_no_subs_is_rejected(self):
+        """A Korean REMUX with only Korean subs must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="REMUX",
+            original_language="ko",
+            subtitle_languages=["Korean"],
+        )
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_non_english_with_english_subs_is_allowed(self):
+        """A Korean REMUX with English subtitles must pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="REMUX",
+            original_language="ko",
+            subtitle_languages=["Korean", "English"],
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_english_original_no_subs_is_allowed(self):
+        """A REMUX from an English-language source does not need English subs."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="REMUX",
+            original_language="en",
+            subtitle_languages=["French"],
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_no_subtitle_data_is_permissive(self):
+        """If subtitle_languages is empty/None we cannot determine — allow it."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="REMUX",
+            original_language="ja",
+            subtitle_languages=[],
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_webdl_non_english_no_subs_is_not_blocked_by_this_rule(self):
+        """The English-subtitle requirement only applies to REMUX, not WEB-DL."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            original_language="ko",
+            subtitle_languages=["Korean"],
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — FLAC multichannel on REMUX
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksFlacMultichannel:
+    """Multichannel FLAC on REMUX is prohibited; only mono/stereo FLAC is allowed."""
+
+    def test_remux_flac_51_is_rejected(self):
+        """A REMUX with FLAC 5.1 audio must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_flac_71_is_rejected(self):
+        """A REMUX with FLAC 7.1 audio must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 7.1", channels="7.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_flac_20_is_allowed(self):
+        """A REMUX with FLAC 2.0 (stereo) must be allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 2.0", channels="2.0",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_flac_10_is_allowed(self):
+        """A REMUX with FLAC 1.0 (mono) must be allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC 1.0", channels="1.0",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_dtshd_51_is_allowed(self):
+        """A REMUX with DTS-HD MA 5.1 is perfectly fine."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_flac_no_channels_is_permissive(self):
+        """If channels metadata is missing we cannot judge — allow it."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="FLAC", channels="",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
