@@ -314,6 +314,20 @@ class ACM:
                     )
                 return False
 
+        # Dubbed WEB-DL releases are only allowed for animation content.
+        # Non-animation dubs (live-action, etc.) are not permitted at ACM.
+        if release_type == "WEBDL":
+            audio_str = str(meta.get("audio", "")).lower()
+            if "dubbed" in audio_str:
+                genres_str = str(meta.get("genres", "")).lower()
+                if "animation" not in genres_str:
+                    if not bool(meta.get("unattended")):
+                        console.print(
+                            f"[bold red]{self.tracker}: Dubbed WEB-DL is only allowed for animation content.[/bold red]\n"
+                            "[red]Non-animation dubbed releases are not permitted at ACM.[/red]"
+                        )
+                    return False
+
         return True
 
     async def upload(self, meta: dict[str, Any], _) -> bool:
@@ -333,6 +347,13 @@ class ACM:
             audio_codec = str(meta.get("audio", "")).upper()
             if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
                 meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: WEB-DL with {audio_codec.split()[0]} is a hybrid"
+                return False
+
+        # Safety net: dubbed WEB-DL is only allowed for animation
+        if release_type == "WEBDL":
+            audio_str = str(meta.get("audio", "")).lower()
+            if "dubbed" in audio_str and "animation" not in str(meta.get("genres", "")).lower():
+                meta["tracker_status"][self.tracker]["status_message"] = "Skipped: dubbed WEB-DL not allowed for non-animation"
                 return False
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)

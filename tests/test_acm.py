@@ -546,3 +546,67 @@ class TestGetNameRealFiles:
             _run(acm.get_name(meta))
             == "Hunter x Hunter / HUNTER×HUNTER S01 REPACK 1080p CR WEB-DL DD+2.0 H.264-Kitsune"
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — dubbed WEB-DL on non-animation
+# ═══════════════════════════════════════════════════════════════
+
+
+def _checks_meta(**overrides: Any) -> dict[str, Any]:
+    """Minimal meta for get_additional_checks() tests (Asian, non-encode WEB-DL)."""
+    m: dict[str, Any] = {
+        "origin_country": ["KR"],
+        "production_countries": [],
+        "original_language": "ko",
+        "type": "WEBDL",
+        "audio": "DD+ 5.1",
+        "genres": "Action, Drama",
+        "unattended": True,
+        "tracker_status": {"ACM": {}},
+    }
+    m.update(overrides)
+    return m
+
+
+class TestAdditionalChecksDubbedWEBDL:
+    """Dubbed WEB-DL is only permitted for animation content."""
+
+    def test_dubbed_non_animation_is_rejected(self):
+        """A dubbed live-action WEB-DL must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Action, Drama")
+        result = _run(acm.get_additional_checks(meta))
+        assert result is False
+
+    def test_dubbed_animation_is_allowed(self):
+        """A dubbed WEB-DL is OK when the genre includes Animation."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Animation, Action")
+        result = _run(acm.get_additional_checks(meta))
+        assert result is True
+
+    def test_non_dubbed_non_animation_is_allowed(self):
+        """An original-audio (non-dubbed) live-action WEB-DL must pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="DD+ 5.1", genres="Action, Drama")
+        result = _run(acm.get_additional_checks(meta))
+        assert result is True
+
+    def test_dubbed_non_webdl_is_not_blocked_by_this_rule(self):
+        """The dub restriction only applies to WEB-DL; REMUXes are blocked
+        earlier by the encode check, but a disc (DISC type) should not be
+        caught by the dub/animation guard — confirmed by returning True."""
+        acm = ACM(_config())
+        # A REMUX would already be blocked by the encode check; use DISC to
+        # isolate just the dub/WEB-DL rule.
+        meta = _checks_meta(audio="Dubbed DD+ 5.1", genres="Action, Drama", type="DISC")
+        result = _run(acm.get_additional_checks(meta))
+        assert result is True
+
+    def test_dubbed_animation_single_genre(self):
+        """Animation as the only genre with a dubbed dub must still pass."""
+        acm = ACM(_config())
+        meta = _checks_meta(audio="Dubbed AAC 2.0", genres="Animation")
+        result = _run(acm.get_additional_checks(meta))
+        assert result is True
