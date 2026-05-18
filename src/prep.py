@@ -987,6 +987,16 @@ class Prep:
         if meta.get("aka", None) is None:
             meta["aka"] = ""
 
+        # Suppress AKA when it only differs from the main title by case or trivial
+        # punctuation (e.g. "Sapne Vs Everyone" vs "Sapne vs Everyone").  This can
+        # occur when TMDB pre-sets meta["aka"] before the IMDb similarity check above
+        # runs (which skips when meta["aka"] is already populated).
+        if meta.get("aka"):
+            _aka_bare = meta["aka"][4:].strip() if meta["aka"].upper().startswith("AKA ") else meta["aka"]
+            _main = str(meta.get("title", ""))
+            if SequenceMatcher(None, _main.casefold(), _aka_bare.casefold()).ratio() >= 0.9:
+                meta["aka"] = ""
+
         # if it was skipped earlier, make sure we have the season/episode data
         if not meta.get("not_anime", False) and meta.get("category") == "TV":
             meta = await self.season_episode_manager.get_season_episode(video, meta)
