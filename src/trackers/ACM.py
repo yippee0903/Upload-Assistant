@@ -385,10 +385,13 @@ class ACM:
                 if isinstance(subtitle_languages, list) and subtitle_languages:
                     has_english_subs = any("english" in str(lang).lower() for lang in subtitle_languages)
                     if not has_english_subs:
-                        return _deny(
-                            f"[bold red]{self.tracker}: REMUX releases from non-English sources must include English subtitles.[/bold red]\n"
-                            "[red]Exception: if the source disc does not contain English subtitles.[/red]"
-                        )
+                        if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
+                            console.print(f"[bold red]{self.tracker}: REMUX releases from non-English sources must include English subtitles.[/bold red]")
+                            console.print("[yellow]Override if the source disc does not contain English subtitles.[/yellow]")
+                            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                                return False
+                        else:
+                            return False
 
         return True
 
