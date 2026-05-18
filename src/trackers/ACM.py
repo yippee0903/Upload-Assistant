@@ -336,12 +336,18 @@ class ACM:
 
         # ── Releases with URLs embedded in name or tag ───────────────────────────
         # Groups like HDWebMovies, XDMovies embed URLs in their release names.
+        # False positives are possible (e.g. Apple.TV service tags, .io group names),
+        # so this is a soft block — the user can override if it's a false positive.
         tag_clean = str(meta.get("tag", "") or "").lower().replace("-", "")
         if re.search(r"\.(com|net|org|info|io|me|tk|xyz|cc|tv)\b", name_lower + " " + tag_clean):
-            return _deny(
-                f"[bold red]{self.tracker}: Releases with URLs embedded in their name or tag are not allowed.[/bold red]\n"
-                "[red]E.g. HDWebMovies, XDMovies, and similar URL-tagged groups are prohibited.[/red]"
-            )
+            if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
+                console.print(f"[bold red]{self.tracker}: Releases with URLs embedded in their name or tag are not allowed.[/bold red]")
+                console.print("[yellow]E.g. HDWebMovies, XDMovies and similar URL-tagged groups are prohibited.[/yellow]")
+                console.print("[yellow]Note: false positives are possible (e.g. service tags like Apple.TV) — override if needed.[/yellow]")
+                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    return False
+            else:
+                return False
 
         # ── Hybrid WEB-DL: FLAC/LPCM audio not from streaming ────────────────────
         # Streaming services do not deliver FLAC/LPCM — this audio was sourced
