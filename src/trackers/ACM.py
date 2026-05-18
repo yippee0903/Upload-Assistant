@@ -396,38 +396,6 @@ class ACM:
         return True
 
     async def upload(self, meta: dict[str, Any], _) -> bool:
-        release_type = str(meta.get("type", "")).upper()
-
-        # Safety net: Asian origin
-        if not self.check_asian_origin(meta):
-            meta["tracker_status"][self.tracker]["status_message"] = "Skipped: non-Asian origin"
-            return False
-
-        # Safety net: encode types
-        if release_type in ("ENCODE", "WEBRIP", "HDTV"):
-            meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: {release_type} not allowed"
-            return False
-
-        # Safety net: full Blu-ray disc (ISO/BDMV) not allowed except 3D
-        if release_type == "DISC" and meta.get("is_disc") == "BDMV" and not meta.get("3D"):
-            meta["tracker_status"][self.tracker]["status_message"] = "Skipped: Blu-ray ISO/BDMV not allowed (only 3D and DVD)"
-            return False
-
-        # Safety net: WEB-DL with FLAC/LPCM is a hybrid
-        if release_type == "WEBDL":
-            audio_codec = str(meta.get("audio", "") or "").upper()
-            if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
-                meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: WEB-DL with {audio_codec.split()[0]} is a hybrid"
-                return False
-
-        # Safety net: non-original language audio on REMUX/WEB-DL (except animation)
-        if release_type in ("REMUX", "WEBDL"):
-            audio_str = str(meta.get("audio", "") or "").lower()
-            is_animation = "animation" in str(meta.get("genres", "") or "").lower()
-            if ("dual-audio" in audio_str or "dubbed" in audio_str) and not is_animation:
-                meta["tracker_status"][self.tracker]["status_message"] = "Skipped: non-original audio not allowed on REMUX/WEB-DL (except animation)"
-                return False
-
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta["category"])
         type_id = await self.get_type_id(meta)
