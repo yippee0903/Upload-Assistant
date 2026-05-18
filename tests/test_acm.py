@@ -662,69 +662,6 @@ class TestAdditionalChecksAdultContent:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  get_additional_checks — single episode TV shows
-# ═══════════════════════════════════════════════════════════════
-
-
-class TestAdditionalChecksSingleEpisode:
-    """Single episode uploads are only allowed for currently airing shows."""
-
-    def _ep_meta(self, **overrides: Any) -> dict[str, Any]:
-        m = _checks_meta(
-            category="TV",
-            episode="E01",
-            tv_pack=0,
-            season="S01",
-        )
-        m.update(overrides)
-        return m
-
-    def test_single_episode_ended_show_is_rejected(self):
-        """An episode from a show with a last_air_date > 90 days ago must be blocked."""
-        acm = ACM(_config())
-        meta = self._ep_meta(last_air_date="2019-01-01")
-        assert _run(acm.get_additional_checks(meta)) is False
-
-    def test_single_episode_currently_airing_is_allowed(self):
-        """An episode from a show whose last_air_date is recent must be allowed."""
-        from datetime import date, timedelta
-
-        recent = (date.today() - timedelta(days=7)).isoformat()
-        acm = ACM(_config())
-        meta = self._ep_meta(last_air_date=recent)
-        assert _run(acm.get_additional_checks(meta)) is True
-
-    def test_single_episode_no_air_date_is_allowed(self):
-        """If last_air_date is not set we cannot determine, so allow it."""
-        acm = ACM(_config())
-        meta = self._ep_meta(last_air_date=None)
-        assert _run(acm.get_additional_checks(meta)) is True
-
-    def test_season_pack_is_always_allowed(self):
-        """Season packs are not single episodes and must always pass this check."""
-        acm = ACM(_config())
-        meta = _checks_meta(
-            category="TV",
-            episode="",
-            tv_pack=1,
-            season="S01",
-            last_air_date="2019-01-01",
-        )
-        assert _run(acm.get_additional_checks(meta)) is True
-
-    def test_movie_episode_field_ignored(self):
-        """The single-episode check must not fire for MOVIE category."""
-        acm = ACM(_config())
-        meta = _checks_meta(
-            category="MOVIE",
-            episode="E01",
-            tv_pack=0,
-            last_air_date="2019-01-01",
-        )
-        assert _run(acm.get_additional_checks(meta)) is True
-
-
-# ═══════════════════════════════════════════════════════════════
 #  get_additional_checks — full Blu-ray disc (ISO/BDMV)
 # ═══════════════════════════════════════════════════════════════
 

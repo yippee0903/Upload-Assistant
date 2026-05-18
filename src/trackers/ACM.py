@@ -3,10 +3,10 @@ import asyncio
 import os
 import platform
 import re
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import aiofiles
+import cli_ui
 import httpx
 
 from src.bbcode import BBCODE
@@ -303,31 +303,18 @@ class ACM:
             )
 
         # ── Adult content (hentai, porn, JAV) ────────────────────────────────────
+        # TMDB keywords are not always reliable, so this is a soft block: the user
+        # can override if the detection is a false positive.
         genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
         adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav", "japanese adult video"]
         if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
-            return _deny(f"[bold red]{self.tracker}: Adult, hentai, and JAV content is not permitted.[/bold red]")
-
-        # ── Single episodes of TV shows (unless currently airing) ─────────────────
-        # Single episode uploads are allowed only for currently airing shows.
-        # Heuristic: if last_air_date is within the last 90 days (or not set),
-        # the show is treated as currently airing.
-        episode = str(meta.get("episode", "") or "").strip()
-        is_tv_pack = int(meta.get("tv_pack", 0) or 0) == 1
-        if meta.get("category") == "TV" and episode and not is_tv_pack:
-            currently_airing = True
-            last_air_date_str = meta.get("last_air_date")
-            if last_air_date_str:
-                try:
-                    last_air = datetime.strptime(str(last_air_date_str), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                    currently_airing = last_air >= datetime.now(timezone.utc) - timedelta(days=90)
-                except (ValueError, TypeError):
-                    pass
-            if not currently_airing:
-                return _deny(
-                    f"[bold red]{self.tracker}: Single episode uploads are not allowed for finished shows.[/bold red]\n"
-                    "[red]Only episodes from currently airing series are permitted.[/red]"
-                )
+            if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
+                console.print(f"[bold red]{self.tracker}: Adult, hentai, and JAV content is not permitted.[/bold red]")
+                console.print("[yellow]Note: TMDB keywords may not be reliable — override if this is a false positive.[/yellow]")
+                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    return False
+            else:
+                return False
 
         # ── Full Blu-ray disc structures (ISO/BDMV) — except 3D Blu-rays and DVD ──
         # ISO and BDMV uploads are only permitted for 3D Blu-rays and DVD disc structures.
@@ -410,13 +397,6 @@ class ACM:
         # Safety net: encode types
         if release_type in ("ENCODE", "WEBRIP", "HDTV"):
             meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: {release_type} not allowed"
-            return False
-
-        # Safety net: adult content
-        genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
-        adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav"]
-        if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
-            meta["tracker_status"][self.tracker]["status_message"] = "Skipped: adult/hentai/JAV content not allowed"
             return False
 
         # Safety net: full Blu-ray disc (ISO/BDMV) not allowed except 3D
