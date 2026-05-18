@@ -3,6 +3,7 @@ import asyncio
 import os
 import platform
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import aiofiles
@@ -279,81 +280,163 @@ class ACM:
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         """Check ACM-specific requirements before searching/uploading."""
-        # Check Asian origin
+
+        def _deny(msg: str) -> bool:
+            if not bool(meta.get("unattended")):
+                console.print(msg)
+            return False
+
+        # ── Asian origin ────────────────────────────────────────────────────────
         if not self.check_asian_origin(meta):
             origin = meta.get("origin_country", [])
             prod = [pc.get("iso_3166_1", "") for pc in (meta.get("production_countries", []) or [])]
             countries = ", ".join(filter(None, dict.fromkeys(origin + prod))) or "Unknown"
-            if not bool(meta.get("unattended")):
-                console.print(
-                    f"[bold red]Only media produced in Asian countries is allowed at {self.tracker}.[/bold red]\n[red]Detected production countries: {countries}[/red]"
-                )
-            return False
+            return _deny(f"[bold red]Only media produced in Asian countries is allowed at {self.tracker}.[/bold red]\n[red]Detected production countries: {countries}[/red]")
 
-        # Encodes are not allowed on ACM (ENCODE, WEBRIP, HDTV are all re-encoded content)
-        # Only REMUX, WEBDL, and full discs are allowed
+        # ── Release type ────────────────────────────────────────────────────────
+        # Encodes, WEBRiPs, and HDTV captures are not allowed.
+        # Only REMUX, WEB-DL, and full disc structures are permitted.
         release_type = str(meta.get("type", "")).upper()
         if release_type in ("ENCODE", "WEBRIP", "HDTV"):
-            if not bool(meta.get("unattended")):
-                console.print(
-                    f"[bold red]Encodes are not allowed at {self.tracker}.[/bold red]\n"
-                    f"[red]Detected type: {release_type}. Only REMUX, WEB-DL, and full discs are allowed.[/red]"
+            return _deny(
+                f"[bold red]Encodes are not allowed at {self.tracker}.[/bold red]\n[red]Detected type: {release_type}. Only REMUX, WEB-DL, and full discs are allowed.[/red]"
+            )
+
+        # ── Adult content (hentai, porn, JAV) ────────────────────────────────────
+        genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
+        adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav", "japanese adult video"]
+        if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
+            return _deny(f"[bold red]{self.tracker}: Adult, hentai, and JAV content is not permitted.[/bold red]")
+
+        # ── Single episodes of TV shows (unless currently airing) ─────────────────
+        # Single episode uploads are allowed only for currently airing shows.
+        # Heuristic: if last_air_date is within the last 90 days (or not set),
+        # the show is treated as currently airing.
+        episode = str(meta.get("episode", "") or "").strip()
+        is_tv_pack = int(meta.get("tv_pack", 0) or 0) == 1
+        if meta.get("category") == "TV" and episode and not is_tv_pack:
+            currently_airing = True
+            last_air_date_str = meta.get("last_air_date")
+            if last_air_date_str:
+                try:
+                    last_air = datetime.strptime(str(last_air_date_str), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    currently_airing = last_air >= datetime.now(timezone.utc) - timedelta(days=90)
+                except (ValueError, TypeError):
+                    pass
+            if not currently_airing:
+                return _deny(
+                    f"[bold red]{self.tracker}: Single episode uploads are not allowed for finished shows.[/bold red]\n"
+                    "[red]Only episodes from currently airing series are permitted.[/red]"
                 )
-            return False
 
-        # FLAC/LPCM audio on a WEB-DL is a hybrid (audio sourced from BD, not
-        # from streaming).  ACM requires eac3to logs + BDInfo for hybrids.
+        # ── Full Blu-ray disc structures (ISO/BDMV) — except 3D Blu-rays and DVD ──
+        # ISO and BDMV uploads are only permitted for 3D Blu-rays and DVD disc structures.
+        if release_type == "DISC" and meta.get("is_disc") == "BDMV" and not meta.get("3D"):
+            return _deny(
+                f"[bold red]{self.tracker}: Full Blu-ray disc (ISO/BDMV) uploads are not allowed.[/bold red]\n"
+                "[red]Only 3D Blu-rays and DVD disc structures are permitted.[/red]"
+            )
+
+        # ── R5 BDs (Digital TeleCine recordings) ─────────────────────────────────
+        name_lower = str(meta.get("name", "") or "").lower()
+        source_lower = str(meta.get("source", "") or "").lower()
+        if re.search(r"\br5\b", name_lower) or re.search(r"\br5\b", source_lower):
+            return _deny(f"[bold red]{self.tracker}: R5 BD (Digital TeleCine) releases are not allowed.[/bold red]")
+
+        # ── Upscales ──────────────────────────────────────────────────────────────
+        if re.search(r"\bupscal", name_lower):
+            return _deny(f"[bold red]{self.tracker}: Upscaled releases are not allowed.[/bold red]")
+
+        # ── Releases with URLs embedded in name or tag ───────────────────────────
+        # Groups like HDWebMovies, XDMovies embed URLs in their release names.
+        tag_clean = str(meta.get("tag", "") or "").lower().replace("-", "")
+        if re.search(r"\.(com|net|org|info|io|me|tk|xyz|cc|tv)\b", name_lower + " " + tag_clean):
+            return _deny(
+                f"[bold red]{self.tracker}: Releases with URLs embedded in their name or tag are not allowed.[/bold red]\n"
+                "[red]E.g. HDWebMovies, XDMovies, and similar URL-tagged groups are prohibited.[/red]"
+            )
+
+        # ── Hybrid WEB-DL: FLAC/LPCM audio not from streaming ────────────────────
+        # Streaming services do not deliver FLAC/LPCM — this audio was sourced
+        # from a disc.  ACM requires eac3to logs + BDInfo for such hybrids.
         if release_type == "WEBDL":
-            audio_codec = str(meta.get("audio", "")).upper()
+            audio_codec = str(meta.get("audio", "") or "").upper()
             if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
-                if not bool(meta.get("unattended")):
-                    console.print(
-                        f"[bold red]{self.tracker}: WEB-DL with {audio_codec.split()[0]} audio is a hybrid release.[/bold red]\n"
-                        "[red]Streaming services do not offer FLAC/LPCM — this audio was sourced from a disc.[/red]\n"
-                        "[red]Hybrids require eac3to logs and BDInfo for ACM.[/red]"
-                    )
-                return False
+                return _deny(
+                    f"[bold red]{self.tracker}: WEB-DL with {audio_codec.split()[0]} audio is a hybrid release.[/bold red]\n"
+                    "[red]Streaming services do not offer FLAC/LPCM — this audio was sourced from a disc.[/red]\n"
+                    "[red]Hybrids require eac3to logs and BDInfo for ACM.[/red]"
+                )
 
-        # Dubbed WEB-DL releases are only allowed for animation content.
-        # Non-animation dubs (live-action, etc.) are not permitted at ACM.
-        if release_type == "WEBDL":
-            audio_str = str(meta.get("audio", "")).lower()
-            if "dubbed" in audio_str:
-                genres_str = str(meta.get("genres", "")).lower()
-                if "animation" not in genres_str:
-                    if not bool(meta.get("unattended")):
-                        console.print(
-                            f"[bold red]{self.tracker}: Dubbed WEB-DL is only allowed for animation content.[/bold red]\n"
-                            "[red]Non-animation dubbed releases are not permitted at ACM.[/red]"
+        # ── Non-original language audio on REMUX/WEB-DL ─────────────────────────
+        # Additional non-original language audio tracks (dual-audio, dubbed) are
+        # prohibited on REMUX and WEB-DL releases.
+        # Exception: English dub is permitted for animation content only.
+        if release_type in ("REMUX", "WEBDL"):
+            audio_str = str(meta.get("audio", "") or "").lower()
+            is_animation = "animation" in str(meta.get("genres", "") or "").lower()
+            if ("dual-audio" in audio_str or "dubbed" in audio_str) and not is_animation:
+                return _deny(
+                    f"[bold red]{self.tracker}: Non-original language audio tracks are not allowed on REMUX/WEB-DL.[/bold red]\n"
+                    "[red]Exception: English dub is only permitted for animation content.[/red]"
+                )
+
+        # ── REMUX must include English subtitles ─────────────────────────────────
+        # Remux releases from non-English sources must include English subtitles.
+        # Exception: if the original disc did not contain English subtitles (cannot
+        # be detected automatically — the uploader must skip this check manually).
+        if release_type == "REMUX":
+            orig_lang = str(meta.get("original_language", "") or "").lower().strip()
+            if orig_lang and orig_lang not in ("en", "zxx", "xx"):
+                subtitle_languages = meta.get("subtitle_languages") or []
+                if isinstance(subtitle_languages, list) and subtitle_languages:
+                    has_english_subs = any("english" in str(lang).lower() for lang in subtitle_languages)
+                    if not has_english_subs:
+                        return _deny(
+                            f"[bold red]{self.tracker}: REMUX releases from non-English sources must include English subtitles.[/bold red]\n"
+                            "[red]Exception: if the source disc does not contain English subtitles.[/red]"
                         )
-                    return False
 
         return True
 
     async def upload(self, meta: dict[str, Any], _) -> bool:
-        # Safety net: Asian origin should already be checked in search_existing
+        release_type = str(meta.get("type", "")).upper()
+
+        # Safety net: Asian origin
         if not self.check_asian_origin(meta):
             meta["tracker_status"][self.tracker]["status_message"] = "Skipped: non-Asian origin"
             return False
 
-        # Safety net: Encodes should already be blocked in get_additional_checks
-        release_type = str(meta.get("type", "")).upper()
+        # Safety net: encode types
         if release_type in ("ENCODE", "WEBRIP", "HDTV"):
             meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: {release_type} not allowed"
             return False
 
-        # Safety net: WEB-DL with FLAC/LPCM is a hybrid (needs eac3to log + BDInfo)
+        # Safety net: adult content
+        genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
+        adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav"]
+        if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
+            meta["tracker_status"][self.tracker]["status_message"] = "Skipped: adult/hentai/JAV content not allowed"
+            return False
+
+        # Safety net: full Blu-ray disc (ISO/BDMV) not allowed except 3D
+        if release_type == "DISC" and meta.get("is_disc") == "BDMV" and not meta.get("3D"):
+            meta["tracker_status"][self.tracker]["status_message"] = "Skipped: Blu-ray ISO/BDMV not allowed (only 3D and DVD)"
+            return False
+
+        # Safety net: WEB-DL with FLAC/LPCM is a hybrid
         if release_type == "WEBDL":
-            audio_codec = str(meta.get("audio", "")).upper()
+            audio_codec = str(meta.get("audio", "") or "").upper()
             if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
                 meta["tracker_status"][self.tracker]["status_message"] = f"Skipped: WEB-DL with {audio_codec.split()[0]} is a hybrid"
                 return False
 
-        # Safety net: dubbed WEB-DL is only allowed for animation
-        if release_type == "WEBDL":
-            audio_str = str(meta.get("audio", "")).lower()
-            if "dubbed" in audio_str and "animation" not in str(meta.get("genres", "")).lower():
-                meta["tracker_status"][self.tracker]["status_message"] = "Skipped: dubbed WEB-DL not allowed for non-animation"
+        # Safety net: non-original language audio on REMUX/WEB-DL (except animation)
+        if release_type in ("REMUX", "WEBDL"):
+            audio_str = str(meta.get("audio", "") or "").lower()
+            is_animation = "animation" in str(meta.get("genres", "") or "").lower()
+            if ("dual-audio" in audio_str or "dubbed" in audio_str) and not is_animation:
+                meta["tracker_status"][self.tracker]["status_message"] = "Skipped: non-original audio not allowed on REMUX/WEB-DL (except animation)"
                 return False
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
