@@ -334,8 +334,16 @@ class DupeChecker:
                 remember_match("trumpable_id")
 
             if not meta.get("is_disc"):
+                # When uploading a TV season pack, individual-episode entries on the tracker
+                # are NOT exact dupes — the season/episode check below handles them correctly.
+                # Skip the file-comparison early-return so it cannot set filename_match
+                # and bypass the season/episode exclusion for pack-vs-episode pairs.
+                dupe_is_episode = meta.get("category") == "TV" and bool(re.search(r"[sS]\d+[eE]\d{2}", each))
+                skip_file_match_for_pack = is_tv_pack and dupe_is_episode
                 for file in filenames:
                     if tracker_name in ["MTV", "AR", "RTF"]:
+                        if skip_file_match_for_pack:
+                            break  # defer to the season/episode check below
                         # MTV: check if any dupe file is a substring of our file (ignoring extension)
                         if any(f.lower() in file.lower() for f in files):
                             meta["filename_match"] = f"{entry.get('name')} = {entry.get('link', None)}"
@@ -353,6 +361,8 @@ class DupeChecker:
                         if meta.get("debug") and entry_size is None and meta.get("source_size") is not None:
                             console.log(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.get('source_size')}")
                     else:
+                        if skip_file_match_for_pack:
+                            break  # defer to the season/episode check below
                         if meta.get("debug"):
                             console.log(f"[debug] Comparing file: {file} against dupe files list.")
                             console.log(f"[debug] Dupe files list: {files[:10]}{'...' if len(files) > 10 else files}")
@@ -657,15 +667,22 @@ class DupeChecker:
             # matches AND the normalised names are very similar (≥ 0.75), treat
             # this as a confirmed dupe — the entry has already passed all
             # resolution/source/HDR exclusion checks above.
+            # Guard: a season-pack upload must never match an individual-episode
+            # entry via similarity — the names are near-identical but the
+            # releases are not the same thing.
             if not files and tag.strip() and tag.strip() in normalized:
-                target_normalized = await DupeChecker.normalize_filename(str(meta.get("name", "")))
-                similarity = SequenceMatcher(None, normalized, target_normalized).ratio()
-                if meta.get("debug"):
-                    console.log(f"[debug] Name similarity fallback: {similarity:.3f} (threshold 0.75) for {each}")
-                if similarity >= 0.75:
-                    meta["filename_match"] = f"{entry.get('name')} = {entry.get('link', None)}"
-                    remember_match("filename")
-                    return False
+                if is_tv_pack and bool(re.search(r"[sS]\d+[eE]\d{2}", each)):
+                    if meta.get("debug"):
+                        console.log(f"[debug] Skipping name-similarity: season-pack vs episode for {each}")
+                else:
+                    target_normalized = await DupeChecker.normalize_filename(str(meta.get("name", "")))
+                    similarity = SequenceMatcher(None, normalized, target_normalized).ratio()
+                    if meta.get("debug"):
+                        console.log(f"[debug] Name similarity fallback: {similarity:.3f} (threshold 0.75) for {each}")
+                    if similarity >= 0.75:
+                        meta["filename_match"] = f"{entry.get('name')} = {entry.get('link', None)}"
+                        remember_match("filename")
+                        return False
 
             if meta.get("debug"):
                 console.log(f"[cyan]Release PASSED all checks: {each}")

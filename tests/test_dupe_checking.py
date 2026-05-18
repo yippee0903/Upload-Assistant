@@ -337,3 +337,158 @@ class TestFrenchSupersedePlusFilenameMatch:
             "filename_match must NOT be set when the competing release has a "
             "different group tag"
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Season-pack upload vs individual-episode dupe guard
+# ═══════════════════════════════════════════════════════════════
+
+
+def _family_guy_s24_pack_meta(**overrides) -> dict[str, Any]:
+    """Minimal meta for a Family Guy S24 season-pack upload."""
+    meta: dict[str, Any] = {
+        "name": "Family Guy S24 1080p DSNP WEB-DL DD+ 5.1 H.264-FLUX",
+        "uuid": "Family.Guy.S24.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX",
+        "tmdb": "4057",
+        "resolution": "1080p",
+        "category": "TV",
+        "type": "WEBDL",
+        "source": "Disney+",
+        "is_disc": None,
+        "sd": 0,
+        "hdr": None,
+        "season": "S24",
+        "episode": None,
+        "tv_pack": 1,
+        "tag": "-FLUX",
+        "video_encode": "H.264",
+        "unattended": True,
+        "debug": False,
+        "filelist": [
+            "/dl/Family.Guy.S24E01.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+            "/dl/Family.Guy.S24E02.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+            "/dl/Family.Guy.S24E13.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+        ],
+    }
+    meta.update(overrides)
+    return meta
+
+
+def _episode_entry(ep: str, with_files: bool = True) -> dict[str, Any]:
+    """Build a dupe entry for a single Family Guy episode."""
+    name = f"Family Guy S24{ep} 1080p DSNP WEB-DL DD+ 5.1 H.264-FLUX"
+    files = (
+        [f"Family.Guy.S24{ep}.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv"]
+        if with_files
+        else []
+    )
+    return {
+        "name": name,
+        "size": 1_500_000_000,
+        "files": files,
+        "file_count": len(files),
+        "trumpable": False,
+        "link": f"https://tracker.example/torrents/100",
+        "id": 100,
+        "type": "WEB-DL",
+        "res": "1080p",
+        "internal": False,
+    }
+
+
+class TestSeasonPackVsEpisodeGuard:
+    """
+    A TV season-pack upload must NEVER be flagged as an exact match of an
+    individual-episode entry on the tracker, regardless of whether the dupe
+    comparison fires via file list or name-similarity fallback.
+    """
+
+    def test_file_match_does_not_flag_pack_as_episode_dupe(self):
+        """
+        The season pack contains S24E13.mkv.  The tracker has an S24E13
+        episode entry whose file list includes that exact filename.
+        The file-comparison guard must prevent filename_match from being set.
+        """
+        meta = _family_guy_s24_pack_meta()
+        entry = _episode_entry("E13", with_files=True)
+
+        dupes = _run(_checker().filter_dupes([entry], meta, "DP"))
+
+        assert not dupes, "the episode entry must be filtered out — it is not a dupe of the season pack"
+        assert not meta.get("filename_match"), (
+            "filename_match must NOT be set when a season-pack upload matches "
+            "an individual-episode file — they are not the same release"
+        )
+        assert not meta.get("exact_filename_match"), (
+            "exact_filename_match must also not be set for pack-vs-episode"
+        )
+
+    def test_similarity_fallback_does_not_flag_pack_as_episode_dupe(self):
+        """
+        When the tracker returns no file list (e.g. LST) and names are near-
+        identical (Family Guy S24 vs Family Guy S24E13), the name-similarity
+        fallback must be skipped for season-pack vs episode pairs.
+        """
+        meta = _family_guy_s24_pack_meta()
+        entry = _episode_entry("E13", with_files=False)
+
+        dupes = _run(_checker().filter_dupes([entry], meta, "LST"))
+
+        assert not dupes, "the episode entry must be filtered out — it is not a dupe of the season pack"
+        assert not meta.get("filename_match"), (
+            "filename_match must NOT be set via name-similarity fallback when "
+            "a season-pack upload is compared against a single-episode entry"
+        )
+
+    def test_episode_upload_vs_same_episode_still_detected(self):
+        """
+        When uploading a *single episode* (not a pack) and the tracker has that
+        exact episode, the file-comparison must still detect it as a dupe.
+        """
+        meta = _family_guy_s24_pack_meta(
+            name="Family Guy S24E13 1080p DSNP WEB-DL DD+ 5.1 H.264-FLUX",
+            season="S24",
+            episode="E13",
+            tv_pack=0,
+            filelist=["/dl/Family.Guy.S24E13.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv"],
+        )
+        entry = _episode_entry("E13", with_files=True)
+
+        dupes = _run(_checker().filter_dupes([entry], meta, "DP"))
+
+        assert dupes, "identical episode upload must be detected as dupe"
+        assert meta.get("filename_match"), (
+            "filename_match must be set when episode upload matches episode dupe"
+        )
+
+    def test_pack_upload_vs_same_pack_still_detected(self):
+        """
+        When the tracker already has the same season pack, it must still be
+        detected as a dupe (no false exclusion from the new guard).
+        """
+        meta = _family_guy_s24_pack_meta()
+        # Season-pack entry whose name has no episode pattern
+        pack_entry: dict[str, Any] = {
+            "name": "Family Guy S24 1080p DSNP WEB-DL DD+ 5.1 H.264-FLUX",
+            "size": 20_000_000_000,
+            "files": [
+                "Family.Guy.S24E01.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+                "Family.Guy.S24E02.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+                "Family.Guy.S24E13.1080p.DSNP.WEB-DL.DD+.5.1.H.264-FLUX.mkv",
+            ],
+            "file_count": 3,
+            "trumpable": False,
+            "link": "https://tracker.example/torrents/200",
+            "id": 200,
+            "type": "WEB-DL",
+            "res": "1080p",
+            "internal": False,
+        }
+
+        dupes = _run(_checker().filter_dupes([pack_entry], meta, "DP"))
+
+        assert dupes, "season-pack upload vs same season-pack on tracker must be detected as dupe"
+        assert meta.get("filename_match"), (
+            "filename_match must be set when season-pack upload matches an "
+            "existing season-pack entry on the tracker"
+        )
