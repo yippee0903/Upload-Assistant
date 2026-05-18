@@ -255,7 +255,6 @@ class IHD(UNIT3D):
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ihd_name = str(meta.get("name", ""))
-        resolution = str(meta.get("resolution", ""))
 
         # Per IHD naming guide: "Edition" (Remastered, Anniversary Edition, …)
         # is omitted for non-Full Disc releases, but "Cut" (Director's Cut,
@@ -268,15 +267,6 @@ class IHD(UNIT3D):
 
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
-        audio_languages_value = meta.get("audio_languages", [])
-        audio_languages: list[str] = []
-        if isinstance(audio_languages_value, list):
-            audio_languages_list = cast(list[Any], audio_languages_value)
-            audio_languages = [str(item) for item in audio_languages_list]
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
-            foreign_lang = str(audio_languages[0]).upper()
-            if resolution and resolution in ihd_name:
-                ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
 
         return {"name": ihd_name}
 
