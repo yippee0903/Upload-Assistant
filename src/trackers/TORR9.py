@@ -159,8 +159,9 @@ class TORR9(FrenchTrackerMixin):
     #  Categories:   Films, Séries
     #  Subcategories (Films):  Films, Films d'animation, Documentaires,
     #                          Concert, Spectacle, Sport, Vidéo-clips
-    #  Subcategories (Séries): Séries TV, Emission TV, Séries Animées,
-    #                          Mangas-Animes
+    #  Subcategories (Séries): Séries TV, Emission TV,
+    #                          Séries Animées (anime/animation, no mal_id),
+    #                          Mangas-Animes (mal_id present)
     # ──────────────────────────────────────────────────────────
 
     @staticmethod
@@ -169,18 +170,21 @@ class TORR9(FrenchTrackerMixin):
 
         Values must match the exact labels shown on the site's upload page.
         """
-        # Detect animation: anime flag, mal_id, or animation genre
-        is_anime = bool(meta.get("anime")) or bool(meta.get("mal_id"))
+        # mal_id present → confirmed Japanese anime (Mangas-Animes)
+        # anime flag or animation genre without mal_id → Western animated series (Séries Animées)
+        is_anime = bool(meta.get("mal_id"))
         genres = str(meta.get("genres", "")).lower()
-        is_animation = is_anime or "animation" in genres
+        is_animation = bool(meta.get("anime")) or "animation" in genres
 
         if meta.get("category") == "TV":
-            if is_animation:
+            if is_anime:
                 return ("Séries", "Mangas-Animes")
+            if is_animation:
+                return ("Séries", "Séries Animées")
             return ("Séries", "Séries TV")
 
         # Movie
-        if is_animation:
+        if is_anime or is_animation:
             return ("Films", "Films d'animation")
         return ("Films", "Films")
 
