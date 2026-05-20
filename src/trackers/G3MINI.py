@@ -147,9 +147,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                     if not isinstance(encoding_settings, str):
                         encoding_settings = str(encoding_settings)
                     if not encoding_settings:
-                        if meta.get("debug", False):
-                            console.print(f"[yellow]{self.tracker}: No Encoded_Library_Settings found — skipping preset check.[/yellow]")
-                        break
+                        console.print(f"[bold red]{self.tracker}: No encoding settings found in mediainfo — cannot verify x264 preset quality (minimum: 'slow').[/bold red]")
+                        return False
 
                     subme_match = re.search(r"\bsubme\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)
                     trellis_match = re.search(r"\btrellis\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)

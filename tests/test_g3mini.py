@@ -570,3 +570,88 @@ class TestG3MININotagGetName:
         meta = self._base_meta(tag="-NoGrp")
         result = asyncio.run(g3mini.get_name(meta))
         assert result["name"].endswith("-NoGrP")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — x264 preset quality gate
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestG3MINIAdditionalChecksX264Preset:
+    """G3MINI rejects x264 encodes that cannot prove ≥ 'slow' preset quality."""
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, encoding_settings: str | None, **overrides: Any) -> dict[str, Any]:
+        video_track: dict[str, Any] = {"@type": "Video"}
+        if encoding_settings is not None:
+            video_track["Encoded_Library_Settings"] = encoding_settings
+        m = _meta_base(
+            type="ENCODE",
+            video_codec="x264",
+            video_encode="x264",
+            source="BluRay",
+            is_disc=None,
+            mediainfo={
+                "media": {
+                    "track": [
+                        video_track,
+                        {"@type": "Audio", "Language": "fr"},
+                    ]
+                }
+            },
+            audio_languages=["French"],
+            subtitle_languages=[],
+        )
+        m.update(overrides)
+        return m
+
+    def test_no_encoding_settings_is_rejected(self):
+        """Scene releases without Encoded_Library_Settings must be blocked."""
+        meta = self._meta(encoding_settings=None)
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is False
+
+    def test_empty_encoding_settings_is_rejected(self):
+        """Empty Encoded_Library_Settings string must be blocked."""
+        meta = self._meta(encoding_settings="")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is False
+
+    def test_medium_preset_subme7_is_rejected(self):
+        """subme=7 (medium) must be rejected."""
+        meta = self._meta(encoding_settings="cabac=1 / ref=5 / subme=7 / trellis=1")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is False
+
+    def test_medium_preset_trellis1_is_rejected(self):
+        """trellis=1 (medium) must be rejected."""
+        meta = self._meta(encoding_settings="subme=8 / trellis=1")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is False
+
+    def test_slow_preset_passes(self):
+        """subme=8, trellis=2 (slow) must pass."""
+        meta = self._meta(encoding_settings="cabac=1 / ref=5 / subme=8 / trellis=2")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is True
+
+    def test_veryslow_preset_passes(self):
+        """subme=10, trellis=2 (veryslow) must pass."""
+        meta = self._meta(encoding_settings="subme=10 / trellis=2 / ref=8")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is True
+
+    def test_remux_skips_preset_check(self):
+        """REMUX type must not be blocked by the preset check."""
+        meta = self._meta(encoding_settings=None, type="REMUX", video_codec="HEVC", video_encode="")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is True
+
+    def test_disc_skips_preset_check(self):
+        """Full disc (is_disc=BDMV) must not be blocked by the preset check."""
+        meta = self._meta(encoding_settings=None, is_disc="BDMV")
+        result = asyncio.run(self._g3().get_additional_checks(meta))
+        assert result is True
