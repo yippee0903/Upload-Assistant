@@ -590,8 +590,8 @@ class TestG3MINIAdditionalChecksX264Preset:
             video_track["Encoded_Library_Settings"] = encoding_settings
         m = _meta_base(
             type="ENCODE",
-            video_codec="x264",
-            video_encode="x264",
+            video_codec="AVC",
+            video_encode=" x264",
             source="BluRay",
             is_disc=None,
             mediainfo={
@@ -646,7 +646,7 @@ class TestG3MINIAdditionalChecksX264Preset:
 
     def test_remux_skips_preset_check(self):
         """REMUX type must not be blocked by the preset check."""
-        meta = self._meta(encoding_settings=None, type="REMUX", video_codec="HEVC", video_encode="")
+        meta = self._meta(encoding_settings=None, type="REMUX", video_codec="AVC", video_encode="")
         result = asyncio.run(self._g3().get_additional_checks(meta))
         assert result is True
 

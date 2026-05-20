@@ -139,7 +139,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         #   subme : medium=7, slow=8, slower=9, veryslow=10+  → require >= 8
         #   trellis: medium=1, slow=2                          → require >= 2
         # Both conditions must be met to pass (either alone could be a custom override).
-        if not meta.get("is_disc") and meta.get("video_codec") == "x264" and meta.get("type") in {"ENCODE", "WEBRIP"}:
+        if not meta.get("is_disc") and "x264" in meta.get("video_encode", "").lower() and meta.get("type") in {"ENCODE", "WEBRIP"}:
             tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
             for track in tracks:
                 if track.get("@type") == "Video":
