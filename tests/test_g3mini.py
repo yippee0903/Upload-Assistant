@@ -621,8 +621,8 @@ class TestG3MINIAdditionalChecksX264Preset:
         assert result is False
 
     def test_medium_preset_subme7_is_rejected(self):
-        """subme=7 (medium) must be rejected."""
-        meta = self._meta(encoding_settings="cabac=1 / ref=5 / subme=7 / trellis=1")
+        """subme=7 alone (trellis meets minimum) must be rejected."""
+        meta = self._meta(encoding_settings="cabac=1 / ref=5 / subme=7 / trellis=2")
         result = asyncio.run(self._g3().get_additional_checks(meta))
         assert result is False
 
@@ -645,8 +645,8 @@ class TestG3MINIAdditionalChecksX264Preset:
         assert result is True
 
     def test_remux_skips_preset_check(self):
-        """REMUX type must not be blocked by the preset check."""
-        meta = self._meta(encoding_settings=None, type="REMUX", video_codec="AVC", video_encode="")
+        """REMUX type must not be blocked by the preset check even with x264 video_encode."""
+        meta = self._meta(encoding_settings=None, type="REMUX", video_codec="AVC", video_encode=" x264")
         result = asyncio.run(self._g3().get_additional_checks(meta))
         assert result is True
 
