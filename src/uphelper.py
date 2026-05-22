@@ -63,7 +63,12 @@ class UploadHelper:
                     display_name = tracker_rename
 
             # Show naming change before dupe prompts so user knows what the final name will be
-            if display_name is not None and display_name != "" and display_name != meta.get("name", "") and not meta.get("unattended", False):
+            if (
+                display_name is not None
+                and display_name != ""
+                and display_name != meta.get("name", "")
+                and (not meta.get("unattended", False) or meta.get("unattended_confirm", False))
+            ):
                 console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
 
             trumpable_text = None
