@@ -42,6 +42,66 @@ class LST(UNIT3D):
         ):
             return False
 
+        # Block micro-encodes: check minimum video bitrate for ENCODE / WEBRIP / WEBDL
+        if meta.get("type", "").upper() in ("ENCODE", "WEBRIP", "WEBDL"):
+            video_encode = str(meta.get("video_encode", "")).strip().lower()
+            resolution_text = str(meta.get("resolution", "")).lower().replace("p", "").replace("i", "")
+            resolution = int(resolution_text) if resolution_text.isdigit() else 0
+
+            MIN_BITRATE: dict[tuple[str, int], int] = {
+                ("x265", 2160): 3_000_000,
+                ("x265", 1080): 1_000_000,
+                ("x265", 720): 600_000,
+                ("x264", 2160): 8_000_000,
+                ("x264", 1080): 2_000_000,
+                ("x264", 720): 1_000_000,
+            }
+
+            codec_key = None
+            if "x265" in video_encode or "h.265" in video_encode or "hevc" in video_encode:
+                codec_key = "x265"
+            elif "x264" in video_encode or "h.264" in video_encode or "avc" in video_encode:
+                codec_key = "x264"
+
+            # Fail-closed: block if codec or resolution is unrecognised
+            if not codec_key or not resolution:
+                if not meta.get("unattended", False):
+                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — unrecognised codec or resolution.[/bold red]")
+                return False
+
+            rule_key = (codec_key, resolution)
+            min_bps = MIN_BITRATE.get(rule_key)
+
+            # Fail-closed: block if no rule exists for this codec/resolution combination
+            if not min_bps:
+                if not meta.get("unattended", False):
+                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — no bitrate rule for {resolution}p {codec_key.upper()}.[/bold red]")
+                return False
+
+            mediainfo = meta.get("mediainfo", {})
+            tracks = mediainfo.get("media", {}).get("track", [])
+            video_bitrate = 0
+            for track in tracks:
+                if track.get("@type") == "Video":
+                    br = track.get("BitRate")
+                    if br and str(br).isdigit():
+                        video_bitrate = int(br)
+                    break
+
+            # Fail-closed: block if bitrate is missing or unreadable
+            if not video_bitrate:
+                if not meta.get("unattended", False):
+                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — video bitrate missing from mediainfo.[/bold red]")
+                return False
+
+            if video_bitrate < min_bps:
+                if not meta.get("unattended", False):
+                    console.print(
+                        f"[bold red]{self.tracker}: Micro-encode detected — video bitrate {video_bitrate // 1000} kb/s "
+                        f"is below the minimum {min_bps // 1000} kb/s for {resolution}p {codec_key.upper()}.[/bold red]"
+                    )
+                return False
+
         return should_continue
 
     async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:

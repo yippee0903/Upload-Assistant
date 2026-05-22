@@ -210,3 +210,168 @@ class TestTrumpSuffix:
         result = _run(_lst().get_name(meta))["name"]
         assert result.endswith(" - TRUMP"), f"Trump suffix missing: {result}"
         assert "2010" in result, f"Movie year must not be stripped: {result}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — micro-encode bitrate gate
+# ═══════════════════════════════════════════════════════════════
+
+
+def _bitrate_meta(
+    video_bitrate: int,
+    codec: str = "x265",
+    resolution: str = "1080p",
+    type: str = "WEBRIP",
+    **overrides: Any,
+) -> dict[str, Any]:
+    """Minimal meta for get_additional_checks() bitrate tests.
+
+    Language check is short-circuited via language_checked=True + English audio
+    so tests stay fast and offline.
+    """
+    m: dict[str, Any] = {
+        "is_disc": None,
+        "valid_mi_settings": True,
+        "type": type,
+        "video_encode": codec,
+        "resolution": resolution,
+        "original_language": "en",
+        "audio_languages": ["english"],
+        "subtitle_languages": [],
+        "language_checked": True,
+        "tracker_status": {"LST": {}},
+        "debug": False,
+        "unattended": True,
+        "mediainfo": {
+            "media": {
+                "track": [
+                    {"@type": "Video", "BitRate": str(video_bitrate)},
+                ]
+            }
+        },
+    }
+    m.update(overrides)
+    return m
+
+
+class TestAdditionalChecksMicroEncode:
+    """Bitrate gate blocks micro-encodes for ENCODE / WEBRIP / WEBDL."""
+
+    # ── x265 1080p (threshold: 1 000 000 bps) ──────────────────
+
+    def test_x265_1080p_webrip_below_threshold_is_rejected(self):
+        """JATT-style release at ~748 kb/s must be blocked."""
+        meta = _bitrate_meta(video_bitrate=748_000, codec="x265", resolution="1080p", type="WEBRIP")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_1080p_webdl_below_threshold_is_rejected(self):
+        """Same codec/resolution, WEBDL type, must also be blocked."""
+        meta = _bitrate_meta(video_bitrate=900_000, codec="x265", resolution="1080p", type="WEBDL")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_1080p_encode_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=500_000, codec="x265", resolution="1080p", type="ENCODE")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_1080p_just_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=999_999, codec="x265", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_1080p_at_threshold_is_allowed(self):
+        """Exactly at the minimum must pass (not strictly below)."""
+        meta = _bitrate_meta(video_bitrate=1_000_000, codec="x265", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    def test_x265_1080p_above_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=2_000_000, codec="x265", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    # ── x265 1080p — alternate codec labels ────────────────────
+
+    def test_hevc_label_below_threshold_is_rejected(self):
+        """'HEVC' codec label must map to x265 and be checked."""
+        meta = _bitrate_meta(video_bitrate=500_000, codec="HEVC", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_h265_label_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=500_000, codec="H.265", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    # ── x265 720p (threshold: 600 000 bps) ─────────────────────
+
+    def test_x265_720p_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=400_000, codec="x265", resolution="720p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_720p_above_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=800_000, codec="x265", resolution="720p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    # ── x265 2160p (threshold: 3 000 000 bps) ──────────────────
+
+    def test_x265_2160p_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=2_000_000, codec="x265", resolution="2160p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x265_2160p_above_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=4_000_000, codec="x265", resolution="2160p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    # ── x264 1080p (threshold: 2 000 000 bps) ──────────────────
+
+    def test_x264_1080p_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=1_500_000, codec="x264", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x264_1080p_above_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=2_500_000, codec="x264", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    def test_h264_label_below_threshold_is_rejected(self):
+        """'H.264' codec label must map to x264 and be checked."""
+        meta = _bitrate_meta(video_bitrate=1_000_000, codec="H.264", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_avc_label_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=1_000_000, codec="AVC", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    # ── edge cases ──────────────────────────────────────────────
+
+    def test_no_bitrate_in_mediainfo_is_rejected(self):
+        """Missing BitRate value must block the upload (fail-closed)."""
+        meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Video"}]}}
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_unknown_codec_is_rejected(self):
+        """Unrecognised codec (e.g. VP9) must block the upload (fail-closed)."""
+        meta = _bitrate_meta(video_bitrate=5_000_000, codec="vp9", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_unmapped_resolution_is_rejected(self):
+        """Resolution with no rule (e.g. 480p) must block the upload (fail-closed)."""
+        meta = _bitrate_meta(video_bitrate=5_000_000, codec="x265", resolution="480p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_remux_type_skips_bitrate_check(self):
+        """REMUX type is not subject to the bitrate gate."""
+        meta = _bitrate_meta(video_bitrate=100_000, codec="x265", resolution="1080p", type="REMUX")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    def test_disc_type_skips_bitrate_check(self):
+        """DISC type is not subject to the bitrate gate."""
+        meta = _bitrate_meta(video_bitrate=100_000, codec="x265", resolution="1080p", type="DISC")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    def test_invalid_mi_settings_is_rejected(self):
+        """valid_mi_settings=False must return False before any bitrate check."""
+        meta = _bitrate_meta(video_bitrate=5_000_000, codec="x265", resolution="1080p")
+        meta["valid_mi_settings"] = False
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_bdmv_disc_skips_bitrate_check(self):
+        """Full BDMV disc upload bypasses the bitrate gate entirely."""
+        meta = _bitrate_meta(video_bitrate=100_000, codec="x265", resolution="1080p", type="DISC")
+        meta["is_disc"] = "BDMV"
+        assert _run(_lst().get_additional_checks(meta)) is True
