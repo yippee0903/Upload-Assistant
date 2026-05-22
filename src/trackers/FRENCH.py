@@ -422,7 +422,8 @@ class FrenchTrackerMixin:
             check_subtitle=True,
             require_both=False,
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
         return True
 

@@ -459,7 +459,8 @@ class SeasonEpisodeManager:
                     console.print("[red]Aborting due to pack homogeneity issues.")
                     sys.exit(1)
             else:
-                console.print("[yellow]Unattended mode: continuing despite pack homogeneity issues.")
+                console.print("[red]Unattended mode: aborting due to pack homogeneity issues.")
+                sys.exit(1)
         else:
             if meta.get("debug", False):
                 console.print("[green]Pack homogeneity verified")

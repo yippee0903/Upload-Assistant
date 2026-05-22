@@ -130,7 +130,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             require_both=False,
             # original_language=True,   # Devlopement version
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
         # G3MINI requires x264 encodes to use at least the "slow" preset.

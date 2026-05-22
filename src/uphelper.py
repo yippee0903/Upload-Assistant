@@ -63,7 +63,7 @@ class UploadHelper:
                     display_name = tracker_rename
 
             # Show naming change before dupe prompts so user knows what the final name will be
-            if display_name is not None and display_name != "" and display_name != meta.get("name", ""):
+            if display_name is not None and display_name != "" and display_name != meta.get("name", "") and not meta.get("unattended", False):
                 console.print(f"[bold yellow]{tracker_name} applies a naming change for this release: [green]{display_name}[/green][/bold yellow]")
 
             trumpable_text = None
@@ -213,12 +213,8 @@ class UploadHelper:
                         upload = True
 
             else:
-                if french_supersede:
-                    # In unattended mode, auto-skip when a superior French audio version exists
-                    console.print(f"[bold yellow]{tracker_name}: Skipping — a release with French audio already exists (VOSTFR/VO superseded).[/bold yellow]")
-                    upload = False
-                else:
-                    upload = meta.get("dupe", False) is not False
+                # In unattended mode, auto-skip when a superior French audio version exists
+                upload = False if french_supersede else meta.get("dupe", False) is not False
 
             display_name = display_name if display_name is not None else str(meta.get("name", ""))
             display_name = str(display_name)

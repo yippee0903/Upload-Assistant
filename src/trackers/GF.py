@@ -234,7 +234,8 @@ class GF(FrenchTrackerMixin, UNIT3D):
             check_subtitle=True,
             require_both=False,
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
         # Auto-generate NFO if not provided (GF requires NFO for VOSTFR & multi)

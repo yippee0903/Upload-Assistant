@@ -420,9 +420,10 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         candidate_names = [path_basename] + [os.path.basename(f) for f in meta.get("filelist", [])]
         problem_files = [n for n in candidate_names if n and not _SAFE_FILENAME.match(n)]
         if problem_files:
-            console.print(f"[bold red]{self.tracker}: Release contains filename(s) with special characters not accepted by TOS.[/bold red]")
-            for f in problem_files[:3]:
-                console.print(f"[bold yellow]  → {f}[/bold yellow]")
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]{self.tracker}: Release contains filename(s) with special characters not accepted by TOS.[/bold red]")
+                for f in problem_files[:3]:
+                    console.print(f"[bold yellow]  → {f}[/bold yellow]")
             return False
 
         # Check language requirements: must be French audio OR original audio with French subtitles
@@ -436,7 +437,8 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             require_both=False,
             original_language=True,
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
         # Check if it's a Scene release without NFO - TOS requires NFO for Scene releases
