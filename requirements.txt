@@ -39,7 +39,7 @@ regex==2026.5.9
 requests==2.34.2
 rich==15.0.0
 setuptools==82.0.1
-tmdbsimple==2.9.4
+tmdbsimple==2.9.6
 torf==4.3.1
 tqdm==4.67.3
 transmission_rpc==7.0.11
