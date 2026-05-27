@@ -655,3 +655,61 @@ class TestG3MINIAdditionalChecksX264Preset:
         meta = self._meta(encoding_settings=None, is_disc="BDMV")
         result = asyncio.run(self._g3().get_additional_checks(meta))
         assert result is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — regression for Cyclo-style filenames
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestNogroupWebDL:
+    """WEB-DL releases without a group tag must use G3MINI's notag_label.
+
+    G3MINI uses WEB_LABEL='WEB-DL' and notag_label='NoGrP'.
+    Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv had a false
+    group '-DL.AAC.2.0.H.264' extracted, producing duplicated tokens.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(G3MINI(_config()).get_name(meta))['name']
+
+    def test_empty_tag_uses_notag_label(self):
+        """tag='' (nogroup) must produce a name ending with '-NoGrP'."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-NoGrP'), f"Expected -NoGrP suffix, got: {name!r}"
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.count('AAC') == 1, (
+            f"Audio token 'AAC' duplicated in name: {name!r}."
+        )
+
+    def test_real_group_preserved(self):
+        """A real group tag must not be replaced by the notag label."""
+        meta = _meta_base(
+            type='WEBDL',
+            source='WEB',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='-GROUP',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-GROUP'), f"Expected -GROUP suffix, got: {name!r}"

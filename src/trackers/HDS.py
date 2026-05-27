@@ -166,6 +166,13 @@ class HDS:
             meta["skipping"] = f"{self.tracker}"
             return dupes
 
+        tag_group = str(meta.get("tag", "")).strip("-").strip().lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "unk"]
+        if not tag_group or tag_group in invalid_tags:
+            console.print(f"{self.tracker}: Releases without a group tag are not accepted. Skipping.")
+            meta["skipping"] = f"{self.tracker}"
+            return dupes
+
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
         if cookies is not None:

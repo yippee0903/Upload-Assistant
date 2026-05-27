@@ -47,6 +47,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "WEBDL",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         with patch("src.trackers.COMMON.languages_manager") as mock_lm:
             mock_lm.process_desc_language = AsyncMock()
@@ -60,6 +61,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "WEBDL",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         with patch("src.trackers.COMMON.languages_manager") as mock_lm:
             mock_lm.process_desc_language = AsyncMock()
@@ -73,6 +75,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "WEBDL",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         with patch("src.trackers.COMMON.languages_manager") as mock_lm:
             mock_lm.process_desc_language = AsyncMock()
@@ -87,6 +90,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "DISC",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         assert _run(hhd.get_additional_checks(meta)) is True
 
@@ -98,6 +102,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "DISC",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         assert _run(hhd.get_additional_checks(meta)) is True
 
@@ -121,6 +126,7 @@ class TestHHDEnglishLanguageCheck:
             "type": "WEBDL",
             "debug": False,
             "unattended": True,
+            "tag": "-FRiENDS",
         }
         with patch("src.trackers.COMMON.languages_manager") as mock_lm:
             mock_lm.process_desc_language = AsyncMock()
@@ -152,3 +158,57 @@ class TestHHDSearchExistingLanguageGate:
             dupes = _run(hhd.search_existing(meta, ""))
         assert dupes == []
         assert meta["skipping"] == "HHD"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup rejection — get_additional_checks()
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHHDNogroupRejection:
+    """HHD has no stated policy for untagged releases — they must be rejected.
+
+    Regression: before the get_tag fix the false tag '-DL.AAC.2.0.H.264' was
+    accepted as a valid group. After the fix tag='' and HHD must refuse the upload.
+    """
+
+    def _meta(self, **overrides: Any) -> dict[str, Any]:
+        m: dict[str, Any] = {
+            "tag": "-FRiENDS",
+            "type": "WEBDL",
+            "is_disc": None,
+            "audio_languages": ["English"],
+            "subtitle_languages": [],
+            "debug": False,
+            "unattended": True,
+        }
+        m.update(overrides)
+        return m
+
+    def test_empty_tag_is_rejected(self):
+        """tag='' → get_additional_checks returns False."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="")))
+        assert result is False, "HHD must reject releases with no group tag"
+
+    def test_nogrp_tag_is_rejected(self):
+        """'-nogrp' placeholder → rejected."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-nogrp")))
+        assert result is False
+
+    def test_nogroup_tag_is_rejected(self):
+        """'-nogroup' placeholder → rejected."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-nogroup")))
+        assert result is False
+
+    def test_valid_tag_passes(self):
+        """A real English-audio release with a group tag must not be rejected."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-FRiENDS")))
+        assert result is True

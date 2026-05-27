@@ -224,3 +224,81 @@ class TestTosSpecificDupes:
             # Internal groups must NOT be in banned_groups (which blocks uploading *from* those
             # groups). They only block dupes via _check_tos_specific_dupes.
             assert grp not in t.banned_groups, f"{grp} should not be in banned_groups"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — regression for Cyclo-style filenames
+# ═══════════════════════════════════════════════════════════════
+
+
+def _meta_nogroup(**overrides: Any) -> dict[str, Any]:
+    """Full meta for TOS get_name tests."""
+    m: dict[str, Any] = {
+        'category': 'MOVIE',
+        'type': 'WEBDL',
+        'title': 'Cyclo',
+        'year': '1995',
+        'resolution': '1080p',
+        'source': 'WEB',
+        'audio': 'AAC 2.0',
+        'video_encode': 'H.264',
+        'video_codec': 'H.264',
+        'service': '',
+        'tag': '',
+        'edition': '',
+        'repack': '',
+        '3D': '',
+        'uhd': '',
+        'hdr': '',
+        'webdv': '',
+        'part': '',
+        'season': '',
+        'episode': '',
+        'is_disc': None,
+        'search_year': '',
+        'manual_year': None,
+        'manual_date': None,
+        'no_season': False,
+        'no_year': False,
+        'no_aka': False,
+        'debug': False,
+        'tv_pack': False,
+        'scene': False,
+        'scene_name': '',
+        'path': '',
+        'original_language': 'vi',
+        'audio_languages': [],
+        'subtitle_languages': [],
+        'mediainfo': {'media': {'track': []}},
+    }
+    m.update(overrides)
+    return m
+
+
+class TestNogroupWebDL:
+    """WEB-DL releases without a group tag must use TOS's notag_label.
+
+    TOS uses notag_label='NOTAG'.
+    Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv had a false
+    group '-DL.AAC.2.0.H.264' extracted, producing duplicated tokens.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return _run(TOS(_config()).get_name(meta))['name']
+
+    def test_empty_tag_uses_notag_label(self):
+        """tag='' (nogroup) must produce a name ending with '-NOTAG'."""
+        name = self._get_name(_meta_nogroup())
+        assert name.endswith('-NOTAG'), f"Expected -NOTAG suffix, got: {name!r}"
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        name = self._get_name(_meta_nogroup())
+        assert name.count('AAC') == 1, (
+            f"Audio token 'AAC' duplicated in name: {name!r}."
+        )
+
+    def test_real_group_preserved(self):
+        """A real group tag must not be replaced by the notag label."""
+        name = self._get_name(_meta_nogroup(tag='-FRiENDS'))
+        assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"

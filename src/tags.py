@@ -48,7 +48,8 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             # If the extension contains a hyphen, it's not a real extension
             basename_stripped = basename_no_path if ext and "-" in ext else name
         non_anime_match = re.search(
-            r"(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$", basename_stripped
+            r"(?<=-)((?<!WEB-)(?<!Blu-)(?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$",
+            basename_stripped,
         )
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()

@@ -1,0 +1,145 @@
+# Tests for src/tags.py — release-group extraction
+"""
+Regression tests for get_tag().
+
+Key regression: filenames whose only hyphen is part of a source token
+(WEB-DL, Blu-ray) must NOT produce a false group tag.
+
+Before the fix the regex `(?<=-)` would match right after the hyphen in
+"WEB-DL" and capture "DL.AAC.2.0.H.264" as the release group, causing
+tracker naming to produce duplicated audio/codec tokens, e.g.:
+    Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv
+    → meta["tag"] = "-DL.AAC.2.0.H.264"      (wrong)
+    → TORR9 name: …H264-DL.AAC.2.0.H.264     (malformed)
+
+After the fix, both `(?<!WEB-)` and `(?<!Blu-)` lookbehinds prevent the
+regex from firing right after the hyphens in those source tokens.
+"""
+
+import asyncio
+from typing import Any
+
+from src.tags import get_tag
+
+
+# ─── Helpers ──────────────────────────────────────────────────
+
+
+def _meta(**overrides: Any) -> dict[str, Any]:
+    """Minimal meta dict required by get_tag."""
+    m: dict[str, Any] = {
+        "debug": False,
+        "is_disc": None,
+        "anime": False,
+        "tv_pack": False,
+        "keep_folder": False,
+        "scene": False,
+        "uuid": "test-uuid",
+    }
+    m.update(overrides)
+    return m
+
+
+def _run(coro: Any) -> Any:
+    return asyncio.run(coro)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  WEB-DL — hyphen must not be treated as group separator
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagWebDL:
+    """The hyphen in WEB-DL is a source token, not a group separator."""
+
+    def test_webdl_h264_no_group_returns_empty(self):
+        """Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv — no group."""
+        tag = _run(get_tag("Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_webdl_h265_no_group_returns_empty(self):
+        tag = _run(get_tag("Movie.2023.1080p.WEB-DL.DDP5.1.H.265.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_webdl_4k_hdr_no_group_returns_empty(self):
+        tag = _run(get_tag("Film.2022.2160p.WEB-DL.DV.HDR.DDP.5.1.H.265.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_webdl_avc_no_group_returns_empty(self):
+        tag = _run(get_tag("Series.S01E01.1080p.WEB-DL.AAC.2.0.AVC.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_webdl_with_real_group_extracted(self):
+        """Group after the codec, following a second hyphen, must be captured."""
+        tag = _run(get_tag("Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264-GroupName.mkv", _meta()))
+        assert tag == "-GroupName", f"Expected -GroupName, got {tag!r}"
+
+    def test_webdl_h265_with_real_group_extracted(self):
+        tag = _run(get_tag("Movie.2023.1080p.WEB-DL.DDP5.1.H.265-GROUPX.mkv", _meta()))
+        assert tag == "-GROUPX", f"Expected -GROUPX, got {tag!r}"
+
+    def test_webdl_false_tag_before_fix(self):
+        """Document what the old regex would have matched (the DL.AAC… false tag).
+
+        The key invariant after the fix: any tag extracted from a WEB-DL
+        filename must NOT contain "DL" as a prefix.
+        """
+        tag = _run(get_tag("Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv", _meta()))
+        assert not tag.startswith("-DL"), (
+            f"False WEB-DL tag detected: {tag!r}. "
+            "The hyphen in WEB-DL must not be used as a group separator."
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Blu-ray — same family of bug
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagBluray:
+    """The hyphen in Blu-ray is a source token, not a group separator."""
+
+    def test_bluray_no_group_returns_empty(self):
+        tag = _run(get_tag("Film.2020.1080p.Blu-ray.DTS.x264.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_bluray_with_real_group_extracted(self):
+        tag = _run(get_tag("Film.2020.1080p.Blu-ray.DTS.x264-CREW.mkv", _meta()))
+        assert tag == "-CREW", f"Expected -CREW, got {tag!r}"
+
+    def test_bluray_false_tag_before_fix(self):
+        """After the fix, 'ray' must not be extracted as the group from Blu-ray."""
+        tag = _run(get_tag("Film.2020.1080p.Blu-ray.DTS.x264.mkv", _meta()))
+        assert not tag.startswith("-ray"), (
+            f"False Blu-ray tag detected: {tag!r}. "
+            "The hyphen in Blu-ray must not be used as a group separator."
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Standard releases — real group tags must still be extracted
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagRealGroups:
+    """Releases with genuine group tags must still work correctly."""
+
+    def test_bluray_encode_group(self):
+        tag = _run(get_tag("Show.S01E01.1080p.BluRay.x264-GRP.mkv", _meta()))
+        assert tag == "-GRP", f"Expected -GRP, got {tag!r}"
+
+    def test_webrip_group(self):
+        tag = _run(get_tag("Movie.2024.720p.WEBRip.AAC.x264-NTG.mkv", _meta()))
+        assert tag == "-NTG", f"Expected -NTG, got {tag!r}"
+
+    def test_remux_group(self):
+        tag = _run(get_tag("Movie.2020.1080p.BluRay.REMUX.DTS-HD.MA.5.1.H264-TEAM.mkv", _meta()))
+        assert tag == "-TEAM", f"Expected -TEAM, got {tag!r}"
+
+    def test_no_hyphen_no_group(self):
+        tag = _run(get_tag("Standalone.2023.1080p.BluRay.x264.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_web_no_hyphen_group(self):
+        tag = _run(get_tag("Movie.2023.1080p.WEB.AAC.x264-FRGRP.mkv", _meta()))
+        assert tag == "-FRGRP", f"Expected -FRGRP, got {tag!r}"

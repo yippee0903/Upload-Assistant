@@ -47,10 +47,11 @@ class RF(UNIT3D):
         tag_lower = tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
+        # RF accepts releases without a group tag — strip any invalid token but
+        # do NOT append a placeholder suffix.
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
-                rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
-            rf_name = f"{rf_name}-NoGroup"
+                rf_name = re.sub(f"-{re.escape(invalid_tag)}", "", rf_name, flags=re.IGNORECASE)
 
         return {"name": rf_name}
 

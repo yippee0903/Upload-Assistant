@@ -375,3 +375,55 @@ class TestAdditionalChecksMicroEncode:
         meta = _bitrate_meta(video_bitrate=100_000, codec="x265", resolution="1080p", type="DISC")
         meta["is_disc"] = "BDMV"
         assert _run(_lst().get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — passthrough regression
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestNogroupWebDL:
+    """LST accepts releases without a group tag — name is passed through as-is.
+
+    Regression: before the get_tag fix, Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv
+    had '-DL.AAC.2.0.H.264' extracted as the group and appended to LST's name.
+    After the fix tag='' so meta['name'] is already clean; LST must not alter it.
+    """
+
+    def test_empty_tag_name_unchanged(self):
+        """Nogroup movie name passed through without modification."""
+        meta = {
+            "name": "Cyclo.1995.1080p.WEB.AAC.2.0.H264",
+            "tag": "",
+            "category": "MOVIE",
+            "type": "WEBDL",
+            "source": "WEB",
+            "resolution": "1080p",
+            "audio": "AAC 2.0",
+            "video_encode": "H.264",
+            "video_codec": "H.264",
+            "trump_reason": None,
+            "tvdb_series_name": None,
+        }
+        result = _run(_lst().get_name(meta))["name"]
+        assert result == "Cyclo.1995.1080p.WEB.AAC.2.0.H264", (
+            f"LST must not alter nogroup movie name, got: {result!r}"
+        )
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        meta = {
+            "name": "Cyclo.1995.1080p.WEB.AAC.2.0.H264",
+            "tag": "",
+            "category": "MOVIE",
+            "type": "WEBDL",
+            "source": "WEB",
+            "resolution": "1080p",
+            "audio": "AAC 2.0",
+            "video_encode": "H.264",
+            "video_codec": "H.264",
+            "trump_reason": None,
+            "tvdb_series_name": None,
+        }
+        result = _run(_lst().get_name(meta))["name"]
+        assert result.count("AAC") == 1, f"Audio token duplicated: {result!r}"

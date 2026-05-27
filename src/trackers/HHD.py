@@ -90,6 +90,12 @@ class HHD(UNIT3D):
         ):
             return False
 
+        tag_group = str(meta.get("tag", "")).strip("-").strip().lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "unk"]
+        if not tag_group or tag_group in invalid_tags:
+            console.print(f"[bold red]{self.tracker}: Releases without a group tag are not accepted. Skipping.[/bold red]")
+            return False
+
         return should_continue
 
     async def get_resolution_id(self, meta: Meta, resolution: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:

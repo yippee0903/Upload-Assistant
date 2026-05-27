@@ -88,6 +88,12 @@ class YUS(UNIT3D):
             else:
                 return False
 
+        tag_group = str(meta.get("tag", "")).strip("-").strip().lower()
+        invalid_tags = ["nogrp", "nogroup", "unknown", "unk"]
+        if not tag_group or tag_group in invalid_tags:
+            console.print(f"[bold red]{self.tracker}: Releases without a group tag are not accepted. Skipping.[/bold red]")
+            return False
+
         return should_continue
 
     async def get_type_id(

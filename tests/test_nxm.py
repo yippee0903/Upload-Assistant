@@ -149,3 +149,64 @@ class TestTrackerIdentity:
 
     def test_include_service_in_name(self):
         assert NXM.INCLUDE_SERVICE_IN_NAME is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — regression for Cyclo-style filenames
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestNogroupWebDL:
+    """WEB-DL releases without a group tag must use NXM's notag_label.
+
+    NXM uses WEB_LABEL='WEB' and notag_label='NoGrp'.
+    Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv had a false
+    group '-DL.AAC.2.0.H.264' extracted, producing duplicated tokens.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(NXM(_config()).get_name(meta))['name']
+
+    def test_empty_tag_uses_notag_label(self):
+        """tag='' (nogroup) must produce a name ending with '-NoGrp'."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            service='',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-NoGrp'), f"Expected -NoGrp suffix, got: {name!r}"
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            service='',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.count('AAC') == 1, (
+            f"Audio token 'AAC' duplicated in name: {name!r}."
+        )
+
+    def test_real_group_preserved(self):
+        """A real group tag must not be replaced by the notag label."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            service='',
+            tag='-FRiENDS',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"

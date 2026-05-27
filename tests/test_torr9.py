@@ -1609,3 +1609,77 @@ class TestNfoUploadFlow:
 
         import shutil
         shutil.rmtree(tmpd)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — regression for Cyclo-style filenames
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestNogroupWebDL:
+    """WEB-DL releases without a group tag must use TORR9's notag_label.
+
+    Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv triggered a false
+    group extraction ('-DL.AAC.2.0.H.264') which was then appended to the
+    TORR9-built name, producing duplicated audio/codec tokens.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return _run(TORR9(_config()).get_name(meta))['name']
+
+    def test_empty_tag_uses_notag_label(self):
+        """tag='' (nogroup) must produce a name ending with '-NoTag'."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-NoTag'), f"Expected -NoTag suffix, got: {name!r}"
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.count('AAC') == 1, (
+            f"Audio token 'AAC' duplicated in name: {name!r}. "
+            "Possible false group tag extracted from WEB-DL source."
+        )
+
+    def test_codec_not_duplicated(self):
+        """Codec token must appear exactly once."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+        )
+        name = self._get_name(meta)
+        assert name.count('H264') == 1, (
+            f"Codec token 'H264' duplicated in name: {name!r}."
+        )
+
+    def test_real_group_preserved(self):
+        """A real group tag from a WEB-DL release must be kept as-is."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='-FRiENDS',
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"

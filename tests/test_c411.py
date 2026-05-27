@@ -2598,3 +2598,65 @@ class TestC411SearchExistingLanguageGate:
             dupes = _run_async(c411.search_existing(meta, ""))
         assert dupes == []
         assert meta["skipping"] == "C411"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Nogroup WEB-DL naming — regression for Cyclo-style filenames
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestNogroupWebDL:
+    """WEB-DL releases without a group tag must use C411's notag_label.
+
+    C411 uses notag_label='NOTAG'.
+    Regression: Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv had a false
+    group '-DL.AAC.2.0.H.264' extracted, producing duplicated tokens.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        from src.trackers.C411 import C411
+        return _run_async(C411(_config()).get_name(meta))['name']
+
+    def test_empty_tag_uses_notag_label(self):
+        """tag='' (nogroup) must produce a name ending with '-NOTAG'."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+            has_encode_settings=False,
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-NOTAG'), f"Expected -NOTAG suffix, got: {name!r}"
+
+    def test_no_audio_duplication(self):
+        """Audio token must appear exactly once — no duplication from a false tag."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='',
+            has_encode_settings=False,
+        )
+        name = self._get_name(meta)
+        assert name.count('AAC') == 1, (
+            f"Audio token 'AAC' duplicated in name: {name!r}."
+        )
+
+    def test_real_group_preserved(self):
+        """A real group tag must not be replaced by the notag label."""
+        meta = _meta_base(
+            title='Cyclo',
+            year='1995',
+            audio='AAC 2.0',
+            video_encode='H.264',
+            video_codec='H.264',
+            tag='-FRiENDS',
+            has_encode_settings=False,
+        )
+        name = self._get_name(meta)
+        assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"
