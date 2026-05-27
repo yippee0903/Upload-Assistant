@@ -129,6 +129,12 @@ class C411(FrenchTrackerMixin):
         - WEB **with** Encoded_Library_Settings   → x264 / x265
         """
         result = await super().get_name(meta)
+
+        # C411's server rejects "CRITERION" as a banned streaming-platform token.
+        # "Criterion" here is the Criterion Collection (a physical-media label),
+        # not a streaming service — strip it so the upload is accepted.
+        result["name"] = re.sub(r"\.Criterion(?:\.Collection)?", "", result["name"], flags=re.IGNORECASE)
+
         release_type = str(meta.get("type", "")).upper()
         if release_type in ("WEBDL", "WEBRIP"):
             if meta.get("has_encode_settings", False):

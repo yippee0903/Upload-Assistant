@@ -2660,3 +2660,77 @@ class TestNogroupWebDL:
         )
         name = self._get_name(meta)
         assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Criterion Collection edition stripping
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestC411CriterionStripping:
+    """C411's server rejects 'CRITERION' as a banned streaming-platform token.
+
+    Regression: L'argent.1983.Criterion.1080p.BluRay.FLAC.x264-BMF.mkv
+    had edition='Criterion' which landed in the release name and caused a
+    server-side upload rejection.  C411.get_name must strip it.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return _run_async(C411(_config()).get_name(meta))['name']
+
+    def test_criterion_edition_stripped(self):
+        """edition='Criterion' must be removed from the C411 release name."""
+        meta = _meta_base(
+            title="L'Argent",
+            year='1983',
+            type='ENCODE',
+            source='BluRay',
+            resolution='1080p',
+            audio='FLAC',
+            video_encode='x264',
+            video_codec='H.264',
+            edition='Criterion',
+            tag='-BMF',
+            has_encode_settings=True,
+        )
+        name = self._get_name(meta)
+        assert 'Criterion' not in name, f"'Criterion' must be stripped, got: {name!r}"
+        assert 'criterion' not in name.lower(), f"'criterion' must be stripped (case-insensitive), got: {name!r}"
+
+    def test_criterion_collection_stripped(self):
+        """edition='Criterion Collection' must also be stripped."""
+        meta = _meta_base(
+            title="L'Argent",
+            year='1983',
+            type='ENCODE',
+            source='BluRay',
+            resolution='1080p',
+            audio='FLAC',
+            video_encode='x264',
+            video_codec='H.264',
+            edition='Criterion Collection',
+            tag='-BMF',
+            has_encode_settings=True,
+        )
+        name = self._get_name(meta)
+        assert 'criterion' not in name.lower(), f"'Criterion Collection' must be stripped, got: {name!r}"
+
+    def test_real_edition_unaffected(self):
+        """Other edition tokens (e.g. Director's Cut) must not be stripped."""
+        meta = _meta_base(
+            title='Blade Runner',
+            year='1982',
+            type='ENCODE',
+            source='BluRay',
+            resolution='1080p',
+            audio='DTS-HD MA 5.1',
+            video_encode='x264',
+            video_codec='H.264',
+            edition="Director's Cut",
+            tag='-GRP',
+            has_encode_settings=True,
+        )
+        name = self._get_name(meta)
+        assert 'Director' in name or 'director' in name.lower(), (
+            f"Edition token must be preserved, got: {name!r}"
+        )
