@@ -73,6 +73,16 @@ class TestYUSNogroupRejection:
         result = _run(YUS(_config()).get_additional_checks(_meta(tag="-nogroup")))
         assert result is False
 
+    def test_unknown_tag_is_rejected(self):
+        """'-unknown' placeholder → rejected."""
+        result = _run(YUS(_config()).get_additional_checks(_meta(tag="-unknown")))
+        assert result is False
+
+    def test_unk_tag_is_rejected(self):
+        """'-unk' placeholder → rejected."""
+        result = _run(YUS(_config()).get_additional_checks(_meta(tag="-unk")))
+        assert result is False
+
     def test_valid_tag_passes(self):
         """A real group tag must not trigger rejection."""
         result = _run(YUS(_config()).get_additional_checks(_meta(tag="-FRiENDS")))

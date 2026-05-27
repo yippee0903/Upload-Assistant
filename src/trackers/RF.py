@@ -44,14 +44,13 @@ class RF(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         rf_name = str(meta.get("name", ""))
         tag_value = str(meta.get("tag", ""))
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        normalized_tag = tag_value.strip("-").strip().lower()
+        invalid_tag_set = {"nogrp", "nogroup", "unknown", "unk"}
 
         # RF accepts releases without a group tag — strip any invalid token but
         # do NOT append a placeholder suffix.
-        if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
-            for invalid_tag in invalid_tags:
-                rf_name = re.sub(f"-{re.escape(invalid_tag)}", "", rf_name, flags=re.IGNORECASE)
+        if tag_value == "" or normalized_tag in invalid_tag_set:
+            rf_name = re.sub(r"-(?:nogrp|nogroup|unknown|unk)(?=$|-)", "", rf_name, flags=re.IGNORECASE)
 
         return {"name": rf_name}
 

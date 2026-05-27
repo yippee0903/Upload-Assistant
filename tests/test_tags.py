@@ -117,6 +117,46 @@ class TestGetTagBluray:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  Mixed-case WEB-DL — lookbehinds must be case-insensitive
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagWebDLMixedCase:
+    """Case variants of WEB-DL must be guarded the same way as the canonical form."""
+
+    def test_web_dl_mixed_case_no_group_returns_empty(self):
+        """Web-DL (mixed case) must not produce a false group tag."""
+        tag = _run(get_tag("Cyclo.1995.1080p.Web-DL.AAC.2.0.H.264.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+        assert not tag.startswith("-DL"), f"False Web-DL tag detected: {tag!r}"
+
+    def test_web_dl_mixed_case_with_real_group(self):
+        """Web-DL with a real group must still extract the group."""
+        tag = _run(get_tag("Cyclo.1995.1080p.Web-DL.AAC.2.0.H.264-GroupName.mkv", _meta()))
+        assert tag == "-GroupName", f"Expected -GroupName, got {tag!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Mixed-case Blu-ray — lookbehinds must be case-insensitive
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagBlurayMixedCase:
+    """Case variants of Blu-ray must be guarded the same way as canonical."""
+
+    def test_blu_ray_uppercase_no_group_returns_empty(self):
+        """BLU-ray (uppercase BLU) must not produce a false group tag."""
+        tag = _run(get_tag("Film.2020.1080p.BLU-ray.DTS.x264.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+        assert not tag.startswith("-ray"), f"False BLU-ray tag detected: {tag!r}"
+
+    def test_blu_ray_mixed_case_with_real_group(self):
+        """Blu-Ray (capital R) with a real group must still extract the group."""
+        tag = _run(get_tag("Film.2020.1080p.Blu-Ray.DTS.x264-CREW.mkv", _meta()))
+        assert tag == "-CREW", f"Expected -CREW, got {tag!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
 #  Standard releases — real group tags must still be extracted
 # ═══════════════════════════════════════════════════════════════
 

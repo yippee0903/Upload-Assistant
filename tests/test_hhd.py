@@ -206,6 +206,20 @@ class TestHHDNogroupRejection:
             result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-nogroup")))
         assert result is False
 
+    def test_unknown_tag_is_rejected(self):
+        """'-unknown' placeholder → rejected."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-unknown")))
+        assert result is False
+
+    def test_unk_tag_is_rejected(self):
+        """'-unk' placeholder → rejected."""
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            result = _run(HHD(_config()).get_additional_checks(self._meta(tag="-unk")))
+        assert result is False
+
     def test_valid_tag_passes(self):
         """A real English-audio release with a group tag must not be rejected."""
         with patch("src.trackers.COMMON.languages_manager") as mock_lm:

@@ -79,6 +79,20 @@ class TestNogroupWebDL:
         assert "nogroup" not in result.lower(), f"Invalid token not stripped: {result!r}"
         assert not result.endswith("-NoGroup"), f"Unexpected -NoGroup suffix: {result!r}"
 
+    def test_unknown_tag_stripped_no_suffix(self):
+        """'-unknown' placeholder tag is stripped; no '-NoGroup' appended."""
+        meta = {"name": "Title.2024.1080p.H264-unknown", "tag": "-unknown"}
+        result = _run(_rf().get_name(meta))["name"]
+        assert "unknown" not in result.lower(), f"Invalid token not stripped: {result!r}"
+        assert not result.endswith("-NoGroup"), f"Unexpected -NoGroup suffix: {result!r}"
+
+    def test_unk_tag_stripped_no_suffix(self):
+        """'-unk' placeholder tag is stripped; no '-NoGroup' appended."""
+        meta = {"name": "Title.2024.1080p.H264-unk", "tag": "-unk"}
+        result = _run(_rf().get_name(meta))["name"]
+        assert "unk" not in result.lower(), f"Invalid token not stripped: {result!r}"
+        assert not result.endswith("-NoGroup"), f"Unexpected -NoGroup suffix: {result!r}"
+
     def test_real_group_tag_unchanged(self):
         """A real release group tag must be preserved exactly."""
         meta = {"name": "Movie.2024.1080p.WEB.H264-FRiENDS", "tag": "-FRiENDS"}

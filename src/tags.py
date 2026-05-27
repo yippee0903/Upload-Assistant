@@ -50,6 +50,7 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
         non_anime_match = re.search(
             r"(?<=-)((?<!WEB-)(?<!Blu-)(?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$",
             basename_stripped,
+            re.IGNORECASE,
         )
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()

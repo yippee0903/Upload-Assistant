@@ -80,12 +80,11 @@ class LUME(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, Any]:
         lume_name = str(meta.get("name", ""))
         tag_value = str(meta.get("tag", ""))
-        tag_lower = tag_value.lower()
-        invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
+        normalized_tag = tag_value.strip("-").strip().lower()
+        invalid_tag_set = {"nogrp", "nogroup", "unknown", "unk"}
 
-        if tag_value == "" or any(inv in tag_lower for inv in invalid_tags):
-            for inv in invalid_tags:
-                lume_name = re.sub(f"-{re.escape(inv)}", "", lume_name, flags=re.IGNORECASE)
+        if tag_value == "" or normalized_tag in invalid_tag_set:
+            lume_name = re.sub(r"-(?:nogrp|nogroup|unknown|unk)(?=$|-)", "", lume_name, flags=re.IGNORECASE)
             lume_name = f"{lume_name}-NOGROUP"
 
         return {"name": lume_name}
