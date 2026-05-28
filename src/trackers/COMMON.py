@@ -3230,11 +3230,12 @@ class COMMON:
                         console.print(f"[blue]Debug: Original language expanded candidates: {', '.join(sorted(original_language_expanded)) or 'None'}[/blue]")
 
             if original_required and not original_ok:
-                console.print(
-                    f"[red]Original language requirement not met for [bold]{tracker}[/bold].[/red]\n"
-                    f"[yellow]Required original audio language:[/yellow] {language_display}\n"
-                    f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
-                )
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print(
+                        f"[red]Original language requirement not met for [bold]{tracker}[/bold].[/red]\n"
+                        f"[yellow]Required original audio language:[/yellow] {language_display}\n"
+                        f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
+                    )
                 return not meta.get("unattended") and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
 
             audio_ok = not check_audio or any(lang in audio_languages for lang in languages_to_check)
@@ -3250,14 +3251,15 @@ class COMMON:
                 if subtitle_ok:
                     return subtitle_ok
                 else:
-                    console.print(
-                        f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
-                        f"[yellow]Required subtitles in one of the following with an original audio track:[/yellow] "
-                        f"{', '.join(languages_to_check)}\n"
-                        f"[cyan]Found Audio:[/cyan] {', '.join(audio_languages) or 'None'}\n"
-                        f"[cyan]Found Subtitles:[/cyan] {', '.join(subtitle_languages) or 'None'}\n"
-                        f"[cyan]Original Audio Language:[/cyan] {language_display}"
-                    )
+                    if not meta.get("unattended") or meta.get("debug"):
+                        console.print(
+                            f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
+                            f"[yellow]Required subtitles in one of the following with an original audio track:[/yellow] "
+                            f"{', '.join(languages_to_check)}\n"
+                            f"[cyan]Found Audio:[/cyan] {', '.join(audio_languages) or 'None'}\n"
+                            f"[cyan]Found Subtitles:[/cyan] {', '.join(subtitle_languages) or 'None'}\n"
+                            f"[cyan]Original Audio Language:[/cyan] {language_display}"
+                        )
                     return False
 
             if require_both:
@@ -3271,7 +3273,7 @@ class COMMON:
             else:
                 final_ok = True
 
-            if not final_ok:
+            if not final_ok and (not meta.get("unattended") or meta.get("debug")):
                 if require_both:
                     console.print(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"

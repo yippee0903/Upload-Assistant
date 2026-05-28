@@ -148,7 +148,10 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                     if not isinstance(encoding_settings, str):
                         encoding_settings = str(encoding_settings)
                     if not encoding_settings:
-                        console.print(f"[bold red]{self.tracker}: No encoding settings found in mediainfo — cannot verify x264 preset quality (minimum: 'slow').[/bold red]")
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(
+                                f"[bold red]{self.tracker}: No encoding settings found in mediainfo — cannot verify x264 preset quality (minimum: 'slow').[/bold red]"
+                            )
                         return False
 
                     subme_match = re.search(r"\bsubme\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)
@@ -166,7 +169,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                             details.append(f"subme={subme} (minimum 8 for 'slow')")
                         if trellis is not None and trellis < 2:
                             details.append(f"trellis={trellis} (minimum 2 for 'slow')")
-                        console.print(f"[bold red]{self.tracker}: x264 encode quality is below the 'slow' preset minimum: {', '.join(details)}.[/bold red]")
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(f"[bold red]{self.tracker}: x264 encode quality is below the 'slow' preset minimum: {', '.join(details)}.[/bold red]")
                         return False
                     break
 
