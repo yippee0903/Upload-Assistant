@@ -128,7 +128,17 @@ class C411(FrenchTrackerMixin):
         - WEB **without** Encoded_Library_Settings → H264 / H265 / AV1
         - WEB **with** Encoded_Library_Settings   → x264 / x265
         """
+        # C411's server rejects "CRITERION" as a banned streaming-platform token.
+        # "Criterion" here is the Criterion Collection (a physical-media label),
+        # not a streaming service.  Strip it from the edition field *before*
+        # building the name so the regex cannot accidentally remove "Criterion"
+        # from a movie title (e.g. a film literally titled "Criterion ...").
+        meta = dict(meta)
+        edition = meta.get("edition", "") or ""
+        meta["edition"] = re.sub(r"\bCriterion(?:\s+Collection)?\b", "", edition, flags=re.IGNORECASE).strip()
+
         result = await super().get_name(meta)
+
         release_type = str(meta.get("type", "")).upper()
         if release_type in ("WEBDL", "WEBRIP"):
             if meta.get("has_encode_settings", False):
