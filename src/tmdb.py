@@ -2090,8 +2090,9 @@ async def get_tmdb_localized_data(meta: dict[str, Any], data_type: str, language
                 console.print(f"[red]Error reading localized data file {filename}: {e}[/red]")
                 localized_data = {}
 
-        # Re-check if we have cached data for this specific language and data_type
-        cached_result: dict[str, Any] = localized_data.get(language, {}).get(data_type, {})
+        # Re-check if we have cached data for this specific language, data_type and tmdb id
+        tmdb_id_str = str(meta.get("tmdb", ""))
+        cached_result: dict[str, Any] = localized_data.get(language, {}).get(data_type, {}).get(tmdb_id_str, {})
         if cached_result:
             return cached_result
 
@@ -2102,8 +2103,8 @@ async def get_tmdb_localized_data(meta: dict[str, Any], data_type: str, language
                 if response.status_code == 200:
                     tmdb_data = response.json()
 
-                    # Merge the fetched data into existing cache
-                    localized_data.setdefault(language, {})[data_type] = tmdb_data
+                    # Merge the fetched data into existing cache (keyed by tmdb_id)
+                    localized_data.setdefault(language, {}).setdefault(data_type, {})[tmdb_id_str] = tmdb_data
 
                     # Attempt to write to disk, but don't fail if write errors occur
                     try:
