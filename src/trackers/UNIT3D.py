@@ -454,7 +454,7 @@ class UNIT3D:
         data = await self.get_data(meta)
         base = f"{meta['base_dir']}/tmp/{meta['uuid']}"
         nonfo_path = f"{base}/BASE_NONFO.torrent"
-        if meta.get("skip_nfo", False) and os.path.exists(nonfo_path):
+        if getattr(self, "skip_nfo", False) and os.path.exists(nonfo_path):
             torrent_file_path = nonfo_path
         elif "upload_torrent_path" in meta:
             torrent_file_path = meta["upload_torrent_path"]

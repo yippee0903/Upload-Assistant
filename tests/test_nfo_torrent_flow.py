@@ -1089,3 +1089,29 @@ class TestResolveSrcAndSavePath:
             "If src were the parent, os.path.basename(src) would be 'tv-completed' and "
             "the hardlink would create tracker_dir/tv-completed/ instead of tracker_dir/Avatar.../"
         )
+
+    def test_nfo_tracker_single_file_torrent_uses_file_src(self, tmp_path):
+        """Regression: G3MINI-style tracker (tracker_wants_nfo=True) that ends up
+        with a single-file torrent (e.g. when meta['skip_nfo'] is True globally
+        because another tracker in the same batch is skip_nfo).
+
+        Before fix: not tracker_wants_nfo was False → elif branch → src=folder →
+        whole folder hardlinked → save_path/FolderName/movie.mkv BUT torrent
+        expects save_path/movie.mkv → missing file.
+
+        After fix: torrent_is_multi_file is the ground truth → first condition
+        fires → src = meta['filelist'][0] → file hardlinked correctly.
+        """
+        from src.torrent_clients.qbittorrent import QbittorrentClientMixin as QbittorrentClient
+
+        meta = self._make_meta(tmp_path, keep_nfo=True, keep_folder=False)
+        # The torrent is single-file even though tracker_wants_nfo=True
+        torrent = self._make_torrent_obj(multi_file=False)
+        path = meta["path"]  # release dir
+
+        src, _ = QbittorrentClient._resolve_src_and_save_path(path, torrent, meta, "G3MINI")
+
+        assert src == meta["filelist"][0], (
+            "Single-file torrent must use the mkv as src regardless of tracker_wants_nfo. "
+            "Linking the folder when the torrent expects a bare file causes missing-file errors."
+        )

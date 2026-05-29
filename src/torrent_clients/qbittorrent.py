@@ -687,6 +687,13 @@ class QbittorrentClientMixin:
         content under save_path/ReleaseName/movie.mkv.  If we collapsed to a
         single-file source we would create save_path/movie.mkv and qBittorrent
         would report missing files.
+
+        The ground truth is torrent_is_multi_file: if the actual torrent file
+        has no info.files (i.e. it is a genuine single-file torrent), src is
+        always the individual file regardless of what the tracker "wants" for
+        NFO.  This avoids a missing-file error when a non-skip_nfo tracker
+        (e.g. G3MINI) ends up with a single-file torrent because meta["skip_nfo"]
+        was set globally by another skip_nfo tracker in the same upload batch.
         """
         tracker_wants_nfo = meta.get("keep_nfo") and tracker.upper() not in nfo_skip_trackers
         single_file = len(meta["filelist"]) == 1 and os.path.isfile(meta["filelist"][0])
@@ -695,7 +702,7 @@ class QbittorrentClientMixin:
         except Exception:
             torrent_is_multi_file = False
 
-        if single_file and not meta.get("keep_folder") and not tracker_wants_nfo and not torrent_is_multi_file:
+        if single_file and not meta.get("keep_folder") and not torrent_is_multi_file:
             src = meta["filelist"][0]
         elif single_file:
             # single_file: the caller's normalisation only adjusts path to the parent when
