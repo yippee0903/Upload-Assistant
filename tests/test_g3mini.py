@@ -713,3 +713,65 @@ class TestNogroupWebDL:
         )
         name = self._get_name(meta)
         assert name.endswith('-GROUP'), f"Expected -GROUP suffix, got: {name!r}"
+
+
+# ---------------------------------------------------------------------------
+# Tests – 1080p + UHD stripping
+# ---------------------------------------------------------------------------
+
+
+class TestG3MINIUhdStripping:
+    """G3MINI rejects '1080p.UHD.BluRay' — UHD is only valid at 2160p.
+
+    When the release is 1080p (or any non-4K resolution), the UHD token
+    must be stripped from the name even if meta['uhd'] is set.
+    """
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(G3MINI(_config()).get_name(meta))['name']
+
+    def test_1080p_remux_uhd_stripped(self):
+        """1080p BluRay REMUX with uhd='UHD' must not contain 'UHD' in the name."""
+        meta = _meta_base(
+            resolution='1080p',
+            uhd='UHD',
+            type='REMUX',
+            source='BluRay',
+        )
+        name = self._get_name(meta)
+        assert 'UHD' not in name, f"'UHD' must be stripped for 1080p, got: {name!r}"
+
+    def test_1080p_encode_uhd_stripped(self):
+        """1080p ENCODE with uhd='UHD' must not contain 'UHD' in the name."""
+        meta = _meta_base(
+            resolution='1080p',
+            uhd='UHD',
+            type='ENCODE',
+            source='BluRay',
+            video_encode='x265',
+            video_codec='H.265',
+        )
+        name = self._get_name(meta)
+        assert 'UHD' not in name, f"'UHD' must be stripped for 1080p ENCODE, got: {name!r}"
+
+    def test_2160p_remux_uhd_preserved(self):
+        """2160p BluRay REMUX must keep 'UHD' in the name."""
+        meta = _meta_base(
+            resolution='2160p',
+            uhd='UHD',
+            type='REMUX',
+            source='BluRay',
+        )
+        name = self._get_name(meta)
+        assert 'UHD' in name, f"'UHD' must be preserved for 2160p, got: {name!r}"
+
+    def test_1080p_without_uhd_unaffected(self):
+        """1080p release with uhd='' must not have 'UHD' introduced."""
+        meta = _meta_base(
+            resolution='1080p',
+            uhd='',
+            type='REMUX',
+            source='BluRay',
+        )
+        name = self._get_name(meta)
+        assert 'UHD' not in name, f"'UHD' must not appear, got: {name!r}"
