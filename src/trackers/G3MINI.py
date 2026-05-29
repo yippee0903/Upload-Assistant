@@ -212,6 +212,10 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         tag = meta.get("tag", "")
         source = meta.get("source", "")
         uhd = meta.get("uhd", "")
+        # G3MINI: "1080p UHD BluRay" is not a valid token combination — UHD
+        # denotes a 2160p source; strip it when resolution is not 2160p.
+        if resolution and resolution != "2160p":
+            uhd = ""
         hdr = meta.get("hdr", "")
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
         # Ensure the following variables are always defined
