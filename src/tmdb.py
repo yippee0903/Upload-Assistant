@@ -1996,7 +1996,9 @@ async def set_tmdb_metadata(meta: dict[str, Any], filename: Optional[str] = None
                     mal_manual=meta.get("mal_manual"),
                     aka=meta.get("aka", ""),
                     original_language=meta.get("original_language"),
-                    poster=meta.get("poster"),
+                    # In edit mode, always pass poster=None so the correct poster for
+                    # the (possibly corrected) tmdb_id is fetched fresh from the API.
+                    poster=None if meta.get("edit", False) else meta.get("poster"),
                     debug=meta.get("debug", False),
                     mode=meta.get("mode", "cli"),
                     tvdb_id=meta.get("tvdb_id", 0),
