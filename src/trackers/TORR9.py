@@ -150,6 +150,9 @@ class TORR9(FrenchTrackerMixin):
         return self.api_key
 
     # ──────────────────────────────────────────────────────────
+    # Video codec appears before audio in TORR9 release names
+    AUDIO_BEFORE_VIDEO: bool = False
+
     #  Audio / naming / French title — inherited from FrenchTrackerMixin
     # ──────────────────────────────────────────────────────────
 

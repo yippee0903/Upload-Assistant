@@ -1683,3 +1683,69 @@ class TestNogroupWebDL:
         )
         name = self._get_name(meta)
         assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  TORR9 naming: video codec must appear BEFORE audio (AUDIO_BEFORE_VIDEO=False)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestTorr9VideoBeforeAudio:
+    """TORR9 release names must have the video codec token before the audio token."""
+
+    def _get_name(self, meta: dict) -> str:
+        return _run(TORR9(_config()).get_name(meta))["name"]
+
+    def _pos(self, name: str, token: str) -> int:
+        """Return index of token in dot-split list, -1 if absent."""
+        parts = name.upper().replace("-", ".").split(".")
+        token_up = token.upper()
+        for i, p in enumerate(parts):
+            if p == token_up:
+                return i
+        return -1
+
+    def test_encode_video_before_audio(self):
+        """ENCODE: x265 must come before the audio tag."""
+        meta = _meta_base(
+            title="Film",
+            year="2024",
+            audio="DTS-HD MA 5.1",
+            video_encode="x265",
+            video_codec="H.265",
+            source="BluRay",
+            type="ENCODE",
+            tag="-GRP",
+        )
+        name = self._get_name(meta)
+        assert "X265" in name.upper(), f"x265 missing from {name!r}"
+        assert "DTS" in name.upper(), f"DTS missing from {name!r}"
+        pos_video = self._pos(name, "X265")
+        pos_audio = min(i for i, p in enumerate(name.upper().replace("-", ".").split(".")) if "DTS" in p)
+        assert pos_video < pos_audio, (
+            f"Video codec (pos {pos_video}) must come before audio (pos {pos_audio}) in {name!r}"
+        )
+
+    def test_webdl_video_before_audio(self):
+        """WEBDL: H264 must come before the audio tag."""
+        meta = _meta_base(
+            title="Serie",
+            year="2023",
+            audio="AAC 2.0",
+            video_encode="H.264",
+            video_codec="H.264",
+            source="WEB",
+            type="WEBDL",
+            tag="-GRP",
+        )
+        name = self._get_name(meta)
+        pos_video = self._pos(name, "H264")
+        pos_audio = self._pos(name, "AAC")
+        assert pos_video != -1, f"H264 missing from {name!r}"
+        assert pos_audio != -1, f"AAC missing from {name!r}"
+        assert pos_video < pos_audio, (
+            f"Video codec (pos {pos_video}) must come before audio (pos {pos_audio}) in {name!r}"
+        )
+
+    def test_audio_before_video_false_attribute(self):
+        """TORR9 class must declare AUDIO_BEFORE_VIDEO = False."""
+        assert TORR9.AUDIO_BEFORE_VIDEO is False
