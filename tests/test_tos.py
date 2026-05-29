@@ -302,3 +302,63 @@ class TestNogroupWebDL:
         """A real group tag must not be replaced by the notag label."""
         name = self._get_name(_meta_nogroup(tag='-FRiENDS'))
         assert name.endswith('-FRiENDS'), f"Expected -FRiENDS suffix, got: {name!r}"
+
+
+# ---------------------------------------------------------------------------
+# Tests – Scene release NFO requirement
+# ---------------------------------------------------------------------------
+
+
+class TestTosSceneNfoRequirement:
+    """TOS requires a NFO file for Scene releases.
+
+    get_additional_checks must return False when meta['scene'] is True and
+    neither meta['nfo'] nor meta['auto_nfo'] is set.
+    """
+
+    def _patch_lang_ok(self, t: TOS) -> None:
+        t.common.check_language_requirements = AsyncMock(return_value=True)  # type: ignore[assignment]
+
+    def test_scene_without_nfo_rejected(self):
+        """Scene release with no NFO must be rejected."""
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Some.Movie.2025.1080p.BluRay.x264-GRP")
+        meta["scene"] = True
+        meta["nfo"] = False
+        meta["auto_nfo"] = False
+        result = _run(t.get_additional_checks(meta))
+        assert result is False
+
+    def test_scene_with_nfo_accepted(self):
+        """Scene release with a NFO file must pass the NFO check."""
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Some.Movie.2025.1080p.BluRay.x264-GRP")
+        meta["scene"] = True
+        meta["nfo"] = True
+        meta["auto_nfo"] = False
+        result = _run(t.get_additional_checks(meta))
+        assert result is True
+
+    def test_scene_with_auto_nfo_accepted(self):
+        """Scene release with auto-generated NFO must also pass."""
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Some.Movie.2025.1080p.BluRay.x264-GRP")
+        meta["scene"] = True
+        meta["nfo"] = False
+        meta["auto_nfo"] = True
+        result = _run(t.get_additional_checks(meta))
+        assert result is True
+
+    def test_non_scene_without_nfo_accepted(self):
+        """Non-scene release without NFO must not be rejected by the NFO check."""
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Some.Movie.2025.1080p.BluRay.x264-GRP")
+        meta["scene"] = False
+        meta["nfo"] = False
+        meta["auto_nfo"] = False
+        result = _run(t.get_additional_checks(meta))
+        assert result is True
