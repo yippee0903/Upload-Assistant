@@ -2734,3 +2734,23 @@ class TestC411CriterionStripping:
         assert 'Director' in name or 'director' in name.lower(), (
             f"Edition token must be preserved, got: {name!r}"
         )
+
+    def test_criterion_in_title_not_stripped(self):
+        """A movie whose title contains 'Criterion' must not be mangled."""
+        meta = _meta_base(
+            title='Criterion Something',
+            year='2000',
+            type='ENCODE',
+            source='BluRay',
+            resolution='1080p',
+            audio='FLAC',
+            video_encode='x264',
+            video_codec='H.264',
+            edition='',
+            tag='-GRP',
+            has_encode_settings=True,
+        )
+        name = self._get_name(meta)
+        assert 'criterion' in name.lower(), (
+            f"Title word 'Criterion' must not be stripped, got: {name!r}"
+        )
