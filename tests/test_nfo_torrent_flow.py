@@ -540,8 +540,14 @@ class TestBaseNonfoStrip:
     """upload.py tries strip_nfo_from_torrent before falling back to full rehash
     when building BASE_NONFO.torrent."""
 
-    def _make_base_torrent(self, tmp_path: Path, with_nfo: bool = True) -> Path:
-        """Write a minimal BASE.torrent into tmp_path/tmp/<uuid>/."""
+    def _make_base_torrent(
+        self, tmp_path: Path, with_nfo: bool = True, two_mkvs: bool = False
+    ) -> tuple[Path, Path, str]:
+        """Write a minimal BASE.torrent into tmp_path/tmp/<uuid>/.
+
+        two_mkvs=True creates a second MKV so the torrent has 2 non-NFO files,
+        which keeps the 'strip' code-path active under the new single-file guard.
+        """
         uuid = "test-uuid-nonfo"
         torrent_dir = tmp_path / "tmp" / uuid
         torrent_dir.mkdir(parents=True)
@@ -555,6 +561,10 @@ class TestBaseNonfoStrip:
             (release / "Movie.2024.1080p.nfo").write_bytes(nfo_data)
 
         files = [([release.name, "Movie.2024.1080p.mkv"], mkv_data)]
+        if two_mkvs:
+            mkv2_data = b"FAKE_MKV2" * 10
+            (release / "Movie.2024.1080p.Extras.mkv").write_bytes(mkv2_data)
+            files.append(([release.name, "Movie.2024.1080p.Extras.mkv"], mkv2_data))
         if with_nfo:
             files.append(([release.name, "Movie.2024.1080p.nfo"], nfo_data))
 
@@ -563,12 +573,43 @@ class TestBaseNonfoStrip:
         base_path.write_bytes(torrent_bytes)
         return base_path, release, uuid
 
-    def test_strip_called_before_create_torrent_when_base_has_nfo(self, tmp_path):
-        """When BASE has NFO, strip_nfo_from_torrent is called and succeeds →
-        create_torrent must NOT be called."""
+    def test_single_video_nfo_calls_create_torrent_directly(self, tmp_path):
+        """Single MKV + NFO in BASE: after stripping the NFO there would be only
+        one file left.  The new logic must call create_torrent directly (single-
+        file mode) rather than strip, so the tracker gets a proper single-file
+        torrent (no folder wrapper)."""
         from src.torrentcreate import TorrentCreator
 
-        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True)
+        # 1 MKV + 1 NFO
+        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True, two_mkvs=False)
+        nonfo_path = base_path.parent / "BASE_NONFO.torrent"
+
+        strip_calls = []
+        create_torrent_calls = []
+
+        async def fake_strip(src, out, content):
+            strip_calls.append(src)
+            return True
+
+        async def fake_create_torrent(meta, path, output_filename, **kw):
+            create_torrent_calls.append(output_filename)
+            nonfo_path.write_bytes(b"FAKE_NONFO")
+
+        with patch.object(TorrentCreator, "strip_nfo_from_torrent", side_effect=fake_strip), \
+             patch.object(TorrentCreator, "create_torrent", side_effect=fake_create_torrent):
+            _run(self._run_base_nonfo_block(base_path, nonfo_path, str(release)))
+
+        assert strip_calls == [], "strip must NOT be called for single-video+NFO release"
+        assert "BASE_NONFO" in create_torrent_calls, \
+            "create_torrent must be called directly to produce a single-file torrent"
+
+    def test_strip_called_before_create_torrent_when_base_has_nfo(self, tmp_path):
+        """When BASE has NFO and multiple video files, strip_nfo_from_torrent is
+        called and succeeds → create_torrent must NOT be called."""
+        from src.torrentcreate import TorrentCreator
+
+        # two_mkvs=True so the single-file guard does not fire
+        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True, two_mkvs=True)
         nonfo_path = base_path.parent / "BASE_NONFO.torrent"
 
         create_torrent_calls = []
@@ -594,7 +635,8 @@ class TestBaseNonfoStrip:
         """When strip returns False, create_torrent is called as fallback."""
         from src.torrentcreate import TorrentCreator
 
-        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True)
+        # two_mkvs=True so we reach the strip path (single-file guard skipped)
+        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True, two_mkvs=True)
         nonfo_path = base_path.parent / "BASE_NONFO.torrent"
 
         create_torrent_calls = []
@@ -639,6 +681,8 @@ class TestBaseNonfoStrip:
         nonfo_path: Path,
         content_path: str,
         skip_nfo: bool = True,
+        tv_pack: bool = False,
+        is_disc: bool = False,
     ) -> None:
         """Reproduce the BASE_NONFO creation block from upload.py.
 
@@ -653,7 +697,7 @@ class TestBaseNonfoStrip:
         if not base_path.exists() or not skip_nfo:
             return
 
-        meta: dict[str, Any] = {"path": content_path, "debug": False}
+        meta: dict[str, Any] = {"path": content_path, "debug": False, "tv_pack": tv_pack, "is_disc": is_disc}
         try:
             base_t = await asyncio.to_thread(Torrent.read, str(base_path))
             if not any(str(f).lower().endswith(".nfo") for f in base_t.files):
@@ -662,11 +706,22 @@ class TestBaseNonfoStrip:
             if nonfo_path.exists():
                 return
 
-            stripped = await TorrentCreator.strip_nfo_from_torrent(
-                str(base_path), str(nonfo_path), content_path
+            # If stripping the NFO would leave only one video file, create a proper
+            # single-file torrent directly instead of a folder-wrapped single-file.
+            non_nfo_files = [f for f in base_t.files if not str(f).lower().endswith(".nfo")]
+            needs_single_file = (
+                len(non_nfo_files) == 1
+                and not meta.get("tv_pack", False)
+                and not meta.get("is_disc", False)
             )
-            if not stripped:
+            if needs_single_file:
                 await TorrentCreator.create_torrent(meta, Path(content_path), "BASE_NONFO")
+            else:
+                stripped = await TorrentCreator.strip_nfo_from_torrent(
+                    str(base_path), str(nonfo_path), content_path
+                )
+                if not stripped:
+                    await TorrentCreator.create_torrent(meta, Path(content_path), "BASE_NONFO")
             if nonfo_path.exists():
                 meta["base_nonfo_path"] = str(nonfo_path)
         except Exception:
@@ -702,7 +757,8 @@ class TestBaseNonfoStrip:
         full rehash and set meta['base_nonfo_path'] when the output file exists."""
         from src.torrentcreate import TorrentCreator
 
-        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True)
+        # two_mkvs=True so we reach the strip path (single-file guard skipped)
+        base_path, release, uuid = self._make_base_torrent(tmp_path, with_nfo=True, two_mkvs=True)
         nonfo_path = base_path.parent / "BASE_NONFO.torrent"
 
         create_torrent_calls = []

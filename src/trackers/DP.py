@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
-import cli_ui
 import pycountry
 
 from src.console import console
@@ -96,16 +95,6 @@ class DP(UNIT3D):
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         should_continue = True
-        if meta.get("keep_folder"):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]{self.tracker} does not allow single files in a folder.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
-
         nordic_languages = ["danish", "swedish", "norwegian", "icelandic", "finnish", "english"]
         if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True):
             return False

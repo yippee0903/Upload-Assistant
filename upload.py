@@ -1321,10 +1321,18 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 base_t = await asyncio.to_thread(Torrent.read, torrent_path)
                 if any(str(f).lower().endswith(".nfo") for f in base_t.files):
                     if not os.path.exists(nonfo_path) and not meta.get("nohash", False):
-                        stripped = await TorrentCreator.strip_nfo_from_torrent(torrent_path, nonfo_path, meta["path"])
-                        if not stripped:
-                            # strip failed (e.g. single-file torrent) — fall back to full rehash
+                        # If stripping the NFO would leave only a single video file (and
+                        # this is not a tv_pack or disc), create a proper single-file
+                        # torrent instead of keeping a folder-wrapped single-file torrent.
+                        non_nfo_files = [f for f in base_t.files if not str(f).lower().endswith(".nfo")]
+                        needs_single_file = len(non_nfo_files) == 1 and not meta.get("tv_pack", False) and not meta.get("is_disc", False)
+                        if needs_single_file:
                             await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_NONFO")
+                        else:
+                            stripped = await TorrentCreator.strip_nfo_from_torrent(torrent_path, nonfo_path, meta["path"])
+                            if not stripped:
+                                # strip failed (e.g. single-file torrent) — fall back to full rehash
+                                await TorrentCreator.create_torrent(meta, Path(meta["path"]), "BASE_NONFO")
                     if os.path.exists(nonfo_path):
                         meta["base_nonfo_path"] = nonfo_path
             except Exception as e:

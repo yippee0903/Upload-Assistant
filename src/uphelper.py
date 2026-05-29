@@ -27,6 +27,18 @@ class UploadHelper:
             raise ValueError("'DEFAULT' config section must be a dict")
         self.tracker_class_map = cast(Mapping[str, Any], tracker_class_map)
 
+    @staticmethod
+    def strip_keep_folder_if_single_file(meta: dict[str, Any]) -> bool:
+        """Strip keep_folder for single-file non-disc non-tv_pack releases.
+
+        Returns True if keep_folder was stripped, False otherwise.
+        Folder structure is only meaningful for multi-file or disc releases.
+        """
+        if meta.get("keep_folder") and not meta.get("is_disc", False) and not meta.get("tv_pack", False) and len(meta.get("filelist") or []) == 1:
+            meta["keep_folder"] = False
+            return True
+        return False
+
     async def dupe_check(self, dupes: list[Union[DupeEntry, str]], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
         def _format_dupe(entry: Union[DupeEntry, str]) -> str:
             if isinstance(entry, dict):
@@ -385,6 +397,11 @@ class UploadHelper:
             if meta.get("personalrelease", False) is True:
                 console.print("[bold green]Personal Release![/bold green]")
             console.print()
+
+        # Auto-strip keep_folder for single-file releases (no disc, no tv_pack).
+        # Folder structure is only meaningful for multi-file or disc releases.
+        if self.strip_keep_folder_if_single_file(meta) and not meta.get("unattended"):
+            console.print("[yellow]Single-file release detected — folder structure not needed, switching to single-file mode.[/yellow]")
 
         if meta.get("unattended", False) and not meta.get("unattended_confirm", False) and not meta.get("emby_debug", False):
             if meta["debug"] is True:

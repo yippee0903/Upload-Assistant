@@ -341,3 +341,58 @@ class TestDpGetName:
         result = _run(dp.get_name(meta))
         assert "Swedish Dubbed" in result["name"]
         assert result["name"].index("Swedish Dubbed") < result["name"].index("AAC 2.0")
+
+
+class TestDpKeepFolderStrip:
+    """Global keep_folder auto-strip via UploadHelper.strip_keep_folder_if_single_file.
+
+    This logic now lives in uphelper.py, not in DP.get_additional_checks.
+    These tests call the static helper directly to verify the contract.
+    """
+
+    from src.uphelper import UploadHelper
+
+    def test_keep_folder_stripped_for_single_movie(self) -> None:
+        """keep_folder=True on a non-disc non-tv_pack single-file release: must be set to False."""
+        from src.uphelper import UploadHelper
+
+        meta = _base_meta(keep_folder=True, is_disc=False, tv_pack=False, filelist=["/tmp/movie.mkv"])
+        stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
+        assert stripped is True
+        assert meta["keep_folder"] is False
+
+    def test_keep_folder_unchanged_for_tv_pack(self) -> None:
+        """keep_folder=True on a TV pack: must not be touched."""
+        from src.uphelper import UploadHelper
+
+        meta = _base_meta(keep_folder=True, tv_pack=True, is_disc=False, filelist=["/tmp/ep.mkv"])
+        stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
+        assert stripped is False
+        assert meta["keep_folder"] is True
+
+    def test_keep_folder_unchanged_for_disc(self) -> None:
+        """keep_folder=True on a disc release: must not be touched."""
+        from src.uphelper import UploadHelper
+
+        meta = _base_meta(keep_folder=True, is_disc=True, tv_pack=False, filelist=["/tmp/disc.mkv"])
+        stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
+        assert stripped is False
+        assert meta["keep_folder"] is True
+
+    def test_keep_folder_unchanged_for_multi_file(self) -> None:
+        """keep_folder=True with multiple files: must not be touched."""
+        from src.uphelper import UploadHelper
+
+        meta = _base_meta(keep_folder=True, is_disc=False, tv_pack=False, filelist=["/tmp/a.mkv", "/tmp/b.mkv"])
+        stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
+        assert stripped is False
+        assert meta["keep_folder"] is True
+
+    def test_keep_folder_false_unchanged(self) -> None:
+        """keep_folder=False: nothing changes, returns False."""
+        from src.uphelper import UploadHelper
+
+        meta = _base_meta(keep_folder=False, is_disc=False, tv_pack=False, filelist=["/tmp/movie.mkv"])
+        stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
+        assert stripped is False
+        assert meta["keep_folder"] is False

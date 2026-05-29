@@ -222,8 +222,11 @@ class TorrentCreator:
                     # Include NFO in all torrents except BASE_NONFO (used by skip_nfo trackers)
                     if meta.get("keep_nfo", False) and output_filename != "BASE_NONFO":
                         console.print("NFO files detected or requested. Including NFO files in torrent.")
-                        include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
-                        exclude = ["*.*", "*sample.mkv"]
+                        _kf_path_dir = os.fspath(path)
+                        _kf_folder_name = os.path.basename(_kf_path_dir)
+                        _kf_video = [f"{_kf_folder_name}/{os.path.relpath(f, _kf_path_dir)}" for f in meta.get("filelist") or []]
+                        include = _kf_video + ["*.nfo"]
+                        exclude = ["*.*"]
                     elif not meta.get("tv_pack", False):
                         folder_name = os.path.basename(str(path))
                         include = [f"{folder_name}/{os.path.basename(f)}" for f in meta["filelist"]]
@@ -232,32 +235,44 @@ class TorrentCreator:
                 elif meta["isdir"]:
                     if meta.get("keep_nfo", False) and not meta.get("is_disc", False) and output_filename != "BASE_NONFO":
                         console.print("NFO files detected or requested. Including NFO files in torrent.")
-                        include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
-                        exclude = ["*.*", "*sample.mkv"]
+                        _nfo_path_dir = os.fspath(path)
+                        _nfo_folder_name = os.path.basename(_nfo_path_dir)
+                        _nfo_video = [f"{_nfo_folder_name}/{os.path.relpath(f, _nfo_path_dir)}" for f in meta.get("filelist") or []]
+                        include = _nfo_video + ["*.nfo"]
+                        exclude = ["*.*"]
                     elif meta.get("is_disc", False):
                         include = []
                         exclude = []
                     elif not meta.get("tv_pack", False):
                         path_dir = os.fspath(path)
-                        os.chdir(path_dir)
-                        globs = (
-                            [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))]
-                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))]
-                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
-                        )
-                        no_sample_globs = [
-                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
-                        ]
+                        # Use filelist (already sample-filtered by video.py) as the
+                        # authoritative list of video files, falling back to a glob scan
+                        # only when filelist is absent.
+                        filelist_from_meta = meta.get("filelist") or []
+                        if filelist_from_meta:
+                            no_sample_globs = filelist_from_meta
+                        else:
+                            os.chdir(path_dir)
+                            globs = (
+                                [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))]
+                                + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))]
+                                + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                            )
+                            no_sample_globs = [os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs if "sample" not in file.lower()]
                         if len(no_sample_globs) == 1:
-                            path = meta["filelist"][0]
-                        exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta["is_disc"] else []
-                        include = ["*.mkv", "*.mp4", "*.ts"] if not meta["is_disc"] else []
+                            path = no_sample_globs[0]
+                            include = []
+                            exclude = []
+                        else:
+                            folder_name = os.path.basename(path_dir)
+                            include = [f"{folder_name}/{os.path.relpath(f, path_dir)}" for f in no_sample_globs]
+                            exclude = ["*.*"]
                     else:
                         folder_name = os.path.basename(str(path))
                         include = [f"{folder_name}/{os.path.basename(f)}" for f in meta["filelist"]]
                         exclude = ["*", "*/**"]
                 else:
-                    exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta["is_disc"] else []
+                    exclude = ["*.*"] if not meta["is_disc"] else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta["is_disc"] else []
 
                 # If using mkbrr, run the external application
