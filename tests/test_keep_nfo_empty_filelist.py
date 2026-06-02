@@ -157,5 +157,6 @@ class TestKeepNfoEmptyFilelist:
             mkv_files = [n for n in names if n.endswith(".mkv")]
             nfo_files = [n for n in names if n.endswith(".nfo")]
 
-            assert len(mkv_files) == 2, f"Expected 2 nested MKV files, got: {names}"
-            assert len(nfo_files) == 1, f"Expected 1 NFO file, got: {names}"
+            assert any(n.endswith("Season 01/Show.S01E01.mkv") for n in mkv_files), f"S01E01 not found in: {names}"
+            assert any(n.endswith("Season 01/Show.S01E02.mkv") for n in mkv_files), f"S01E02 not found in: {names}"
+            assert any(n.endswith(f"{pack_name}.nfo") for n in nfo_files), f"NFO not found in: {names}"

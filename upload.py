@@ -1306,8 +1306,20 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                         )
                         nfo_on_disk = bool(_top_nfo or _rec_nfo)
                     else:
-                        # Single-file upload: check for a sidecar .nfo with the same stem.
-                        nfo_on_disk = os.path.isfile(os.path.splitext(content_path)[0] + ".nfo")
+                        # Single-file upload: check for a sidecar NFO with the
+                        # same stem, case-insensitively (catches .NFO / .Nfo).
+                        _stem = os.path.splitext(content_path)[0]
+                        _base_stem = os.path.basename(_stem)
+                        _sib_dir = os.path.dirname(content_path)
+                        nfo_on_disk = (
+                            any(
+                                os.path.splitext(f)[0] == _base_stem and os.path.splitext(f)[1].lower() == ".nfo"
+                                for f in os.listdir(_sib_dir)
+                                if os.path.isfile(os.path.join(_sib_dir, f))
+                            )
+                            if os.path.isdir(_sib_dir)
+                            else False
+                        )
                     if nfo_on_disk:
                         console.print("[yellow]BASE.torrent is missing NFO files required by --keep-nfo. Removing stale torrent...[/yellow]")
                         os.remove(torrent_path)

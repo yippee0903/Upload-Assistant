@@ -1505,4 +1505,12 @@ def determine_keep_nfo(meta: dict, tracker_status: dict, target_trackers: list) 
             return True
         _recursive = [p for p in glob.glob(os.path.join(content_path_str, "**", "*"), recursive=True) if os.path.basename(p).lower().endswith(".nfo")]
         return bool(_recursive)
-    return os.path.isfile(os.path.splitext(content_path_str)[0] + ".nfo")
+    # Single-file: check for a sidecar NFO with the same stem, case-insensitively.
+    _stem = os.path.splitext(content_path_str)[0]
+    _base_stem = os.path.basename(_stem)
+    _sib_dir = os.path.dirname(content_path_str)
+    return (
+        any(os.path.splitext(f)[0] == _base_stem and os.path.splitext(f)[1].lower() == ".nfo" for f in os.listdir(_sib_dir) if os.path.isfile(os.path.join(_sib_dir, f)))
+        if os.path.isdir(_sib_dir)
+        else False
+    )
