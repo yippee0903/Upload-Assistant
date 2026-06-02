@@ -1492,7 +1492,11 @@ def determine_keep_nfo(meta: dict, tracker_status: dict, target_trackers: list) 
     if not auto_nfo_confirmed:
         return False
 
+    import glob
+
     content_path_str = str(meta.get("path", ""))
     if os.path.isdir(content_path_str):
-        return any(f.lower().endswith(".nfo") for f in os.listdir(content_path_str))
+        # Search top-level first (fast), then recurse into sub-directories so
+        # that TV packs with episode-level NFOs are also detected.
+        return bool(glob.glob(os.path.join(content_path_str, "*.nfo")) or glob.glob(os.path.join(content_path_str, "**", "*.nfo"), recursive=True))
     return os.path.isfile(os.path.splitext(content_path_str)[0] + ".nfo")

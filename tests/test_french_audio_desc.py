@@ -244,4 +244,3 @@ class TestFrenchAudioDescriptionAcrossTrackers:
             ], [_sub_track("fr")]),
         )
         assert _run(tracker._build_audio_string(meta)) == "AD.VOSTFR"
-

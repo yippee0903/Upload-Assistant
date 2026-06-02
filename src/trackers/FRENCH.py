@@ -1139,6 +1139,14 @@ class FrenchTrackerMixin:
         the apostrophe becomes a space while preserving the original case:
         ``l'autre`` → ``l autre``, ``L'Ordre`` → ``L Ordre``.
         """
+        import unicodedata
+
+        # Normalise to NFC first so that combining-character sequences
+        # (e.g. U+0065 U+0301 for "é") are collapsed into their
+        # precomposed form before unidecode sees them.  Without this,
+        # unidecode turns the bare combining accent (U+0301) into an
+        # empty string, silently dropping the following vowel.
+        text = unicodedata.normalize("NFC", text)
         for char, repl in FrenchTrackerMixin._TITLE_CHAR_MAP.items():
             text = text.replace(char, repl)
         text = unidecode(text)

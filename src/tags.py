@@ -40,7 +40,14 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
             # If video is a directory, use the directory name as basename
             basename_stripped = os.path.basename(os.path.normpath(video))
         elif (meta.get("tv_pack", False) or meta.get("keep_folder", False)) and not season_pack_check:
-            basename_stripped = meta["uuid"]
+            # For TV packs: use the parent folder name as the primary tag source.
+            # When the folder itself carries no group tag (e.g. "Bon Appetit Your
+            # Majesty/"), the episode filename is tried as a fallback so that
+            # releases where only the per-episode filenames carry a tag are not
+            # incorrectly labelled NOTAG.
+            _tv_parent = os.path.dirname(video) if not os.path.isdir(video) else video
+            _tv_folder = os.path.basename(os.path.normpath(_tv_parent)) if _tv_parent else ""
+            basename_stripped = _tv_folder if _tv_folder else meta["uuid"]
         else:
             # If video is a file, use the filename without extension
             basename_no_path = os.path.basename(video)
@@ -60,6 +67,27 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
                 release_group = None
             if meta["debug"]:
                 console.print(f"Non-anime regex match: {release_group}")
+
+        # If the folder name yielded no tag for a TV-pack file, retry with the
+        # episode filename itself (the group tag may live on individual files, not
+        # on the parent folder — e.g. "Bon Appetit Your Majesty/…-FW.mkv").
+        if not release_group and not os.path.isdir(video) and (meta.get("tv_pack", False) or meta.get("keep_folder", False)) and not season_pack_check:
+            _fb_basename = os.path.basename(video)
+            _fb_name, _fb_ext = os.path.splitext(_fb_basename)
+            _fb_stripped = _fb_basename if _fb_ext and "-" in _fb_ext else _fb_name
+            _fb_match = re.search(
+                r"(?<=-)((?<!WEB-)(?<!Blu-)(?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$",
+                _fb_stripped,
+                re.IGNORECASE,
+            )
+            if _fb_match:
+                release_group = _fb_match.group(1).strip()
+                if "Z0N3" in release_group:
+                    release_group = release_group.replace("Z0N3", "D-Z0N3")
+                if not meta.get("scene", False) and release_group and len(release_group) > 25:
+                    release_group = None
+                if meta["debug"]:
+                    console.print(f"TV-pack file-fallback tag: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
     if not release_group and meta.get("is_disc"):

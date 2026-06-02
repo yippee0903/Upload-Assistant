@@ -516,6 +516,11 @@ async def _get_audio_v2(
                         and "compatibility" not in str(t.get("Title") or "").lower()
                         and not AD_TRACK_RE.search(str(t.get("Title") or ""))
                     ]
+                    # If every non-commentary/non-compat audio track is an AD
+                    # track the release is almost certainly mis-identified; flag
+                    # it so the caller can warn the user and skip unattended uploads.
+                    if has_ad and not audio_tracks:
+                        meta["ad_only_audio"] = True
                     audio_language = None
                     if meta["debug"]:
                         console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")

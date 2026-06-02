@@ -183,3 +183,54 @@ class TestGetTagRealGroups:
     def test_web_no_hyphen_group(self):
         tag = _run(get_tag("Movie.2023.1080p.WEB.AAC.x264-FRGRP.mkv", _meta()))
         assert tag == "-FRGRP", f"Expected -FRGRP, got {tag!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TV-pack tag: folder has no group tag but files do
+#  Regression for the NOTAG bug where tv_pack path fell back to
+#  meta["uuid"] instead of trying the episode filename.
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagTVPackFallback:
+    """TV packs: fall back to the episode filename when folder has no tag."""
+
+    def test_folder_no_tag_file_has_group(self):
+        """Bug: folder name has no tag → should extract group from episode file."""
+        tag = _run(
+            get_tag(
+                "/downloads/Bon Appetit Your Majesty/S01E01.1080p.WEB-DL.AAC.2.0.H.264-FW.mkv",
+                _meta(tv_pack=1),
+            )
+        )
+        assert tag == "-FW", f"Expected -FW, got {tag!r}"
+
+    def test_folder_has_tag_is_preferred(self):
+        """When the folder itself carries the tag, that takes precedence."""
+        tag = _run(
+            get_tag(
+                "/downloads/Chicago.Fire.S12.MULTi.1080p.WEB.H264-FW/E01.mkv",
+                _meta(tv_pack=1),
+            )
+        )
+        assert tag == "-FW", f"Expected -FW, got {tag!r}"
+
+    def test_no_tag_on_folder_or_file_returns_empty(self):
+        """No tag on either folder or file → empty tag."""
+        tag = _run(
+            get_tag(
+                "/downloads/Show S01/Episode01.1080p.WEB.mkv",
+                _meta(tv_pack=1),
+            )
+        )
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_keep_folder_fallback(self):
+        """Same fallback applies when keep_folder is set instead of tv_pack."""
+        tag = _run(
+            get_tag(
+                "/downloads/Movie Collection/Movie.2024.1080p.BluRay.x264-CREW.mkv",
+                _meta(keep_folder=True),
+            )
+        )
+        assert tag == "-CREW", f"Expected -CREW, got {tag!r}"
