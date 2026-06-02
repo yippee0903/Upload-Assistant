@@ -496,8 +496,16 @@ async def _get_audio_v2(
                     has_audiodesc = False
                     has_compatibility = False
                     has_coms = [t for t in tracks if "commentary" in str(t.get("Title") or "").lower()]
-                    has_ad = [t for t in tracks if AD_TRACK_RE.search(str(t.get("Title") or ""))]
                     has_compat = [t for t in tracks if "compatibility" in str(t.get("Title") or "").lower()]
+                    # Scope AD detection to Audio-typed, non-commentary, non-compat
+                    # tracks so that an "Audio Description commentary" does not
+                    # falsely trigger the AD-only flag.
+                    _non_special_audio = [
+                        t
+                        for t in tracks
+                        if t.get("@type") == "Audio" and "commentary" not in str(t.get("Title") or "").lower() and "compatibility" not in str(t.get("Title") or "").lower()
+                    ]
+                    has_ad = [t for t in _non_special_audio if AD_TRACK_RE.search(str(t.get("Title") or ""))]
                     if has_coms:
                         has_commentary = True
                     if has_ad:
@@ -508,19 +516,13 @@ async def _get_audio_v2(
                         console.print(f"DEBUG: Found {len(has_coms)} commentary tracks, has_commentary = {has_commentary}")
                         console.print(f"DEBUG: Found {len(has_ad)} audio description, has_audiodesc = {has_audiodesc}")
                         console.print(f"DEBUG: Found {len(has_compat)} compatibility tracks, has_compatibility = {has_compatibility}")
-                    audio_tracks = [
-                        t
-                        for t in tracks
-                        if t.get("@type") == "Audio"
-                        and "commentary" not in str(t.get("Title") or "").lower()
-                        and "compatibility" not in str(t.get("Title") or "").lower()
-                        and not AD_TRACK_RE.search(str(t.get("Title") or ""))
-                    ]
-                    # If every non-commentary/non-compat audio track is an AD
-                    # track the release is almost certainly mis-identified; flag
-                    # it so the caller can warn the user and skip unattended uploads.
+                    audio_tracks = [t for t in _non_special_audio if not AD_TRACK_RE.search(str(t.get("Title") or ""))]
+                    # Explicitly set/clear ad_only_audio so stale values from a
+                    # previous gather_prep run cannot carry over and block uploads.
                     if has_ad and not audio_tracks:
                         meta["ad_only_audio"] = True
+                    else:
+                        meta["ad_only_audio"] = False
                     audio_language = None
                     if meta["debug"]:
                         console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")

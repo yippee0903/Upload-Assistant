@@ -104,3 +104,58 @@ class TestKeepNfoEmptyFilelist:
 
             assert len(mkv_files) == 2, f"Expected 2 MKV files, got: {names}"
             assert len(nfo_files) == 1, f"Expected 1 NFO file, got: {names}"
+
+    def test_empty_filelist_nested_episodes_included(self):
+        """Regression: MKV files inside a Season sub-folder must be in the torrent.
+
+        Before the recursive-walk fix, the flat extension glob ``*.mkv`` only
+        matched top-level files, so episode files placed under a ``Season 01/``
+        sub-directory were silently omitted from the torrent.
+        """
+        from src.torrentcreate import TorrentCreator
+        from torf import Torrent
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pack_name = "Show.S01.1080p.WEB.H264-GRP"
+            pack_dir = os.path.join(tmpdir, pack_name)
+            season_dir = os.path.join(pack_dir, "Season 01")
+            os.makedirs(season_dir)
+
+            for name in ("Show.S01E01.mkv", "Show.S01E02.mkv"):
+                with open(os.path.join(season_dir, name), "wb") as fh:
+                    fh.write(b"x" * 512)
+
+            with open(os.path.join(pack_dir, f"{pack_name}.nfo"), "w") as fh:
+                fh.write("NFO")
+
+            run_uuid = str(uuid.uuid4())
+            tmp_dir = os.path.join(tmpdir, "tmp", run_uuid)
+            os.makedirs(tmp_dir)
+            meta = {
+                "uuid": run_uuid,
+                "base_dir": tmpdir,
+                "tv_pack": 1,
+                "isdir": True,
+                "is_disc": False,
+                "keep_folder": False,
+                "keep_nfo": True,
+                "path": pack_dir,
+                "filelist": [],
+                "mkbrr": False,
+                "debug": False,
+                "max_piece_size": 0,
+                "bloated_trackers": [],
+            }
+
+            _run(TorrentCreator.create_torrent(meta, Path(pack_dir), "BASE"))
+
+            torrent_path = os.path.join(tmp_dir, "BASE.torrent")
+            assert os.path.exists(torrent_path), "BASE.torrent was not created"
+
+            t = Torrent.read(torrent_path)
+            names = [str(f) for f in t.files]
+            mkv_files = [n for n in names if n.endswith(".mkv")]
+            nfo_files = [n for n in names if n.endswith(".nfo")]
+
+            assert len(mkv_files) == 2, f"Expected 2 nested MKV files, got: {names}"
+            assert len(nfo_files) == 1, f"Expected 1 NFO file, got: {names}"

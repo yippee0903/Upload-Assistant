@@ -1498,5 +1498,11 @@ def determine_keep_nfo(meta: dict, tracker_status: dict, target_trackers: list) 
     if os.path.isdir(content_path_str):
         # Search top-level first (fast), then recurse into sub-directories so
         # that TV packs with episode-level NFOs are also detected.
-        return bool(glob.glob(os.path.join(content_path_str, "*.nfo")) or glob.glob(os.path.join(content_path_str, "**", "*.nfo"), recursive=True))
+        # Post-filter with .lower() to catch ".NFO" / ".Nfo" on case-sensitive
+        # filesystems (glob patterns are case-sensitive on Linux).
+        _top = [p for p in glob.glob(os.path.join(content_path_str, "*")) if os.path.basename(p).lower().endswith(".nfo")]
+        if _top:
+            return True
+        _recursive = [p for p in glob.glob(os.path.join(content_path_str, "**", "*"), recursive=True) if os.path.basename(p).lower().endswith(".nfo")]
+        return bool(_recursive)
     return os.path.isfile(os.path.splitext(content_path_str)[0] + ".nfo")

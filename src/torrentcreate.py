@@ -229,8 +229,18 @@ class TorrentCreator:
                             _kf_video = [f"{_kf_folder_name}/{os.path.relpath(f, _kf_path_dir)}" for f in _kf_filelist]
                             include = _kf_video + ["*.nfo"]
                         else:
-                            # No explicit filelist – fall back to extension globs to avoid an NFO-only torrent.
-                            include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
+                            # No explicit filelist – walk the tree so nested episode
+                            # folders are included, not just top-level files.
+                            _kf_discovered: list[str] = []
+                            _video_exts = {".mkv", ".mp4", ".ts"}
+                            for _root, _dirs, _fnames in os.walk(_kf_path_dir):
+                                _dirs.sort()
+                                for _fname in sorted(_fnames):
+                                    _ext = os.path.splitext(_fname)[1].lower()
+                                    if _ext in _video_exts or _fname.lower().endswith(".nfo"):
+                                        _abs = os.path.join(_root, _fname)
+                                        _kf_discovered.append(f"{_kf_folder_name}/{os.path.relpath(_abs, _kf_path_dir)}")
+                            include = _kf_discovered if _kf_discovered else ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*"]
                     elif not meta.get("tv_pack", False):
                         folder_name = os.path.basename(str(path))
@@ -247,8 +257,18 @@ class TorrentCreator:
                             _nfo_video = [f"{_nfo_folder_name}/{os.path.relpath(f, _nfo_path_dir)}" for f in _nfo_filelist]
                             include = _nfo_video + ["*.nfo"]
                         else:
-                            # No explicit filelist – fall back to extension globs to avoid an NFO-only torrent.
-                            include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
+                            # No explicit filelist – walk the tree so nested episode
+                            # folders are included, not just top-level files.
+                            _nfo_discovered: list[str] = []
+                            _video_exts_nfo = {".mkv", ".mp4", ".ts"}
+                            for _root, _dirs, _fnames in os.walk(_nfo_path_dir):
+                                _dirs.sort()
+                                for _fname in sorted(_fnames):
+                                    _ext = os.path.splitext(_fname)[1].lower()
+                                    if _ext in _video_exts_nfo or _fname.lower().endswith(".nfo"):
+                                        _abs = os.path.join(_root, _fname)
+                                        _nfo_discovered.append(f"{_nfo_folder_name}/{os.path.relpath(_abs, _nfo_path_dir)}")
+                            include = _nfo_discovered if _nfo_discovered else ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*"]
                     elif meta.get("is_disc", False):
                         include = []
