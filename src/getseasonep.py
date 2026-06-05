@@ -89,7 +89,16 @@ class SeasonEpisodeManager:
                             guess_year = ""
                         try:
                             guess_data = _guessit_data(video)
-                            season_guess = str(guess_data.get("season") or "")
+                            raw_season = guess_data.get("season")
+                            # guessit may return a list when words like "Seasons" in the
+                            # title and a year both parse as season candidates
+                            # (e.g. "The.Four.Seasons.2025.S02" → [2025, 2]).
+                            # Normalise: strip year-valued entries and take the first remainder.
+                            if isinstance(raw_season, list):
+                                year_int = int(guess_year) if guess_year.isdigit() else None
+                                filtered = [s for s in raw_season if s != year_int]
+                                raw_season = filtered[0] if filtered else (raw_season[0] if raw_season else None)
+                            season_guess = str(raw_season or "")
                             if season_guess == guess_year:
                                 if f"s{season_guess}" in video.lower():
                                     season_int = int(season_guess)
@@ -98,7 +107,7 @@ class SeasonEpisodeManager:
                                     season_int = 1
                                     season = "S01"
                             else:
-                                season_int = int(guess_data.get("season") or 1)
+                                season_int = int(raw_season or 1)
                                 season = "S" + str(season_int).zfill(2)
                         except Exception:
                             console.print(

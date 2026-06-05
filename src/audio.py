@@ -522,7 +522,20 @@ async def _get_audio_v2(
                     if has_ad and not audio_tracks:
                         meta["ad_only_audio"] = True
                     else:
-                        meta["ad_only_audio"] = False
+                        # Fallback: if no AD tracks were detected by title but the
+                        # release folder name contains "Audio Description" (a common
+                        # convention for ATVP/streamer releases where track Title
+                        # fields may be empty), and there is only one audio track,
+                        # treat it as AD-only so the upload is flagged.
+                        release_basename = os.path.basename(str(meta.get("path") or ""))
+                        path_has_ad = bool(AD_TRACK_RE.search(release_basename.replace(".", " ")))
+                        if path_has_ad and len(_non_special_audio) == 1:
+                            meta["ad_only_audio"] = True
+                            has_audiodesc = True
+                            if meta["debug"]:
+                                console.print(f"DEBUG: AD-only flagged via release name: {release_basename}")
+                        else:
+                            meta["ad_only_audio"] = False
                     audio_language = None
                     if meta["debug"]:
                         console.print(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
