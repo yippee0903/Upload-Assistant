@@ -26,7 +26,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         self.source_flag = "G3MINI"
         pass
 
-    WEB_LABEL: str = "WEB-DL"
+    WEB_LABEL: str = "WEB"
 
     async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
@@ -273,7 +273,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             elif type == "ENCODE":  # Encode
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {source} {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {service} WEB-DL {hybrid} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {service} {self.WEB_LABEL} {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBRIP":  # WEBRip
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {uhd} {service} WEBRip {hybrid} {hdr} {audio} {video_encode}"
             elif type == "HDTV":  # HDTV
@@ -296,7 +296,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             elif type == "ENCODE":  # Encode
                 name = f"{title} {year} {season_ep} {part} {edition} {repack} {language} {resolution} {uhd} {source} {hybrid} {hdr} {audio} {video_encode}"  # SOURCE
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {season_ep} {part} {edition} {repack} {language} {resolution} {uhd} {service} WEB-DL {hybrid} {hdr} {audio} {video_encode}"
+                name = f"{title} {year} {season_ep} {part} {edition} {repack} {language} {resolution} {uhd} {service} {self.WEB_LABEL} {hybrid} {hdr} {audio} {video_encode}"
             elif type == "WEBRIP":  # WEBRip
                 name = f"{title} {year} {season_ep} {part} {edition} {repack} {language} {resolution} {uhd} {service} WEBRip {hybrid} {hdr} {audio} {video_encode}"
             elif type == "HDTV":  # HDTV

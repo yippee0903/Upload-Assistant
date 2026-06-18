@@ -1390,6 +1390,11 @@ class C411(FrenchTrackerMixin):
         Optional fields: options, uploaderNote, tmdbData, rawgData
         """
 
+        if meta.get("unattended", False) and meta.get("_c411_slot_occupied", False):
+            console.print("[yellow]C411: slot already taken — skipping in unattended mode[/yellow]")
+            meta["tracker_status"][self.tracker]["status_message"] = "slot occupied — skipped in unattended mode"
+            return False
+
         common = COMMON(config=self.config)
 
         # If NFO file exist, include it in torrent file by recreate .torrent
@@ -1840,6 +1845,8 @@ class C411(FrenchTrackerMixin):
             meta["_corrective_slot_warning"] = True
         else:
             meta.pop("_corrective_slot_warning", None)
+
+        meta["_c411_slot_occupied"] = len(final_dupes) > 0
 
         return final_dupes
 
