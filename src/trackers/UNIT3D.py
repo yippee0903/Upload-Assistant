@@ -514,6 +514,7 @@ class UNIT3D:
                         return False  # Auth/permission error
                     elif e.response.status_code in [401, 404, 422]:
                         meta["tracker_status"][self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
+                        return False
                     else:
                         # Retry other HTTP errors
                         if attempt < max_retries - 1:

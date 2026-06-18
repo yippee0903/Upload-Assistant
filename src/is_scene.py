@@ -251,13 +251,19 @@ class SceneManager:
                                 console.print(f"[yellow]Predb: Checking {release_name} against {video_base}")
                             if release_name == video_base:
                                 found = True
-                                meta["scene_name"] = release_attr
+                                # predb stores releases with file extensions; strip them from scene_name
+                                _root, _ext = os.path.splitext(release_attr)
+                                meta["scene_name"] = _root if _ext.lower() in {".mkv", ".mp4", ".ts", ".m2ts", ".avi", ".vob", ".nfo"} else release_attr
                                 console.print("[green]Predb: Match found")
                                 # The 4th <td> contains the group
                                 if len(tds) >= 4:
                                     group_a = tds[3].find("a")
                                     if group_a:
                                         group = self._attr_to_string(group_a.get_text()).strip()
+                                        # predb sometimes includes the file extension in the group column
+                                        _g_root, _g_ext = os.path.splitext(group)
+                                        if _g_ext.lower() in {".mkv", ".mp4", ".ts", ".m2ts", ".avi", ".vob", ".nfo"}:
+                                            group = _g_root
                                         meta["tag"] = f"-{group}" if group and not group.startswith("-") else group
                                 return True
                 if not found:
