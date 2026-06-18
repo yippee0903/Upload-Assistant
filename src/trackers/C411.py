@@ -1390,7 +1390,7 @@ class C411(FrenchTrackerMixin):
         Optional fields: options, uploaderNote, tmdbData, rawgData
         """
 
-        if meta.get("unattended", False) and meta.get("_c411_slot_occupied", False):
+        if meta.get("unattended", False) and meta.get("_c411_slot_occupied", False) and not self._is_corrective_version_meta(meta):
             console.print("[yellow]C411: slot already taken — skipping in unattended mode[/yellow]")
             meta["tracker_status"][self.tracker]["status_message"] = "slot occupied — skipped in unattended mode"
             return False
@@ -1846,7 +1846,7 @@ class C411(FrenchTrackerMixin):
         else:
             meta.pop("_corrective_slot_warning", None)
 
-        meta["_c411_slot_occupied"] = len(final_dupes) > 0
+        meta["_c411_slot_occupied"] = len(final_dupes) > 0 and not is_corrective
 
         return final_dupes
 
