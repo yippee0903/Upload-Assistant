@@ -331,5 +331,10 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         dot_name = re.sub(r"\.(-\.)+", ".", dot_name)
         # Collapse consecutive dots and strip boundary dots
         dot_name = re.sub(r"\.{2,}", ".", dot_name)
+        # G3MINI convention: codec abbreviation directly concatenated with channel
+        # layout — no dot separator.  "DDP.5.1" → "DDP5.1", "DTS.5.1" → "DTS5.1".
+        # DTS-HD MA is unaffected: "DTS" is followed by "-" not ".", so \bDTS\. never
+        # matches inside "DTS-HD.MA.5.1".
+        dot_name = re.sub(r"\b(DDP|EAC3|DD|DTS|FLAC|AAC|MP3|Opus)\.(\d+\.\d+)", r"\1\2", dot_name, flags=re.IGNORECASE)
         dot_name = dot_name.strip(".")
         return {"name": dot_name}
