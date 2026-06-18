@@ -140,7 +140,8 @@ class ULCX(UNIT3D):
                 else:
                     return False
             else:
-                console.print(f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}. Skipping.[/bold red]")
+                if not meta.get("unattended", False):
+                    console.print(f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}. Skipping.[/bold red]")
                 return False
 
         if meta.get("discs_missing_certificate", []):
