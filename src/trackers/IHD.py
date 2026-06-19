@@ -268,6 +268,12 @@ class IHD(UNIT3D):
         if not meta.get("language_checked", False):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
+        audio_languages: list[str] = meta.get("audio_languages") or []
+        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+            foreign_lang = audio_languages[0].upper()
+            if meta.get("is_disc") != "BDMV":
+                ihd_name = ihd_name.replace(meta["resolution"], f"{foreign_lang} {meta['resolution']}", 1)
+
         return {"name": ihd_name}
 
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
