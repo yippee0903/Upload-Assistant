@@ -33,7 +33,7 @@ psutil==7.2.2
 pycountry==26.2.16
 pyimgbox==1.0.7
 pymediainfo==7.0.1
-pyotp==2.9.0
+pyotp==2.10.0
 qbittorrent-api==2026.5.3
 regex==2026.5.9
 requests==2.34.2
