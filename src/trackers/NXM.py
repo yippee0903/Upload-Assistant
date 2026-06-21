@@ -255,7 +255,11 @@ class NXM(FrenchTrackerMixin):
             directory = video_path if os.path.isdir(video_path) else os.path.dirname(video_path)
             if directory and os.path.isdir(directory):
                 subtitle_extensions = (".srt", ".sub", ".ass", ".ssa", ".idx", ".smi", ".psb")
-                if any(f.lower().endswith(subtitle_extensions) for f in os.listdir(directory)):
+                if any(
+                    fname.lower().endswith(subtitle_extensions)
+                    for _, _, files in os.walk(directory)
+                    for fname in files
+                ):
                     if not meta.get("unattended") or meta.get("debug"):
                         console.print("[bold red]NXM: fichiers de sous-titres séparés détectés — ils doivent être encapsulés dans le MKV.[/bold red]")
                     return False
@@ -263,11 +267,10 @@ class NXM(FrenchTrackerMixin):
         # §6 — Animés : lien AniDB / AniList / MAL obligatoire
         is_anime = bool(meta.get("anime")) or bool(meta.get("mal_id"))
         category = await self._get_category(meta)
-        if category == 4 or is_anime:
-            if not meta.get("mal_id") and not meta.get("anidb_id") and not meta.get("anilist_id"):
-                if not meta.get("unattended") or meta.get("debug"):
-                    console.print("[bold red]NXM: les animés requièrent un lien AniDB, AniList ou MAL (--mal, --anidb, --anilist).[/bold red]")
-                return False
+        if (category == 4 or is_anime) and not meta.get("mal_id") and not meta.get("anidb_id") and not meta.get("anilist_id"):
+            if not meta.get("unattended") or meta.get("debug"):
+                console.print("[bold red]NXM: les animés requièrent un lien AniDB, AniList ou MAL (--mal, --anidb, --anilist).[/bold red]")
+            return False
 
         return True
 
