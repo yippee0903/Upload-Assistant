@@ -573,6 +573,16 @@ class NXM(FrenchTrackerMixin):
                 chap_body = "\n".join(f"{tc[:8]} — {name}" for tc, name in chapters)
                 out.append(f"[spoiler=Liste des chapitres]{chap_body}[/spoiler]")
 
+        # ── Notes ─────────────────────────────────────────────────────────
+        out.append("")
+        out.append(f"[img]{_B}/notes.svg[/img]")
+        out.append("")
+        note = self.config["TRACKERS"].get(self.tracker, {}).get("note", "Bon visionnage à tous, et vive Nexum !")
+        personal_note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
+        if personal_note:
+            note = f"{note}\n{personal_note}"
+        out.append(note)
+
         # ── Captures d'écran ──────────────────────────────────────────────
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
         image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
@@ -585,17 +595,8 @@ class NXM(FrenchTrackerMixin):
                     img_lines.append(f"[url={web_url}][img]{raw_url}[/img][/url]" if web_url else f"[img]{raw_url}[/img]")
             if img_lines:
                 out.append("")
+                out.append("")
                 out.append(f"[spoiler=Captures d'écran]\n{chr(10).join(img_lines)}\n[/spoiler]")
-
-        # ── Notes ─────────────────────────────────────────────────────────
-        out.append("")
-        out.append(f"[img]{_B}/notes.svg[/img]")
-        out.append("")
-        note = self.config["TRACKERS"].get(self.tracker, {}).get("note", "Bon visionnage à tous, et vive Nexum !")
-        personal_note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
-        if personal_note:
-            note = f"{note}\n{personal_note}"
-        out.append(note)
 
         # ── Signature UA ──────────────────────────────────────────────────
         ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
