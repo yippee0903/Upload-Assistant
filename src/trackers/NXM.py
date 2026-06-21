@@ -583,8 +583,6 @@ class NXM(FrenchTrackerMixin):
                     img_lines.append(f"[url={web_url}][img]{raw_url}[/img][/url]" if web_url else f"[img]{raw_url}[/img]")
             if img_lines:
                 out.append("")
-                out.append("[b]Captures d'écran[/b]")
-                out.append("")
                 out.append(f"[spoiler=Captures d'écran]\n{chr(10).join(img_lines)}\n[/spoiler]")
 
         # ── Notes ─────────────────────────────────────────────────────────
