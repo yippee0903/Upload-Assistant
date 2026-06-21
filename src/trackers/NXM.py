@@ -297,109 +297,312 @@ class NXM(FrenchTrackerMixin):
     #  Description builder (BBCode)
     # ──────────────────────────────────────────────────────────
 
+    # ── Language / country display name tables (used in _build_description) ──
+
+    _LANG_FR: dict[str, str] = {
+        "af": "Afrikaans",
+        "ar": "Arabe",
+        "bg": "Bulgare",
+        "ca": "Catalan",
+        "cs": "Tchèque",
+        "da": "Danois",
+        "de": "Allemand",
+        "el": "Grec",
+        "en": "Anglais",
+        "es": "Espagnol",
+        "et": "Estonien",
+        "eu": "Basque",
+        "fa": "Persan",
+        "fi": "Finnois",
+        "fr": "Français",
+        "gl": "Galicien",
+        "he": "Hébreu",
+        "hi": "Hindi",
+        "hr": "Croate",
+        "hu": "Hongrois",
+        "id": "Indonésien",
+        "is": "Islandais",
+        "it": "Italien",
+        "ja": "Japonais",
+        "ko": "Coréen",
+        "lt": "Lituanien",
+        "lv": "Letton",
+        "ms": "Malais",
+        "nl": "Néerlandais",
+        "no": "Norvégien",
+        "pl": "Polonais",
+        "pt": "Portugais",
+        "ro": "Roumain",
+        "ru": "Russe",
+        "sk": "Slovaque",
+        "sl": "Slovène",
+        "sq": "Albanais",
+        "sr": "Serbe",
+        "sv": "Suédois",
+        "th": "Thaï",
+        "tr": "Turc",
+        "uk": "Ukrainien",
+        "vi": "Vietnamien",
+        "zh": "Chinois",
+        # ISO 639-2
+        "ara": "Arabe",
+        "ces": "Tchèque",
+        "chi": "Chinois",
+        "cze": "Tchèque",
+        "dan": "Danois",
+        "deu": "Allemand",
+        "dut": "Néerlandais",
+        "ell": "Grec",
+        "eng": "Anglais",
+        "fra": "Français",
+        "fre": "Français",
+        "ger": "Allemand",
+        "gre": "Grec",
+        "heb": "Hébreu",
+        "hin": "Hindi",
+        "hun": "Hongrois",
+        "ind": "Indonésien",
+        "ita": "Italien",
+        "jpn": "Japonais",
+        "kor": "Coréen",
+        "nld": "Néerlandais",
+        "nor": "Norvégien",
+        "pol": "Polonais",
+        "por": "Portugais",
+        "ron": "Roumain",
+        "rum": "Roumain",
+        "rus": "Russe",
+        "slk": "Slovaque",
+        "slo": "Slovaque",
+        "slv": "Slovène",
+        "spa": "Espagnol",
+        "swe": "Suédois",
+        "tha": "Thaï",
+        "tur": "Turc",
+        "ukr": "Ukrainien",
+        "vie": "Vietnamien",
+        "zho": "Chinois",
+    }
+    _COUNTRY_FR: dict[str, str] = {
+        "FR": "France",
+        "BE": "Belgique",
+        "CH": "Suisse",
+        "CA": "Canada",
+        "US": "États-Unis",
+        "GB": "Royaume-Uni",
+        "AU": "Australie",
+        "DE": "Allemagne",
+        "AT": "Autriche",
+        "ES": "Espagne",
+        "MX": "Mexique",
+        "BR": "Brésil",
+        "PT": "Portugal",
+        "IT": "Italie",
+        "JP": "Japon",
+        "KR": "Corée du Sud",
+        "CN": "Chine",
+        "TW": "Taïwan",
+        "RU": "Russie",
+        "NL": "Pays-Bas",
+        "PL": "Pologne",
+        "SE": "Suède",
+        "NO": "Norvège",
+        "DK": "Danemark",
+        "FI": "Finlande",
+    }
+
     async def _build_description(self, meta: dict[str, Any]) -> str:
-        """Build a concise BBCode description for NXM.
-
-        NXM's torrent page already displays the poster, synopsis, genres,
-        and quality badge.  The description therefore focuses on technical
-        details, audio/subtitle tracks, release metadata, and screenshots.
-        """
-        parts: list[str] = ["[center]"]
+        """Build NXM-style BBCode description with banner images."""
+        tracks: list[dict[str, Any]] = (meta.get("mediainfo") or {}).get("media", {}).get("track", [])
         mi_text = await self._get_mediainfo_text(meta)
+        _B = "https://nexum-core.com/img/banners"
 
-        # ── Informations techniques ──
-        parts.append("[b]Informations techniques[/b]")
-        tech: list[str] = []
-        type_label = self._get_type_label(meta)
-        if type_label:
-            tech.append(f"[b]Type :[/b] {type_label}")
-        source = meta.get("source", "") or meta.get("type", "")
-        if source:
-            tech.append(f"[b]Source :[/b] {source}")
-        service = meta.get("service", "")
-        if service:
-            tech.append(f"[b]Service :[/b] {service}")
-        resolution = meta.get("resolution", "")
-        if resolution:
-            tech.append(f"[b]Résolution :[/b] {resolution}")
-        container = self._format_container(mi_text)
-        if container:
-            tech.append(f"[b]Format vidéo :[/b] {container}")
-        video_codec = (meta.get("video_encode", "").strip() or meta.get("video_codec", "")).strip()
-        video_codec = video_codec.replace("H.264", "H264").replace("H.265", "H265")
-        raw_codec = meta.get("video_codec", "").strip()
-        if video_codec and raw_codec and raw_codec != video_codec:
-            video_codec = f"{video_codec} ({raw_codec})"
-        if video_codec:
-            tech.append(f"[b]Codec vidéo :[/b] {video_codec}")
-        hdr_dv = self._format_hdr_dv_bbcode(meta)
-        if hdr_dv:
-            tech.append(f"[b]HDR :[/b] {hdr_dv}")
-        if mi_text:
-            vbr_m = re.search(r"(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)", mi_text)
-            if vbr_m:
-                tech.append(f"[b]Débit vidéo :[/b] {vbr_m.group(1).strip()}")
-        parts.extend(tech)
-        parts.append("")
+        # ── Local helpers ──────────────────────────────────────────────────
 
-        # ── Audio(s) ──
-        parts.append("[b]Audio(s)[/b]")
-        audio_lines = self._format_audio_bbcode(mi_text, meta)
-        if audio_lines:
-            parts.extend(f"[i]{al}[/i]" for al in audio_lines)
-        else:
-            parts.append("[i]Non spécifié[/i]")
-        parts.append("")
+        def _lang_fr(code: str) -> str:
+            if not code:
+                return ""
+            parts = code.replace("_", "-").split("-")
+            name = self._LANG_FR.get(parts[0].lower(), parts[0])
+            country = self._COUNTRY_FR.get(parts[1].upper(), "") if len(parts) > 1 else ""
+            return f"{name} ({country})" if country else name
 
-        # ── Sous-titre(s) ──
-        parts.append("[b]Sous-titre(s)[/b]")
-        sub_lines = self._format_subtitle_bbcode(mi_text, meta)
-        if sub_lines:
-            parts.extend(f"[i]{sl}[/i]" for sl in sub_lines)
-        else:
-            parts.append("[i]Aucun[/i]")
-        parts.append("")
+        def _kbps(br: str) -> str:
+            try:
+                return f"{int(br) // 1000:,}".replace(",", " ") + " kb/s"
+            except (ValueError, TypeError):
+                return ""
 
-        # ── Release ──
-        parts.append("[b]Release[/b]")
-        size_str = self._get_total_size(meta, mi_text)
-        if size_str:
-            parts.append(f"[b]Taille totale :[/b] {size_str}")
-        file_count = self._count_files(meta)
-        if file_count:
-            parts.append(f"[b]Nombre de fichier(s) :[/b] {file_count}")
-        group = self._get_release_group(meta)
-        if group:
-            parts.append(f"[b]Groupe :[/b] {group}")
-        personal_note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
-        if personal_note:
-            parts.append(f"[b]Note :[/b] {personal_note}")
-        parts.append("")
+        def _channels_label(track: dict[str, Any]) -> str:
+            n_str = str(track.get("Channels", "") or "")
+            layout = str(track.get("ChannelLayout", "") or "")
+            try:
+                n = int(n_str)
+            except (ValueError, TypeError):
+                return n_str
+            lfe = "LFE" in layout.upper()
+            return {1: "Mono", 2: "Stéréo", 6: "5.1" if lfe else "6.0", 8: "7.1" if lfe else "8.0"}.get(n, f"{n}.0")
 
-        # ── Captures d'écran ──
+        def _flags(track: dict[str, Any]) -> str:
+            f: list[str] = []
+            if str(track.get("Default", "")).lower() == "yes":
+                f.append("défaut")
+            if str(track.get("Forced", "")).lower() == "yes":
+                f.append("forcé")
+            return f" [{', '.join(f)}]" if f else ""
+
+        def _sub_fmt(track: dict[str, Any]) -> str:
+            fmt = str(track.get("Format", "") or "")
+            codec_id = str(track.get("CodecID", "") or "")
+            return (
+                {"UTF-8": "SRT", "ASS": "ASS", "SSA": "SSA", "PGS": "PGS", "HDMV PGS": "PGS", "VobSub": "VobSub"}.get(fmt)
+                or {"S_TEXT/UTF8": "SRT", "S_ASS": "ASS", "S_VOBSUB": "VobSub", "S_HDMV/PGS": "PGS"}.get(codec_id)
+                or fmt
+                or "?"
+            )
+
+        def _duration_fr(sec_str: str) -> str:
+            try:
+                total = float(sec_str)
+                h, rem = divmod(int(total), 3600)
+                m, s = divmod(rem, 60)
+                return f"{h} h {m:02d} min {s:02d} s" if h else f"{m} min {s:02d} s"
+            except (ValueError, TypeError):
+                return ""
+
+        def _filesize_fr(size_str: str) -> str:
+            try:
+                size = int(size_str)
+                if size >= 1 << 30:
+                    return f"{size / (1 << 30):.2f} GiB"
+                return f"{size / (1 << 20):.0f} MiB"
+            except (ValueError, TypeError):
+                return ""
+
+        def _field(label: str, value: str) -> str:
+            return f"[b]{label} :[/b] [i]{value}[/i]" if value else ""
+
+        out: list[str] = []
+
+        # ── Général ───────────────────────────────────────────────────────
+        general: dict[str, Any] = next((t for t in tracks if t.get("@type") == "General"), {})
+        out.append(f"[img]{_B}/general.svg[/img]")
+        out.append("")
+        video_path = meta.get("path", "")
+        filename = os.path.basename(video_path) if video_path and not os.path.isdir(str(video_path)) else ""
+        if filename:
+            out.append(_field("Nom du fichier", filename))
+        container = self._format_container(mi_text) or str(general.get("Format", "") or "")
+        ext = os.path.splitext(filename)[1].lower().lstrip(".") if filename else ""
+        container_label = f"{container} (.{ext})" if ext and ext not in container.lower() else container
+        out.append(_field("Format", container_label))
+        out.append(_field("Taille", _filesize_fr(str(general.get("FileSize", "") or ""))))
+        out.append(_field("Durée", _duration_fr(str(general.get("Duration", "") or ""))))
+        out.append(_field("Débit global", _kbps(str(general.get("OverallBitRate", "") or ""))))
+
+        # ── Vidéo ─────────────────────────────────────────────────────────
+        video: dict[str, Any] = next((t for t in tracks if t.get("@type") == "Video"), {})
+        if video:
+            out.append("")
+            out.append(f"[img]{_B}/video.svg[/img]")
+            out.append("")
+            codec_name = (meta.get("video_encode") or meta.get("video_codec") or "").replace("H.264", "H.264").replace("H.265", "H.265")
+            profile = str(video.get("Format_Profile", "") or "")
+            hdr_dv = self._format_hdr_dv_bbcode(meta)
+            codec_label = f"{codec_name} - Profil {profile}" if codec_name and profile else codec_name
+            if hdr_dv:
+                codec_label = f"{codec_label} / {hdr_dv}" if codec_label else hdr_dv
+            out.append(_field("Codec", codec_label))
+            w = str(video.get("Width", "") or "")
+            h = str(video.get("Height", "") or "")
+            out.append(_field("Résolution", f"{w}x{h}" if w and h else ""))
+            fps = str(video.get("FrameRate", "") or "")
+            fps_num = str(video.get("FrameRate_Num", "") or "")
+            fps_den = str(video.get("FrameRate_Den", "") or "")
+            fps_label = f"{fps} ({fps_num}/{fps_den}) FPS" if fps and fps_num and fps_den else (f"{fps} FPS" if fps else "")
+            out.append(_field("Fréquence d'images", fps_label))
+            out.append(_field("Débit vidéo", _kbps(str(video.get("BitRate", "") or ""))))
+            bit_depth = str(video.get("BitDepth", "") or "")
+            out.append(_field("Profondeur des couleurs", f"{bit_depth} bits" if bit_depth else ""))
+
+        # ── Audio ──────────────────────────────────────────────────────────
+        audio_tracks = [t for t in tracks if t.get("@type") == "Audio"]
+        if audio_tracks:
+            out.append("")
+            out.append(f"[img]{_B}/audio.svg[/img]")
+            out.append("")
+            for at in audio_tracks:
+                lang = _lang_fr(str(at.get("Language", "") or ""))
+                title = str(at.get("Title", "") or "")
+                fmt = str(at.get("Format", "") or "")
+                chans = _channels_label(at)
+                br = _kbps(str(at.get("BitRate", "") or ""))
+                rhs = " - ".join(p for p in [fmt, chans] if p)
+                if br:
+                    rhs = f"{rhs} @ {br}" if rhs else br
+                line = f"{lang} : {title} - {rhs}" if title else f"{lang} : {rhs}"
+                out.append(f"{line.strip()}{_flags(at)}")
+
+        # ── Sous-titres ────────────────────────────────────────────────────
+        text_tracks = [t for t in tracks if t.get("@type") == "Text"]
+        if text_tracks:
+            out.append("")
+            out.append(f"[img]{_B}/subtitles.svg[/img]")
+            out.append("")
+            for st in text_tracks:
+                lang = _lang_fr(str(st.get("Language", "") or ""))
+                title = str(st.get("Title", "") or "")
+                fmt = _sub_fmt(st)
+                elem = str(st.get("ElementCount", "") or "")
+                rhs = " - ".join(p for p in [fmt, f"{elem} éléments" if elem else ""] if p)
+                line = f"{lang} : {title} - {rhs}" if title else f"{lang} : {rhs}"
+                out.append(f"{line.strip()}{_flags(st)}")
+
+        # ── Chapitres ─────────────────────────────────────────────────────
+        menu: dict[str, Any] = next((t for t in tracks if t.get("@type") == "Menu"), {})
+        if menu:
+            raw_menu: dict[str, Any] = menu.get("extra") or menu
+            chapters = sorted([(k, str(v)) for k, v in raw_menu.items() if re.match(r"\d{2}:\d{2}:\d{2}", k)])
+            if chapters:
+                out.append("")
+                out.append(f"[img]{_B}/chapters.svg[/img]")
+                out.append("")
+                out.append(f"{len(chapters)} chapitre{'s' if len(chapters) > 1 else ''}")
+                chap_body = "\n".join(f"{tc[:8]} — {name}" for tc, name in chapters)
+                out.append(f"[spoiler=Liste des chapitres]{chap_body}[/spoiler]")
+
+        # ── Captures d'écran ──────────────────────────────────────────────
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
         image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
         if image_list:
-            parts.append("[b]Captures d'écran[/b][spoiler]")
-            parts.append("")
             img_lines: list[str] = []
             for img in image_list:
-                raw = img.get("raw_url", "")
-                web = img.get("web_url", "")
-                if raw:
-                    img_lines.append(f"[url={web}][img]{raw}[/img][/url]" if web else f"[img]{raw}[/img]")
+                raw_url = img.get("raw_url", "")
+                web_url = img.get("web_url", "")
+                if raw_url:
+                    img_lines.append(f"[url={web_url}][img]{raw_url}[/img][/url]" if web_url else f"[img]{raw_url}[/img]")
             if img_lines:
-                parts.append("\n".join(img_lines))
-            parts.append("[/spoiler]")
-            parts.append("")
+                out.append("")
+                out.append(f"[img]{_B}/screenshots.svg[/img]")
+                out.append("")
+                out.append(f"[spoiler=Captures d'écran]\n{chr(10).join(img_lines)}\n[/spoiler]")
 
-        parts.append("[/center]")
+        # ── Notes ─────────────────────────────────────────────────────────
+        out.append("")
+        out.append(f"[img]{_B}/notes.svg[/img]")
+        out.append("")
+        note = self.config["TRACKERS"].get(self.tracker, {}).get("note", "Bon visionnage à tous, et vive Nexum !")
+        personal_note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
+        if personal_note:
+            note = f"{note}\n{personal_note}"
+        out.append(note)
 
-        # ── Signature ──
+        # ── Signature UA ──────────────────────────────────────────────────
         ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
-        parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant]{ua_sig}[/url][/right]")
+        out.append("")
+        out.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant]{ua_sig}[/url][/right]")
 
-        return "\n".join(parts)
+        return "\n".join(line for line in out if line is not None)
 
     async def _get_mediainfo_text(self, meta: dict[str, Any]) -> str:
         """Read MediaInfo text from temp files."""
