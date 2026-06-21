@@ -494,7 +494,7 @@ class NXM(FrenchTrackerMixin):
             out.append(_field("Nom du fichier", filename))
         container = self._format_container(mi_text) or str(general.get("Format", "") or "")
         ext = os.path.splitext(filename)[1].lower().lstrip(".") if filename else ""
-        container_label = f"{container} (.{ext})" if ext and ext not in container.lower() else container
+        container_label = f"{container} (.{ext})" if container and ext and ext not in container.lower() else container or (f".{ext}" if ext else "")
         out.append(_field("Format", container_label))
         out.append(_field("Taille", _filesize_fr(str(general.get("FileSize", "") or ""))))
         out.append(_field("Durée", _duration_fr(str(general.get("Duration", "") or ""))))
@@ -540,7 +540,8 @@ class NXM(FrenchTrackerMixin):
                 rhs = " - ".join(p for p in [fmt, chans] if p)
                 if br:
                     rhs = f"{rhs} @ {br}" if rhs else br
-                line = f"{lang} : {title} - {rhs}" if title else f"{lang} : {rhs}"
+                left = f"{lang} : {title}" if lang and title else (lang or title)
+                line = f"{left} - {rhs}" if left and rhs else (left or rhs)
                 out.append(f"{line.strip()}{_flags(at)}")
 
         # ── Sous-titres ────────────────────────────────────────────────────
@@ -555,7 +556,8 @@ class NXM(FrenchTrackerMixin):
                 fmt = _sub_fmt(st)
                 elem = str(st.get("ElementCount", "") or "")
                 rhs = " - ".join(p for p in [fmt, f"{elem} éléments" if elem else ""] if p)
-                line = f"{lang} : {title} - {rhs}" if title else f"{lang} : {rhs}"
+                left = f"{lang} : {title}" if lang and title else (lang or title)
+                line = f"{left} - {rhs}" if left and rhs else (left or rhs)
                 out.append(f"{line.strip()}{_flags(st)}")
 
         # ── Chapitres ─────────────────────────────────────────────────────
