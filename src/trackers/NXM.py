@@ -255,11 +255,7 @@ class NXM(FrenchTrackerMixin):
             directory = video_path if os.path.isdir(video_path) else os.path.dirname(video_path)
             if directory and os.path.isdir(directory):
                 subtitle_extensions = (".srt", ".sub", ".ass", ".ssa", ".idx", ".smi", ".psb")
-                if any(
-                    fname.lower().endswith(subtitle_extensions)
-                    for _, _, files in os.walk(directory)
-                    for fname in files
-                ):
+                if any(fname.lower().endswith(subtitle_extensions) for _, _, files in os.walk(directory) for fname in files):
                     if not meta.get("unattended") or meta.get("debug"):
                         console.print("[bold red]NXM: fichiers de sous-titres séparés détectés — ils doivent être encapsulés dans le MKV.[/bold red]")
                     return False
