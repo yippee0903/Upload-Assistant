@@ -54,36 +54,165 @@ class NXM(FrenchTrackerMixin):
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[str] = [
-            "Avitech",
-            "Boheme",
-            "CINeHD",
-            "Cpasbien",
+            "ACOOL",
+            "AKLHD",
+            "ALIOZ",
+            "ANONA",
+            "ARKAS",
+            "ARKRIL",
+            "ASPHIXIAS",
+            "AT",
+            "AVITECH",
+            "AZAZE",
+            "BAGUETTE",
+            "BALIBALO",
+            "BANDIX",
+            "BIGZT",
+            "BLABLASTREAM",
+            "BOHEME",
+            "BOL",
+            "BOSSBABY",
+            "CHAMPION9",
+            "CINEHD",
+            "COPYCOMIC",
+            "CORTEX91",
+            "CPASBIEN",
             "CPB",
+            "CR4ZYTIME",
             "CZ530",
             "D0LL4R",
+            "DDLFRENCH",
+            "DDLFRENCHORG",
+            "DOLL4R",
+            "DREADTEAM",
+            "DROPSE",
+            "EASPORTS",
+            "ELITET",
             "EXTREME",
+            "EZTV",
+            "EZTVRE",
             "FGT",
+            "FIRETOWN",
             "FLOP",
-            "Firetown",
             "FLY3R",
-            "FuN",
+            "FREEZER",
+            "FUN",
+            "FUNKKY",
+            "FYR3N",
+            "FZTEAM",
             "GAÏA",
+            "GHOSTSPIRIT",
+            "GHZ",
+            "GLADOS",
+            "GOBO2S",
+            "GZR",
+            "HD2",
             "HDMIDIMADRIDI",
+            "HEVCBAY",
+            "HMIDIMADRIDI",
+            "HUSH",
+            "JETANIME",
+            "JIHEFF",
+            "K0RE",
+            "KATAIRI",
             "KILLERMIX",
+            "KR4K3N",
+            "L-O-L",
+            "L-OL",
+            "LIBERTAD",
+            "LION",
+            "LMPS",
+            "LNA3D",
+            "LO-L",
+            "LOL",
+            "LTATM",
+            "LTTM",
             "LUCKY",
-            "NEWCiNE",
-            "PiCKLES",
+            "MACK4",
+            "MATMATHA",
+            "MEMYL",
+            "METALLIKA",
+            "MGD",
+            "MKVXTEAM",
+            "MONCHAT",
+            "MONICO",
+            "MOOREA81",
+            "MOVIZ",
+            "MUXMAN",
+            "MYSTIC",
+            "MZC",
+            "MZISYS",
+            "MZSYS",
+            "N3TFL1X",
+            "NEWCINE",
+            "NEWZT",
+            "NG",
+            "NLX5",
+            "NOELMAISON",
+            "NOMAD",
+            "NORRIS",
+            "NUTELLA",
+            "OMERTA",
+            "PICKLES",
+            "PIKACHU",
+            "PREUMS",
+            "PULSE",
+            "Q7",
+            "QCTIMB3RLANDQC",
+            "R3Z",
             "RARBG",
+            "REBOT",
+            "RELIC",
             "ROLLED",
             "RPZ",
+            "RZP",
+            "SANCTUAIRE",
+            "SCREEN",
             "SHARKS",
-            "ShowFR",
+            "SHIFT",
+            "SHOWFR",
+            "SKRIN",
+            "SKS",
+            "SP3CTR",
+            "SPOW",
+            "STR4NGE",
+            "STVFRV",
+            "SUBZERO",
             "SUNS3T",
-            "TicaDow",
-            "Tokushi",
-            "Torrent9",
+            "T9",
+            "TEAMSUW",
+            "TICADOW",
+            "TIME2WATCH",
+            "TIREXO",
+            "TOKUSHI",
+            "TONYK",
+            "TORRENT9",
+            "TORRID",
+            "TOXIC",
+            "TSN999",
+            "TUTUTE",
             "TVPSLO",
-            "Wawa-Porno",
+            "UNIKORN",
+            "UPMIX",
+            "VATFER",
+            "VERCLAM",
+            "VIKI47",
+            "WAKANIM",
+            "WANEZT",
+            "WAWA",
+            "WAWA-CITY",
+            "WAWA-MANIA",
+            "WAWA-PORNO",
+            "WAWACITY",
+            "WAWAMANIA",
+            "WAWAPORNO",
+            "WEBANIME",
+            "WINCHESTER",
+            "WITA",
+            "YIFY",
+            "YTS",
+            "ZOMBIE",
+            "ZONE",
             "ZT",
             "ZW",
         ]
@@ -98,6 +227,49 @@ class NXM(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
     # _get_category — overridden below
     # ──────────────────────────────────────────────────────────
+
+    # Sources explicitly forbidden by NXM rules (§2 / §3.7)
+    _FORBIDDEN_SOURCES: frozenset[str] = frozenset({"DCP", "Screener", "DVD Screener", "WEB Screener", "Workprint"})
+
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        # French language requirement (inherited base check)
+        if not await super().get_additional_checks(meta):
+            return False
+
+        # §3.7 — DCP, Screener, Workprint interdits
+        source = meta.get("source", "")
+        if source in self._FORBIDDEN_SOURCES:
+            if not meta.get("unattended") or meta.get("debug"):
+                console.print(f"[bold red]NXM: source '{source}' est interdite (DCP / Screener / Workprint).[/bold red]")
+            return False
+
+        # §3.6 — Paramètres d'encodage obligatoires pour les encodes
+        if meta.get("type") == "ENCODE" and not meta.get("valid_mi_settings"):
+            if not meta.get("unattended") or meta.get("debug"):
+                console.print("[bold red]NXM: paramètres d'encodage absents du MediaInfo — upload ignoré.[/bold red]")
+            return False
+
+        # SRT séparés interdits — doivent être encapsulés dans le MKV
+        if meta.get("is_disc") not in ("BDMV", "DVD"):
+            video_path = meta.get("path", "")
+            directory = video_path if os.path.isdir(video_path) else os.path.dirname(video_path)
+            if directory and os.path.isdir(directory):
+                subtitle_extensions = (".srt", ".sub", ".ass", ".ssa", ".idx", ".smi", ".psb")
+                if any(f.lower().endswith(subtitle_extensions) for f in os.listdir(directory)):
+                    if not meta.get("unattended") or meta.get("debug"):
+                        console.print("[bold red]NXM: fichiers de sous-titres séparés détectés — ils doivent être encapsulés dans le MKV.[/bold red]")
+                    return False
+
+        # §6 — Animés : lien AniDB / AniList / MAL obligatoire
+        is_anime = bool(meta.get("anime")) or bool(meta.get("mal_id"))
+        category = await self._get_category(meta)
+        if category == 4 or is_anime:
+            if not meta.get("mal_id") and not meta.get("anidb_id") and not meta.get("anilist_id"):
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print("[bold red]NXM: les animés requièrent un lien AniDB, AniList ou MAL (--mal, --anidb, --anilist).[/bold red]")
+                return False
+
+        return True
 
     async def _get_category(self, meta: Meta) -> int:
         """Return category id for NXM upload.
