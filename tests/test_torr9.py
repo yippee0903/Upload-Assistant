@@ -831,10 +831,12 @@ class TestSearchExisting:
         t._bearer_token = 'test-token'  # skip login
         mock_response = MagicMock()
         mock_response.status_code = 200
+        # Names must include the group tag (-Troxy) and the resolution (1080p)
+        # to pass the post-search resolution+group filters added in the dupe check.
         mock_response.json.return_value = {
             'torrents': [
-                {'title': 'Le.Prenom.2012.MULTi.1080p', 'id': 42, 'file_size_bytes': 5000000000},
-                {'title': 'Le.Prenom.2012.FRENCH.720p', 'id': 43, 'file_size_bytes': 3000000000},
+                {'title': 'Le.Prenom.2012.MULTi.1080p.WEB.x264-Troxy', 'id': 42, 'file_size_bytes': 5000000000},
+                {'title': 'Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy', 'id': 43, 'file_size_bytes': 3000000000},
             ],
             'total_count': 2,
         }
@@ -849,7 +851,7 @@ class TestSearchExisting:
             dupes = _run(t.search_existing(_meta_base(), ''))
 
         assert len(dupes) == 2
-        assert dupes[0]['name'] == 'Le.Prenom.2012.MULTi.1080p'
+        assert dupes[0]['name'] == 'Le.Prenom.2012.MULTi.1080p.WEB.x264-Troxy'
         assert dupes[0]['id'] == 42
         assert dupes[0]['size'] == 5000000000
 
@@ -1030,7 +1032,7 @@ class TestDupeRelevanceFilter:
         assert dupes == []
 
     def test_keeps_matching_titles(self):
-        """Results matching the title+year should be kept."""
+        """Results matching the title+year+resolution+group should be kept."""
         t = TORR9(_config())
         t._bearer_token = 'test-token'
         meta = _meta_base(title='Inception', year='2010')
@@ -1038,9 +1040,9 @@ class TestDupeRelevanceFilter:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             'data': [
-                {'title': 'Inception.2010.MULTi.2160p.REMUX', 'id': 10},
-                {'title': 'A.Fistful.of.Dollars.1964.MULTi.2160p', 'id': 1},
-                {'title': 'Inception.2010.FRENCH.1080p.WEB-DL', 'id': 11},
+                {'title': 'Inception.2010.MULTi.1080p.BluRay.x264-Troxy', 'id': 10},
+                {'title': 'A.Fistful.of.Dollars.1964.MULTi.1080p.x264-Troxy', 'id': 1},
+                {'title': 'Inception.2010.FRENCH.1080p.WEB.x264-Troxy', 'id': 11},
             ]
         }
 
@@ -1054,8 +1056,8 @@ class TestDupeRelevanceFilter:
             dupes = _run(t.search_existing(meta, ''))
 
         assert len(dupes) == 2
-        assert dupes[0]['name'] == 'Inception.2010.MULTi.2160p.REMUX'
-        assert dupes[1]['name'] == 'Inception.2010.FRENCH.1080p.WEB-DL'
+        assert dupes[0]['name'] == 'Inception.2010.MULTi.1080p.BluRay.x264-Troxy'
+        assert dupes[1]['name'] == 'Inception.2010.FRENCH.1080p.WEB.x264-Troxy'
 
     def test_accent_insensitive_match(self):
         """French titles with accents should match their dot-separated versions."""
@@ -1066,7 +1068,7 @@ class TestDupeRelevanceFilter:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             'data': [
-                {'title': 'Le.Prenom.2012.FRENCH.1080p', 'id': 50},
+                {'title': 'Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy', 'id': 50},
             ]
         }
 
@@ -1098,7 +1100,7 @@ class TestDupeRelevanceFilter:
         resp_en.status_code = 200
         resp_en.json.return_value = {
             'data': [
-                {'title': 'The.Sixth.Sense.1999.MULTi.2160p.REMUX', 'id': 100},
+                {'title': 'The.Sixth.Sense.1999.MULTi.1080p.BluRay.x264-Troxy', 'id': 100},
             ]
         }
         # Second call (FR title) → returns 1 result under French name
@@ -1106,7 +1108,7 @@ class TestDupeRelevanceFilter:
         resp_fr.status_code = 200
         resp_fr.json.return_value = {
             'data': [
-                {'title': 'Sixieme.Sens.1999.FRENCH.1080p', 'id': 101},
+                {'title': 'Sixieme.Sens.1999.FRENCH.1080p.WEB.x264-Troxy', 'id': 101},
             ]
         }
 
@@ -1122,8 +1124,8 @@ class TestDupeRelevanceFilter:
         # Both results should be present
         assert len(dupes) == 2
         names = [d['name'] for d in dupes]
-        assert 'The.Sixth.Sense.1999.MULTi.2160p.REMUX' in names
-        assert 'Sixieme.Sens.1999.FRENCH.1080p' in names
+        assert 'The.Sixth.Sense.1999.MULTi.1080p.BluRay.x264-Troxy' in names
+        assert 'Sixieme.Sens.1999.FRENCH.1080p.WEB.x264-Troxy' in names
 
     def test_bilingual_search_deduplicates(self):
         """If both queries return the same torrent, it should appear only once."""
@@ -1140,7 +1142,7 @@ class TestDupeRelevanceFilter:
         resp.status_code = 200
         resp.json.return_value = {
             'data': [
-                {'title': 'Inception.2010.MULTi.2160p', 'id': 200},
+                {'title': 'Inception.2010.MULTi.1080p.BluRay.x264-Troxy', 'id': 200},
             ]
         }
 
@@ -1174,7 +1176,7 @@ class TestDupeRelevanceFilter:
         resp_fr.status_code = 200
         resp_fr.json.return_value = {
             'data': [
-                {'title': 'Intouchables.2011.FRENCH.1080p', 'id': 300},
+                {'title': 'Intouchables.2011.FRENCH.1080p.WEB.x264-Troxy', 'id': 300},
             ]
         }
         resp_en = MagicMock()
@@ -1205,6 +1207,7 @@ class TestDupeRelevanceFilter:
             frtitle='Fais pas ci fais pas ça',
             year='2007',
             original_language='fr',
+            tag='-FW',
         )
 
         resp = MagicMock()
