@@ -80,6 +80,45 @@ class TORR9(FrenchTrackerMixin):
     # TORR9 accepts NOTAG
     notag_label: str = "NoTag"
 
+    # TORR9 internal production groups — existing releases from these groups
+    # always block the upload, even if _check_french_lang_dupes would clear them.
+    # These are NOT in banned_groups: we block reposts *of* their releases, not
+    # uploads *by* these groups.
+    _TORR9_INTERNAL_GROUPS: frozenset[str] = frozenset(
+        {
+            "Blade56",
+            "Blap",
+            "Floppy",
+            "KAF",
+            "S7KO",
+            "SUB",
+            "Tsundere-Raws",
+            "ZiGZaG",
+        }
+    )
+
+    def _check_torr9_specific_dupes(
+        self,
+        all_dupes: list[dict[str, Any]],
+        filtered: list[dict[str, Any]],
+        meta: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Re-inject dupes from TORR9 internal groups that block all reposts."""
+        result = list(filtered)
+        for dupe in all_dupes:
+            if not isinstance(dupe, dict):
+                continue
+            name = dupe.get("name", "")
+            m = re.search(r"-([A-Za-z0-9][A-Za-z0-9\-]*)\s*$", name.replace(".", " "))
+            group = m.group(1) if m else ""
+            if group in self._TORR9_INTERNAL_GROUPS:
+                if dupe not in result:
+                    result.append(dupe)
+                flags: list[str] = dupe.setdefault("flags", [])
+                if "torr9_internal" not in flags:
+                    flags.append("torr9_internal")
+        return result
+
     # ──────────────────────────────────────────────────────────
     #  Authentication — login to obtain Bearer JWT
     # ──────────────────────────────────────────────────────────
@@ -959,27 +998,41 @@ class TORR9(FrenchTrackerMixin):
         if not fr_title:
             fr_title = await self._get_french_title(meta)
         year = meta.get("year", "")
+        resolution = meta.get("resolution", "")
+        group = self._get_release_group(meta)
 
-        # Normalize for relevance filtering
+        # Normalize for relevance filtering (strip all non-alphanumeric)
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
-        # Build the list of search queries — original-language title first
+        # Clean a title for use in the API query: strip accents, parentheses,
+        # and extra punctuation so the TORR9 search API can match stored names.
+        def _clean_query(s: str) -> str:
+            return re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split()
+
+        def _q(s: str) -> str:
+            return " ".join(_clean_query(s))
+
+        # Build queries using TORR9's naming pattern (Titre Année Résolution Groupe)
+        # TORR9 allows the same release from different groups, so the group must be
+        # included to avoid false-positive dupe blocks.
+        suffix = " ".join(p for p in [str(year), resolution, group] if p)
+
         search_queries: list[str] = []
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"
 
         if is_original_french:
             # Original is French → search FR first, then EN as complement
             if fr_title:
-                search_queries.append(f"{fr_title} {year}".strip())
+                search_queries.append(f"{_q(fr_title)} {suffix}".strip())
             if title and _normalize(title) != _normalize(fr_title or ""):
-                search_queries.append(f"{title} {year}".strip())
+                search_queries.append(f"{_q(title)} {suffix}".strip())
         else:
             # Original is not French → search EN first, then FR as complement
             if title:
-                search_queries.append(f"{title} {year}".strip())
+                search_queries.append(f"{_q(title)} {suffix}".strip())
             if fr_title and _normalize(fr_title) != _normalize(title or ""):
-                search_queries.append(f"{fr_title} {year}".strip())
+                search_queries.append(f"{_q(fr_title)} {suffix}".strip())
 
         if not search_queries:
             return []
@@ -987,6 +1040,8 @@ class TORR9(FrenchTrackerMixin):
         title_norm = _normalize(title)
         fr_title_norm = _normalize(fr_title) if fr_title else ""
         year_str = str(year).strip()
+        resolution_norm = _normalize(resolution)
+        group_norm = _normalize(group)
         seen_names: set[str] = set()
 
         try:
@@ -1032,7 +1087,7 @@ class TORR9(FrenchTrackerMixin):
                         if name_norm in seen_names:
                             continue
 
-                        # Filter: the result must contain the title (EN or FR) AND year to be relevant
+                        # Filter: result must contain title (EN or FR), year, resolution, group
                         title_match = title_norm and title_norm in name_norm
                         fr_title_match = fr_title_norm and fr_title_norm in name_norm
                         if not title_match and not fr_title_match:
@@ -1043,6 +1098,16 @@ class TORR9(FrenchTrackerMixin):
                         if year_str and year_str not in name and meta.get("category") != "TV":
                             if meta.get("debug"):
                                 console.print(f"[dim]TORR9 dupe skip (year mismatch): {name}[/dim]")
+                            continue
+                        # Resolution must match — TORR9 allows different qualities per title
+                        if resolution_norm and resolution_norm not in name_norm:
+                            if meta.get("debug"):
+                                console.print(f"[dim]TORR9 dupe skip (resolution mismatch): {name}[/dim]")
+                            continue
+                        # Group must match — TORR9 allows same quality from different groups
+                        if group_norm and group_norm not in name_norm:
+                            if meta.get("debug"):
+                                console.print(f"[dim]TORR9 dupe skip (group mismatch): {name}[/dim]")
                             continue
 
                         seen_names.add(name_norm)
@@ -1070,7 +1135,8 @@ class TORR9(FrenchTrackerMixin):
         if dupes and token:
             await self._enrich_with_files(dupes, token, debug=bool(meta.get("debug")))
 
-        return await self._check_french_lang_dupes(dupes, meta)
+        filtered = await self._check_french_lang_dupes(dupes, meta)
+        return self._check_torr9_specific_dupes(dupes, filtered, meta)
 
     async def _enrich_with_files(self, dupes: list[dict[str, Any]], token: str, *, debug: bool = False) -> None:
         """Fetch file lists for each dupe entry via GET /api/v1/torrents/{id}/files.
