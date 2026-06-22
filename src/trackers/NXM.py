@@ -892,28 +892,32 @@ class NXM(FrenchTrackerMixin):
         if not fr_title:
             fr_title = await self._get_french_title(meta)
         year = meta.get("year", "")
-        tag = meta.get("tag", "")
+        resolution = meta.get("resolution", "")
+        group = self._get_release_group(meta)
 
         # Normalize for relevance filtering
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
-        # Build the list of search queries — original-language title first
+        # Build search queries using NXM's naming pattern (Titre Année Résolution Groupe)
+        # NXM allows dupes from different groups, so the group must be part of the query.
+        suffix = " ".join(p for p in [str(year), resolution, group] if p)
+
         search_queries: list[str] = []
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"
 
         if is_original_french:
             # Original is French → search FR first, then EN as complement
             if fr_title:
-                search_queries.append(f"{fr_title} {tag}".strip())
+                search_queries.append(f"{fr_title} {suffix}".strip())
             if title and _normalize(title) != _normalize(fr_title or ""):
-                search_queries.append(f"{title} {tag}".strip())
+                search_queries.append(f"{title} {suffix}".strip())
         else:
             # Original is not French → search EN first, then FR as complement
             if title:
-                search_queries.append(f"{title} {tag}".strip())
+                search_queries.append(f"{title} {suffix}".strip())
             if fr_title and _normalize(fr_title) != _normalize(title or ""):
-                search_queries.append(f"{fr_title} {tag}".strip())
+                search_queries.append(f"{fr_title} {suffix}".strip())
 
         if not search_queries:
             return []
@@ -921,6 +925,8 @@ class NXM(FrenchTrackerMixin):
         title_norm = _normalize(title)
         fr_title_norm = _normalize(fr_title) if fr_title else ""
         year_str = str(year).strip()
+        resolution_norm = _normalize(resolution)
+        group_norm = _normalize(group)
         seen_names: set[str] = set()
 
         try:
@@ -969,7 +975,7 @@ class NXM(FrenchTrackerMixin):
                         if name_norm in seen_names:
                             continue
 
-                        # Filter: the result must contain the title (EN or FR) AND year to be relevant
+                        # Filter: result must contain title (EN or FR), year, and resolution
                         title_match = title_norm and title_norm in name_norm
                         fr_title_match = fr_title_norm and fr_title_norm in name_norm
                         if not title_match and not fr_title_match:
@@ -980,6 +986,16 @@ class NXM(FrenchTrackerMixin):
                         if year_str and year_str not in name and meta.get("category") != "TV":
                             if meta.get("debug"):
                                 console.print(f"[dim]NXM dupe skip (year mismatch): {name}[/dim]")
+                            continue
+                        # Resolution must match — 1080p and 2160p are distinct uploads on NXM
+                        if resolution_norm and resolution_norm not in name_norm:
+                            if meta.get("debug"):
+                                console.print(f"[dim]NXM dupe skip (resolution mismatch): {name}[/dim]")
+                            continue
+                        # Group must match — NXM allows the same release from different groups
+                        if group_norm and group_norm not in name_norm:
+                            if meta.get("debug"):
+                                console.print(f"[dim]NXM dupe skip (group mismatch): {name}[/dim]")
                             continue
 
                         seen_names.add(name_norm)
