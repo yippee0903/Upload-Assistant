@@ -893,14 +893,15 @@ class NXM(FrenchTrackerMixin):
             fr_title = await self._get_french_title(meta)
         year = meta.get("year", "")
         resolution = meta.get("resolution", "")
+        group = self._get_release_group(meta)
 
         # Normalize for relevance filtering
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
-        # Build search queries using NXM's naming pattern (Titre Année Résolution)
-        # so the API returns results that match the specific quality being uploaded.
-        suffix = " ".join(p for p in [str(year), resolution] if p)
+        # Build search queries using NXM's naming pattern (Titre Année Résolution Groupe)
+        # NXM allows dupes from different groups, so the group must be part of the query.
+        suffix = " ".join(p for p in [str(year), resolution, group] if p)
 
         search_queries: list[str] = []
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"
@@ -925,6 +926,7 @@ class NXM(FrenchTrackerMixin):
         fr_title_norm = _normalize(fr_title) if fr_title else ""
         year_str = str(year).strip()
         resolution_norm = _normalize(resolution)
+        group_norm = _normalize(group)
         seen_names: set[str] = set()
 
         try:
@@ -989,6 +991,11 @@ class NXM(FrenchTrackerMixin):
                         if resolution_norm and resolution_norm not in name_norm:
                             if meta.get("debug"):
                                 console.print(f"[dim]NXM dupe skip (resolution mismatch): {name}[/dim]")
+                            continue
+                        # Group must match — NXM allows the same release from different groups
+                        if group_norm and group_norm not in name_norm:
+                            if meta.get("debug"):
+                                console.print(f"[dim]NXM dupe skip (group mismatch): {name}[/dim]")
                             continue
 
                         seen_names.add(name_norm)
