@@ -1580,7 +1580,7 @@ class TestSearchExisting:
             )
 
         assert len(dupes) >= 1
-        assert dupes[0]['name'] == '[COMPAT-01] Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy'
+        assert dupes[0]['name'] == '[COMPAT-WR] Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy'
 
         # Verify API was called with correct params
         call_args = mock_client.get.call_args_list
@@ -2058,7 +2058,7 @@ class TestSlotISO:
     def test_iso_not_matched_in_word(self):
         """'ISO' embedded in another word (e.g. ISOLATION) should NOT match as ISO disc."""
         slot = C411._determine_c411_slot_from_name('Isolation.2024.1080p.WEB-DL.AAC.2.0.H.264-GRP')
-        assert slot == 'COMPAT-01'
+        assert slot == 'COMPAT-WR'
 
     def test_iso_not_matched_mid_name(self):
         """'ISO' as a prefix inside a mid-name token (e.g. .Isolated.) must NOT match."""
@@ -2076,18 +2076,18 @@ class TestSlotADEdition:
         c = C411(_config())
         meta = _meta_base(edition='AD', resolution='1080p')
         slot = c._determine_c411_slot(meta)
-        assert slot == 'AD|COMPAT-01'
+        assert slot == 'AD|COMPAT-WR'
 
     def test_ad_from_name(self):
         # "AD" is intentionally skipped in name-based detection (too ambiguous as a token).
         # Only meta-based detection sets the AD edition prefix.
         slot = C411._determine_c411_slot_from_name('Movie.2024.AD.FRENCH.1080p.WEB.x264-GRP')
-        assert slot == 'COMPAT-01'
+        assert slot == 'COMPAT-WR'
 
     def test_ad_not_in_word(self):
         """AD embedded in another word should NOT trigger special edition."""
         slot = C411._determine_c411_slot_from_name('Adrenaline.2024.FRENCH.1080p.WEB.x264-GRP')
-        assert slot == 'COMPAT-01'
+        assert slot == 'COMPAT-WR'
 
     def test_ad_4k_remux(self):
         c = C411(_config())
@@ -2357,7 +2357,7 @@ class TestADFalsePositiveRegression:
         c = C411(_config())
         meta = _meta_base(edition='AD', resolution='1080p')
         slot = c._determine_c411_slot(meta)
-        assert slot == 'AD|COMPAT-01'
+        assert slot == 'AD|COMPAT-WR'
 
 
 # ═══════════════════════════════════════════════════════════════

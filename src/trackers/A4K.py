@@ -150,5 +150,6 @@ class A4K(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             if meta.get("is_disc") != "BDMV":
                 a4k_name = a4k_name.replace(meta["resolution"], f"{foreign_lang} {meta['resolution']}", 1)
-        console.print(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
+        if not meta.get("unattended", False):
+            console.print(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
         return {"name": a4k_name}

@@ -445,8 +445,8 @@ class C411(FrenchTrackerMixin):
         uuid = str(meta.get("uuid", "")).lower()
         is_disc = str(meta.get("is_disc", ""))
         is_4klight = "4klight" in uuid
-        # Source-based distinction: BluRay (encode from disc) vs WEB
-        is_webrip = release_type == "WEBRIP"
+        # Source-based distinction: BluRay (encode from disc) vs WEB (WEBDL and WEBRIP both map to WR slots)
+        is_web = release_type in ("WEBRIP", "WEBDL")
 
         lossless = self._is_lossless_audio(audio)
         h264 = self._is_h264_codec(codec)
@@ -468,7 +468,7 @@ class C411(FrenchTrackerMixin):
 
         # ── COMPAT: H.264, 1080p, SDR, Lossy ──
         if h264 and not is_4k and not has_hdr:
-            if is_webrip:
+            if is_web:
                 return f"{prefix}COMPAT-WR"
             return f"{prefix}COMPAT-01"
 
@@ -478,13 +478,13 @@ class C411(FrenchTrackerMixin):
             if is_4k:
                 if is_4klight:
                     return f"{prefix}HCOPT-2160-4KL-{codec_suffix}"
-                if is_webrip:
+                if is_web:
                     if has_hdr:
                         return f"{prefix}HCOPT-2160-WR-{codec_suffix}-HDR"
                     return f"{prefix}HCOPT-2160-WR-{codec_suffix}"
                 return f"{prefix}HCOPT-2160-BD-{codec_suffix}"
             else:
-                if is_webrip:
+                if is_web:
                     return f"{prefix}HCOPT-1080-WR-{codec_suffix}"
                 return f"{prefix}HCOPT-1080-BD-{codec_suffix}"
 
@@ -495,14 +495,14 @@ class C411(FrenchTrackerMixin):
             if has_hdr:
                 return f"{prefix}OPTI-2160-HDR"
             else:
-                if is_webrip:
+                if is_web:
                     return f"{prefix}OPTI-2160-SDR-WR"
                 return f"{prefix}OPTI-2160-SDR-BD"
         else:
             # 1080p
             if has_hdr:
                 return f"{prefix}OPTI-1080-HDR"
-            if is_webrip:
+            if is_web:
                 return f"{prefix}OPTI-1080-SDR-WR"
             return f"{prefix}OPTI-1080-SDR-BD"
 
@@ -526,7 +526,7 @@ class C411(FrenchTrackerMixin):
         is_remux = "REMUX" in n
         is_bdmv = "BDMV" in n or "BD.FULL" in n or "COMPLETE.BLURAY" in n
         is_iso = "ISO" in n.split(".")
-        is_webrip = "WEBRIP" in n or "WEB.RIP" in n
+        is_web = "WEBRIP" in n or "WEB.RIP" in n or "WEB.DL" in n or "WEBDL" in n or ".WEB." in n
         is_4klight = "4KLIGHT" in n
 
         # Codec
@@ -557,7 +557,7 @@ class C411(FrenchTrackerMixin):
 
         # ── COMPAT: H.264, 1080p, SDR ──
         if h264 and not is_4k and not has_hdr:
-            return f"{prefix}COMPAT-WR" if is_webrip else f"{prefix}COMPAT-01"
+            return f"{prefix}COMPAT-WR" if is_web else f"{prefix}COMPAT-01"
 
         # ── HCOPT or OPTI ──
         if lossless or has_dv or av1:
@@ -566,13 +566,13 @@ class C411(FrenchTrackerMixin):
             if is_4k:
                 if is_4klight:
                     return f"{prefix}HCOPT-2160-4KL-{codec_suffix}"
-                if is_webrip:
+                if is_web:
                     if has_hdr:
                         return f"{prefix}HCOPT-2160-WR-{codec_suffix}-HDR"
                     return f"{prefix}HCOPT-2160-WR-{codec_suffix}"
                 return f"{prefix}HCOPT-2160-BD-{codec_suffix}"
             else:
-                if is_webrip:
+                if is_web:
                     return f"{prefix}HCOPT-1080-WR-{codec_suffix}"
                 return f"{prefix}HCOPT-1080-BD-{codec_suffix}"
 
@@ -583,13 +583,13 @@ class C411(FrenchTrackerMixin):
             if has_hdr:
                 return f"{prefix}OPTI-2160-HDR"
             else:
-                if is_webrip:
+                if is_web:
                     return f"{prefix}OPTI-2160-SDR-WR"
                 return f"{prefix}OPTI-2160-SDR-BD"
         else:
             if has_hdr:
                 return f"{prefix}OPTI-1080-HDR"
-            if is_webrip:
+            if is_web:
                 return f"{prefix}OPTI-1080-SDR-WR"
             return f"{prefix}OPTI-1080-SDR-BD"
 
