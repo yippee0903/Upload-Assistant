@@ -899,25 +899,44 @@ class NXM(FrenchTrackerMixin):
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
+        # Detect VOSTFR upload early: for VOSTFR, we must surface FR-audio releases
+        # from other groups (they supersede VOSTFR regardless of group).
+        # Level >= 3 means FR audio (VFF/VFI/VFQ/MULTI…); VOSTFR = level 2.
+        upload_audio = await self._build_audio_string(meta)
+        _, upload_lang_level = self._extract_french_lang_tag(upload_audio)
+        is_vostfr_upload = upload_lang_level < 3
+
         # Build search queries using NXM's naming pattern (Titre Année Résolution Groupe)
         # NXM allows dupes from different groups, so the group must be part of the query.
         suffix = " ".join(p for p in [str(year), resolution, group] if p)
+        # For VOSTFR: also build broader queries (no group) to find FR-audio releases
+        # from any group that would supersede this upload.
+        broad_suffix = " ".join(p for p in [str(year), resolution] if p)
 
         search_queries: list[str] = []
+        broad_queries: list[str] = []  # VOSTFR only — no group filter applied
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"
 
         if is_original_french:
             # Original is French → search FR first, then EN as complement
             if fr_title:
                 search_queries.append(f"{fr_title} {suffix}".strip())
+                if is_vostfr_upload:
+                    broad_queries.append(f"{fr_title} {broad_suffix}".strip())
             if title and _normalize(title) != _normalize(fr_title or ""):
                 search_queries.append(f"{title} {suffix}".strip())
+                if is_vostfr_upload:
+                    broad_queries.append(f"{title} {broad_suffix}".strip())
         else:
             # Original is not French → search EN first, then FR as complement
             if title:
                 search_queries.append(f"{title} {suffix}".strip())
+                if is_vostfr_upload:
+                    broad_queries.append(f"{title} {broad_suffix}".strip())
             if fr_title and _normalize(fr_title) != _normalize(title or ""):
                 search_queries.append(f"{fr_title} {suffix}".strip())
+                if is_vostfr_upload:
+                    broad_queries.append(f"{fr_title} {broad_suffix}".strip())
 
         if not search_queries:
             return []
@@ -928,13 +947,6 @@ class NXM(FrenchTrackerMixin):
         resolution_norm = _normalize(resolution)
         group_norm = _normalize(group)
         seen_names: set[str] = set()
-
-        # Detect VOSTFR upload early: for VOSTFR, we must also surface FR-audio
-        # releases from other groups (they supersede VOSTFR regardless of group).
-        # Level >= 3 means FR audio (VFF/VFI/VFQ/MULTI…); VOSTFR = level 2.
-        upload_audio = await self._build_audio_string(meta)
-        _, upload_lang_level = self._extract_french_lang_tag(upload_audio)
-        is_vostfr_upload = upload_lang_level < 3
 
         try:
             headers = {
@@ -1012,6 +1024,76 @@ class NXM(FrenchTrackerMixin):
                                 if meta.get("debug"):
                                     console.print(f"[dim]NXM dupe skip (group mismatch): {name}[/dim]")
                                 continue
+
+                        seen_names.add(name_norm)
+                        dupes.append(
+                            {
+                                "name": name,
+                                "size": item.get("size", item.get("file_size_bytes")),
+                                "link": (
+                                    item.get("url")
+                                    or item.get("link")
+                                    or (f"{self.torrent_url}{item['slug']}" if item.get("slug") else None)
+                                    or (f"{self.torrent_url}{item['id']}" if item.get("id") else None)
+                                ),
+                                "id": item.get("id", item.get("torrent_id")),
+                            }
+                        )
+
+                # Broad queries (VOSTFR only): find FR-audio releases from any group.
+                # Only keep results with FR audio (level >= 3); group filter is skipped.
+                for search_term in broad_queries:
+                    try:
+                        response = await client.get(
+                            self.search_url,
+                            headers=headers,
+                            params={"q": search_term},
+                        )
+                    except Exception:  # noqa: BLE001
+                        continue
+
+                    if response.status_code != 200:
+                        continue
+
+                    try:
+                        data = response.json()
+                    except json.JSONDecodeError:
+                        continue
+
+                    if not isinstance(data, dict):
+                        continue
+
+                    items = data.get("torrents", data.get("data", []))
+                    if not items:
+                        continue
+
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        name = item.get("title", item.get("name", ""))
+                        if not name:
+                            continue
+
+                        name_norm = _normalize(name)
+                        if name_norm in seen_names:
+                            continue
+
+                        title_match = title_norm and title_norm in name_norm
+                        fr_title_match = fr_title_norm and fr_title_norm in name_norm
+                        if not title_match and not fr_title_match:
+                            continue
+                        if year_str and year_str not in name and meta.get("category") != "TV":
+                            continue
+                        if resolution_norm and resolution_norm not in name_norm:
+                            continue
+
+                        # Only keep FR-audio results (the whole point of this broader search)
+                        _, name_level = self._extract_french_lang_tag(name)
+                        if name_level < 3:
+                            continue
+
+                        if meta.get("debug"):
+                            console.print(f"[dim]NXM broad search: FR-audio dupe from other group: {name}[/dim]")
 
                         seen_names.add(name_norm)
                         dupes.append(
