@@ -2333,6 +2333,49 @@ class TestLossyLosslessCoexistence:
 
         assert len(dupes) == 1, "PURE-BD-BDMV dupe must not be silently dropped by lossless filter"
 
+    def test_vostfr_lossless_upload_sees_multi_lossy_dupe(self):
+        """A lossless VOSTFR upload must NOT silently drop a lossy MULTI dupe.
+        Regression: the lossless/lossy coexistence filter removed EAC3 releases before
+        _check_french_lang_dupes could flag them as french_lang_supersede.
+        """
+        c = C411(_config())
+        meta = _meta_base(
+            type='WEBDL', resolution='2160p', audio='TrueHD Atmos 7.1',
+            video_encode='H.265', hdr='DV HDR10+',
+            mediainfo=_mi([_audio_track('en')], [_sub_track('fr')]),
+            original_language='en',
+        )
+        meta['is_disc'] = None
+        meta['uhd'] = ''
+
+        # Existing release: MULTI (FR audio, level 3+), lossy EAC3, same WR+DV slot
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.MULTI.VFF.2160p.WEB.ATMOS.DV.HDR10Plus.EAC3.5.1.H265-GRP</title>
+      <guid>https://c411.org/torrents/999</guid>
+      <link>https://c411.org/torrents/999/download</link>
+      <size>15000000000</size>
+    </item>
+  </channel>
+</rss>"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = xml
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_cls.return_value = mock_client
+
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        assert len(dupes) == 1, "MULTI EAC3 dupe must survive lossless filter when upload is VOSTFR"
+        assert 'french_lang_supersede' in (dupes[0].get('flags') or []), "Dupe must be flagged as french_lang_supersede"
+
 
 # ─── AD false positive: Ad.Astra regression ──────────────────
 

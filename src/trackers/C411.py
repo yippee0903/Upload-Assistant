@@ -1820,11 +1820,29 @@ class C411(FrenchTrackerMixin):
 
         # ── Lossy / Lossless coexistence (permanent) ──
         # A lossy version and a lossless version can always coexist in the same slot.
+        # Exception: for VOSTFR uploads, always keep FR-audio releases regardless of
+        # lossless/lossy — they must reach _check_french_lang_dupes to be flagged as
+        # french_lang_supersede. Without this, a MULTI EAC3 release would be silently
+        # removed before the language-hierarchy check can see it.
         if dupes:
-            upload_audio = str(meta.get("audio", ""))
-            upload_lossless = self._is_lossless_audio(upload_audio)
+            upload_audio_str = str(meta.get("audio", ""))
+            upload_lossless = self._is_lossless_audio(upload_audio_str)
+            upload_audio_tag = await self._build_audio_string(meta)
+            _, upload_lang_level = self._extract_french_lang_tag(upload_audio_tag)
+            # Level 1=VO, 2=VOSTFR, >=3=FR audio, 0=no French tag (e.g. English release).
+            # Only treat the upload as VOSTFR when it carries an explicit VO/VOSTFR tag.
+            is_vostfr_upload = 1 <= upload_lang_level < 3
             before = len(dupes)
-            dupes = [d for d in dupes if self._is_lossless_from_name(d.get("name", "")) == upload_lossless]
+
+            def _keep_dupe(d: dict) -> bool:
+                name = d.get("name", "")
+                if is_vostfr_upload:
+                    _, name_level = self._extract_french_lang_tag(name)
+                    if name_level >= 3:
+                        return True  # FR-audio: let _check_french_lang_dupes handle it
+                return self._is_lossless_from_name(name) == upload_lossless
+
+            dupes = [d for d in dupes if _keep_dupe(d)]
             if meta.get("debug") and len(dupes) < before:
                 kind = "lossless" if upload_lossless else "lossy"
                 opposite = "lossy" if upload_lossless else "lossless"
