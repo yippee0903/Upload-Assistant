@@ -929,6 +929,13 @@ class NXM(FrenchTrackerMixin):
         group_norm = _normalize(group)
         seen_names: set[str] = set()
 
+        # Detect VOSTFR upload early: for VOSTFR, we must also surface FR-audio
+        # releases from other groups (they supersede VOSTFR regardless of group).
+        # Level >= 3 means FR audio (VFF/VFI/VFQ/MULTI…); VOSTFR = level 2.
+        upload_audio = await self._build_audio_string(meta)
+        _, upload_lang_level = self._extract_french_lang_tag(upload_audio)
+        is_vostfr_upload = upload_lang_level < 3
+
         try:
             headers = {
                 "X-API-Key": self.api_key,
@@ -992,11 +999,19 @@ class NXM(FrenchTrackerMixin):
                             if meta.get("debug"):
                                 console.print(f"[dim]NXM dupe skip (resolution mismatch): {name}[/dim]")
                             continue
-                        # Group must match — NXM allows the same release from different groups
+                        # Group must match — NXM allows the same release from different groups.
+                        # Exception: for VOSTFR uploads, also keep non-same-group releases
+                        # that have FR audio (level >= 3), so _check_french_lang_dupes can
+                        # flag them as superseding dupes.
                         if group_norm and group_norm not in name_norm:
-                            if meta.get("debug"):
-                                console.print(f"[dim]NXM dupe skip (group mismatch): {name}[/dim]")
-                            continue
+                            keep = False
+                            if is_vostfr_upload:
+                                _, name_level = self._extract_french_lang_tag(name)
+                                keep = name_level >= 3
+                            if not keep:
+                                if meta.get("debug"):
+                                    console.print(f"[dim]NXM dupe skip (group mismatch): {name}[/dim]")
+                                continue
 
                         seen_names.add(name_norm)
                         dupes.append(
