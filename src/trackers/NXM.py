@@ -93,7 +93,6 @@ class NXM(FrenchTrackerMixin):
             "EZTVRE",
             "FGT",
             "FIRETOWN",
-            "FLOP",
             "FLY3R",
             "FREEZER",
             "FUN",
