@@ -1050,7 +1050,7 @@ class NXM(FrenchTrackerMixin):
                             params={"q": search_term},
                         )
                     except Exception:  # noqa: BLE001
-                        continue
+                        continue  # nosec B112 — skip failed search queries gracefully
 
                     if response.status_code != 200:
                         continue
