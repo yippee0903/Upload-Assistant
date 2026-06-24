@@ -526,7 +526,12 @@ class C411(FrenchTrackerMixin):
         is_remux = "REMUX" in n
         is_bdmv = "BDMV" in n or "BD.FULL" in n or "COMPLETE.BLURAY" in n
         is_iso = "ISO" in n.split(".")
-        is_web = "WEBRIP" in n or "WEB.RIP" in n or "WEB.DL" in n or "WEBDL" in n or ".WEB." in n
+        # Restrict the ambiguous ".WEB." token to the technical portion (post-year) to
+        # avoid matching it in movie titles such as "The.Girl.in.the.Spider.s.WEB.2018...".
+        # WEBRIP / WEB.RIP / WEB.DL / WEBDL are unambiguous and stay on the full string.
+        _year_m = re.search(r'\.(19|20)\d{2}\.', n)
+        _tech = n[_year_m.start() :] if _year_m else n
+        is_web = "WEBRIP" in n or "WEB.RIP" in n or "WEB.DL" in n or "WEBDL" in n or ".WEB." in _tech
         is_4klight = "4KLIGHT" in n
 
         # Codec

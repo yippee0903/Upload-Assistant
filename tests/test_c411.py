@@ -2065,6 +2065,17 @@ class TestSlotISO:
         slot = C411._determine_c411_slot_from_name('Movie.Isolated.2024.2160p.UHD.WEB-DL.AAC.2.0.H.264-GRP')
         assert slot != 'PURE-UHD-ISO'
 
+    def test_web_in_title_not_treated_as_web_source(self):
+        """'WEB' appearing only in the movie title must not be confused with WEB source.
+        Regression: '.WEB.' in 'Spider.s.Web.2018' was triggering is_web=True and
+        producing a WR slot for what is actually a BluRay release.
+        """
+        slot = C411._determine_c411_slot_from_name(
+            "The.Girl.in.the.Spider.s.Web.2018.1080p.BluRay.REMUX.AC3.5.1-GRP"
+        )
+        assert "WR" not in slot, f"WEB in title should not produce a WR slot, got: {slot}"
+        assert slot == "PURE-BD-REMUX"
+
 
 # ─── Slot: AD special edition ────────────────────────────────
 
