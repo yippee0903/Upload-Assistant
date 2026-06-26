@@ -106,6 +106,13 @@ def pick_exact_nfo(releases: list[dict[str, Any]], our_name: str) -> Optional[di
     return None
 
 
+def _safe_nfo_filename(name: str) -> str:
+    """Map an (external) release name to a filename that cannot escape its
+    directory. Returns '' for names that resolve to nothing usable."""
+    base = os.path.basename(str(name).replace("\\", "/")).strip()
+    return "" if base in ("", ".", "..") else f"{base}.nfo"
+
+
 def _has_disk_nfo(path: str) -> bool:
     """True when a physical .nfo sits next to the content (same rule as the
     French trackers' on-disk NFO inclusion)."""
@@ -220,7 +227,12 @@ async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any
     if not nfo_text:
         return
 
-    dest = os.path.join(str(meta.get("base_dir", "")), "tmp", str(meta.get("uuid", "")), f"{match['name']}.nfo")
+    # Derive a safe filename from the (external) release name so it can never
+    # escape tmp/<uuid>/ via path separators or traversal segments.
+    safe_name = _safe_nfo_filename(str(match["name"]))
+    if not safe_name:
+        return
+    dest = os.path.join(str(meta.get("base_dir", "")), "tmp", str(meta.get("uuid", "")), safe_name)
     try:
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         Path(dest).write_text(nfo_text, encoding="utf-8")

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 """Unit tests for the predb.fr cross-check (pure matching, no network)."""
 
-from src.predb_fr import _tmdb_from_media_id, analyze, pick_exact_nfo
+from src.predb_fr import _safe_nfo_filename, _tmdb_from_media_id, analyze, pick_exact_nfo
 
 
 def _rel(**kw):
@@ -85,3 +85,14 @@ def test_exact_nfo_no_partial_match():
     rels = [_rel(name="Film.1989.MULTi.VFF.1080p.BluRay.x264-OTHER", has_nfo=True)]
     assert pick_exact_nfo(rels, _NAME) is None
     assert pick_exact_nfo(rels, "") is None
+
+
+def test_safe_nfo_filename_blocks_traversal():
+    assert _safe_nfo_filename(_NAME) == f"{_NAME}.nfo"
+    # Path separators / traversal collapse to a basename, never escaping.
+    assert _safe_nfo_filename("../../etc/passwd") == "passwd.nfo"
+    assert _safe_nfo_filename("a/b/c") == "c.nfo"
+    assert _safe_nfo_filename("..\\..\\win") == "win.nfo"
+    for bad in ("", "..", ".", "/", "  "):
+        out = _safe_nfo_filename(bad)
+        assert out == "" or ("/" not in out and out not in ("..nfo",))

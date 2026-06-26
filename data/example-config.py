@@ -119,7 +119,8 @@ config = {
         "check_predb": False,
 
         # Optional cross-check of French-tracker uploads against predb.fr (https://predb.fr).
-        # When set, French trackers warn on TMDB/group/nuke/NFO divergence before submitting.
+        # When set, French trackers warn on TMDB/group/nuke divergence before submitting, and
+        # source the canonical NFO on an exact release match when none exists on disk.
         # Purely informational: no match never blocks an upload. Get your own key from predb.fr.
         "predb_fr_api_key": "",
 

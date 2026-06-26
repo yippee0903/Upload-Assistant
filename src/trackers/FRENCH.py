@@ -1997,6 +1997,13 @@ class FrenchTrackerMixin:
             rel = os.path.relpath(nfo_path, content_path)
             path_components = rel.replace("\\", "/").split("/")
 
+            # Skip NFOs that live outside the release tree (e.g. a predb.fr NFO
+            # fetched into tmp/): they have no valid in-torrent path. They are
+            # still delivered through the tracker's separate NFO upload field,
+            # exactly like the generated MediaInfo NFO.
+            if os.path.isabs(rel) or ".." in path_components:
+                continue
+
             if tuple(path_components) in existing_rel_paths:
                 return None
 
