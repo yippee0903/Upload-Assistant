@@ -21,6 +21,7 @@ from unidecode import unidecode
 
 from src.audio import AD_TRACK_RE, codec_info_from_track
 from src.console import console
+from src.predb_fr import crosscheck as predb_fr_crosscheck
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
 
@@ -425,6 +426,9 @@ class FrenchTrackerMixin:
             if not meta.get("unattended", False):
                 console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
+        # Optional predb.fr cross-check (opt-in via DEFAULT.predb_fr_api_key).
+        # Side-effect only: prints warnings, never blocks the upload.
+        await predb_fr_crosscheck(meta, self.config, self.tracker)  # type: ignore[attr-defined]
         return True
 
     # ──────────────────────────────────────────────────────────

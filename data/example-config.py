@@ -118,6 +118,11 @@ config = {
         # predb is not consistent, can timeout, but can find some releases not found on SRRDB
         "check_predb": False,
 
+        # Optional cross-check of French-tracker uploads against predb.fr (https://predb.fr).
+        # When set, French trackers warn on TMDB/group/nuke/NFO divergence before submitting.
+        # Purely informational: no match never blocks an upload. Get your own key from predb.fr.
+        "predb_fr_api_key": "",
+
         # SCREENSHOT HANDLING
 
         # Number of screenshots to capture
