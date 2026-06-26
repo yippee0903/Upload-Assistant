@@ -1899,6 +1899,12 @@ class FrenchTrackerMixin:
             stem = os.path.splitext(path)[0]
             nfo_path = f"{stem}.nfo"
             nfo_files = [nfo_path] if os.path.isfile(nfo_path) else []
+        # A physical NFO always wins.  Only when none exists do we fall back to
+        # the canonical NFO fetched from predb.fr on an exact match (if any).
+        if not nfo_files:
+            predb_nfo = str(meta.get("predb_fr_nfo_file", ""))
+            if predb_nfo and os.path.isfile(predb_nfo):
+                nfo_files = [predb_nfo]
         if nfo_files:
             meta["keep_nfo"] = True
         return nfo_files

@@ -11,6 +11,9 @@ upload** — the FR pre database is incomplete and your own encode may simply
 not be indexed.
 """
 
+import glob
+import os
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -18,6 +21,7 @@ import httpx
 from src.console import console
 
 API_URL = "https://api.predb.fr/api/v1/releases"
+NFO_URL = "https://api.predb.fr/api/v1/releases/nfo"
 
 
 def _tmdb_from_media_id(media_id: Optional[str]) -> Optional[int]:
@@ -35,13 +39,21 @@ def _norm_group(tag: Any) -> str:
     return str(tag or "").lstrip("-").strip().lower()
 
 
+_VIDEO_EXTS = {".mkv", ".mp4", ".ts", ".m2ts", ".avi", ".vob"}
+
+
+def _strip_video_ext(name: str) -> str:
+    """Drop a trailing video extension predb sometimes keeps in the name."""
+    root, ext = os.path.splitext(name)
+    return root if ext.lower() in _VIDEO_EXTS else name
+
+
 def analyze(
     releases: list[dict[str, Any]],
     *,
     tmdb_id: Any,
     group: Any,
     category: Any,
-    have_nfo: bool,
 ) -> list[str]:
     """Compare predb candidates to our submission and return warning lines.
 
@@ -67,17 +79,67 @@ def analyze(
     if our_tmdb and tmdb_ids and our_tmdb not in tmdb_ids:
         warnings.append(f"TMDB possiblement erroné : tu soumets {our_tmdb}, predb.fr référence {sorted(tmdb_ids)} pour ce titre.")
 
-    # Nuke / reputation / NFO only reported for same-group candidates to avoid noise.
+    # Nuke / reputation only reported for same-group candidates to avoid noise.
     warnings.extend(f"Release nukée côté FR : {r['name']} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
     if ours and not any(r.get("team_profilarr_validated") for r in ours):
         warnings.append(f"Groupe {group} non validé profilarr sur predb.fr.")
-    nfo_avail = next((r for r in ours if r.get("has_nfo")), None)
-    if nfo_avail and not have_nfo:
-        # ponytail: report availability only; downloading the canonical NFO
-        # (GET /releases/nfo, like is_scene.py does for SRRDB) is the next step.
-        warnings.append(f"NFO disponible sur predb.fr : {nfo_avail['name']}")
 
     return warnings
+
+
+def pick_exact_nfo(releases: list[dict[str, Any]], our_name: str) -> Optional[dict[str, Any]]:
+    """Return the predb release whose name *exactly* matches our release.
+
+    Exact match (case-insensitive, ignoring a trailing video extension on
+    either side) means it is literally the same release, so its canonical NFO
+    legitimately describes our file.  Only returns candidates that have an NFO.
+    Pure function — unit-testable without network.
+    """
+    if not our_name:
+        return None
+    want = _strip_video_ext(our_name).strip().lower()
+    if not want:
+        return None
+    for r in releases:
+        if r.get("has_nfo") and _strip_video_ext(str(r.get("name", ""))).strip().lower() == want:
+            return r
+    return None
+
+
+def _has_disk_nfo(path: str) -> bool:
+    """True when a physical .nfo sits next to the content (same rule as the
+    French trackers' on-disk NFO inclusion)."""
+    if not path:
+        return False
+    if os.path.isdir(path):
+        return bool(glob.glob(os.path.join(path, "*.nfo")) or glob.glob(os.path.join(path, "**", "*.nfo"), recursive=True))
+    return os.path.isfile(f"{os.path.splitext(path)[0]}.nfo")
+
+
+def _our_release_name(meta: dict[str, Any]) -> str:
+    """The source release name to match against predb (folder/file basename)."""
+    path = str(meta.get("path", "")).rstrip("/")
+    base = os.path.basename(path)
+    if base and not os.path.isdir(path):
+        base = os.path.splitext(base)[0]
+    return base or str(meta.get("uuid", ""))
+
+
+async def _fetch_nfo(name: str, source: str, key: str) -> Optional[str]:
+    """Download the raw NFO for an exact release. None on any failure."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                NFO_URL,
+                params={"name": name, "source": source},
+                headers={"X-Api-Key": key},
+                timeout=15.0,
+            )
+        if resp.status_code == 200 and resp.text.strip():
+            return resp.text
+    except Exception:
+        return None
+    return None
 
 
 async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str) -> None:
@@ -129,7 +191,43 @@ async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str)
         tmdb_id=meta.get("tmdb_id") or meta.get("tmdb"),
         group=meta.get("tag"),
         category=meta.get("category"),
-        have_nfo=bool(meta.get("nfo")),
     )
     for w in warnings:
         console.print(f"[yellow]⚠️  predb.fr [{tracker}] : {w}")
+
+    await _maybe_download_nfo(meta, releases, key)
+
+
+async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any]], key: str) -> None:
+    """Fetch the canonical NFO only when there is no physical NFO on disk and
+    an *exact* predb match exists.
+
+    A physical NFO next to the content always wins (handled by the trackers'
+    ``_get_nfo_files``); otherwise an exact match means it is the same release,
+    so we prefer its canonical NFO over a MediaInfo-generated one.  No exact
+    match → trackers fall back to the generated NFO as before.
+    """
+    if meta.get("predb_fr_nfo_file"):
+        return  # already fetched this upload
+    if _has_disk_nfo(str(meta.get("path", ""))):
+        return  # physical NFO wins, no debate
+
+    match = pick_exact_nfo(releases, _our_release_name(meta))
+    if not match:
+        return
+
+    nfo_text = await _fetch_nfo(str(match["name"]), str(match.get("source", "P2P")), key)
+    if not nfo_text:
+        return
+
+    dest = os.path.join(str(meta.get("base_dir", "")), "tmp", str(meta.get("uuid", "")), f"{match['name']}.nfo")
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        Path(dest).write_text(nfo_text, encoding="utf-8")
+    except OSError as e:
+        if meta.get("debug"):
+            console.print(f"[yellow]predb.fr: écriture NFO échouée: {type(e).__name__}")
+        return
+
+    meta["predb_fr_nfo_file"] = dest
+    console.print(f"[green]predb.fr : NFO canonique récupéré ({match['name']})[/green]")
