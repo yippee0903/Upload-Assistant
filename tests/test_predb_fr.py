@@ -49,6 +49,14 @@ def test_tmdb_debug_line_no_our_id():
     assert "no TMDB id on our submission" in line
 
 
+def test_malformed_entries_do_not_raise():
+    # Non-dict items (None, str, int) from a bad API payload must be ignored.
+    rels = [None, "garbage", 42, _rel(media_id="movie:999", nuke_reason="bad")]
+    blocking, info = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")
+    assert any("TMDB" in w for w in blocking)
+    assert tmdb_debug_line(rels, tmdb_id=207, category="MOVIE", tracker="C411")
+
+
 def test_tmdb_mismatch_is_blocking():
     rels = [_rel(media_id="movie:999"), _rel(media_id="movie:999", team_name="OTHER")]
     blocking, info = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")

@@ -50,9 +50,14 @@ def _strip_video_ext(name: str) -> str:
 
 
 def _category_candidates(releases: list[dict[str, Any]], category: Any) -> list[dict[str, Any]]:
-    """Releases whose predb category matches our upload (Anime always counts)."""
+    """Releases whose predb category matches our upload (Anime always counts).
+
+    Non-dict entries are dropped here — the single chokepoint feeding both
+    ``analyze`` and ``tmdb_debug_line`` — so malformed API data can never raise
+    downstream (the analyze flow runs outside crosscheck's try/except).
+    """
     want_categ = "Series" if str(category).upper() == "TV" else "Movies"
-    return [r for r in releases if r.get("categ") in (want_categ, "Anime")]
+    return [r for r in releases if isinstance(r, dict) and r.get("categ") in (want_categ, "Anime")]
 
 
 def _our_tmdb(tmdb_id: Any) -> int:
@@ -116,7 +121,7 @@ def analyze(
         blocking.append(f"TMDB mismatch: you are submitting {our_tmdb}, but predb.fr lists {sorted(tmdb_ids)} for this title.")
 
     # Nuke only reported for same-group candidates to avoid noise.
-    blocking.extend(f"Nuked release on the FR scene: {r['name']} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
+    blocking.extend(f"Nuked release on the FR scene: {r.get('name')} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
 
     # Group reputation is advisory only.
     if ours and not any(r.get("team_profilarr_validated") for r in ours):
