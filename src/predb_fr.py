@@ -190,6 +190,9 @@ async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str)
                 console.print(f"[yellow]predb.fr: requête échouée: {type(e).__name__}")
         cache[query] = releases
 
+    if meta.get("debug"):
+        console.print(f"[cyan]predb.fr [{tracker}]: '{query}' → {len(releases)} release(s)[/cyan]")
+
     if not releases:
         return  # not indexed → stay silent, never block the upload
 
@@ -214,17 +217,24 @@ async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any
     so we prefer its canonical NFO over a MediaInfo-generated one.  No exact
     match → trackers fall back to the generated NFO as before.
     """
+    debug = meta.get("debug")
     if meta.get("predb_fr_nfo_file"):
         return  # already fetched this upload
     if _has_disk_nfo(str(meta.get("path", ""))):
+        if debug:
+            console.print("[cyan]predb.fr: NFO physique présent sur disque → conservé[/cyan]")
         return  # physical NFO wins, no debate
 
     match = pick_exact_nfo(releases, _our_release_name(meta))
     if not match:
+        if debug:
+            console.print(f"[cyan]predb.fr: aucun match exact pour '{_our_release_name(meta)}' → NFO généré[/cyan]")
         return
 
     nfo_text = await _fetch_nfo(str(match["name"]), str(match.get("source", "P2P")), key)
     if not nfo_text:
+        if debug:
+            console.print(f"[yellow]predb.fr: téléchargement NFO échoué pour '{match['name']}'[/yellow]")
         return
 
     # Derive a safe filename from the (external) release name so it can never
