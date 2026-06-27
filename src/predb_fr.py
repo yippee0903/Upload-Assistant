@@ -49,6 +49,40 @@ def _strip_video_ext(name: str) -> str:
     return root if ext.lower() in _VIDEO_EXTS else name
 
 
+def _category_candidates(releases: list[dict[str, Any]], category: Any) -> list[dict[str, Any]]:
+    """Releases whose predb category matches our upload (Anime always counts)."""
+    want_categ = "Series" if str(category).upper() == "TV" else "Movies"
+    return [r for r in releases if r.get("categ") in (want_categ, "Anime")]
+
+
+def _our_tmdb(tmdb_id: Any) -> int:
+    """Our TMDB id as an int, or 0 when absent/unparseable."""
+    try:
+        return int(tmdb_id) if tmdb_id else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def tmdb_debug_line(releases: list[dict[str, Any]], *, tmdb_id: Any, category: Any, tracker: str) -> str:
+    """One ``--debug`` line spelling out what predb.fr can say about our TMDB id.
+
+    Distinguishes the three silent cases of ``analyze`` (real confirmation, no
+    TMDB data on candidates, or no TMDB id on our side) so the log is no longer
+    ambiguous.  Pure function — unit-testable.
+    """
+    cands = _category_candidates(releases, category)
+    our_tmdb = _our_tmdb(tmdb_id)
+    tmdb_ids = {t for r in cands if (t := _tmdb_from_media_id(r.get("media_id"))) is not None}
+    if not our_tmdb:
+        return f"[cyan]predb.fr [{tracker}]: no TMDB id on our submission to check[/cyan]"
+    if not tmdb_ids:
+        return f"[cyan]predb.fr [{tracker}]: no TMDB data on {len(cands)} candidate(s) → nothing to confirm[/cyan]"
+    if our_tmdb in tmdb_ids:
+        n = sum(1 for r in cands if _tmdb_from_media_id(r.get("media_id")) == our_tmdb)
+        return f"[green]predb.fr [{tracker}]: TMDB {our_tmdb} confirmed by {n} release(s)[/green]"
+    return f"[cyan]predb.fr [{tracker}]: TMDB {our_tmdb} not among predb {sorted(tmdb_ids)}[/cyan]"
+
+
 def analyze(
     releases: list[dict[str, Any]],
     *,
@@ -66,8 +100,7 @@ def analyze(
     Pure function (no network) so it can be unit-tested directly.  Both lists
     are empty when nothing relevant is found — never treated as a failure.
     """
-    want_categ = "Series" if str(category).upper() == "TV" else "Movies"
-    cands = [r for r in releases if r.get("categ") in (want_categ, "Anime")]
+    cands = _category_candidates(releases, category)
     if not cands:
         return [], []
 
@@ -78,10 +111,7 @@ def analyze(
 
     # TMDB sanity: if candidates converge on TMDB id(s) that exclude ours.
     tmdb_ids = {t for r in cands if (t := _tmdb_from_media_id(r.get("media_id"))) is not None}
-    try:
-        our_tmdb = int(tmdb_id) if tmdb_id else 0
-    except (TypeError, ValueError):
-        our_tmdb = 0
+    our_tmdb = _our_tmdb(tmdb_id)
     if our_tmdb and tmdb_ids and our_tmdb not in tmdb_ids:
         blocking.append(f"TMDB mismatch: you are submitting {our_tmdb}, but predb.fr lists {sorted(tmdb_ids)} for this title.")
 
@@ -206,9 +236,12 @@ async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str)
     if not releases:
         return True  # not indexed → stay silent, never block the upload
 
+    our_tmdb_id = meta.get("tmdb_id") or meta.get("tmdb")
+    if meta.get("debug"):
+        console.print(tmdb_debug_line(releases, tmdb_id=our_tmdb_id, category=meta.get("category"), tracker=tracker))
     blocking, info = analyze(
         releases,
-        tmdb_id=meta.get("tmdb_id") or meta.get("tmdb"),
+        tmdb_id=our_tmdb_id,
         group=meta.get("tag"),
         category=meta.get("category"),
     )

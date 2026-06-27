@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 """Unit tests for the predb.fr cross-check (pure matching, no network)."""
 
-from src.predb_fr import _safe_nfo_filename, _tmdb_from_media_id, analyze, pick_exact_nfo
+from src.predb_fr import _safe_nfo_filename, _tmdb_from_media_id, analyze, pick_exact_nfo, tmdb_debug_line
 
 
 def _rel(**kw):
@@ -30,6 +30,23 @@ def test_no_candidates_is_silent():
     # Only Ebooks/Other → nothing to compare against for a movie upload.
     rels = [_rel(categ="Ebooks"), _rel(categ="Other")]
     assert analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE") == ([], [])
+
+
+def test_tmdb_debug_line_confirmed():
+    rels = [_rel(media_id="movie:207"), _rel(media_id="movie:207", team_name="OTHER")]
+    line = tmdb_debug_line(rels, tmdb_id=207, category="MOVIE", tracker="C411")
+    assert "confirmed by 2 release(s)" in line
+
+
+def test_tmdb_debug_line_no_data():
+    rels = [_rel(media_id=None), _rel(media_id="")]
+    line = tmdb_debug_line(rels, tmdb_id=207, category="MOVIE", tracker="C411")
+    assert "nothing to confirm" in line
+
+
+def test_tmdb_debug_line_no_our_id():
+    line = tmdb_debug_line([_rel()], tmdb_id=0, category="MOVIE", tracker="C411")
+    assert "no TMDB id on our submission" in line
 
 
 def test_tmdb_mismatch_is_blocking():
