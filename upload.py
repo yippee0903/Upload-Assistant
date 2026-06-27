@@ -576,6 +576,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
     if detag_detected:
         detag_info = meta.get("detag_info", {})
         detection_type = detag_info.get("type", "detag")
+
+        # Unattended: notag/detag releases generally need manual verification, so
+        # cancel the whole upload up front — regardless of per-tracker accept_notag.
+        if meta.get("unattended", False):
+            console.print(f"[yellow]Unattended mode: {detection_type} detected — cancelling upload (needs manual verification).[/yellow]")
+            meta["we_are_uploading"] = False
+            return
+
         mi_grp = detag_info.get("mi_group", "")
         mi_file = detag_info.get("mi_filename", "")
 
@@ -634,11 +642,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 # detag_info stays so trackerstatus.py can skip per-tracker
                 console.print("[yellow]Trackers that reject notag will be skipped automatically.[/yellow]")
             else:
-                # ALL trackers reject notag — ask confirmation
-                if meta.get("unattended", False):
-                    console.print("[yellow]Unattended mode: skipping notag release (all trackers reject it).[/yellow]")
-                    meta["we_are_uploading"] = False
-                    return
+                # ALL trackers reject notag — ask confirmation.
+                # (Attended only; unattended already cancelled above.)
                 try:
                     detag_confirm = cli_ui.ask_yes_no("All trackers reject notag. Proceed anyway?", default=False)
                 except EOFError:
@@ -666,10 +671,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
             console.print()
 
-            if meta.get("unattended", False):
-                console.print("[yellow]Unattended mode: skipping detagged release.[/yellow]")
-                meta["we_are_uploading"] = False
-                return
+            # Attended only; unattended already cancelled above.
             try:
                 detag_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=False)
             except EOFError:
