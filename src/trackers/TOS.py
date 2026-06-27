@@ -543,7 +543,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 return False
             return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
 
-        return True
+        return await self.predb_fr_check(meta)
 
     async def _build_audio_string(self, meta):
         """Build the language tag following French tracker conventions.

@@ -174,7 +174,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                         return False
                     break
 
-        return True
+        return await self.predb_fr_check(meta)
 
     # https://gemini-tracker.org/pages/7
     async def get_name(self, meta):

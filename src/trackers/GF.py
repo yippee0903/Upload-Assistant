@@ -246,7 +246,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
                 meta["nfo"] = nfo_path
                 meta["auto_nfo"] = True
 
-        return True
+        return await self.predb_fr_check(meta)
 
     # ──────────────────────────────────────────────────────────
     #  Dupe search — broader search for VOSTFR / VO uploads

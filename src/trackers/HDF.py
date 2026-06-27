@@ -711,7 +711,7 @@ class HDF(FrenchTrackerMixin):
             except Exception as exc:
                 console.print(f"[yellow]{self.tracker}: NFO generation skipped ({exc})[/yellow]")
 
-        return True
+        return await self.predb_fr_check(meta)
 
     def _warn_superfluous_tracks(self, meta: Meta) -> None:
         """Print a warning when audio/subtitle tracks are not VF or VO.

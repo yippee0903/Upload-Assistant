@@ -426,9 +426,17 @@ class FrenchTrackerMixin:
             if not meta.get("unattended", False):
                 console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
-        # Optional predb.fr cross-check (opt-in via DEFAULT.predb_fr_api_key).
-        # Blocking TMDB/nuke divergences gate the upload (bypassable when
-        # attended; refused when unattended); group reputation is advisory.
+        return await self.predb_fr_check(meta)
+
+    async def predb_fr_check(self, meta: Meta) -> bool:
+        """Optional predb.fr cross-check (opt-in via DEFAULT.predb_fr_api_key).
+
+        Blocking TMDB/nuke divergences gate the upload (bypassable when
+        attended; refused when unattended); group reputation is advisory.
+        French trackers that override ``get_additional_checks`` without calling
+        ``super()`` should end their success path with
+        ``return await self.predb_fr_check(meta)`` so the cross-check still runs.
+        """
         return await predb_fr_crosscheck(meta, self.config, self.tracker)  # type: ignore[attr-defined]
 
     # ──────────────────────────────────────────────────────────

@@ -172,7 +172,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
         ):
             console.print(f"[bold red]{self.tracker} requiert au moins une piste audio VF.[/bold red]")
             return False
-        return True
+        return await self.predb_fr_check(meta)
 
     # ── Image host gating ─────────────────────────────────────────────
 
