@@ -85,6 +85,25 @@ def test_unvalidated_group_is_advisory_not_blocking():
     assert any("not profilarr-validated" in w for w in info)
 
 
+def test_unvalidated_group_silent_without_fr_audio():
+    # VOSTFR upload (English audio): the ENG group is legitimately unvalidated,
+    # so the advisory must be suppressed.
+    blocking, info = analyze(
+        [_rel(team_profilarr_validated=False)], tmdb_id=207, group="-T4KT", category="MOVIE", has_fr_audio=False
+    )
+    assert blocking == []
+    assert info == []
+
+
+def test_has_fr_audio_detection():
+    from src.predb_fr import _has_fr_audio
+
+    assert _has_fr_audio({"audio_languages": ["English", "French"]})
+    assert _has_fr_audio({"audio_languages": ["fr-FR"]})
+    assert not _has_fr_audio({"audio_languages": ["English", "Japanese"]})
+    assert not _has_fr_audio({})
+
+
 def test_tv_category_matches_series():
     rels = [_rel(categ="Series", media_id="tv:999")]
     blocking, _ = analyze(rels, tmdb_id=72879, group="-T4KT", category="TV")
