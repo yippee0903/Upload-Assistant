@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+import cli_ui
 import httpx
 
 from src.console import console
@@ -54,19 +55,24 @@ def analyze(
     tmdb_id: Any,
     group: Any,
     category: Any,
-) -> list[str]:
-    """Compare predb candidates to our submission and return warning lines.
+) -> tuple[list[str], list[str]]:
+    """Compare predb candidates to our submission.
 
-    Pure function (no network) so it can be unit-tested directly.
-    Returns an empty list when nothing relevant is found — callers treat an
-    empty list as "all good / not indexed", never as a failure.
+    Returns ``(blocking, info)``:
+    - ``blocking`` — TMDB / nuke divergences that should gate the upload
+      (bypassable when attended, refused when unattended).
+    - ``info`` — advisory lines (group reputation) that never block.
+
+    Pure function (no network) so it can be unit-tested directly.  Both lists
+    are empty when nothing relevant is found — never treated as a failure.
     """
     want_categ = "Series" if str(category).upper() == "TV" else "Movies"
     cands = [r for r in releases if r.get("categ") in (want_categ, "Anime")]
     if not cands:
-        return []
+        return [], []
 
-    warnings: list[str] = []
+    blocking: list[str] = []
+    info: list[str] = []
     group_n = _norm_group(group)
     ours = [r for r in cands if group_n and _norm_group(r.get("team_name")) == group_n]
 
@@ -77,14 +83,16 @@ def analyze(
     except (TypeError, ValueError):
         our_tmdb = 0
     if our_tmdb and tmdb_ids and our_tmdb not in tmdb_ids:
-        warnings.append(f"TMDB possiblement erroné : tu soumets {our_tmdb}, predb.fr référence {sorted(tmdb_ids)} pour ce titre.")
+        blocking.append(f"TMDB mismatch: you are submitting {our_tmdb}, but predb.fr lists {sorted(tmdb_ids)} for this title.")
 
-    # Nuke / reputation only reported for same-group candidates to avoid noise.
-    warnings.extend(f"Release nukée côté FR : {r['name']} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
+    # Nuke only reported for same-group candidates to avoid noise.
+    blocking.extend(f"Nuked release on the FR scene: {r['name']} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
+
+    # Group reputation is advisory only.
     if ours and not any(r.get("team_profilarr_validated") for r in ours):
-        warnings.append(f"Groupe {group} non validé profilarr sur predb.fr.")
+        info.append(f"Group {group} is not profilarr-validated on predb.fr.")
 
-    return warnings
+    return blocking, info
 
 
 def pick_exact_nfo(releases: list[dict[str, Any]], our_name: str) -> Optional[dict[str, Any]]:
@@ -149,19 +157,21 @@ async def _fetch_nfo(name: str, source: str, key: str) -> Optional[str]:
     return None
 
 
-async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str) -> None:
-    """Query predb.fr for the current upload and print any divergence warnings.
+async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str) -> bool:
+    """Query predb.fr for the current upload and check for divergences.
 
     Opt-in: does nothing unless ``DEFAULT.predb_fr_api_key`` is set.  Never
-    raises and never aborts the upload.
+    raises.  Returns ``False`` only when a blocking divergence (TMDB / nuke) is
+    not bypassed — refused outright when unattended, or declined at the prompt
+    when attended.  Returns ``True`` otherwise.
     """
     key = str(config.get("DEFAULT", {}).get("predb_fr_api_key", "")).strip()
     if not key:
-        return
+        return True
 
     title = str(meta.get("title", "")).strip()
     if not title:
-        return
+        return True
     year = meta.get("year") or ""
     query = ".".join(f"{title} {year}".split())
 
@@ -184,28 +194,40 @@ async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str)
             if resp.status_code == 200:
                 releases = resp.json().get("releases", [])
             elif meta.get("debug"):
-                console.print(f"[yellow]predb.fr: HTTP {resp.status_code} pour '{query}'")
+                console.print(f"[yellow]predb.fr: HTTP {resp.status_code} for '{query}'")
         except Exception as e:
             if meta.get("debug"):
-                console.print(f"[yellow]predb.fr: requête échouée: {type(e).__name__}")
+                console.print(f"[yellow]predb.fr: request failed: {type(e).__name__}")
         cache[query] = releases
 
     if meta.get("debug"):
         console.print(f"[cyan]predb.fr [{tracker}]: '{query}' → {len(releases)} release(s)[/cyan]")
 
     if not releases:
-        return  # not indexed → stay silent, never block the upload
+        return True  # not indexed → stay silent, never block the upload
 
-    warnings = analyze(
+    blocking, info = analyze(
         releases,
         tmdb_id=meta.get("tmdb_id") or meta.get("tmdb"),
         group=meta.get("tag"),
         category=meta.get("category"),
     )
-    for w in warnings:
-        console.print(f"[yellow]⚠️  predb.fr [{tracker}] : {w}")
+    for w in info:
+        console.print(f"[yellow]⚠️  predb.fr [{tracker}]: {w}[/yellow]")
+
+    if blocking:
+        for w in blocking:
+            console.print(f"[bold red]predb.fr [{tracker}]: {w}[/bold red]")
+        # Bypassable when attended (or when unattended_confirm is set); refused
+        # outright in plain unattended mode. Mirrors the BLU/ULCX pattern.
+        if not meta.get("unattended") or meta.get("unattended_confirm", False):
+            if not cli_ui.ask_yes_no("Upload anyway despite the predb.fr divergence?", default=False):
+                return False
+        else:
+            return False
 
     await _maybe_download_nfo(meta, releases, key)
+    return True
 
 
 async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any]], key: str) -> None:
@@ -222,19 +244,19 @@ async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any
         return  # already fetched this upload
     if _has_disk_nfo(str(meta.get("path", ""))):
         if debug:
-            console.print("[cyan]predb.fr: NFO physique présent sur disque → conservé[/cyan]")
+            console.print("[cyan]predb.fr: physical NFO present on disk → kept[/cyan]")
         return  # physical NFO wins, no debate
 
     match = pick_exact_nfo(releases, _our_release_name(meta))
     if not match:
         if debug:
-            console.print(f"[cyan]predb.fr: aucun match exact pour '{_our_release_name(meta)}' → NFO généré[/cyan]")
+            console.print(f"[cyan]predb.fr: no exact match for '{_our_release_name(meta)}' → generated NFO[/cyan]")
         return
 
     nfo_text = await _fetch_nfo(str(match["name"]), str(match.get("source", "P2P")), key)
     if not nfo_text:
         if debug:
-            console.print(f"[yellow]predb.fr: téléchargement NFO échoué pour '{match['name']}'[/yellow]")
+            console.print(f"[yellow]predb.fr: NFO download failed for '{match['name']}'[/yellow]")
         return
 
     # Derive a safe filename from the (external) release name so it can never
@@ -248,8 +270,8 @@ async def _maybe_download_nfo(meta: dict[str, Any], releases: list[dict[str, Any
         Path(dest).write_text(nfo_text, encoding="utf-8")
     except OSError as e:
         if meta.get("debug"):
-            console.print(f"[yellow]predb.fr: écriture NFO échouée: {type(e).__name__}")
+            console.print(f"[yellow]predb.fr: NFO write failed: {type(e).__name__}")
         return
 
     meta["predb_fr_nfo_file"] = dest
-    console.print(f"[green]predb.fr : NFO canonique récupéré ({match['name']})[/green]")
+    console.print(f"[green]predb.fr: canonical NFO fetched ({match['name']})[/green]")

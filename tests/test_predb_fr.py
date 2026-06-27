@@ -29,39 +29,41 @@ def test_media_id_parsing():
 def test_no_candidates_is_silent():
     # Only Ebooks/Other → nothing to compare against for a movie upload.
     rels = [_rel(categ="Ebooks"), _rel(categ="Other")]
-    assert analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE") == []
+    assert analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE") == ([], [])
 
 
-def test_tmdb_mismatch_warns():
+def test_tmdb_mismatch_is_blocking():
     rels = [_rel(media_id="movie:999"), _rel(media_id="movie:999", team_name="OTHER")]
-    out = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")
-    assert any("TMDB" in w and "999" in w for w in out)
+    blocking, info = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")
+    assert any("TMDB" in w and "999" in w for w in blocking)
+    assert info == []
 
 
 def test_tmdb_match_no_warn():
-    out = analyze([_rel(media_id="movie:207")], tmdb_id=207, group="-T4KT", category="MOVIE")
-    assert not any("TMDB" in w for w in out)
+    blocking, info = analyze([_rel(media_id="movie:207")], tmdb_id=207, group="-T4KT", category="MOVIE")
+    assert blocking == [] and info == []
 
 
-def test_nuke_warns_for_our_group_only():
+def test_nuke_is_blocking_for_our_group_only():
     rels = [
         _rel(nuke_reason="dupe", team_name="T4KT"),
         _rel(nuke_reason="badaudio", team_name="OTHER"),  # not our group → ignored
     ]
-    out = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")
-    nuke_lines = [w for w in out if "nukée" in w]
+    blocking, _ = analyze(rels, tmdb_id=207, group="-T4KT", category="MOVIE")
+    nuke_lines = [w for w in blocking if "Nuked" in w]
     assert len(nuke_lines) == 1 and "dupe" in nuke_lines[0]
 
 
-def test_unvalidated_group_warns():
-    out = analyze([_rel(team_profilarr_validated=False)], tmdb_id=207, group="-T4KT", category="MOVIE")
-    assert any("non validé profilarr" in w for w in out)
+def test_unvalidated_group_is_advisory_not_blocking():
+    blocking, info = analyze([_rel(team_profilarr_validated=False)], tmdb_id=207, group="-T4KT", category="MOVIE")
+    assert blocking == []
+    assert any("not profilarr-validated" in w for w in info)
 
 
 def test_tv_category_matches_series():
     rels = [_rel(categ="Series", media_id="tv:999")]
-    out = analyze(rels, tmdb_id=72879, group="-T4KT", category="TV")
-    assert any("TMDB" in w for w in out)
+    blocking, _ = analyze(rels, tmdb_id=72879, group="-T4KT", category="TV")
+    assert any("TMDB" in w for w in blocking)
 
 
 # ── exact-match NFO selection ──────────────────────────────────────────────

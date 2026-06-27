@@ -427,9 +427,9 @@ class FrenchTrackerMixin:
                 console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
         # Optional predb.fr cross-check (opt-in via DEFAULT.predb_fr_api_key).
-        # Side-effect only: prints warnings, never blocks the upload.
-        await predb_fr_crosscheck(meta, self.config, self.tracker)  # type: ignore[attr-defined]
-        return True
+        # Blocking TMDB/nuke divergences gate the upload (bypassable when
+        # attended; refused when unattended); group reputation is advisory.
+        return await predb_fr_crosscheck(meta, self.config, self.tracker)  # type: ignore[attr-defined]
 
     # ──────────────────────────────────────────────────────────
     #  Edition formatting
