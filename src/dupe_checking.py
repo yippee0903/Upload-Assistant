@@ -789,7 +789,9 @@ class DupeChecker:
             return set()
         hdr_upper = str(hdr).upper()
         terms: set[str] = set()
-        if "DV" in hdr_upper or "DOVI" in hdr_upper:
+        # "DOLBY VISION" spelled out (e.g. in a release name) is Dolby Vision too —
+        # the bare "DV" substring doesn't occur in it, so match it explicitly.
+        if "DV" in hdr_upper or "DOVI" in hdr_upper or "DOLBY VISION" in hdr_upper or "DOLBYVISION" in hdr_upper:
             terms.add("DV")
         if "HDR" in hdr_upper:  # Any HDR-related term is normalized to 'HDR'
             terms.add("HDR")

@@ -492,3 +492,29 @@ class TestSeasonPackVsEpisodeGuard:
             "filename_match must be set when season-pack upload matches an "
             "existing season-pack entry on the tracker"
         )
+
+
+class TestRefineHdrTerms:
+    """refine_hdr_terms must recognise 'Dolby Vision' spelled out, not just 'DV'."""
+
+    def test_dolby_vision_spelled_out_is_dv(self):
+        # A release name carrying "DOLBY.VISION" (normalised to "dolby vision")
+        # must yield DV — the bare "DV" substring never appears in it.
+        terms = _run(DupeChecker.refine_hdr_terms("solo 2018 2160p 4klight dolby vision ddp 7 1 x265-qtz"))
+        assert terms == {"DV"}
+
+    def test_dv_token_still_works(self):
+        assert _run(DupeChecker.refine_hdr_terms("movie 2160p dv hdr10 x265")) == {"DV", "HDR"}
+
+    def test_plain_hdr(self):
+        assert _run(DupeChecker.refine_hdr_terms("movie 2160p hdr10 x265")) == {"HDR"}
+
+    def test_no_hdr(self):
+        assert _run(DupeChecker.refine_hdr_terms("movie 1080p bluray x264")) == set()
+
+    def test_dolby_vision_matches_dv_hdr_target(self):
+        # The reported bug: a DV upload (hdr="DV HDR") vs a "Dolby Vision" dupe
+        # must be considered the same HDR flavour, not excluded.
+        file_hdr = _run(DupeChecker.refine_hdr_terms("solo 2018 2160p 4klight dolby vision ddp 7 1 x265-qtz"))
+        target_hdr = _run(DupeChecker.refine_hdr_terms("DV HDR"))
+        assert _run(DupeChecker.has_matching_hdr(file_hdr, target_hdr, {"type": "ENCODE"}, tracker="C411"))
