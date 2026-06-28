@@ -274,7 +274,9 @@ class NXM(FrenchTrackerMixin):
 
         { "id": 1, "name": "Films", "slug": "films" },
         { "id": 2, "name": "Séries TV", "slug": "series" },
-        { "id": 3, "name": "Documentaires", "slug": "documentaires" },
+        { "id": 3, "name": "Documentaires", "slug": "documentaires" },  # parent — needs a sub-cat:
+            { "id": 23, "name": "Film documentaire", "slug": "documentaires-films" },
+            { "id": 24, "name": "Série documentaire", "slug": "documentaires-series" },
         { "id": 4, "name": "Animés", "slug": "animes" },
         { "id": 5, "name": "Concerts / Spectacles", "slug": "concerts-spectacles" },
         { "id": 7, "name": "Sports", "slug": "sports" }
@@ -287,7 +289,8 @@ class NXM(FrenchTrackerMixin):
         if "concert" in genres.lower() or "concert" in keywords.lower():
             return 5
         elif "documentary" in genres.lower() or "documentary" in keywords.lower():
-            return 3
+            # Documentaires (3) has sub-cats; sending the parent id is a 422.
+            return 24 if meta.get("category") == "TV" else 23
         elif meta.get("category") == "TV":
             return 4 if is_anime else 2
         return 4 if is_anime else 1
