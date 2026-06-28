@@ -135,6 +135,35 @@ class TestTosSpecialCharRejection:
         assert result is True
 
 
+class TestTosLightReencodeRejection:
+    """get_additional_checks must reject 4KLight / HDLight re-encodes (forbidden on TOS)."""
+
+    def _patch_lang_ok(self, t: TOS) -> None:
+        t.common.check_language_requirements = AsyncMock(return_value=True)  # type: ignore[assignment]
+
+    def test_4klight_rejected(self):
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Solo.2018.2160p.4KLight.BluRay.x265-GRP")
+        meta["uuid"] = "Solo.2018.2160p.4KLight.BluRay.x265-GRP.mkv"
+        assert _run(t.get_additional_checks(meta)) is False
+
+    def test_hdlight_rejected(self):
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Film.2020.1080p.HDLight.BluRay.x265-GRP")
+        meta["uuid"] = "Film.2020.1080p.HDLight.BluRay.x265-GRP.mkv"
+        assert _run(t.get_additional_checks(meta)) is False
+
+    def test_normal_encode_not_rejected_by_light_gate(self):
+        t = TOS(_config())
+        self._patch_lang_ok(t)
+        meta = _additional_checks_meta("/tmp/Film.2020.1080p.BluRay.x265-GRP")
+        meta["uuid"] = "Film.2020.1080p.BluRay.x265-GRP.mkv"
+        # No light tag → gate passes; clean filename + stubbed language → True
+        assert _run(t.get_additional_checks(meta)) is True
+
+
 # ---------------------------------------------------------------------------
 # Tests – _check_tos_specific_dupes
 # ---------------------------------------------------------------------------

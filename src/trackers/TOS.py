@@ -413,6 +413,16 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         import os
         import re as _re
 
+        # TOS forbids light re-encodes (4KLight / HDLight). The minimum-bitrate
+        # check below catches most of them indirectly, but this rejects the label
+        # itself — regardless of bitrate — with a clear reason. Detected from the
+        # source filename (uuid), like the rest of the 4klight/hdlight handling.
+        uuid = str(meta.get("uuid", "")).lower()
+        if "4klight" in uuid or "hdlight" in uuid:
+            if not meta.get("unattended", False):
+                console.print(f"[bold red]{self.tracker}: 4KLight/HDLight re-encodes are not allowed on TOS.[/bold red]")
+            return False
+
         # TOS rejects filenames with special characters (e.g. parentheses).
         # Check both the release folder name and all individual files.
         _SAFE_FILENAME = _re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
