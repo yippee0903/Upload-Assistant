@@ -3177,13 +3177,13 @@ class COMMON:
         counts as a rename, because cross-seeding needs byte-identical filenames,
         so any change to the name is rejected.
         """
-        known_ext = (".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".mpg", ".mpeg", ".vob", ".iso")
+        known_ext = {".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".mpg", ".mpeg", ".vob", ".iso"}
 
         def strip_ext(s: str) -> str:
-            for ext in known_ext:
-                if s.lower().endswith(ext):
-                    return s[: -len(ext)]
-            return s
+            # splitext only peels the final component, so ".m2ts" is dropped
+            # whole instead of being truncated by a shorter ".ts" match.
+            root, ext = os.path.splitext(s)
+            return root if ext.lower() in known_ext else s
 
         disk = strip_ext(disk_name).strip()
         embedded = strip_ext(embedded_name).strip()

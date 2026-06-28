@@ -212,3 +212,19 @@ class TestRenameDetection:
             result = _run(common.check_detag(meta, "TEST"))
         assert result is False
         assert "detag_info" not in meta
+
+    def test_not_renamed_m2ts_extension(self, common):
+        # ".m2ts" must be dropped whole, not truncated to ".m2" by a ".ts" match.
+        assert common._is_renamed("Movie.2026.1080p.BluRay.x264-GRP.m2ts", "Movie.2026.1080p.BluRay.x264-GRP") is False
+
+    def test_check_detag_no_rename_without_group_tag(self, common):
+        # Embedded name is a plain human title (no -GROUP suffix): we don't trust
+        # its format, so a mismatch must NOT be flagged as a rename.
+        meta = {"tag": "-GRP"}
+        with patch.object(
+            common, "_get_mediainfo_filename",
+            AsyncMock(return_value=("The Movie 2026", "Movie.2026.1080p.BluRay.x264-GRP.mkv")),
+        ):
+            result = _run(common.check_detag(meta, "TEST"))
+        assert result is False
+        assert "detag_info" not in meta
