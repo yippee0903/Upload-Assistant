@@ -71,17 +71,12 @@ def _our_tmdb(tmdb_id: Any) -> int:
 # Exact French language codes/names. Mirrors FRENCH.FRENCH_LANG_VALUES but kept
 # local so this module stays importable without pymediainfo. A prefix test would
 # wrongly match Frisian/Friulian ("fry", "fur", "frisian"), so we match exactly.
-_FR_AUDIO_VALUES = frozenset(
-    {"fr", "fre", "fra", "french", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch"}
-)
+_FR_AUDIO_VALUES = frozenset({"fr", "fre", "fra", "french", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch"})
 
 
 def _has_fr_audio(meta: dict[str, Any]) -> bool:
     """True when the upload has at least one French audio track."""
-    return any(
-        str(lang).strip().lower().replace("_", "-") in _FR_AUDIO_VALUES
-        for lang in (meta.get("audio_languages") or [])
-    )
+    return any(str(lang).strip().lower().replace("_", "-") in _FR_AUDIO_VALUES for lang in (meta.get("audio_languages") or []))
 
 
 def tmdb_debug_line(releases: list[dict[str, Any]], *, tmdb_id: Any, category: Any, tracker: str) -> str:
