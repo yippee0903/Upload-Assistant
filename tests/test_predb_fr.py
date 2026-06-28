@@ -98,8 +98,15 @@ def test_unvalidated_group_silent_without_fr_audio():
 def test_has_fr_audio_detection():
     from src.predb_fr import _has_fr_audio
 
+    # Accepted French variants (codes and names, any case/separator).
     assert _has_fr_audio({"audio_languages": ["English", "French"]})
     assert _has_fr_audio({"audio_languages": ["fr-FR"]})
+    assert _has_fr_audio({"audio_languages": ["fra"]})
+    assert _has_fr_audio({"audio_languages": ["français"]})
+    assert _has_fr_audio({"audio_languages": ["FR_CA"]})
+    # Non-French values that merely start with "fr" must be rejected.
+    assert not _has_fr_audio({"audio_languages": ["Frisian"]})
+    assert not _has_fr_audio({"audio_languages": ["Friulian", "fry"]})
     assert not _has_fr_audio({"audio_languages": ["English", "Japanese"]})
     assert not _has_fr_audio({})
 
