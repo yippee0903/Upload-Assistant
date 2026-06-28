@@ -3078,7 +3078,7 @@ class COMMON:
         torrent_tag = meta.get("tag", "")
         torrent_group = torrent_tag.lstrip("-").strip() if torrent_tag else ""
 
-        mi_filename = await self._get_mediainfo_filename(meta)
+        mi_filename, disk_filename = await self._get_mediainfo_filename(meta)
         mi_group = self._extract_group_from_filename(mi_filename) if mi_filename else ""
 
         if not torrent_group:
@@ -3098,18 +3098,39 @@ class COMMON:
             }
             return True
 
+        # Rename: the embedded name is a real release name (it carries a group
+        # tag, so we trust its format) but the on-disk filename no longer matches
+        # it. Renamed files are always refused — they usually hide a faked
+        # quality/source and need manual verification.
+        if mi_filename and mi_group and disk_filename and self._is_renamed(disk_filename, mi_filename):
+            meta["detag_info"] = {
+                "type": "rename",
+                "torrent_group": torrent_group,
+                "mi_group": mi_group,
+                "mi_filename": mi_filename,
+                "disk_filename": disk_filename,
+            }
+            return True
+
         return False
 
-    async def _get_mediainfo_filename(self, meta: dict[str, Any]) -> str:
-        """Read the original release name from MEDIAINFO_CLEANPATH.txt."""
+    async def _get_mediainfo_filename(self, meta: dict[str, Any]) -> tuple[str, str]:
+        """Read the embedded release name and the on-disk filename from
+        MEDIAINFO_CLEANPATH.txt.
+
+        Returns ``(embedded_name, disk_name)`` where *embedded_name* is the
+        ``Movie name``/``Title`` the release group muxed into the container and
+        *disk_name* is ``Complete name`` (rewritten to the current basename by
+        exportmi). A mismatch between the two means the file was renamed.
+        """
         base_dir = meta.get("base_dir", ".")
         uuid = meta.get("uuid", "")
         if not uuid:
-            return ""
+            return "", ""
 
         cleanpath = os.path.join(base_dir, "tmp", uuid, "MEDIAINFO_CLEANPATH.txt")
         if not os.path.isfile(cleanpath):
-            return ""
+            return "", ""
 
         try:
             async with aiofiles.open(cleanpath, encoding="utf-8", errors="ignore") as f:
@@ -3117,6 +3138,7 @@ class COMMON:
 
             movie_name = ""
             title = ""
+            complete_name = ""
             in_general = False
             for line in content.splitlines():
                 stripped = line.strip()
@@ -3126,7 +3148,11 @@ class COMMON:
                 if in_general and stripped == "":
                     break
                 if in_general:
-                    if stripped.startswith("Movie name"):
+                    if stripped.startswith("Complete name"):
+                        parts = line.split(":", 1)
+                        if len(parts) == 2:
+                            complete_name = parts[1].strip()
+                    elif stripped.startswith("Movie name"):
                         parts = line.split(":", 1)
                         if len(parts) == 2:
                             movie_name = parts[1].strip()
@@ -3135,11 +3161,33 @@ class COMMON:
                         if len(parts) == 2:
                             title = parts[1].strip()
 
-            return movie_name or title
+            return movie_name or title, complete_name
         except OSError:
             pass
 
-        return ""
+        return "", ""
+
+    @staticmethod
+    def _is_renamed(disk_name: str, embedded_name: str) -> bool:
+        """True when the on-disk filename differs from the name the release group
+        muxed into the container.
+
+        The comparison is exact — only a trailing media extension is dropped
+        (the embedded name usually carries none). Even a dot-vs-space difference
+        counts as a rename, because cross-seeding needs byte-identical filenames,
+        so any change to the name is rejected.
+        """
+        known_ext = (".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".wmv", ".mpg", ".mpeg", ".vob", ".iso")
+
+        def strip_ext(s: str) -> str:
+            for ext in known_ext:
+                if s.lower().endswith(ext):
+                    return s[: -len(ext)]
+            return s
+
+        disk = strip_ext(disk_name).strip()
+        embedded = strip_ext(embedded_name).strip()
+        return bool(disk) and bool(embedded) and disk != embedded
 
     @staticmethod
     def _extract_group_from_filename(filename: str) -> str:

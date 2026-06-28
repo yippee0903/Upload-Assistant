@@ -657,6 +657,33 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                     return
                 # User overrides — clear so trackers won't skip
                 meta.pop("detag_info", None)
+        elif detection_type == "rename":
+            # --- RENAME: always block, ask confirmation ---
+            disk_file = detag_info.get("disk_filename", "")
+            console.print("[bold yellow]⚠️  RENAME DETECTED[/bold yellow]")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print(f"[cyan]On-disk filename:[/cyan] [yellow]{disk_file}[/yellow]")
+            console.print(f"[cyan]Original filename:[/cyan] [yellow]{mi_file}[/yellow]")
+            console.print()
+            console.print("[bold white]The file was renamed: its on-disk name differs from the name the release group muxed in.[/bold white]")
+            console.print("[bold white]This release will be skipped on all trackers unless you override below.[/bold white]")
+            console.print("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+            console.print()
+
+            # Attended only; unattended already cancelled above.
+            try:
+                detag_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=False)
+            except EOFError:
+                console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                await cleanup_manager.cleanup()
+                cleanup_manager.reset_terminal()
+                sys.exit(1)
+            if not detag_confirm:
+                console.print("[red]Upload cancelled due to rename detection.[/red]")
+                meta["we_are_uploading"] = False
+                return
+            # User chose to proceed — clear flag so trackers won't skip
+            meta.pop("detag_info", None)
         else:
             # --- DETAG: always block, ask confirmation ---
             torrent_grp = detag_info.get("torrent_group", "?")
