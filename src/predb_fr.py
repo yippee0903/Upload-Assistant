@@ -68,6 +68,17 @@ def _our_tmdb(tmdb_id: Any) -> int:
         return 0
 
 
+# Exact French language codes/names. Mirrors FRENCH.FRENCH_LANG_VALUES but kept
+# local so this module stays importable without pymediainfo. A prefix test would
+# wrongly match Frisian/Friulian ("fry", "fur", "frisian"), so we match exactly.
+_FR_AUDIO_VALUES = frozenset({"fr", "fre", "fra", "french", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch"})
+
+
+def _has_fr_audio(meta: dict[str, Any]) -> bool:
+    """True when the upload has at least one French audio track."""
+    return any(str(lang).strip().lower().replace("_", "-") in _FR_AUDIO_VALUES for lang in (meta.get("audio_languages") or []))
+
+
 def tmdb_debug_line(releases: list[dict[str, Any]], *, tmdb_id: Any, category: Any, tracker: str) -> str:
     """One ``--debug`` line spelling out what predb.fr can say about our TMDB id.
 
@@ -94,6 +105,7 @@ def analyze(
     tmdb_id: Any,
     group: Any,
     category: Any,
+    has_fr_audio: bool = True,
 ) -> tuple[list[str], list[str]]:
     """Compare predb candidates to our submission.
 
@@ -123,8 +135,10 @@ def analyze(
     # Nuke only reported for same-group candidates to avoid noise.
     blocking.extend(f"Nuked release on the FR scene: {r.get('name')} — {r['nuke_reason']}" for r in ours if r.get("nuke_reason"))
 
-    # Group reputation is advisory only.
-    if ours and not any(r.get("team_profilarr_validated") for r in ours):
+    # Group reputation is advisory only, and only meaningful for French-audio
+    # releases: FR trackers also take VOSTFR (English audio + FR subs) whose
+    # groups are English teams that predb.fr legitimately won't have validated.
+    if has_fr_audio and ours and not any(r.get("team_profilarr_validated") for r in ours):
         info.append(f"Group {group} is not profilarr-validated on predb.fr.")
 
     return blocking, info
@@ -249,6 +263,7 @@ async def crosscheck(meta: dict[str, Any], config: dict[str, Any], tracker: str)
         tmdb_id=our_tmdb_id,
         group=meta.get("tag"),
         category=meta.get("category"),
+        has_fr_audio=_has_fr_audio(meta),
     )
     for w in info:
         console.print(f"[yellow]⚠️  predb.fr [{tracker}]: {w}[/yellow]")
