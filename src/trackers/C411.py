@@ -329,6 +329,13 @@ class C411(FrenchTrackerMixin):
     def _detect_special_edition_from_meta(cls, meta: Meta) -> str:
         """Return normalised edition key from meta, or '' if standard release."""
         edition = str(meta.get("edition", "")).upper()
+        # "Hybrid" lives in webdv (get_name keeps it out of edition), but the
+        # name parser sees it as a HYBRID edition token. Fold it in so the
+        # meta-based slot matches the name-based one — otherwise a Hybrid
+        # release fails to match its own dupe.
+        webdv = str(meta.get("webdv", "")).strip().upper()
+        if webdv:
+            edition = f"{edition} {webdv}".strip()
         if not edition:
             return ""
         tokens = set(edition.replace(".", " ").replace("-", " ").replace("_", " ").split())
