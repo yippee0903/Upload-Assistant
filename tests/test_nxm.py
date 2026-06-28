@@ -100,10 +100,10 @@ class TestGetCategoryId:
             ("MOVIE", "", "", False, 1),
             # Standard TV → numeric 2 (serie-tv)
             ("TV", "", "", False, 2),
-            # Documentary movie → numeric 3 (documentaire)
-            ("MOVIE", "Documentary", "", False, 3),
-            # Documentary TV → numeric 3 (documentaire)
-            ("TV", "Documentary", "", False, 3),
+            # Documentary movie → 23 (Film documentaire sub-cat; parent 3 is a 422)
+            ("MOVIE", "Documentary", "", False, 23),
+            # Documentary TV → 24 (Série documentaire sub-cat)
+            ("TV", "Documentary", "", False, 24),
             # Anime movie → numeric 4 (animation)
             ("MOVIE", "", "", True, 4),
             # Anime TV → numeric 4 (animation-serie)
