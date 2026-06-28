@@ -986,6 +986,7 @@ class FrenchTrackerMixin:
         three_d = meta.get("3D", "")
         tag = meta.get("tag", "")
         source = meta.get("source", "")
+        light = self._light_encode_tag(meta)
         uhd = meta.get("uhd", "")
         hdr = meta.get("hdr", "").replace("HDR10+", "HDR10PLUS")
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
@@ -1053,7 +1054,7 @@ class FrenchTrackerMixin:
             elif type_val == "REMUX":
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {_av(video_codec, audio)}"
             elif type_val == "ENCODE":
-                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {hdr} {_av(video_encode, audio)}"
+                name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {light} {hdr} {_av(video_encode, audio)}"
             elif type_val == "WEBDL":
                 name = f"{title} {year} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} {web_lbl} {hdr} {_av(video_encode, audio)}"
             elif type_val == "WEBRIP":
@@ -1081,7 +1082,7 @@ class FrenchTrackerMixin:
             elif type_val == "REMUX":
                 name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} REMUX {hdr} {_av(video_codec, audio)}"
             elif type_val == "ENCODE":
-                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {hdr} {_av(video_encode, audio)}"
+                name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {source} {light} {hdr} {_av(video_encode, audio)}"
             elif type_val == "WEBDL":
                 name = f"{title} {year} {se} {part} {edition} {repack} {language} {resolution} {hybrid} {uhd} {service} {web_lbl} {hdr} {_av(video_encode, audio)}"
             elif type_val == "WEBRIP":
@@ -1322,6 +1323,22 @@ class FrenchTrackerMixin:
         """Return a human-readable release type label."""
         raw = (meta.get("type") or "").upper()
         return FrenchTrackerMixin.TYPE_LABELS.get(raw, raw)
+
+    @staticmethod
+    def _light_encode_tag(meta: dict) -> str:
+        """French-scene light re-encode label, or '' when not one.
+
+        4KLight (2160p) and HDLight (1080p) are BluRay re-encodes; the source
+        release name declares which, but it isn't a meta field, so we read it
+        from ``uuid`` exactly like the C411 slot/quality detection does. Surfaced
+        in the generated name (after the source) so the tag isn't dropped.
+        """
+        uuid = str(meta.get("uuid", "")).lower()
+        if "4klight" in uuid:
+            return "4KLight"
+        if "hdlight" in uuid:
+            return "HDLight"
+        return ""
 
     # Container name → common file extension
     CONTAINER_EXT: dict[str, str] = {
