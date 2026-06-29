@@ -1013,10 +1013,13 @@ class TORR9(FrenchTrackerMixin):
         def _q(s: str) -> str:
             return " ".join(_clean_query(s))
 
-        # Build queries using TORR9's naming pattern (Titre Année Résolution Groupe)
-        # TORR9 allows the same release from different groups, so the group must be
-        # included to avoid false-positive dupe blocks.
-        suffix = " ".join(p for p in [str(year), resolution, group] if p)
+        # Query by title + year only. Resolution and group are deliberately left
+        # out: the search API ranks by relevance over the whole stored name, where
+        # real releases interleave type/codec/audio tokens (…2160p.BluRay.x265…-QTZ),
+        # so a trailing "<res> <group>" tanks the match and the dupe is never
+        # returned. Resolution and group are already enforced by the filters below,
+        # so keeping them out of the query widens recall without losing precision.
+        suffix = str(year).strip()
 
         search_queries: list[str] = []
         is_original_french = str(meta.get("original_language", "")).lower() == "fr"

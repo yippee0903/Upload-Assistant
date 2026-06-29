@@ -1197,6 +1197,51 @@ class TestDupeRelevanceFilter:
         assert 'Intouchables' in first_call.kwargs.get('params', {}).get('q', '')
         assert len(dupes) == 1
 
+    def test_search_query_excludes_resolution_and_group(self):
+        """Query is title+year only — resolution/group would break relevance matching.
+
+        Regression: existing releases that interleave codec/type tokens between the
+        resolution and the group (e.g. ...2160p.BluRay.x265.AC3.5.1-QTZ) were never
+        returned by the API when the query ended in "<res> <group>", so obvious
+        dupes slipped through. Resolution/group stay as post-filters, not in the query.
+        """
+        t = TORR9(_config())
+        t._bearer_token = 'test-token'
+        meta = _meta_base(
+            title='Jurassic Park III',
+            frtitle='Jurassic Park III',
+            year='2001',
+            resolution='2160p',
+            original_language='en',
+            tag='-QTZ',
+        )
+
+        # Existing release: differently formatted, but same title/year/res/group.
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            'data': [
+                {'title': 'Jurassic.Park.III.2001.MULTI.2160p.BluRay.x265.AC3.5.1-QTZ', 'id': 600},
+            ]
+        }
+
+        with patch('httpx.AsyncClient') as MockClient:
+            client_instance = AsyncMock()
+            client_instance.get = AsyncMock(return_value=resp)
+            client_instance.__aenter__ = AsyncMock(return_value=client_instance)
+            client_instance.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = client_instance
+
+            dupes = _run(t.search_existing(meta, ''))
+
+        q = client_instance.get.call_args_list[0].kwargs.get('params', {}).get('q', '')
+        assert 'Jurassic Park III' in q
+        assert '2001' in q
+        assert '2160p' not in q
+        assert 'QTZ' not in q.upper()
+        # The differently-formatted existing release is still detected as a dupe.
+        assert len(dupes) == 1
+
     def test_tv_dupes_without_year_in_name(self):
         """TV torrents whose names lack the year should still be detected as duplicates."""
         t = TORR9(_config())
