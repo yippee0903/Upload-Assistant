@@ -722,6 +722,7 @@ class C411(FrenchTrackerMixin):
             "MULTI.VFF": 4,
             "MULTI.VFI": 4,
             "MULTI.VFQ": 5,
+            "MULTI.VOQ": 5,
             "MULTI.VOF": 4,
             "MULTI.TRUEFRENCH": 4,
             "MULTI": 4,
@@ -730,6 +731,7 @@ class C411(FrenchTrackerMixin):
             "VFF": 2,
             "VFI": 2,
             "VFQ": 6,
+            "VOQ": 6,
             "VOSTFR": 8,
         }
         return tag_map.get(language_tag, 1)  # default: 1 (Anglais)
