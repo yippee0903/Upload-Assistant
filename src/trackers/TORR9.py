@@ -1061,6 +1061,7 @@ class TORR9(FrenchTrackerMixin):
                     # read the first. Walk every page so all editions are checked.
                     items: list[Any] = []
                     page = 1
+                    incomplete = False
                     while page <= 50:  # hard cap so a misreported total can't loop forever
                         try:
                             response = await client.get(
@@ -1069,16 +1070,19 @@ class TORR9(FrenchTrackerMixin):
                                 params={"q": search_term, "limit": 100, "page": page},
                             )
                         except Exception:  # noqa: BLE001
-                            break  # nosec B112 — skip failed search queries gracefully
+                            incomplete = True
+                            break
 
                         if response.status_code != 200:
                             if meta.get("debug"):
                                 console.print(f"[yellow]TORR9 search returned HTTP {response.status_code} for '{search_term}'[/yellow]")
+                            incomplete = True
                             break
 
                         try:
                             data = response.json()
                         except json.JSONDecodeError:
+                            incomplete = True
                             break
 
                         page_items = data.get("torrents", data.get("data", []))
@@ -1089,6 +1093,14 @@ class TORR9(FrenchTrackerMixin):
                         if page >= (data.get("total_pages", 1) or 1):
                             break
                         page += 1
+
+                    # A failed/unparseable page leaves us with only part of the
+                    # result set — a dupe could sit on a page we never read. Fail
+                    # closed: skip the tracker rather than upload over a possible dupe.
+                    if incomplete:
+                        console.print(f"[yellow]TORR9: incomplete dupe search for '{search_term}', skipping tracker to avoid a false negative.[/yellow]")
+                        meta["skipping"] = self.tracker
+                        return []
 
                     if not items:
                         continue
