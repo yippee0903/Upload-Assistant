@@ -1055,26 +1055,41 @@ class TORR9(FrenchTrackerMixin):
 
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 for search_term in search_queries:
-                    try:
-                        response = await client.get(
-                            "https://api.torr9.net/api/v1/torrents/search",
-                            headers=headers,
-                            params={"q": search_term},
-                        )
-                    except Exception:  # noqa: BLE001
-                        continue  # nosec B112 — skip failed search queries gracefully
+                    # The API paginates (default 25/page). A popular title can span
+                    # several pages (e.g. ~230 results for Game of Thrones), and a
+                    # matching edition on a later page would be missed if we only
+                    # read the first. Walk every page so all editions are checked.
+                    items: list[Any] = []
+                    page = 1
+                    while page <= 50:  # hard cap so a misreported total can't loop forever
+                        try:
+                            response = await client.get(
+                                "https://api.torr9.net/api/v1/torrents/search",
+                                headers=headers,
+                                params={"q": search_term, "limit": 100, "page": page},
+                            )
+                        except Exception:  # noqa: BLE001
+                            break  # nosec B112 — skip failed search queries gracefully
 
-                    if response.status_code != 200:
-                        if meta.get("debug"):
-                            console.print(f"[yellow]TORR9 search returned HTTP {response.status_code} for '{search_term}'[/yellow]")
-                        continue
+                        if response.status_code != 200:
+                            if meta.get("debug"):
+                                console.print(f"[yellow]TORR9 search returned HTTP {response.status_code} for '{search_term}'[/yellow]")
+                            break
 
-                    try:
-                        data = response.json()
-                    except json.JSONDecodeError:
-                        continue
+                        try:
+                            data = response.json()
+                        except json.JSONDecodeError:
+                            break
 
-                    items = data.get("torrents", data.get("data", []))
+                        page_items = data.get("torrents", data.get("data", []))
+                        if not page_items:
+                            break
+                        items.extend(page_items)
+
+                        if page >= (data.get("total_pages", 1) or 1):
+                            break
+                        page += 1
+
                     if not items:
                         continue
 
