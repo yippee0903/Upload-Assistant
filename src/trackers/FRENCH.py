@@ -880,8 +880,10 @@ class FrenchTrackerMixin:
                 return "VF2"
             if is_original_french:
                 # Original French production. Distinguish Québec (fr-CA audio) from
-                # France: a Québécois original is VOQ, a French one VOF.
-                if fr_suffix == "VFQ" or is_vfq_filename:
+                # France: a Québécois original is VOQ, a French one VOF. Filename VFQ
+                # only counts as a fallback when MediaInfo carries no explicit region,
+                # so an explicit fr-FR (VFF) is never overridden to VOQ.
+                if fr_suffix == "VFQ" or (not fr_suffix and is_vfq_filename):
                     return "VOQ"
                 return "VOF"
             if is_vfi:
@@ -912,7 +914,7 @@ class FrenchTrackerMixin:
         # ── Single French track ──
         else:
             # Includes the original-French case: _fr_precision() returns VOF, or
-            # VFQ when the original audio is Québécois (fr-CA).
+            # VOQ when the original audio is Québécois (fr-CA).
             language = _fr_precision()
 
         # ── Audio Description prefix ──

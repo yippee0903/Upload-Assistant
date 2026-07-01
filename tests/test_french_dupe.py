@@ -1581,3 +1581,13 @@ class TestOriginalQuebecois:
         )
         assert tag == 'VOQ'
         assert level == 5
+
+    def test_explicit_france_not_overridden_by_vfq_filename(self):
+        """Explicit fr-FR audio wins over a stray VFQ filename token → VOF, not VOQ."""
+        host = _mixin()
+        meta = _meta_base(
+            original_language='fr',
+            name='Film.2025.VFQ.1080p.WEB.H264-GRP',
+            mediainfo=_mi([_audio_track('fr-FR')]),
+        )
+        assert asyncio.run(host._build_audio_string(meta)) == 'VOF'
