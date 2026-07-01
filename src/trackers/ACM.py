@@ -263,20 +263,19 @@ class ACM:
         )
 
     def check_asian_origin(self, meta: dict[str, Any]) -> bool:
-        """Return True if the media originates from at least one Asian country.
+        """Return True only when *every* production country is Asian.
 
-        Uses TMDB ``origin_country`` as the primary signal (where the content
-        actually comes from).  Falls back to ``production_countries`` only when
-        ``origin_country`` is not available — co-productions with Asian studios
-        (e.g. a US show filmed with a Japanese partner) should not qualify.
+        A single non-Asian partner disqualifies the release: a Franco-Japanese
+        co-production (e.g. Wasabi, produced in FR+JP) or a Japanese show
+        co-produced with a US studio are both rejected.  Uses TMDB
+        ``production_countries`` as the authoritative signal and falls back to
+        ``origin_country`` only when no production countries are provided.
         """
-        origin_codes = [c.strip().upper() for c in (meta.get("origin_country", []) or []) if isinstance(c, str) and c.strip()]
-        if origin_codes:
-            return any(code in self.ASIAN_COUNTRIES for code in origin_codes)
-
-        # Fallback: origin_country not provided — check production_countries
-        production_countries: list[dict[str, str]] = meta.get("production_countries", []) or []
-        return any(pc.get("iso_3166_1", "").upper() in self.ASIAN_COUNTRIES for pc in production_countries)
+        codes = [str(pc.get("iso_3166_1", "")).strip().upper() for pc in (meta.get("production_countries", []) or []) if isinstance(pc, dict)]
+        codes = [c for c in codes if c]
+        if not codes:
+            codes = [c.strip().upper() for c in (meta.get("origin_country", []) or []) if isinstance(c, str) and c.strip()]
+        return bool(codes) and all(code in self.ASIAN_COUNTRIES for code in codes)
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         """Check ACM-specific requirements before searching/uploading."""

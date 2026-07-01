@@ -60,11 +60,11 @@ class TestCheckAsianOrigin:
         assert acm.check_asian_origin(meta) is False
 
     def test_us_origin_with_jp_production(self):
-        """US origin with Japanese co-production should NOT pass.
+        """A JP+US co-production should NOT pass — US is not Asian.
 
-        This is the Monarch: Legacy of Monsters case — an American show
-        co-produced with a Japanese studio. origin_country=['US'] takes
-        priority over production_countries containing JP.
+        Monarch: Legacy of Monsters case. production_countries is the
+        authoritative signal and every country must be Asian, so the US
+        partner disqualifies it regardless of origin_country.
         """
         acm = ACM(_config())
         meta = _meta(
@@ -77,7 +77,10 @@ class TestCheckAsianOrigin:
         assert acm.check_asian_origin(meta) is False
 
     def test_jp_origin_with_us_production(self):
-        """Japanese origin with US co-production should pass."""
+        """Japanese origin but US co-production should NOT pass.
+
+        Every production country must be Asian; the US partner disqualifies it.
+        """
         acm = ACM(_config())
         meta = _meta(
             origin_country=["JP"],
@@ -86,19 +89,42 @@ class TestCheckAsianOrigin:
                 {"iso_3166_1": "JP", "name": "Japan"},
             ],
         )
+        assert acm.check_asian_origin(meta) is False
+
+    def test_all_asian_production(self):
+        """A JP+KR co-production (all Asian) should pass."""
+        acm = ACM(_config())
+        meta = _meta(
+            production_countries=[
+                {"iso_3166_1": "JP", "name": "Japan"},
+                {"iso_3166_1": "KR", "name": "South Korea"},
+            ],
+        )
         assert acm.check_asian_origin(meta) is True
 
+    def test_franco_japanese_coproduction_rejected(self):
+        """Wasabi (FR+JP co-production) must be rejected — France is not Asian."""
+        acm = ACM(_config())
+        meta = _meta(
+            origin_country=["FR", "JP"],
+            production_countries=[
+                {"iso_3166_1": "FR", "name": "France"},
+                {"iso_3166_1": "JP", "name": "Japan"},
+            ],
+        )
+        assert acm.check_asian_origin(meta) is False
+
     def test_multi_asian_origin(self):
-        """Multiple Asian origin countries should pass."""
+        """Multiple Asian origin countries (no production data) should pass."""
         acm = ACM(_config())
         meta = _meta(origin_country=["JP", "KR"])
         assert acm.check_asian_origin(meta) is True
 
     def test_mixed_origin_with_asian(self):
-        """US + KR origin — at least one Asian country means pass."""
+        """US + KR origin fallback — a non-Asian country means reject."""
         acm = ACM(_config())
         meta = _meta(origin_country=["US", "KR"])
-        assert acm.check_asian_origin(meta) is True
+        assert acm.check_asian_origin(meta) is False
 
     def test_fallback_to_production_countries(self):
         """When origin_country is empty, fall back to production_countries."""
