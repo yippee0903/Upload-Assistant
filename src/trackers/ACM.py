@@ -8,6 +8,7 @@ from typing import Any
 import aiofiles
 import cli_ui
 import httpx
+import pycountry
 
 from src.bbcode import BBCODE
 from src.console import console
@@ -245,6 +246,61 @@ class ACM:
             return " [No Eng subs]"
         return f" [{subs[0]} subs only]"
 
+    # Audio/subtitle language codes and names → ACM's title-case abbreviation.
+    _LANG_ABBR: dict[str, set[str]] = {
+        "Jpn": {"ja", "jpn", "jp", "japanese"},
+        "Kor": {"ko", "kor", "korean"},
+        "Chi": {"zh", "chi", "zho", "cmn", "yue", "chinese", "mandarin", "cantonese"},
+        "Tha": {"th", "tha", "thai"},
+        "Vie": {"vi", "vie", "vietnamese"},
+        "Hin": {"hi", "hin", "hindi"},
+        "Eng": {"en", "eng", "english"},
+        "Fre": {"fr", "fre", "fra", "french"},
+        "Ger": {"de", "ger", "deu", "german"},
+        "Spa": {"es", "spa", "spanish"},
+        "Ita": {"it", "ita", "italian"},
+    }
+
+    def _lang_abbr(self, code: Any) -> str:
+        """Map a language code/name (e.g. 'ja', 'jpn', 'Japanese', 'ja-JP') to 'Jpn'."""
+        value = str(code or "").lower().strip().split("-")[0]
+        for abbr, forms in self._LANG_ABBR.items():
+            if value in forms:
+                return abbr
+        return ""
+
+    def _dub_only_abbr(self, meta: dict[str, Any]) -> str:
+        """Return the dub language abbreviation when the only audio is a non-original dub.
+
+        Empty when there's original audio, multiple audio languages, or the original
+        language is unknown (can't tell it's a dub).
+        """
+        tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+        abbrs: set[str] = set()
+        for track in tracks:
+            if not isinstance(track, dict) or track.get("@type") != "Audio":
+                continue
+            if "commentary" in str(track.get("Title", "") or "").lower():
+                continue
+            abbr = self._lang_abbr(track.get("Language"))
+            if abbr:
+                abbrs.add(abbr)
+        if len(abbrs) != 1:
+            return ""
+        dub = abbrs.pop()
+        original = self._lang_abbr(meta.get("original_language"))
+        # Only a dub if we know the original and the sole audio differs from it.
+        return dub if original and dub != original else ""
+
+    def _language_tag(self, meta: dict[str, Any], subs: list[str]) -> str:
+        """Build the trailing language tag, merging a dub-only marker with the subs tag."""
+        subs_tag = self.get_subs_tag(subs)
+        dub = self._dub_only_abbr(meta)
+        if not dub:
+            return subs_tag
+        inner = subs_tag.strip().strip("[]").strip()
+        return f" [{dub} dub only, {inner}]" if inner else f" [{dub} dub only]"
+
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
@@ -293,13 +349,50 @@ class ACM:
             return _deny(f"[bold red]Only media produced in Asian countries is allowed at {self.tracker}.[/bold red]\n[red]Detected production countries: {countries}[/red]")
 
         # ── Release type ────────────────────────────────────────────────────────
-        # Encodes, WEBRiPs, and HDTV captures are not allowed.
-        # Only REMUX, WEB-DL, and full disc structures are permitted.
+        # Encodes and WEBRiPs are re-encodes and not allowed. HDTV/SDTV broadcasts
+        # ARE allowed (TS/TP/MKV) as long as they weren't re-encoded — a raw capture
+        # carries no encoder settings, whereas an HDTVRip does.
         release_type = str(meta.get("type", "")).upper()
-        if release_type in ("ENCODE", "WEBRIP", "HDTV"):
+        if release_type in ("ENCODE", "WEBRIP"):
             return _deny(
-                f"[bold red]Encodes are not allowed at {self.tracker}.[/bold red]\n[red]Detected type: {release_type}. Only REMUX, WEB-DL, and full discs are allowed.[/red]"
+                f"[bold red]Encodes are not allowed at {self.tracker}.[/bold red]\n[red]Detected type: {release_type}. Only REMUX, WEB-DL, full discs, and untouched HDTV/SDTV broadcasts are allowed.[/red]"
             )
+        if release_type == "HDTV" and meta.get("has_encode_settings"):
+            return _deny(
+                f"[bold red]{self.tracker}: Re-encoded HDTV (HDTVRip) is not allowed.[/bold red]\n"
+                "[red]Only untouched broadcast captures (TS/TP/MKV without encoder settings) are permitted.[/red]"
+            )
+
+        # ── DVD source: only for pre-2010 titles with no HD available ────────────
+        # "No HD available" can't be detected automatically, so this is enforced on
+        # year only: a DVD source (full disc or DVD remux) for a 2010-or-later title
+        # is rejected. Pre-2010 is allowed — the uploader judges HD availability.
+        is_dvd_source = meta.get("is_disc") == "DVD" or str(meta.get("source", "") or "").upper().endswith("DVD")
+        if is_dvd_source:
+            try:
+                year_val = int(str(meta.get("year", "") or "").strip()[:4])
+            except ValueError:
+                year_val = 0
+            if year_val >= 2010:
+                return _deny(
+                    f"[bold red]{self.tracker}: DVD sources are only allowed for pre-2010 titles with no HD available.[/bold red]\n"
+                    f"[red]Detected year: {year_val or 'unknown'}.[/red]"
+                )
+
+        # ── Single TV episodes — only allowed for currently-airing shows ─────────
+        # A single episode (not a season pack) is prohibited unless the show is
+        # currently airing, which can't be detected reliably — so ask the uploader.
+        if meta.get("category") == "TV" and not meta.get("tv_pack") and str(meta.get("episode", "")).strip():
+            if bool(meta.get("unattended")):
+                return _deny(
+                    f"[bold red]{self.tracker}: Single TV episodes are only allowed for currently-airing shows.[/bold red]\n"
+                    "[red]This can't be confirmed in unattended mode — skipping.[/red]"
+                )
+            console.print(
+                f"[bold yellow]{self.tracker}: Single episodes are only allowed for shows that are currently airing.[/bold yellow]"
+            )
+            if not cli_ui.ask_yes_no("Is this show currently airing?", default=False):
+                return False
 
         # ── Adult content (hentai, porn, JAV) ────────────────────────────────────
         # TMDB keywords are not always reliable, so this is a soft block: the user
@@ -315,13 +408,9 @@ class ACM:
             else:
                 return False
 
-        # ── Full Blu-ray disc structures (ISO/BDMV) — except 3D Blu-rays and DVD ──
-        # ISO and BDMV uploads are only permitted for 3D Blu-rays and DVD disc structures.
-        if release_type == "DISC" and meta.get("is_disc") == "BDMV" and not meta.get("3D"):
-            return _deny(
-                f"[bold red]{self.tracker}: Full Blu-ray disc (ISO/BDMV) uploads are not allowed.[/bold red]\n"
-                "[red]Only 3D Blu-rays and DVD disc structures are permitted.[/red]"
-            )
+        # BDMV full-disc structures are allowed (that's the primary Blu-ray format).
+        # Only raw ISOs are restricted to 3D/MGVC, but UA never uploads ISOs — it
+        # always works from a BDMV folder structure — so there's nothing to block.
 
         # ── R5 BDs (Digital TeleCine recordings) ─────────────────────────────────
         name_lower = str(meta.get("name", "") or "").lower()
@@ -348,17 +437,24 @@ class ACM:
             else:
                 return False
 
-        # ── Hybrid WEB-DL: FLAC/LPCM audio not from streaming ────────────────────
-        # Streaming services do not deliver FLAC/LPCM — this audio was sourced
-        # from a disc.  ACM requires eac3to logs + BDInfo for such hybrids.
+        # ── Hybrid WEB-DL: audio replaced with Blu-ray audio ─────────────────────
+        # Streaming services don't deliver FLAC/LPCM, so this audio came from a disc.
+        # ACM allows such hybrids but they need BDInfo + eac3to logs, same as a REMUX
+        # — so we require confirmation and reject unattended (logs can't be added).
         if release_type == "WEBDL":
             audio_codec = str(meta.get("audio", "") or "").upper()
             if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
-                return _deny(
-                    f"[bold red]{self.tracker}: WEB-DL with {audio_codec.split()[0]} audio is a hybrid release.[/bold red]\n"
-                    "[red]Streaming services do not offer FLAC/LPCM — this audio was sourced from a disc.[/red]\n"
-                    "[red]Hybrids require eac3to logs and BDInfo for ACM.[/red]"
+                if bool(meta.get("unattended")):
+                    return _deny(
+                        f"[bold red]{self.tracker}: hybrid WEB-DL ({audio_codec.split()[0]} audio from a disc) requires BDInfo + eac3to logs.[/bold red]\n"
+                        "[red]This can't be provided in unattended mode — skipping.[/red]"
+                    )
+                console.print(
+                    f"[bold yellow]{self.tracker}: this looks like a hybrid WEB-DL ({audio_codec.split()[0]} audio sourced from a disc). "
+                    "It needs BDInfo and eac3to logs under spoilers, same as a REMUX.[/bold yellow]"
                 )
+                if not cli_ui.ask_yes_no("Do you have these logs and will you add them to the description after upload?", default=False):
+                    return False
 
         # ── Non-original language audio on REMUX/WEB-DL ─────────────────────────
         # Additional non-original language audio tracks (dual-audio, dubbed) are
@@ -373,23 +469,47 @@ class ACM:
                     "[red]Exception: English dub is only permitted for animation content.[/red]"
                 )
 
-        # ── FLAC multichannel on REMUX ────────────────────────────────────────────
-        # Lossless mono/stereo may stay as FLAC, but multichannel tracks must be
-        # converted to DTS-HD MA using DTS-HD Master Audio Suite, not FLAC.
+        # ── Uncompressed/FLAC multichannel on REMUX ──────────────────────────────
+        # Lossless mono/stereo may stay as FLAC, but multichannel LPCM/FLAC must be
+        # converted to DTS-HD MA with the DTS-HD Master Audio Suite.
         if release_type == "REMUX":
             audio_codec_upper = str(meta.get("audio", "") or "").upper()
             channels_str = str(meta.get("channels", "") or "")
-            if audio_codec_upper.startswith("FLAC") and channels_str:
+            if (audio_codec_upper.startswith("FLAC") or audio_codec_upper.startswith("LPCM")) and channels_str:
                 try:
                     main_ch = int(channels_str.split(".")[0])
                 except ValueError:
                     main_ch = 0
                 if main_ch > 2:
+                    codec = "LPCM" if audio_codec_upper.startswith("LPCM") else "FLAC"
                     return _deny(
-                        f"[bold red]{self.tracker}: Multichannel FLAC ({channels_str}) is not allowed on REMUX.[/bold red]\n"
+                        f"[bold red]{self.tracker}: Multichannel {codec} ({channels_str}) is not allowed on REMUX.[/bold red]\n"
                         "[red]Multichannel tracks must be converted to DTS-HD MA (DTS-HD Master Audio Suite).[/red]\n"
-                        "[red]Only mono/stereo FLAC (≤2 channels) is permitted.[/red]"
+                        "[red]Only mono/stereo lossless (≤2 channels) is permitted.[/red]"
                     )
+
+        # ── Redundant audio: multiple channel mixes of the same language ─────────
+        # REMUX/WEB-DL may not carry two mixes of the same language (e.g. 5.1 and
+        # 2.0 for the same track). Commentary / audio-description tracks are exempt.
+        if release_type in ("REMUX", "WEBDL"):
+            tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+            lang_channels: dict[str, set[str]] = {}
+            for track in tracks:
+                if not isinstance(track, dict) or track.get("@type") != "Audio":
+                    continue
+                title = str(track.get("Title", "") or "").lower()
+                if "commentary" in title or "description" in title:
+                    continue
+                lang = str(track.get("Language", "") or "").lower().strip()
+                channels = str(track.get("Channels", "") or "").strip()
+                if not lang or not channels:
+                    continue
+                lang_channels.setdefault(lang, set()).add(channels)
+            if any(len(chans) > 1 for chans in lang_channels.values()):
+                return _deny(
+                    f"[bold red]{self.tracker}: Redundant audio — multiple channel mixes of the same language "
+                    "(e.g. 5.1 and 2.0) are not allowed on REMUX/WEB-DL.[/bold red]"
+                )
 
         # ── REMUX must include English subtitles ─────────────────────────────────
         # Remux releases from non-English sources must include English subtitles.
@@ -409,6 +529,24 @@ class ACM:
                                 return False
                         else:
                             return False
+
+        # ── REMUX eac3to / conversion logs ───────────────────────────────────────
+        # Every remux needs an eac3to/demux log in the description, plus a conversion
+        # log if mono/stereo was FLAC-encoded or LPCM was converted to DTS-HD MA.
+        # UA performs no audio conversion and produces no such logs, so the uploader
+        # must add them after upload — which is impossible unattended, so we reject.
+        if release_type == "REMUX":
+            if bool(meta.get("unattended")):
+                return _deny(
+                    f"[bold red]{self.tracker}: REMUX releases require an eac3to/demux log in the description.[/bold red]\n"
+                    "[red]This can't be provided in unattended mode — skipping.[/red]"
+                )
+            console.print(
+                f"[bold yellow]{self.tracker}: Remuxes must include an eac3to/demux log under spoilers in the description "
+                "(plus a conversion log if mono/stereo was FLAC-encoded or LPCM was converted to DTS-HD MA).[/bold yellow]"
+            )
+            if not cli_ui.ask_yes_no("Do you have these logs and will you add them to the description after upload?", default=False):
+                return False
 
         return True
 
@@ -562,6 +700,33 @@ class ACM:
 
         return dupes
 
+    def _bd_disc_count_tag(self, meta: dict[str, Any]) -> str:
+        """Return the ' - NxBD50 …' disc-count tag for a multi-disc Blu-ray.
+
+        Only Blu-ray full discs need it added here — DVD counts are already in the
+        UA base name. Empty for single discs or non-BDMV sources.
+        """
+        discs = meta.get("discs") or []
+        if meta.get("is_disc") != "BDMV" or len(discs) < 2:
+            return ""
+        # (max GiB, label) buckets, checked in order; last is the catch-all.
+        buckets = (
+            [(48, "UHD50"), (63, "UHD66"), (float("inf"), "UHD100")]
+            if meta.get("uhd") == "UHD"
+            else [(23.3, "BD25"), (float("inf"), "BD50")]
+        )
+        counts: dict[str, int] = {}
+        for disc in discs:
+            try:
+                gib = float(disc.get("disc_size") or 0)
+            except (TypeError, ValueError):
+                gib = 0.0
+            label = next(lab for cap, lab in buckets if gib < cap)
+            counts[label] = counts.get(label, 0) + 1
+        # By quantity (descending), then label for stable ordering.
+        ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        return " - " + " ".join(f"{n}x{label}" for label, n in ordered)
+
     async def get_name(self, meta: dict[str, Any]) -> str:
         name: str = meta.get("name", "")
         aka: str = meta.get("aka", "")
@@ -602,6 +767,10 @@ class ACM:
                 name = name.replace(audio.strip().replace("  ", " "), audio.replace("AAC ", "AAC"))
             name = name.replace("DD+ ", "DD+")
             name = name.replace("DD ", "DD")
+            # ACM streams use H.264 / HEVC, never AVC / x264 / x265
+            name = re.sub(r"\bAVC\b", "H.264", name)
+            name = re.sub(r"\bx264\b", "H.264", name, flags=re.IGNORECASE)
+            name = re.sub(r"\bx265\b", "HEVC", name, flags=re.IGNORECASE)
 
         # Remux format: remove BluRay prefix
         name = name.replace("UHD BluRay REMUX", "Remux")
@@ -613,6 +782,27 @@ class ACM:
         # Remove Atmos suffix (integrated into audio codec)
         name = name.replace(" Atmos", "")
 
+        # Blu-ray titles don't carry DoVi/HDR/DTS:X tags: the format has a
+        # compatibility layer, so these are only tagged on WEB-DL and Remux.
+        if is_disc == "BDMV":
+            if meta.get("hdr"):
+                name = name.replace(str(meta["hdr"]), "")
+            # DTS:X is carried in a DTS-HD MA core — fall back to that base codec.
+            name = name.replace("DTS:X", "DTS-HD MA")
+
+        # Country code is omitted when it matches the country of origin.
+        region = str(meta.get("region", "") or "").strip()
+        if is_disc in ("BDMV", "DVD") and region:
+            origin_a3: set[str] = set()
+            for code in meta.get("origin_country") or []:
+                country = pycountry.countries.get(alpha_2=str(code).strip().upper())
+                if country:
+                    origin_a3.add(country.alpha_3)
+            if "DEU" in origin_a3:  # UA uses 'GER' for Germany, not ISO 'DEU'
+                origin_a3.add("GER")
+            if region.upper() in origin_a3:
+                name = re.sub(rf"\s*\b{re.escape(region)}\b", "", name, count=1)
+
         # DVD format adjustments
         if is_disc == "DVD":
             name = name.replace(f"{source} DVD5", f"{resolution} DVD {source}")
@@ -620,7 +810,7 @@ class ACM:
             if audio == meta.get("channels"):
                 name = name.replace(f"{audio}", f"MPEG {audio}")
 
-        name = name + self.get_subs_tag(subs)
+        name = name + self._bd_disc_count_tag(meta) + self._language_tag(meta, subs)
         # Remove the LTR embedding marker (U+202A) used for TV year removal
         name = name.replace("\u202a", "")
         # Collapse any double spaces left after marker/year removal
@@ -674,7 +864,7 @@ class ACM:
 
             if images:
                 await descfile.write("[center]\n")
-                for i in range(min(len(images), int(meta.get("screens", 0)))):
+                for i in range(min(len(images), int(meta.get("screens", 0)), 12)):  # ACM caps the description at 12 screenshots
                     image = images[i]
                     web_url = image.get("web_url", "")
                     img_url = image.get("img_url", "")

@@ -5,14 +5,20 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-
-import pytest
+from unittest.mock import patch
 
 from src.trackers.ACM import ACM
 
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+def _run_remux_confirmed(acm: ACM, meta: dict[str, Any]) -> bool:
+    """Run get_additional_checks for a REMUX, attended, confirming the eac3to-log prompt."""
+    meta = {**meta, "unattended": False}
+    with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=True):
+        return _run(acm.get_additional_checks(meta))
 
 
 def _config() -> dict[str, Any]:
@@ -383,6 +389,168 @@ class TestGetName:
         result = _run(acm.get_name(meta))
         assert "Atmos" not in result
 
+    # ------------------------------------------------------------------ AVC → H.264 (streams)
+
+    def test_avc_replaced_by_h264_on_stream(self):
+        """On streams, AVC becomes H.264 (never AVC / x264)."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Title 2019 1080p WEB-DL AAC 2.0 AVC",
+            audio="AAC 2.0",
+            type="WEBDL",
+        )
+        result = _run(acm.get_name(meta))
+        assert "H.264" in result
+        assert "AVC" not in result
+
+    def test_avc_kept_on_physical_remux(self):
+        """On physical media (Remux/Disc), AVC is kept — only streams use H.264."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Title 2019 1080p BluRay REMUX AVC TrueHD 5.1",
+            audio="TrueHD 5.1",
+            type="REMUX",
+        )
+        result = _run(acm.get_name(meta))
+        assert "AVC" in result
+        assert "H.264" not in result
+
+    # ------------------------------------------------------------------ Blu-ray HDR strip
+
+    def test_hdr_stripped_on_bluray(self):
+        """Blu-ray full-disc titles don't carry DoVi/HDR tags."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Oldboy 2003 2160p KOR UHD Blu-ray DV HDR10+ HEVC DTS-HD MA 5.1",
+            audio="DTS-HD MA 5.1",
+            type="DISC",
+            is_disc="BDMV",
+            hdr="DV HDR10+",
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "HDR10+" not in result
+        assert "DV " not in result
+
+    # ------------------------------------------------------------------ Multi-disc BD tag
+
+    def test_multi_disc_bd_tag_appended(self):
+        """A 2-disc BD50 set gets a ' - 2xBD50' tag."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Pinocchio 2003 1080p KOR Blu-ray AVC DTS-HD MA 2.0",
+            audio="DTS-HD MA 2.0",
+            type="DISC",
+            is_disc="BDMV",
+            discs=[{"disc_size": 45.0}, {"disc_size": 40.0}],
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "2xBD50" in result
+
+    def test_single_disc_bd_has_no_count_tag(self):
+        """A single-disc BD gets no disc-count tag."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Oldboy 2003 1080p KOR Blu-ray AVC DTS-HD MA 5.1",
+            audio="DTS-HD MA 5.1",
+            type="DISC",
+            is_disc="BDMV",
+            discs=[{"disc_size": 45.0}],
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "xBD" not in result
+
+    # ------------------------------------------------------------------ DTS:X on Blu-ray
+
+    def test_dtsx_falls_back_to_dtshd_ma_on_bluray(self):
+        """DTS:X is not tagged on Blu-ray — it falls back to its DTS-HD MA core."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Movie 2003 2160p JPN UHD Blu-ray HEVC DTS:X 7.1",
+            audio="DTS:X 7.1",
+            type="DISC",
+            is_disc="BDMV",
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "DTS:X" not in result
+        assert "DTS-HD MA 7.1" in result
+
+    # ------------------------------------------------------------------ Country code omission
+
+    def test_country_code_omitted_when_matches_origin(self):
+        """KOR country_code is dropped for a Korean-origin Blu-ray."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Oldboy 2003 2160p KOR UHD Blu-ray HEVC DTS-HD MA 5.1",
+            audio="DTS-HD MA 5.1",
+            type="DISC",
+            is_disc="BDMV",
+            region="KOR",
+            origin_country=["KR"],
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "KOR" not in result
+
+    def test_country_code_kept_when_differs_from_origin(self):
+        """USA country_code is kept for a Japanese-origin US Blu-ray."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Final Fantasy 2001 1080p USA Blu-ray AVC LPCM 5.1",
+            audio="LPCM 5.1",
+            type="DISC",
+            is_disc="BDMV",
+            region="USA",
+            origin_country=["JP"],
+            bdinfo={"subtitles": []},
+        )
+        result = _run(acm.get_name(meta))
+        assert "USA" in result
+
+    # ------------------------------------------------------------------ Dub-only tag
+
+    def test_dub_only_tag_for_single_non_original_audio(self):
+        """A Korean film with only a German dub gets a '[Ger dub only, …]' tag."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Movie 1986 1080p WEB-DL DD 1.0 H.264",
+            audio="DD 1.0",
+            type="WEBDL",
+            original_language="ko",
+            mediainfo={"media": {"track": [{"@type": "General"}, {"@type": "Audio", "Language": "de"}]}},
+        )
+        result = _run(acm.get_name(meta))
+        assert "Ger dub only" in result
+
+    def test_no_dub_tag_when_original_audio_present(self):
+        """Original-language audio is not a dub — no dub-only tag."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Movie 1986 1080p WEB-DL DD 1.0 H.264",
+            audio="DD 1.0",
+            type="WEBDL",
+            original_language="ja",
+            mediainfo={"media": {"track": [{"@type": "General"}, {"@type": "Audio", "Language": "ja"}]}},
+        )
+        result = _run(acm.get_name(meta))
+        assert "dub only" not in result
+
+    def test_no_dub_tag_when_original_language_unknown(self):
+        """If the original language is unknown, we can't call it a dub."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Movie 1986 1080p WEB-DL DD 1.0 H.264",
+            audio="DD 1.0",
+            type="WEBDL",
+            original_language="",
+            mediainfo={"media": {"track": [{"@type": "General"}, {"@type": "Audio", "Language": "de"}]}},
+        )
+        result = _run(acm.get_name(meta))
+        assert "dub only" not in result
+
     # ------------------------------------------------------------------ Subtitle tags
 
     def test_no_subs_tag_appended(self):
@@ -633,7 +801,7 @@ class TestAdditionalChecksDubbedWEBDL:
         acm = ACM(_config())
         meta = _checks_meta(audio="Dubbed TrueHD 5.1", genres="Animation", type="REMUX",
                             subtitle_languages=["Japanese", "English"])
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_non_dubbed_non_animation_is_allowed(self):
         """An original-audio live-action WEB-DL must pass."""
@@ -688,29 +856,29 @@ class TestAdditionalChecksAdultContent:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  get_additional_checks — full Blu-ray disc (ISO/BDMV)
+#  get_additional_checks — full Blu-ray / DVD discs
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestAdditionalChecksISO:
-    """Full BD ISO/BDMV uploads are only allowed for 3D Blu-rays and DVDs."""
+class TestAdditionalChecksDisc:
+    """BDMV full discs are the primary allowed Blu-ray format (UA never uploads ISOs)."""
 
-    def test_bdmv_non_3d_is_rejected(self):
-        """A non-3D Blu-ray DISC upload must be blocked."""
+    def test_bdmv_non_3d_is_allowed(self):
+        """A non-3D Blu-ray full disc is allowed — BDMV is the accepted format."""
         acm = ACM(_config())
         meta = _checks_meta(type="DISC", is_disc="BDMV")
-        assert _run(acm.get_additional_checks(meta)) is False
+        assert _run(acm.get_additional_checks(meta)) is True
 
     def test_bdmv_3d_is_allowed(self):
-        """A 3D Blu-ray DISC upload must be allowed."""
+        """A 3D Blu-ray full disc is allowed."""
         acm = ACM(_config())
         meta = _checks_meta(type="DISC", is_disc="BDMV", **{"3D": True})
         assert _run(acm.get_additional_checks(meta)) is True
 
-    def test_dvd_disc_is_always_allowed(self):
-        """A DVD DISC upload is always allowed (DVDs are exempt)."""
+    def test_dvd_disc_is_allowed(self):
+        """A pre-2010 DVD full disc is allowed."""
         acm = ACM(_config())
-        meta = _checks_meta(type="DISC", is_disc="DVD")
+        meta = _checks_meta(type="DISC", is_disc="DVD", year="2003")
         assert _run(acm.get_additional_checks(meta)) is True
 
     def test_remux_from_bdmv_is_not_blocked(self):
@@ -718,7 +886,7 @@ class TestAdditionalChecksISO:
         acm = ACM(_config())
         meta = _checks_meta(type="REMUX", is_disc="BDMV",
                             subtitle_languages=["Japanese", "English"])
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -794,7 +962,7 @@ class TestAdditionalChecksRemuxEnglishSubs:
             original_language="ko",
             subtitle_languages=["Korean", "English"],
         )
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_remux_english_original_no_subs_is_allowed(self):
         """A REMUX from an English-language source does not need English subs."""
@@ -804,7 +972,7 @@ class TestAdditionalChecksRemuxEnglishSubs:
             original_language="en",
             subtitle_languages=["French"],
         )
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_remux_no_subtitle_data_is_permissive(self):
         """If subtitle_languages is empty/None we cannot determine — allow it."""
@@ -814,7 +982,7 @@ class TestAdditionalChecksRemuxEnglishSubs:
             original_language="ja",
             subtitle_languages=[],
         )
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_webdl_non_english_no_subs_is_not_blocked_by_this_rule(self):
         """The English-subtitle requirement only applies to REMUX, not WEB-DL."""
@@ -854,25 +1022,254 @@ class TestAdditionalChecksFlacMultichannel:
         acm = ACM(_config())
         meta = _checks_meta(type="REMUX", audio="FLAC 2.0", channels="2.0",
                             subtitle_languages=["Korean", "English"])
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_remux_flac_10_is_allowed(self):
         """A REMUX with FLAC 1.0 (mono) must be allowed."""
         acm = ACM(_config())
         meta = _checks_meta(type="REMUX", audio="FLAC 1.0", channels="1.0",
                             subtitle_languages=["Korean", "English"])
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_remux_dtshd_51_is_allowed(self):
         """A REMUX with DTS-HD MA 5.1 is perfectly fine."""
         acm = ACM(_config())
         meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
                             subtitle_languages=["Korean", "English"])
-        assert _run(acm.get_additional_checks(meta)) is True
+        assert _run_remux_confirmed(acm, meta) is True
 
     def test_remux_flac_no_channels_is_permissive(self):
         """If channels metadata is missing we cannot judge — allow it."""
         acm = ACM(_config())
         meta = _checks_meta(type="REMUX", audio="FLAC", channels="",
                             subtitle_languages=["Korean", "English"])
+        assert _run_remux_confirmed(acm, meta) is True
+
+    def test_remux_lpcm_51_is_rejected(self):
+        """A REMUX with LPCM 5.1 must be blocked — must be converted to DTS-HD MA."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="LPCM 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_lpcm_20_is_allowed(self):
+        """A REMUX with LPCM 2.0 (stereo) is fine — lossless mono/stereo may stay."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="LPCM 2.0", channels="2.0",
+                            subtitle_languages=["Korean", "English"])
+        assert _run_remux_confirmed(acm, meta) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — DVD source year restriction
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksDvdYear:
+    """DVD sources are only allowed for pre-2010 titles with no HD available."""
+
+    def test_dvd_disc_2010_or_later_is_rejected(self):
+        """A full DVD disc from 2010 onward must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="DISC", is_disc="DVD", year="2015",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dvd_remux_2010_or_later_is_rejected(self):
+        """A DVD remux (source 'NTSC DVD') from 2010 onward must be blocked."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", source="NTSC DVD", year="2012",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_dvd_pre_2010_is_allowed(self):
+        """A pre-2010 DVD is allowed — the uploader judges HD availability."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="DISC", is_disc="DVD", year="2003",
+                            subtitle_languages=["Korean", "English"])
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_non_dvd_2010_or_later_is_unaffected(self):
+        """A non-DVD source (WEB-DL) from 2010+ is not touched by this rule."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", year="2020")
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — REMUX eac3to / conversion logs
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksRemuxLogs:
+    """Remuxes need an eac3to/demux log the uploader must add manually after upload."""
+
+    def test_remux_unattended_is_rejected(self):
+        """Unattended REMUX can't confirm logs will be added → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"], unattended=True)
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_remux_attended_confirmed_is_allowed(self):
+        """Attended REMUX where the uploader confirms the logs → allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"], unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=True):
+            assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_remux_attended_declined_is_rejected(self):
+        """Attended REMUX where the uploader declines the log prompt → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="REMUX", audio="DTS-HD MA 5.1", channels="5.1",
+                            subtitle_languages=["Korean", "English"], unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=False):
+            assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_non_remux_has_no_log_gate(self):
+        """WEB-DL is unaffected by the eac3to-log requirement, even unattended."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", unattended=True)
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — redundant audio (channel mixes)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _audio_mi(*tracks: dict[str, Any]) -> dict[str, Any]:
+    """Wrap audio-track dicts in a MediaInfo structure."""
+    return {"media": {"track": [{"@type": "General"}, *[{"@type": "Audio", **t} for t in tracks]]}}
+
+
+class TestAdditionalChecksRedundantAudio:
+    """Multiple channel mixes of the same language are prohibited on REMUX/WEB-DL."""
+
+    def test_same_language_two_mixes_is_rejected(self):
+        """Korean 5.1 + Korean 2.0 on a WEB-DL is redundant audio → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            mediainfo=_audio_mi({"Language": "ko", "Channels": "6"},
+                                {"Language": "ko", "Channels": "2"}),
+        )
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_different_languages_same_channels_is_allowed(self):
+        """Korean 5.1 + English 5.1 is fine — different languages, not redundant."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            mediainfo=_audio_mi({"Language": "ko", "Channels": "6"},
+                                {"Language": "en", "Channels": "6"}),
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_commentary_track_is_exempt(self):
+        """A 2.0 commentary alongside a 5.1 main track is not redundant audio."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            mediainfo=_audio_mi({"Language": "ko", "Channels": "6"},
+                                {"Language": "ko", "Channels": "2", "Title": "Director Commentary"}),
+        )
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — single TV episodes
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksSingleEpisode:
+    """Single TV episodes are only allowed for currently-airing shows."""
+
+    def test_single_episode_unattended_is_rejected(self):
+        """A single episode can't confirm 'currently airing' unattended → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", category="TV", episode="E05", tv_pack=0, unattended=True)
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_single_episode_attended_airing_is_allowed(self):
+        """Attended, uploader confirms the show is airing → allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", category="TV", episode="E05", tv_pack=0, unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=True):
+            assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_single_episode_attended_not_airing_is_rejected(self):
+        """Attended, uploader says not airing → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", category="TV", episode="E05", tv_pack=0, unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=False):
+            assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_season_pack_is_allowed(self):
+        """A full season pack is not a single episode → unaffected."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", category="TV", episode="", tv_pack=1, unattended=True)
+        assert _run(acm.get_additional_checks(meta)) is True
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — HDTV broadcast vs re-encode
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksHdtv:
+    """HDTV broadcasts are allowed; only re-encoded HDTVRips are rejected."""
+
+    def test_hdtv_broadcast_is_allowed(self):
+        """A raw HDTV capture (no encoder settings) is allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="HDTV", has_encode_settings=False)
+        assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_hdtv_reencode_is_rejected(self):
+        """An HDTVRip (encoder settings present) is rejected."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="HDTV", has_encode_settings=True)
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_encode_still_rejected(self):
+        """A plain ENCODE is still rejected."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="ENCODE")
+        assert _run(acm.get_additional_checks(meta)) is False
+
+
+# ═══════════════════════════════════════════════════════════════
+#  get_additional_checks — hybrid WEB-DL (disc audio)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAdditionalChecksHybridWebdl:
+    """WEB-DL with FLAC/LPCM audio is a disc-sourced hybrid needing eac3to/BDInfo logs."""
+
+    def test_hybrid_unattended_is_rejected(self):
+        """Unattended hybrid WEB-DL can't provide logs → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", audio="FLAC 2.0", unattended=True)
+        assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_hybrid_attended_confirmed_is_allowed(self):
+        """Attended, uploader confirms the logs → allowed."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", audio="LPCM 2.0", unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=True):
+            assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_hybrid_attended_declined_is_rejected(self):
+        """Attended, uploader declines the log prompt → reject."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", audio="FLAC 2.0", unattended=False)
+        with patch("src.trackers.ACM.cli_ui.ask_yes_no", return_value=False):
+            assert _run(acm.get_additional_checks(meta)) is False
+
+    def test_normal_webdl_is_not_flagged(self):
+        """A normal WEB-DL (streaming DD+ audio) is not treated as a hybrid."""
+        acm = ACM(_config())
+        meta = _checks_meta(type="WEBDL", audio="DD+ 5.1", unattended=True)
         assert _run(acm.get_additional_checks(meta)) is True
