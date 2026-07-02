@@ -1167,6 +1167,20 @@ class TestAdditionalChecksRedundantAudio:
         )
         assert _run(acm.get_additional_checks(meta)) is True
 
+    def test_same_language_alias_mixes_is_rejected(self):
+        """Korean 5.1 tagged 'ko' + Korean 2.0 tagged 'Korean' still groups → reject.
+
+        Guards the alias-normalization: raw MediaInfo language variants must not
+        bypass the redundant-mix rule by keying under different strings.
+        """
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            mediainfo=_audio_mi({"Language": "ko", "Channels": "6"},
+                                {"Language": "Korean", "Channels": "2"}),
+        )
+        assert _run(acm.get_additional_checks(meta)) is False
+
     def test_commentary_track_is_exempt(self):
         """A 2.0 commentary alongside a 5.1 main track is not redundant audio."""
         acm = ACM(_config())

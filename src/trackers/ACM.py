@@ -318,6 +318,18 @@ class ACM:
             approved_image_hosts=self.approved_image_hosts,
         )
 
+    @staticmethod
+    def _normalize_countries(meta: dict[str, Any]) -> tuple[list[str], list[str]]:
+        """Return (production_codes, origin_codes) as upper-cased ISO strings.
+
+        Safely coerces both TMDB fields into lists of non-empty strings, tolerating
+        ``None`` values and malformed entries (non-dict production countries, etc.).
+        """
+        prod = [str(pc.get("iso_3166_1", "")).strip().upper() for pc in (meta.get("production_countries") or []) if isinstance(pc, dict)]
+        prod = [c for c in prod if c]
+        origin = [c.strip().upper() for c in (meta.get("origin_country") or []) if isinstance(c, str) and c.strip()]
+        return prod, origin
+
     def check_asian_origin(self, meta: dict[str, Any]) -> bool:
         """Return True only when *every* production country is Asian.
 
@@ -327,10 +339,8 @@ class ACM:
         ``production_countries`` as the authoritative signal and falls back to
         ``origin_country`` only when no production countries are provided.
         """
-        codes = [str(pc.get("iso_3166_1", "")).strip().upper() for pc in (meta.get("production_countries", []) or []) if isinstance(pc, dict)]
-        codes = [c for c in codes if c]
-        if not codes:
-            codes = [c.strip().upper() for c in (meta.get("origin_country", []) or []) if isinstance(c, str) and c.strip()]
+        prod, origin = self._normalize_countries(meta)
+        codes = prod or origin
         return bool(codes) and all(code in self.ASIAN_COUNTRIES for code in codes)
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
@@ -343,9 +353,8 @@ class ACM:
 
         # ── Asian origin ────────────────────────────────────────────────────────
         if not self.check_asian_origin(meta):
-            origin = meta.get("origin_country", [])
-            prod = [pc.get("iso_3166_1", "") for pc in (meta.get("production_countries", []) or [])]
-            countries = ", ".join(filter(None, dict.fromkeys(origin + prod))) or "Unknown"
+            prod, origin = self._normalize_countries(meta)
+            countries = ", ".join(dict.fromkeys(origin + prod)) or "Unknown"
             return _deny(f"[bold red]Only media produced in Asian countries is allowed at {self.tracker}.[/bold red]\n[red]Detected production countries: {countries}[/red]")
 
         # ── Release type ────────────────────────────────────────────────────────
@@ -388,9 +397,7 @@ class ACM:
                     f"[bold red]{self.tracker}: Single TV episodes are only allowed for currently-airing shows.[/bold red]\n"
                     "[red]This can't be confirmed in unattended mode — skipping.[/red]"
                 )
-            console.print(
-                f"[bold yellow]{self.tracker}: Single episodes are only allowed for shows that are currently airing.[/bold yellow]"
-            )
+            console.print(f"[bold yellow]{self.tracker}: Single episodes are only allowed for shows that are currently airing.[/bold yellow]")
             if not cli_ui.ask_yes_no("Is this show currently airing?", default=False):
                 return False
 
@@ -500,15 +507,17 @@ class ACM:
                 title = str(track.get("Title", "") or "").lower()
                 if "commentary" in title or "description" in title:
                     continue
-                lang = str(track.get("Language", "") or "").lower().strip()
+                raw_lang = str(track.get("Language", "") or "").lower().strip()
+                # Normalize aliases (ko/kor/Korean → Kor) so equivalent languages
+                # group together; fall back to raw value when unknown to _LANG_ABBR.
+                lang = self._lang_abbr(raw_lang) or raw_lang
                 channels = str(track.get("Channels", "") or "").strip()
                 if not lang or not channels:
                     continue
                 lang_channels.setdefault(lang, set()).add(channels)
             if any(len(chans) > 1 for chans in lang_channels.values()):
                 return _deny(
-                    f"[bold red]{self.tracker}: Redundant audio — multiple channel mixes of the same language "
-                    "(e.g. 5.1 and 2.0) are not allowed on REMUX/WEB-DL.[/bold red]"
+                    f"[bold red]{self.tracker}: Redundant audio — multiple channel mixes of the same language (e.g. 5.1 and 2.0) are not allowed on REMUX/WEB-DL.[/bold red]"
                 )
 
         # ── REMUX must include English subtitles ─────────────────────────────────
@@ -710,11 +719,7 @@ class ACM:
         if meta.get("is_disc") != "BDMV" or len(discs) < 2:
             return ""
         # (max GiB, label) buckets, checked in order; last is the catch-all.
-        buckets = (
-            [(48, "UHD50"), (63, "UHD66"), (float("inf"), "UHD100")]
-            if meta.get("uhd") == "UHD"
-            else [(23.3, "BD25"), (float("inf"), "BD50")]
-        )
+        buckets = [(48, "UHD50"), (63, "UHD66"), (float("inf"), "UHD100")] if meta.get("uhd") == "UHD" else [(23.3, "BD25"), (float("inf"), "BD50")]
         counts: dict[str, int] = {}
         for disc in discs:
             try:
