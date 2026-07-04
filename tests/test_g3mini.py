@@ -721,10 +721,11 @@ class TestNogroupWebDL:
 
 
 class TestG3MINIUhdStripping:
-    """G3MINI rejects '1080p.UHD.BluRay' — UHD is only valid at 2160p.
+    """G3MINI never carries the UHD token.
 
-    When the release is 1080p (or any non-4K resolution), the UHD token
-    must be stripped from the name even if meta['uhd'] is set.
+    At 2160p it's redundant (2160p already denotes UHD); at any lower
+    resolution it's invalid. Either way it must be stripped from the name
+    even when meta['uhd'] is set.
     """
 
     def _get_name(self, meta: dict) -> str:
@@ -754,8 +755,8 @@ class TestG3MINIUhdStripping:
         name = self._get_name(meta)
         assert 'UHD' not in name, f"'UHD' must be stripped for 1080p ENCODE, got: {name!r}"
 
-    def test_2160p_remux_uhd_preserved(self):
-        """2160p BluRay REMUX must keep 'UHD' in the name."""
+    def test_2160p_remux_uhd_stripped(self):
+        """2160p BluRay REMUX must not repeat 'UHD' — it's redundant with 2160p."""
         meta = _meta_base(
             resolution='2160p',
             uhd='UHD',
@@ -763,7 +764,7 @@ class TestG3MINIUhdStripping:
             source='BluRay',
         )
         name = self._get_name(meta)
-        assert 'UHD' in name, f"'UHD' must be preserved for 2160p, got: {name!r}"
+        assert 'UHD' not in name, f"'UHD' must be stripped for 2160p, got: {name!r}"
 
     def test_1080p_without_uhd_unaffected(self):
         """1080p release with uhd='' must not have 'UHD' introduced."""
