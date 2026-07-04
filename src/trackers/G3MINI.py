@@ -214,7 +214,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         # G3MINI never carries the UHD token: it's redundant with 2160p (which
         # already denotes UHD) and invalid on any lower resolution.
         uhd = ""
-        hdr = meta.get("hdr", "")
+        # G3MINI spells HDR10+ as HDR10P (no '+' in the tag).
+        hdr = meta.get("hdr", "").replace("HDR10+", "HDR10P")
         hybrid = str(meta.get("webdv", "")) if meta.get("webdv", "") else ""
         # Ensure the following variables are always defined
         name = ""

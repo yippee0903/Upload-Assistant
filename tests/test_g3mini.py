@@ -776,3 +776,21 @@ class TestG3MINIUhdStripping:
         )
         name = self._get_name(meta)
         assert 'UHD' not in name, f"'UHD' must not appear, got: {name!r}"
+
+
+class TestG3MINIHdr10Plus:
+    """G3MINI spells HDR10+ as HDR10P (no '+')."""
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(G3MINI(_config()).get_name(meta))['name']
+
+    def test_hdr10_plus_becomes_hdr10p(self):
+        meta = _meta_base(
+            resolution='2160p',
+            type='REMUX',
+            source='BluRay',
+            hdr='HDR10+',
+        )
+        name = self._get_name(meta)
+        assert 'HDR10P' in name, f"HDR10+ must render as HDR10P, got: {name!r}"
+        assert 'HDR10+' not in name, f"'+' must be gone, got: {name!r}"
