@@ -52,3 +52,23 @@ class TestSendWebhookNotification:
         post = AsyncMock(side_effect=ConnectionError("boom"))
         with patch("src.webhook.httpx.AsyncClient", return_value=_mock_client(post)):
             _run(send_webhook_notification("https://discord.test/webhook", "Uploadé", {"Title": "X"}))
+
+    def test_non_2xx_response_is_logged_as_failure(self):
+        response = MagicMock(status_code=404)
+        response.raise_for_status.side_effect = RuntimeError("404 for url https://discord.test/webhook/SECRET")
+        post = AsyncMock(return_value=response)
+        with patch("src.webhook.httpx.AsyncClient", return_value=_mock_client(post)), patch("src.webhook.console.print") as console_print:
+            _run(send_webhook_notification("https://discord.test/webhook/SECRET", "Uploadé", {"Title": "X"}))
+        logged = " ".join(str(c.args[0]) for c in console_print.call_args_list)
+        assert "Failed to send webhook notification" in logged
+
+    def test_error_log_never_leaks_webhook_url(self):
+        """The webhook URL embeds a secret token: it must not reach the logs."""
+        sentinel = "tok3n-s3cr3t"
+        url = f"https://discord.test/webhook/{sentinel}"
+        post = AsyncMock(side_effect=ConnectionError(f"cannot reach {url}"))
+        with patch("src.webhook.httpx.AsyncClient", return_value=_mock_client(post)), patch("src.webhook.console.print") as console_print:
+            _run(send_webhook_notification(url, "Uploadé", {"Title": "X"}))
+        logged = " ".join(str(c.args[0]) for c in console_print.call_args_list)
+        assert "ConnectionError" in logged
+        assert sentinel not in logged

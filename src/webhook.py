@@ -25,6 +25,7 @@ async def send_webhook_notification(url: str, title: str, fields: dict[str, str]
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(url, json=payload)
+            response.raise_for_status()
             if debug:
                 console.print(f"[cyan]Webhook notification response: {response.status_code}")
     except Exception as e:

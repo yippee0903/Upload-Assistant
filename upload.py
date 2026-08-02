@@ -2091,8 +2091,8 @@ async def do_the_thing(base_dir: str) -> None:
                 else:
                     await DiscordNotifier.send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get("debug", False), meta=meta)
 
-            webhook_url = str(config["DEFAULT"].get("webhook_url", "") or "")
-            if webhook_url and not meta["debug"]:
+            webhook_url = config["DEFAULT"].get("webhook_url", "")
+            if isinstance(webhook_url, str) and webhook_url and not meta["debug"]:
                 tracker_status_all = cast(dict[str, Any], meta.get("tracker_status", {}))
                 uploaded_trackers = [t for t, s in tracker_status_all.items() if isinstance(s, dict) and cast(dict[str, Any], s).get("upload") is True]
                 if uploaded_trackers:
