@@ -450,14 +450,17 @@ class ACM:
         # — so we require confirmation and reject unattended (logs can't be added).
         if release_type == "WEBDL":
             audio_codec = str(meta.get("audio", "") or "").upper()
-            if audio_codec.startswith("FLAC") or audio_codec.startswith("LPCM"):
+            # Match anywhere, not just as a prefix: "Dual-Audio FLAC 2.0" is
+            # still a disc-sourced hybrid.
+            hybrid_codec = re.search(r"\b(FLAC|LPCM)\b", audio_codec)
+            if hybrid_codec:
                 if bool(meta.get("unattended")):
                     return _deny(
-                        f"[bold red]{self.tracker}: hybrid WEB-DL ({audio_codec.split()[0]} audio from a disc) requires BDInfo + eac3to logs.[/bold red]\n"
+                        f"[bold red]{self.tracker}: hybrid WEB-DL ({hybrid_codec.group(1)} audio from a disc) requires BDInfo + eac3to logs.[/bold red]\n"
                         "[red]This can't be provided in unattended mode — skipping.[/red]"
                     )
                 console.print(
-                    f"[bold yellow]{self.tracker}: this looks like a hybrid WEB-DL ({audio_codec.split()[0]} audio sourced from a disc). "
+                    f"[bold yellow]{self.tracker}: this looks like a hybrid WEB-DL ({hybrid_codec.group(1)} audio sourced from a disc). "
                     "It needs BDInfo and eac3to logs under spoilers, same as a REMUX.[/bold yellow]"
                 )
                 if not cli_ui.ask_yes_no("Do you have these logs and will you add them to the description after upload?", default=False):
@@ -482,13 +485,14 @@ class ACM:
         if release_type == "REMUX":
             audio_codec_upper = str(meta.get("audio", "") or "").upper()
             channels_str = str(meta.get("channels", "") or "")
-            if (audio_codec_upper.startswith("FLAC") or audio_codec_upper.startswith("LPCM")) and channels_str:
+            lossless_codec = re.search(r"\b(FLAC|LPCM)\b", audio_codec_upper)
+            if lossless_codec and channels_str:
                 try:
                     main_ch = int(channels_str.split(".")[0])
                 except ValueError:
                     main_ch = 0
                 if main_ch > 2:
-                    codec = "LPCM" if audio_codec_upper.startswith("LPCM") else "FLAC"
+                    codec = lossless_codec.group(1)
                     return _deny(
                         f"[bold red]{self.tracker}: Multichannel {codec} ({channels_str}) is not allowed on REMUX.[/bold red]\n"
                         "[red]Multichannel tracks must be converted to DTS-HD MA (DTS-HD Master Audio Suite).[/red]\n"
@@ -786,6 +790,9 @@ class ACM:
 
         # Remove Atmos suffix (integrated into audio codec)
         name = name.replace(" Atmos", "")
+
+        # ACM titles never carry the Dual-Audio tag (any category/type)
+        name = re.sub(r"\s*\bDual-Audio\b", "", name)
 
         # Blu-ray titles don't carry DoVi/HDR/DTS:X tags: the format has a
         # compatibility layer, so these are only tagged on WEB-DL and Remux.

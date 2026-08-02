@@ -245,6 +245,21 @@ class TestGetName:
         assert "DD+5.1" in result
         assert "DD+ 5.1" not in result
 
+    def test_dual_audio_tag_is_stripped(self):
+        """Regression: Dual-Audio never appears in ACM titles."""
+        acm = ACM(_config())
+        meta = _name_meta(
+            "Title S13 1080p CR WEB-DL Dual-Audio DD+ 2.0 H.264-GRP",
+            audio="Dual-Audio DD+ 2.0",
+            type="WEBDL",
+            category="TV",
+            season="S13",
+            year="",
+        )
+        result = _run(acm.get_name(meta))
+        assert "Dual-Audio" not in result
+        assert "DD+2.0" in result
+
     def test_webdl_dd_no_space(self):
         """DD 5.1 → DD5.1 for streams (non-plus Dolby Digital)."""
         acm = ACM(_config())
@@ -1287,3 +1302,16 @@ class TestAdditionalChecksHybridWebdl:
         acm = ACM(_config())
         meta = _checks_meta(type="WEBDL", audio="DD+ 5.1", unattended=True)
         assert _run(acm.get_additional_checks(meta)) is True
+
+    def test_dual_audio_flac_hybrid_unattended_is_rejected(self):
+        """Regression: "Dual-Audio FLAC 2.0" is still a disc-sourced hybrid —
+        FLAC must be detected anywhere, not only as a prefix of the audio
+        string (and the animation dual-audio exception must not bypass it)."""
+        acm = ACM(_config())
+        meta = _checks_meta(
+            type="WEBDL",
+            audio="Dual-Audio FLAC 2.0",
+            genres="Animation",
+            unattended=True,
+        )
+        assert _run(acm.get_additional_checks(meta)) is False
