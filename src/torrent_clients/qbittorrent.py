@@ -64,7 +64,7 @@ class QbittorrentClientMixin:
         if proxy_url:
             qbt_proxy_url = proxy_url.rstrip("/")
             ssl_context = self.create_ssl_context_for_client(client)
-            qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), connector=aiohttp.TCPConnector(ssl=ssl_context))
+            qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=aiohttp.TCPConnector(ssl=ssl_context))
             qbt_proxy_url = proxy_url.rstrip("/")
         else:
             potential_qbt_client = await self.init_qbittorrent_client(client)
@@ -245,8 +245,14 @@ class QbittorrentClientMixin:
             ssl_context.verify_mode = ssl.CERT_NONE
         return ssl_context
 
-    async def _check_qbit_reachable(self, client: dict[str, Any]) -> bool:
-        """Return True when the qBittorrent API (direct or via proxy) responds."""
+    async def _check_qbit_reachable(self, client: dict[str, Any], attempts: int = 3, timeout: float = 10.0, retry_delay: float = 5.0) -> bool:
+        """Return True when the qBittorrent API (direct or via proxy) responds.
+
+        The result is cached per process by the caller, so a false negative
+        aborts every qBit operation of the run: probe several times with a
+        generous timeout before declaring the client offline (slow remotes
+        and waking tunnels routinely exceed a single short probe).
+        """
         proxy_url = client.get("qui_proxy_url", "").strip()
         if proxy_url:
             check_url = f"{proxy_url.rstrip('/')}/api/v2/app/version"
@@ -254,19 +260,27 @@ class QbittorrentClientMixin:
             qbt_url = str(client.get("qbit_url", "")).rstrip("/")
             qbt_port = client.get("qbit_port", 8080)
             check_url = f"{qbt_url}:{qbt_port}/api/v2/app/version"
-        try:
-            ssl_ctx = self.create_ssl_context_for_client(client)
-            async with (
-                aiohttp.ClientSession(
-                    timeout=aiohttp.ClientTimeout(total=5),
-                    connector=aiohttp.TCPConnector(ssl=ssl_ctx),
-                ) as session,
-                session.get(check_url) as r,
-            ):
-                # 200 = OK, 401/403 = qBit is up but needs auth — all mean reachable
-                return r.status not in (502, 503, 504)
-        except Exception:
-            return False
+        ssl_ctx = self.create_ssl_context_for_client(client)
+        for attempt in range(attempts):
+            try:
+                async with (
+                    aiohttp.ClientSession(
+                        timeout=aiohttp.ClientTimeout(total=timeout),
+                        connector=aiohttp.TCPConnector(ssl=ssl_ctx),
+                    ) as session,
+                    session.get(check_url) as r,
+                ):
+                    # 200 = OK, 401/403 = qBit is up but needs auth — all mean
+                    # reachable. Anything else (5xx, gateway errors, misrouted
+                    # 404…) is treated as unreachable and retried.
+                    if r.status in (200, 401, 403):
+                        return True
+            except Exception:
+                pass
+            if attempt < attempts - 1:
+                console.print(f"[yellow]qBittorrent health check failed (attempt {attempt + 1}/{attempts}), retrying in {retry_delay:.0f}s...")
+                await asyncio.sleep(retry_delay)
+        return False
 
     async def _confirm_proceed_if_offline(self, client: dict[str, Any], meta: dict[str, Any]) -> bool:
         """Check qBittorrent reachability and ask the user what to do if it is offline.
@@ -307,8 +321,8 @@ class QbittorrentClientMixin:
         session: aiohttp.ClientSession,
         url: str,
         params: Optional[dict[str, Any]] = None,
-        max_retries: int = 1,
-        retry_delay: float = 3.0,
+        max_retries: int = 2,
+        retry_delay: float = 5.0,
     ) -> tuple[int, Any]:
         """GET request via QUI proxy with automatic retry on timeout / gateway errors.
 
@@ -418,7 +432,7 @@ class QbittorrentClientMixin:
                     qbt_client = potential_qbt_client
                 elif proxy_url and qbt_session is None:
                     ssl_context = self.create_ssl_context_for_client(client)
-                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), connector=aiohttp.TCPConnector(ssl=ssl_context))
+                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=aiohttp.TCPConnector(ssl=ssl_context))
                     created_session = True
 
             except qbittorrentapi.LoginFailed:
@@ -896,7 +910,7 @@ class QbittorrentClientMixin:
 
         if proxy_url:
             ssl_context = self.create_ssl_context_for_client(client)
-            qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), connector=aiohttp.TCPConnector(ssl=ssl_context))
+            qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=aiohttp.TCPConnector(ssl=ssl_context))
             qbt_proxy_url = proxy_url.rstrip("/")
         else:
             potential_qbt_client = await self.init_qbittorrent_client(client)
@@ -1424,7 +1438,7 @@ class QbittorrentClientMixin:
             if proxy_url:
                 try:
                     ssl_context = self.create_ssl_context_for_client(client_config)
-                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15), connector=aiohttp.TCPConnector(ssl=ssl_context))
+                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=aiohttp.TCPConnector(ssl=ssl_context))
                     qbt_proxy_url = proxy_url.rstrip("/")
 
                 except Exception as e:

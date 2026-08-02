@@ -384,7 +384,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
                 if proxy_url:
                     ssl_context = self.create_ssl_context_for_client(client)
-                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10), connector=aiohttp.TCPConnector(ssl=ssl_context))
+                    qbt_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=aiohttp.TCPConnector(ssl=ssl_context))
                 else:
                     qbt_client = await self.init_qbittorrent_client(client)
 
