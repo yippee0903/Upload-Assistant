@@ -19,7 +19,7 @@ flask-cors==6.0.5
 Flask-Limiter==4.1.1
 Flask-Session==0.8.0
 cachelib==0.14.0
-guessit==4.1.0
+guessit==4.4.0
 httpx==0.28.1
 Jinja2==3.1.6
 keyring==25.7.0
