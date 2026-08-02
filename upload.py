@@ -63,6 +63,7 @@ from src.trackersetup import (
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
+from src.webhook import send_webhook_notification
 
 cli_ui.setup(color="always", title="Upload Assistant")
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -2089,6 +2090,26 @@ async def do_the_thing(base_dir: str) -> None:
                         console.print(f"[red]Error in tracker print loop: {e}[/red]")
                 else:
                     await DiscordNotifier.send_discord_notification(config, bot, f"Finished uploading: {meta['path']}\n", debug=meta.get("debug", False), meta=meta)
+
+            webhook_url = config["DEFAULT"].get("webhook_url", "")
+            if isinstance(webhook_url, str) and webhook_url and not meta["debug"]:
+                tracker_status_all = cast(dict[str, Any], meta.get("tracker_status", {}))
+                uploaded_trackers = [t for t, s in tracker_status_all.items() if isinstance(s, dict) and cast(dict[str, Any], s).get("upload") is True]
+                if uploaded_trackers:
+                    tracker_links = "".join(build_tracker_status_line(t, tracker_status_all[t]) for t in uploaded_trackers)
+                    try:
+                        size_bytes = sum(os.path.getsize(f) for f in cast(list[str], meta.get("filelist") or []))
+                        size_str = f"{size_bytes / (1024**3):.2f} GB" if size_bytes else ""
+                    except OSError:
+                        size_str = ""
+                    webhook_fields = {
+                        "Title": str(meta.get("name") or os.path.basename(meta["path"])),
+                        "Category": str(meta.get("category") or ""),
+                        "Size": size_str,
+                        "Trackers": tracker_links,
+                        "Path": str(meta["path"]),
+                    }
+                    await send_webhook_notification(webhook_url, "Uploadé", webhook_fields, debug=meta.get("debug", False))
 
             for tracker in meta.get("trumping_trackers", []):
                 console.print(f"[yellow]Submitting trumpable report to {tracker}.....")
