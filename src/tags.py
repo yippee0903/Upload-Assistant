@@ -112,9 +112,14 @@ async def get_tag(video: str, meta: dict[str, Any], season_pack_check: bool = Fa
     if tag == "-":
         tag = ""
 
-    # Remove generic "no group" tags
-    if tag and tag[1:].lower() in ["hd.ma.5.1", "untouched"]:
-        tag = ""
+    # Remove generic "no group" tags: leftovers of a hyphenated audio codec
+    # (DTS-HD MA 5.1, DTS-HD.HRA.7.1, …) captured when no real group exists.
+    # The "DTS-" prefix can't be excluded in the extraction regex itself
+    # because "…DTS-GROUP" is a legitimate naming pattern.
+    if tag:
+        normalized = re.sub(r"[\s.]+", ".", tag[1:]).lower().strip(".")
+        if normalized == "untouched" or re.fullmatch(r"hd\.(?:ma|hra?)(?:\.\d\.\d)?", normalized):
+            tag = ""
 
     return tag
 
