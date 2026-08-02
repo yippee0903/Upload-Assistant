@@ -186,6 +186,44 @@ class TestGetTagRealGroups:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  Generic "no group" tags — separator variants
+#  Regression: "…DTS-HD MA 5.1.mkv" (space separators) produced the
+#  false tag "-HD MA 5.1"; only the dotted "hd.ma.5.1" was filtered.
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGetTagGenericNoGroup:
+    """False tags extracted from audio codecs must be dropped in all separator styles."""
+
+    def test_dts_hd_ma_dotted_returns_empty(self):
+        tag = _run(get_tag("Movie.1991.2160p.UHD.BluRay.REMUX.HDR10+.HEVC.DTS-HD.MA.5.1.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_dts_hd_ma_spaced_returns_empty(self):
+        """Regression: Terminator 2 … DTS-HD MA 5.1.mkv → tag was '-HD MA 5.1'."""
+        tag = _run(get_tag("Terminator 2 Judgment Day 1991 Hybrid 2160p UHD BluRay REMUX HDR10+ HEVC DTS-HD MA 5.1.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_dts_hd_hra_spaced_returns_empty(self):
+        """The whole DTS-HD family is generic: HRA profile, any channel layout."""
+        tag = _run(get_tag("Movie.2020.1080p.BluRay.DTS-HD HRA 7.1.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_dts_hd_ma_stereo_returns_empty(self):
+        tag = _run(get_tag("Movie.2020.1080p.BluRay.DTS-HD.MA.2.0.mkv", _meta()))
+        assert tag == "", f"Expected empty tag, got {tag!r}"
+
+    def test_real_group_after_dts_hd_ma_still_extracted(self):
+        tag = _run(get_tag("Movie.1991.2160p.UHD.BluRay.REMUX.DTS-HD.MA.5.1-CiNEPHiLES.mkv", _meta()))
+        assert tag == "-CiNEPHiLES", f"Expected -CiNEPHiLES, got {tag!r}"
+
+    def test_real_group_directly_after_dts_still_extracted(self):
+        """…DTS-WiKi is a legitimate pattern: the hyphen after DTS can be a real separator."""
+        tag = _run(get_tag("Movie.2010.1080p.BluRay.x264.DTS-WiKi.mkv", _meta()))
+        assert tag == "-WiKi", f"Expected -WiKi, got {tag!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
 #  TV-pack tag: folder has no group tag but files do
 #  Regression for the NOTAG bug where tv_pack path fell back to
 #  meta["uuid"] instead of trying the episode filename.

@@ -9,6 +9,12 @@ config = {
         # will print the changelog if an update is available
         "verbose_notification": False,
 
+        # Webhook URL notified after each processed upload (Discord-compatible
+        # JSON payload: an embed with Title/Category/Size/Trackers/Path fields).
+        # Only fires when not in debug mode and at least one tracker upload
+        # succeeded. Leave empty to disable.
+        "webhook_url": "",
+
         # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
