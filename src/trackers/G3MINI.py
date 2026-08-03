@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 from src.console import console
+from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.UNIT3D import UNIT3D
@@ -15,6 +16,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         super().__init__(config, tracker_name="G3MINI")
         self.config = config
         self.common = COMMON(config)
+        self.tmdb_manager = TmdbManager(config)
         self.tracker = "G3MINI"
         self.base_url = "https://gemini-tracker.org"
         self.id_url = f"{self.base_url}/api/torrents/"
@@ -193,6 +195,9 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
 
         type = meta.get("type", "").upper()
         title = meta.get("title", "")
+        # French-origin works must carry their French title in the release name.
+        if str(meta.get("original_language", "")).lower() == "fr":
+            title = await self._get_french_title(meta)
         year = meta.get("year", "")
         manual_year = meta.get("manual_year")
         if manual_year is not None and int(manual_year) > 0:
@@ -232,6 +237,11 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         else:
             video_codec = meta.get("video_codec", "")
             video_encode = meta.get("video_encode", "").replace("H.264", "H264").replace("H.265", "H265")
+            # Encodes are labeled by their encoder (x264/x265), never H264/H265.
+            # A WEB release typed WEBDL from its filename but whose video track
+            # carries x264/x265 encoding settings is really an encode.
+            if meta.get("has_encode_settings"):
+                video_encode = video_encode.replace("H264", "x264").replace("H265", "x265")
         edition = self._format_edition(meta.get("edition", ""))
         if "hybrid" in edition.upper():
             edition = edition.replace("Hybrid", "").strip()
