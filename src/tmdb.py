@@ -786,7 +786,28 @@ async def get_tmdb_id(
 
         return 0, category
 
-    # TMDb doesn't do roman
+    # If we have a secondary title, try searching with that
+    if secondary_title:
+        if debug:
+            console.print(f"[yellow]Trying secondary title: {secondary_title}[/yellow]")
+        result = await search_tmdb_id(
+            secondary_title, search_year, category, untouched_filename, debug=debug, secondary_title=secondary_title, path=path, unattended=unattended
+        )
+        if result and result != (0, category):
+            return result
+
+    # Try searching with the primary filename
+    if debug:
+        console.print(f"[yellow]Trying primary filename: {filename}[/yellow]")
+    if not search_results.get("results"):
+        result = await search_tmdb_id(filename, search_year, category, untouched_filename, debug=debug, secondary_title=secondary_title, path=path, unattended=unattended)
+        if result and result != (0, category):
+            return result
+
+    # TMDb doesn't do roman — fallback only, AFTER the untouched title: a
+    # converted query ("Gen V" → "Gen 5") can match unrelated shows through
+    # transliterated alternative titles, so it must never pre-empt an exact
+    # title search.
     if not search_results.get("results"):
         try:
             words = filename.split()
@@ -818,24 +839,6 @@ async def get_tmdb_id(
         except Exception as e:
             console.print(f"[bold red]Roman numeral conversion error:[/bold red] {e}")
             search_results = {"results": []}
-
-    # If we have a secondary title, try searching with that
-    if secondary_title:
-        if debug:
-            console.print(f"[yellow]Trying secondary title: {secondary_title}[/yellow]")
-        result = await search_tmdb_id(
-            secondary_title, search_year, category, untouched_filename, debug=debug, secondary_title=secondary_title, path=path, unattended=unattended
-        )
-        if result and result != (0, category):
-            return result
-
-    # Try searching with the primary filename
-    if debug:
-        console.print(f"[yellow]Trying primary filename: {filename}[/yellow]")
-    if not search_results.get("results"):
-        result = await search_tmdb_id(filename, search_year, category, untouched_filename, debug=debug, secondary_title=secondary_title, path=path, unattended=unattended)
-        if result and result != (0, category):
-            return result
 
     # Try searching with year + 1 if search_year is provided
     if not search_results.get("results"):
