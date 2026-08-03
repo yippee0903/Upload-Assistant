@@ -794,3 +794,81 @@ class TestG3MINIHdr10Plus:
         name = self._get_name(meta)
         assert 'HDR10P' in name, f"HDR10+ must render as HDR10P, got: {name!r}"
         assert 'HDR10+' not in name, f"'+' must be gone, got: {name!r}"
+
+
+class TestG3MINIFrenchTitle:
+    """French-origin works must use the French title in the release name."""
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(G3MINI(_config()).get_name(meta))['name']
+
+    def test_french_origin_uses_french_title(self):
+        meta = _meta_base(
+            title='The Price of Peril',
+            original_language='fr',
+            frtitle='Le Prix du Danger',
+            type='ENCODE',
+            video_encode='x264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+        )
+        name = self._get_name(meta)
+        assert name.startswith('Le.Prix.du.Danger'), f"French title expected, got: {name!r}"
+        assert 'Price.of.Peril' not in name
+
+    def test_non_french_origin_keeps_main_title(self):
+        meta = _meta_base(
+            title='Some English Title',
+            original_language='en',
+            frtitle='Un Titre Français',
+            type='ENCODE',
+            video_encode='x264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+        )
+        name = self._get_name(meta)
+        assert name.startswith('Some.English.Title'), f"Main title expected, got: {name!r}"
+
+
+class TestG3MINIEncodeCodecLabel:
+    """Encodes must be labeled x264/x265, never H264/H265."""
+
+    def _get_name(self, meta: dict) -> str:
+        return asyncio.run(G3MINI(_config()).get_name(meta))['name']
+
+    def _web_meta(self, **overrides) -> dict:
+        base = dict(
+            type='WEBDL',
+            video_encode='H.264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+            source='Web',
+        )
+        base.update(overrides)
+        return _meta_base(**base)
+
+    def test_webdl_with_encode_settings_uses_x264(self):
+        meta = self._web_meta(has_encode_settings=True)
+        name = self._get_name(meta)
+        assert 'x264' in name, f"x264 expected for an encode, got: {name!r}"
+        assert 'H264' not in name
+
+    def test_webdl_with_encode_settings_uses_x265(self):
+        meta = self._web_meta(video_encode='H.265', has_encode_settings=True)
+        name = self._get_name(meta)
+        assert 'x265' in name, f"x265 expected for an encode, got: {name!r}"
+        assert 'H265' not in name
+
+    def test_true_webdl_keeps_h264(self):
+        meta = self._web_meta(has_encode_settings=False)
+        name = self._get_name(meta)
+        assert 'H264' in name, f"Untouched WEB-DL keeps H264, got: {name!r}"
