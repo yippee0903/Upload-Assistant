@@ -15,6 +15,10 @@ import httpx
 from src.cleanup import cleanup_manager
 from src.console import console
 
+IMDB_GRAPHQL_URL = "https://api.graphql.imdb.com/"
+# IMDb's WAF returns 403 for requests carrying no Referer.
+IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
+
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
@@ -271,9 +275,9 @@ class ImdbManager:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
-                    "https://api.graphql.imdb.com/",
+                    IMDB_GRAPHQL_URL,
                     json=query,
-                    headers={"Content-Type": "application/json"},
+                    headers=IMDB_GRAPHQL_HEADERS,
                     timeout=10,
                 )
                 response.raise_for_status()
@@ -500,7 +504,7 @@ class ImdbManager:
                 attempted = 0
             if attempted:
                 await asyncio.sleep(1)  # Whoa baby, slow down
-            url = "https://api.graphql.imdb.com/"
+            url = IMDB_GRAPHQL_URL
             if category == "MOVIE":
                 filename = filename.replace("and", "&").replace("And", "&").replace("AND", "&").strip()
 
@@ -557,7 +561,7 @@ class ImdbManager:
 
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.post(url, json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                    response = await client.post(url, json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                     response.raise_for_status()
                     data = response.json()
             except Exception as e:
@@ -920,7 +924,7 @@ class ImdbManager:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post("https://api.graphql.imdb.com/", json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                response = await client.post(IMDB_GRAPHQL_URL, json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                 response.raise_for_status()
                 data = response.json()
             except Exception as e:
