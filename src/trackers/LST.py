@@ -31,6 +31,31 @@ class LST(UNIT3D):
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         return {}
 
+    @staticmethod
+    def _get_video_bitrate(meta: Meta) -> int:
+        """Video bitrate in bps from mediainfo, 0 if undeterminable.
+
+        VBR encodes (typically x265 in MKV) often carry no BitRate field, so
+        fall back to BitRate_Nominal, then to StreamSize/Duration.
+        """
+        tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+        for track in tracks:
+            if track.get("@type") != "Video":
+                continue
+            for field in ("BitRate", "BitRate_Nominal"):
+                value = str(track.get(field, "") or "")
+                if value.isdigit():
+                    return int(value)
+            try:
+                stream_size = int(str(track.get("StreamSize", "") or ""))
+                duration = float(str(track.get("Duration", "") or ""))
+                if stream_size > 0 and duration > 0:
+                    return int(stream_size * 8 / duration)
+            except (ValueError, TypeError):
+                pass
+            break
+        return 0
+
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
         if not meta["valid_mi_settings"]:
@@ -42,19 +67,21 @@ class LST(UNIT3D):
         ):
             return False
 
-        # Block micro-encodes: check minimum video bitrate for ENCODE / WEBRIP / WEBDL
-        if meta.get("type", "").upper() in ("ENCODE", "WEBRIP", "WEBDL"):
+        # Block micro-encodes: check minimum video bitrate for ENCODE / WEBRIP.
+        # WEB-DL is exempt: it's the service's untouched stream, whatever its
+        # bitrate — never a micro-encode.
+        if meta.get("type", "").upper() in ("ENCODE", "WEBRIP"):
             video_encode = str(meta.get("video_encode", "")).strip().lower()
             resolution_text = str(meta.get("resolution", "")).lower().replace("p", "").replace("i", "")
             resolution = int(resolution_text) if resolution_text.isdigit() else 0
 
             MIN_BITRATE: dict[tuple[str, int], int] = {
-                ("x265", 2160): 3_000_000,
-                ("x265", 1080): 1_000_000,
-                ("x265", 720): 600_000,
-                ("x264", 2160): 8_000_000,
-                ("x264", 1080): 2_000_000,
-                ("x264", 720): 1_000_000,
+                ("x265", 2160): 4_000_000,
+                ("x265", 1080): 1_500_000,
+                ("x265", 720): 800_000,
+                ("x264", 2160): 10_000_000,
+                ("x264", 1080): 2_500_000,
+                ("x264", 720): 1_200_000,
             }
 
             codec_key = None
@@ -78,15 +105,7 @@ class LST(UNIT3D):
                     console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — no bitrate rule for {resolution}p {codec_key.upper()}.[/bold red]")
                 return False
 
-            mediainfo = meta.get("mediainfo", {})
-            tracks = mediainfo.get("media", {}).get("track", [])
-            video_bitrate = 0
-            for track in tracks:
-                if track.get("@type") == "Video":
-                    br = track.get("BitRate")
-                    if br and str(br).isdigit():
-                        video_bitrate = int(br)
-                    break
+            video_bitrate = self._get_video_bitrate(meta)
 
             # Fail-closed: block if bitrate is missing or unreadable
             if not video_bitrate:
