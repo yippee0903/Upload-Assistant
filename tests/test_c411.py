@@ -1661,6 +1661,61 @@ class TestSearchExisting:
 
         assert dupes == []
 
+    @staticmethod
+    def _torznab_page(count: int, start: int = 0) -> str:
+        items = "".join(
+            f"""<item>
+      <title>Film.{start + i}.2012.FRENCH.1080p.WEB.x264-GRP</title>
+      <guid>https://c411.org/torrents/{start + i}</guid>
+      <link>https://c411.org/torrents/{start + i}/download</link>
+      <size>4000000000</size>
+    </item>"""
+            for i in range(count)
+        )
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>{items}</channel>
+</rss>"""
+
+    def test_search_paginates_past_first_page(self):
+        """A full page must trigger a follow-up request with the next offset."""
+        c = C411(_config())
+        meta = _meta_base(tmdb='', imdb_id=0)  # only the text query remains
+
+        full_page = MagicMock(status_code=200, text=self._torznab_page(100))
+        short_page = MagicMock(status_code=200, text=self._torznab_page(3, start=100))
+
+        with patch('httpx.AsyncClient') as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=[full_page, short_page])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        offsets = [ca.kwargs['params'].get('offset') for ca in mock_client.get.call_args_list]
+        assert offsets == ['0', '100'], f"Expected two paginated calls, got offsets {offsets}"
+        assert all(ca.kwargs['params'].get('limit') == '100' for ca in mock_client.get.call_args_list)
+
+    def test_search_short_page_stops_pagination(self):
+        """A page smaller than the page size must not trigger another request."""
+        c = C411(_config())
+        meta = _meta_base(tmdb='', imdb_id=0)
+
+        short_page = MagicMock(status_code=200, text=self._torznab_page(3))
+
+        with patch('httpx.AsyncClient') as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=short_page)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+
+            asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        assert mock_client.get.call_count == 1
+
     def test_search_deduplicates(self):
         """When IMDB + text search return the same torrent, it should appear only once."""
         c = C411(_config())

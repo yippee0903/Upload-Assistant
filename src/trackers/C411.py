@@ -1726,31 +1726,42 @@ class C411(FrenchTrackerMixin):
 
         seen_guids: set[str] = set()
 
+        # The API caps un-paginated queries at 25 items sorted newest-first, so
+        # older packs vanish behind recent episode uploads: paginate explicitly.
+        page_size = 100
+        max_results = 300  # per query
+
         for params in queries:
-            try:
-                url_params = {**params, "apikey": self.api_key}
-                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                    response = await client.get("https://c411.org/api", params=url_params)
+            offset = 0
+            while offset < max_results:
+                try:
+                    url_params = {**params, "limit": str(page_size), "offset": str(offset), "apikey": self.api_key}
+                    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                        response = await client.get("https://c411.org/api", params=url_params)
 
-                if response.status_code != 200:
+                    if response.status_code != 200:
+                        if meta.get("debug"):
+                            console.print(f"[yellow]C411 Torznab search returned HTTP {response.status_code}[/yellow]")
+                        break
+
+                    # Parse XML response
+                    items = self._parse_torznab_response(response.text)
+
+                    for item in items:
+                        guid = item.get("guid", item.get("name", ""))
+                        if guid in seen_guids:
+                            continue
+                        seen_guids.add(guid)
+                        dupes.append(item)
+
+                    if len(items) < page_size:
+                        break
+                    offset += page_size
+
+                except Exception as e:
                     if meta.get("debug"):
-                        console.print(f"[yellow]C411 Torznab search returned HTTP {response.status_code}[/yellow]")
-                    continue
-
-                # Parse XML response
-                items = self._parse_torznab_response(response.text)
-
-                for item in items:
-                    guid = item.get("guid", item.get("name", ""))
-                    if guid in seen_guids:
-                        continue
-                    seen_guids.add(guid)
-                    dupes.append(item)
-
-            except Exception as e:
-                if meta.get("debug"):
-                    console.print(f"[yellow]C411 Torznab search error: {e}[/yellow]")
-                continue
+                        console.print(f"[yellow]C411 Torznab search error: {e}[/yellow]")
+                    break
 
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
