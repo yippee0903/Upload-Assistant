@@ -1682,12 +1682,11 @@ class TestSearchExisting:
         c = C411(_config())
         meta = _meta_base(tmdb='', imdb_id=0)  # only the text query remains
 
-        full_page = MagicMock(status_code=200, text=self._torznab_page(100))
-        short_page = MagicMock(status_code=200, text=self._torznab_page(3, start=100))
+        pages = [MagicMock(status_code=200, text=self._torznab_page(100, start=i * 100)) for i in range(3)]
 
         with patch('httpx.AsyncClient') as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(side_effect=[full_page, short_page])
+            mock_client.get = AsyncMock(side_effect=pages)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
@@ -1695,7 +1694,7 @@ class TestSearchExisting:
             asyncio.run(c.search_existing(meta, 'nodisc'))
 
         offsets = [ca.kwargs['params'].get('offset') for ca in mock_client.get.call_args_list]
-        assert offsets == ['0', '100'], f"Expected two paginated calls, got offsets {offsets}"
+        assert offsets == ['0', '100', '200'], f"Expected three paginated calls capped at 300, got offsets {offsets}"
         assert all(ca.kwargs['params'].get('limit') == '100' for ca in mock_client.get.call_args_list)
 
     def test_search_short_page_stops_pagination(self):

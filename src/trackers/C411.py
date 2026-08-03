@@ -1748,7 +1748,9 @@ class C411(FrenchTrackerMixin):
                     items = self._parse_torznab_response(response.text)
 
                     for item in items:
-                        guid = item.get("guid", item.get("name", ""))
+                        # The parser stores the RSS <guid> under "id"; fall back
+                        # to the name so distinct torrents never collapse.
+                        guid = item.get("id") or item.get("name", "")
                         if guid in seen_guids:
                             continue
                         seen_guids.add(guid)
