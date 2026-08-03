@@ -390,7 +390,18 @@ class NST(FrenchTrackerMixin, UNIT3D):
         return data
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
+        # year for TV is mantatory and sometimes "search_year" from TMDB is empty
+        manual_year = meta.get("manual_year", "")
+        year = meta.get("year", "")
+        search_year = meta.get("search_year", "")
+        if meta.get("category", "") == "TV":
+            if manual_year is not None and int(manual_year) > 0:
+                year = manual_year
+                meta["year"] = manual_year
+            meta["search_year"] = year if search_year == "" else ""
+
         result = await super().get_name(meta)
+
         # Atmos before channel
         name = re.sub(
             r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.Atmos.\2\3", result["name"], flags=re.IGNORECASE
