@@ -398,7 +398,7 @@ class NST(FrenchTrackerMixin, UNIT3D):
             if manual_year is not None and int(manual_year) > 0:
                 year = manual_year
                 meta["year"] = manual_year
-            meta["search_year"] = year if search_year == "" else ""
+            meta["search_year"] = year if search_year == "" else search_year
 
         result = await super().get_name(meta)
 
