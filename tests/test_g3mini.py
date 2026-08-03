@@ -819,6 +819,29 @@ class TestG3MINIFrenchTitle:
         assert name.startswith('Le.Prix.du.Danger'), f"French title expected, got: {name!r}"
         assert 'Price.of.Peril' not in name
 
+    def test_french_origin_fetches_title_when_uncached(self):
+        """Without a cached frtitle, the title comes from the localized TMDB data."""
+        meta = _meta_base(
+            title='The Price of Peril',
+            original_language='fr',
+            type='ENCODE',
+            video_encode='x264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+        )
+        g = G3MINI(_config())
+
+        async def fake_localized(*args, **kwargs):
+            return {'title': 'Le Prix du Danger', 'original_title': 'Le Prix du Danger', 'original_language': 'fr'}
+
+        g.tmdb_manager.get_tmdb_localized_data = fake_localized
+        name = asyncio.run(g.get_name(meta))['name']
+        assert name.startswith('Le.Prix.du.Danger'), f"French title expected, got: {name!r}"
+        assert 'Price.of.Peril' not in name
+
     def test_non_french_origin_keeps_main_title(self):
         meta = _meta_base(
             title='Some English Title',
@@ -872,3 +895,10 @@ class TestG3MINIEncodeCodecLabel:
         meta = self._web_meta(has_encode_settings=False)
         name = self._get_name(meta)
         assert 'H264' in name, f"Untouched WEB-DL keeps H264, got: {name!r}"
+        assert 'x264' not in name, f"x264 must not appear for a true WEB-DL, got: {name!r}"
+
+    def test_true_webdl_keeps_h265(self):
+        meta = self._web_meta(video_encode='H.265', has_encode_settings=False)
+        name = self._get_name(meta)
+        assert 'H265' in name, f"Untouched WEB-DL keeps H265, got: {name!r}"
+        assert 'x265' not in name, f"x265 must not appear for a true WEB-DL, got: {name!r}"
