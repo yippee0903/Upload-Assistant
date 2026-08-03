@@ -104,8 +104,10 @@ class TOS(FrenchTrackerMixin, UNIT3D):
                 "DISC": "1",
                 "REMUX": "2",
                 "ENCODE": "3",
+                # TOS uses a single "WEB" type (id 4) for both WEB-DL and
+                # WEBRip; there is no id 5 and the API rejects it.
                 "WEBDL": "4",
-                "WEBRIP": "5",
+                "WEBRIP": "4",
                 "HDTV": "6",
             }.get(meta["type"], "0")
         return {"type_id": type_id}

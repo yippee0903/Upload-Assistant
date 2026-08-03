@@ -391,3 +391,27 @@ class TestTosSceneNfoRequirement:
         meta["auto_nfo"] = False
         result = _run(t.get_additional_checks(meta))
         assert result is True
+
+
+class TestTosTypeId:
+    """TOS has a single "WEB" type (id 4) for WEB-DL and WEBRip; id 5 does
+    not exist and the upload API rejects it with a validation error."""
+
+    def _type_meta(self, release_type: str) -> dict[str, Any]:
+        return {"type": release_type, "is_disc": None, "3D": ""}
+
+    def test_webrip_maps_to_web_type_4(self):
+        t = TOS(_config())
+        result = _run(t.get_type_id(self._type_meta("WEBRIP")))
+        assert result == {"type_id": "4"}
+
+    def test_webdl_maps_to_web_type_4(self):
+        t = TOS(_config())
+        result = _run(t.get_type_id(self._type_meta("WEBDL")))
+        assert result == {"type_id": "4"}
+
+    def test_never_emits_type_5(self):
+        t = TOS(_config())
+        for release_type in ("DISC", "REMUX", "ENCODE", "WEBDL", "WEBRIP", "HDTV", "UNKNOWN"):
+            result = _run(t.get_type_id(self._type_meta(release_type)))
+            assert result["type_id"] != "5", f"{release_type} produced invalid type_id 5"
