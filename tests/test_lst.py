@@ -327,6 +327,26 @@ class TestAdditionalChecksMicroEncode:
         meta = _bitrate_meta(video_bitrate=3_000_000, codec="x264", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
+    # ── x264 720p (threshold: 1 200 000 bps) ───────────────────
+
+    def test_x264_720p_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=1_199_999, codec="x264", resolution="720p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x264_720p_at_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=1_200_000, codec="x264", resolution="720p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
+    # ── x264 2160p (threshold: 10 000 000 bps) ─────────────────
+
+    def test_x264_2160p_below_threshold_is_rejected(self):
+        meta = _bitrate_meta(video_bitrate=9_999_999, codec="x264", resolution="2160p")
+        assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_x264_2160p_at_threshold_is_allowed(self):
+        meta = _bitrate_meta(video_bitrate=10_000_000, codec="x264", resolution="2160p")
+        assert _run(_lst().get_additional_checks(meta)) is True
+
     def test_h264_label_below_threshold_is_rejected(self):
         """'H.264' codec label must map to x264 and be checked."""
         meta = _bitrate_meta(video_bitrate=1_000_000, codec="H.264", resolution="1080p")
@@ -343,6 +363,12 @@ class TestAdditionalChecksMicroEncode:
         meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
         meta["mediainfo"] = {"media": {"track": [{"@type": "Video"}]}}
         assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_zero_bitrate_falls_through_to_nominal(self):
+        """A zero BitRate is unusable, not authoritative: keep falling back."""
+        meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "BitRate": "0", "BitRate_Nominal": "3000000"}]}}
+        assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_nominal_bitrate_fallback(self):
         """VBR encodes without BitRate must be judged on BitRate_Nominal."""

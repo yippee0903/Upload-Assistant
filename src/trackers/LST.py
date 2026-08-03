@@ -44,7 +44,8 @@ class LST(UNIT3D):
                 continue
             for field in ("BitRate", "BitRate_Nominal"):
                 value = str(track.get(field, "") or "")
-                if value.isdigit():
+                # A zero value is as unusable as a missing one: keep falling back.
+                if value.isdigit() and int(value) > 0:
                     return int(value)
             try:
                 stream_size = int(str(track.get("StreamSize", "") or ""))
