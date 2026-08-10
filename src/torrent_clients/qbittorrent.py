@@ -165,7 +165,7 @@ class QbittorrentClientMixin:
                     meta.update(tracker_ids)
 
                     if tracker_ids:
-                        for tracker in ["ptp", "bhd", "btn", "huno", "blu", "aither", "ulcx", "lst", "oe", "hdb"]:
+                        for tracker in ["ptp", "bhd", "btn", "huno", "blu", "aither", "ulcx", "lst", "oe", "hdb", "a4k", "hhd", "ihd", "lume", "stc", "g3mini", "tos", "acm"]:
                             if meta.get(tracker):
                                 console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -1431,9 +1431,41 @@ class QbittorrentClientMixin:
                 "yus": {"url": "https://yu-scene.net", "pattern": r"/(\d+)$"},
                 "dp": {"url": "https://darkpeers.org", "pattern": r"/(\d+)$"},
                 "sp": {"url": "https://seedpool.org", "pattern": r"/(\d+)$"},
+                "a4k": {"url": "https://aura4k.net", "pattern": r"/(\d+)$"},
+                "hhd": {"url": "https://homiehelpdesk.net", "pattern": r"/(\d+)$"},
+                "ihd": {"url": "https://infinityhd.net", "pattern": r"/(\d+)$"},
+                "lume": {"url": "https://luminarr.me", "pattern": r"/(\d+)$"},
+                "stc": {"url": "https://skipthecommercials.xyz", "pattern": r"/(\d+)$"},
+                "g3mini": {"url": "https://gemini-tracker.org", "pattern": r"/(\d+)$"},
+                "tos": {"url": "https://theoldschool.cc", "pattern": r"/(\d+)$"},
+                "acm": {"url": "https://eiga.moi", "pattern": r"/(\d+)$"},
             }
 
-            tracker_priority = ["aither", "ulcx", "lst", "blu", "oe", "btn", "bhd", "huno", "hdb", "rf", "otw", "yus", "dp", "sp", "ptp"]
+            tracker_priority = [
+                "aither",
+                "ulcx",
+                "lst",
+                "blu",
+                "oe",
+                "btn",
+                "bhd",
+                "huno",
+                "hdb",
+                "rf",
+                "otw",
+                "yus",
+                "dp",
+                "sp",
+                "a4k",
+                "hhd",
+                "ihd",
+                "lume",
+                "stc",
+                "g3mini",
+                "tos",
+                "acm",
+                "ptp",
+            ]
 
             if proxy_url:
                 try:
