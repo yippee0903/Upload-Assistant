@@ -1390,12 +1390,24 @@ class TestDescription:
 
     def test_with_screenshots(self):
         meta = _meta_base(image_list=[
+            {'img_url': 'https://img.host/1.md.png', 'raw_url': 'https://img.host/1.png', 'web_url': 'https://img.host/view/1'},
+            {'img_url': 'https://img.host/2.md.png', 'raw_url': 'https://img.host/2.png', 'web_url': ''},
+        ])
+        c = C411(_config({'include_screenshots': True}))
+        desc = asyncio.run(c._build_description(meta))
+        assert "[color=#3d85c6]Captures d'écran[/color]" in desc
+        # Thumbnails are embedded, linked to the full-size image
+        assert '[url=https://img.host/view/1][img]https://img.host/1.md.png[/img][/url]' in desc
+        assert '[url=https://img.host/2.png][img]https://img.host/2.md.png[/img][/url]' in desc
+
+    def test_with_screenshots_no_thumbnail(self):
+        # Hosts without a separate thumbnail fall back to the full-size URL
+        meta = _meta_base(image_list=[
             {'raw_url': 'https://img.host/1.png', 'web_url': 'https://img.host/view/1'},
             {'raw_url': 'https://img.host/2.png', 'web_url': ''},
         ])
         c = C411(_config({'include_screenshots': True}))
         desc = asyncio.run(c._build_description(meta))
-        assert "[color=#3d85c6]Captures d'écran[/color]" in desc
         assert '[url=https://img.host/view/1][img]https://img.host/1.png[/img][/url]' in desc
         assert '[img]https://img.host/2.png[/img]' in desc
 
