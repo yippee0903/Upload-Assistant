@@ -1117,13 +1117,17 @@ class C411(FrenchTrackerMixin):
             parts.append("")
             img_lines: list[str] = []
             for img in image_list:
+                # Embed the thumbnail, linked to the full-size image: the site
+                # does not scale [img] tags, so a raw screenshot renders full width.
                 raw = img.get("raw_url", "")
                 web = img.get("web_url", "")
-                if raw:
-                    if web:
-                        img_lines.append(f"[url={web}][img]{raw}[/img][/url]")
+                thumb = img.get("img_url", "") or raw
+                link = web or (raw if thumb != raw else "")
+                if thumb:
+                    if link:
+                        img_lines.append(f"[url={link}][img]{thumb}[/img][/url]")
                     else:
-                        img_lines.append(f"[img]{raw}[/img]")
+                        img_lines.append(f"[img]{thumb}[/img]")
             if img_lines:
                 parts.append("[center]")
                 parts.append("\n".join(img_lines))
