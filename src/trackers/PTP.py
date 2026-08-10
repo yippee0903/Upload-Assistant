@@ -524,6 +524,7 @@ class PTP:
             "passtheimage": ("passtheima.ge",),
             "seedpool_cdn": ("cdn.seedpool.org",),
             "utppm": ("utp.pm",),
+            "lostimg": ("lostimg.cc",),
         }
         aliases = host_aliases.get(selected_host, (selected_host,))
         return any(hostname == alias or hostname.endswith(f".{alias}") for alias in aliases)

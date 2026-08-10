@@ -32,7 +32,7 @@ config = {
         "ptpimg_api": "",
         "lensdump_api": "",
         "ptscreens_api": "",
-        "oeimg_api": "",
+        "onlyimage_api": "",
         "dalexni_api": "",
         "passtheima_ge_api": "",
 
@@ -44,9 +44,13 @@ config = {
         # ShareX-style image host (IMageHosting) token
         "sharex_url": "https://img.digitalcore.club/api/upload",
         "sharex_api_key": "",
+        # utp.pm API key
+        "utppm_api": "",
+        # lostimg.cc API key
+        "lostimg_api": "",
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, oeimg, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm
+        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "imgbb",
         "img_host_2": "imgbox",
 
