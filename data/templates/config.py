@@ -44,6 +44,8 @@ config = {
         # ShareX-style image host (IMageHosting) token
         "sharex_url": "https://img.digitalcore.club/api/upload",
         "sharex_api_key": "",
+        # utp.pm API key
+        "utppm_api": "",
         # lostimg.cc API key
         "lostimg_api": "",
 
