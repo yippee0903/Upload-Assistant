@@ -865,7 +865,10 @@ async def _upload_screens(
             if not using_custom_img_list:
                 console.print(f"[green]Successfully obtained and uploaded {len(new_images)} images.")
         else:
-            raise Exception("No images uploaded. Configure additional image hosts or use a different -ih")
+            # Return an empty result instead of raising: callers (notably the
+            # multi-host loop in upload.py) handle the shortfall by switching
+            # to the next configured host.
+            console.print(f"[yellow]No images uploaded to {img_host}.")
 
         if meta.get("debug") and upload_start_time is not None:
             console.print(f"Screenshot uploads processed in {time.time() - upload_start_time:.4f} seconds")
