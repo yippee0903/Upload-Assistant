@@ -275,6 +275,13 @@ class QueueManager:
             queue.append(p1)
         else:
             console.print(f"[red]Path: [bold red]{p1}[/bold red] does not exist")
+            # All-or-nothing: a leftover fragment means the input was not a
+            # clean list of paths (e.g. a vanished path whose existing prefix
+            # is a parent directory). Queuing the resolved fragments anyway
+            # could enqueue an entire unrelated directory.
+            if queue:
+                console.print(f"[red]Discarding {len(queue)} partially resolved path(s); check the input path: [bold red]{path}[/bold red]")
+            return []
 
         return queue
 
