@@ -58,3 +58,32 @@ def test_id_keys_wired_through_prep_and_tracker_keys() -> None:
         for i, keys_map in enumerate(tracker_keys_maps):
             assert ast.literal_eval(keys_map).get(key) == name, f"{key} missing from tracker_keys #{i + 1}"
         assert name in unit3d_trackers, f"{name} missing from trackermeta UNIT3D branch"
+
+
+def test_qbit_auto_search_recognizes_new_trackers() -> None:
+    source = _source("src/torrent_clients/qbittorrent.py")
+
+    patterns_match = re.search(r"tracker_patterns = (\{.*?\n\s*\})\n", source, re.DOTALL)
+    assert patterns_match
+    tracker_patterns = ast.literal_eval(patterns_match.group(1))
+
+    priority_match = re.search(r"tracker_priority = (\[[^\]]*\])", source)
+    assert priority_match
+    tracker_priority = ast.literal_eval(priority_match.group(1))
+
+    for key, domain in NEW_TRACKERS.items():
+        info = tracker_patterns.get(key)
+        assert info, f"{key} missing from qbit tracker_patterns"
+        assert domain in info["url"], f"{key} url does not point to {domain}"
+        assert key in tracker_priority, f"{key} missing from qbit tracker_priority"
+
+        # The pattern must extract the torrent id from a UNIT3D comment URL...
+        comment = f"https://{domain}/torrents/4567"
+        assert info["url"] in comment
+        match = re.search(info["pattern"], comment)
+        assert match and match.group(1) == "4567", f"{key} pattern failed on {comment}"
+        # ...and not match when no trailing id is present.
+        assert re.search(info["pattern"], f"https://{domain}/torrents") is None
+
+    # PTP must stay last: the priority list prefers smaller trackers first.
+    assert tracker_priority[-1] == "ptp"
