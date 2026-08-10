@@ -47,7 +47,7 @@ config = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm
+        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -73,6 +73,8 @@ config = {
         "sharex_api_key": "",
         # utp.pm API key
         "utppm_api": "",
+        # lostimg.cc API key
+        "lostimg_api": "",
 
         # GETTING METADATA
 
