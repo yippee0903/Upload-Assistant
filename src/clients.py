@@ -88,6 +88,38 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 tracker_id = _last_path_id(path)
                 if tracker_id:
                     tracker_ids["huno"] = tracker_id
+            elif _is_host(host, "aura4k.net"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["a4k"] = tracker_id
+            elif _is_host(host, "homiehelpdesk.net"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["hhd"] = tracker_id
+            elif _is_host(host, "infinityhd.net"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["ihd"] = tracker_id
+            elif _is_host(host, "luminarr.me"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["lume"] = tracker_id
+            elif _is_host(host, "skipthecommercials.xyz"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["stc"] = tracker_id
+            elif _is_host(host, "gemini-tracker.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["g3mini"] = tracker_id
+            elif _is_host(host, "theoldschool.cc"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["tos"] = tracker_id
+            elif _is_host(host, "eiga.moi"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["acm"] = tracker_id
 
         return tracker_ids
 

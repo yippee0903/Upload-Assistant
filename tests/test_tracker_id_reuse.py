@@ -1,0 +1,60 @@
+# Tests for explicit-ID metadata reuse wiring.
+#
+# A tracker torrent found in the client carries its site URL in the torrent
+# comment; the extracted ID must flow through prep.py's gate list and
+# get_tracker_data's tracker_keys into trackermeta's UNIT3D branch. These tests
+# cover the comment extractor and keep the four lists consistent.
+
+import ast
+import os
+import re
+
+from src.clients import Clients
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+NEW_TRACKERS = {
+    "a4k": "aura4k.net",
+    "hhd": "homiehelpdesk.net",
+    "ihd": "infinityhd.net",
+    "lume": "luminarr.me",
+    "stc": "skipthecommercials.xyz",
+    "g3mini": "gemini-tracker.org",
+    "tos": "theoldschool.cc",
+    "acm": "eiga.moi",
+}
+
+
+def test_extractor_finds_new_unit3d_tracker_ids() -> None:
+    for key, domain in NEW_TRACKERS.items():
+        comment = f"https://{domain}/torrents/4567"
+        assert Clients._extract_tracker_ids_from_comment(comment) == {key: "4567"}, key
+
+
+def test_extractor_still_finds_existing_ids() -> None:
+    assert Clients._extract_tracker_ids_from_comment("https://lst.gg/torrents/156060") == {"lst": "156060"}
+    assert Clients._extract_tracker_ids_from_comment("no url here") == {}
+
+
+def _source(path: str) -> str:
+    with open(os.path.join(BASE, path), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_id_keys_wired_through_prep_and_tracker_keys() -> None:
+    prep_match = re.search(r"tracker_ids = (\[[^\]]*\])", _source("src/prep.py"))
+    assert prep_match
+    prep_ids = set(ast.literal_eval(prep_match.group(1)))
+
+    tracker_keys_maps = re.findall(r"tracker_keys = (\{[^}]*\})", _source("src/get_tracker_data.py"))
+    assert len(tracker_keys_maps) == 2
+
+    unit3d_match = re.search(r'elif tracker_name in (\[[^\]]*\]):', _source("src/trackermeta.py"))
+    assert unit3d_match
+    unit3d_trackers = set(ast.literal_eval(unit3d_match.group(1)))
+
+    for key, name in [(k, k.upper()) for k in NEW_TRACKERS]:
+        assert key in prep_ids, f"{key} missing from prep.py tracker_ids"
+        for i, keys_map in enumerate(tracker_keys_maps):
+            assert ast.literal_eval(keys_map).get(key) == name, f"{key} missing from tracker_keys #{i + 1}"
+        assert name in unit3d_trackers, f"{name} missing from trackermeta UNIT3D branch"

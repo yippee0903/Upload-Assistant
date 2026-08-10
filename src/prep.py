@@ -137,7 +137,31 @@ class Prep:
         client = Clients(config=self.config)
         meta["skip_auto_torrent"] = meta.get("skip_auto_torrent", False) or self.config["DEFAULT"].get("skip_auto_torrent", False)
         hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
-        tracker_ids = ["aither", "ulcx", "lst", "blu", "oe", "btn", "bhd", "huno", "hdb", "rf", "otw", "yus", "dp", "sp", "ptp"]
+        tracker_ids = [
+            "aither",
+            "ulcx",
+            "lst",
+            "blu",
+            "oe",
+            "btn",
+            "bhd",
+            "huno",
+            "hdb",
+            "rf",
+            "otw",
+            "yus",
+            "dp",
+            "sp",
+            "ptp",
+            "a4k",
+            "hhd",
+            "ihd",
+            "lume",
+            "stc",
+            "g3mini",
+            "tos",
+            "acm",
+        ]
         use_sonarr = self.config["DEFAULT"].get("use_sonarr", False)
         use_radarr = self.config["DEFAULT"].get("use_radarr", False)
         meta["print_tracker_messages"] = self.config["DEFAULT"].get("print_tracker_messages", False)
