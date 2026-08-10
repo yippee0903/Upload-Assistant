@@ -16,6 +16,9 @@ PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4
 
 
 def _setup(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    # _upload_screens os.chdir()s into the screenshot dir; monkeypatch restores
+    # the original working directory on teardown.
+    monkeypatch.chdir(tmp_path)
     uuid = "fake-release"
     shot_dir = tmp_path / "tmp" / uuid
     shot_dir.mkdir(parents=True)

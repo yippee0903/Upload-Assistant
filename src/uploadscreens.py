@@ -807,7 +807,6 @@ async def _upload_screens(
         return None
 
     try:
-        max_retries = 3
         results: list[tuple[int, dict[str, Any]]] = []
         try:
             upload_results = await asyncio.gather(*[async_upload(task, max_retries) for task in upload_tasks])
@@ -865,9 +864,9 @@ async def _upload_screens(
             if not using_custom_img_list:
                 console.print(f"[green]Successfully obtained and uploaded {len(new_images)} images.")
         else:
-            # Return an empty result instead of raising: callers (notably the
-            # multi-host loop in upload.py) handle the shortfall by switching
-            # to the next configured host.
+            # A fully failed host is not an error here: when the internal
+            # failover above did not apply, return an empty result and let the
+            # caller decide how to handle the shortfall.
             console.print(f"[yellow]No images uploaded to {img_host}.")
 
         if meta.get("debug") and upload_start_time is not None:
