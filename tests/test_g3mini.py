@@ -819,6 +819,40 @@ class TestG3MINIFrenchTitle:
         assert name.startswith('Le.Prix.du.Danger'), f"French title expected, got: {name!r}"
         assert 'Price.of.Peril' not in name
 
+    def test_accented_title_is_transliterated_not_stripped(self):
+        """Accented letters must transliterate (é→e, à→a), never vanish."""
+        meta = _meta_base(
+            title='Cleo from 5 to 7',
+            original_language='fr',
+            frtitle='Cléo de 5 à 7',
+            type='ENCODE',
+            video_encode='x264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+        )
+        name = self._get_name(meta)
+        assert name.startswith('Cleo.de.5.a.7'), f"Transliterated title expected, got: {name!r}"
+
+    def test_elided_article_apostrophe_becomes_separator(self):
+        """L'autre → L.autre (apostrophe expanded, not glued)."""
+        meta = _meta_base(
+            title="One Sings, the Other Doesn't",
+            original_language='fr',
+            frtitle="L'une chante, l'autre pas",
+            type='ENCODE',
+            video_encode='x264',
+            video_codec='',
+            hdr='',
+            webdv='',
+            uhd='',
+            resolution='1080p',
+        )
+        name = self._get_name(meta)
+        assert name.startswith('L.une.chante.l.autre.pas'), f"Expanded elision expected, got: {name!r}"
+
     def test_french_origin_fetches_title_when_uncached(self):
         """Without a cached frtitle, the title comes from the localized TMDB data."""
         meta = _meta_base(

@@ -186,12 +186,9 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         def _clean_filename(name):
             # G3MINI keeps title-internal hyphens (WALL·E → WALL-E), so
             # middle dot / bullet map to hyphen instead of space.
-            _g3_map = {**FrenchTrackerMixin._TITLE_CHAR_MAP, "\u00b7": "-", "\u2022": "-"}
-            for char, repl in _g3_map.items():
-                name = name.replace(char, repl)
-            # Strip all non-alphanumeric chars except spaces, dots, hyphens, and + (for DD+, HDR10+)
-            name = re.sub(r"[^a-zA-Z0-9 .+\-]", "", name)
-            return name
+            name = name.replace("\u00b7", "-").replace("\u2022", "-")
+            # The shared cleaning transliterates accents and expands elisions.
+            return self._fr_clean(name)
 
         type = meta.get("type", "").upper()
         title = meta.get("title", "")
