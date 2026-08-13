@@ -75,6 +75,13 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _should_fetch_tracker_data(meta: dict[str, Any], ids: Optional[dict[str, Any]], tracker_ids: list[str]) -> bool:
+    # Arr results only provide database IDs, while a known tracker torrent
+    # also carries a description and hosted images: a tracker ID must still
+    # trigger the tracker-data fetch even when an Arr answered first.
+    return not meta.get("edit", False) and (not ids or any(meta.get(key) for key in tracker_ids))
+
+
 def _title_without_leading_article(title: str) -> str:
     return re.sub(r"^(the|a|an)\s+", "", title.strip().lower(), flags=re.IGNORECASE)
 
@@ -704,7 +711,7 @@ class Prep:
             if meta.get("infohash") is not None and not meta["base_torrent_created"] and not meta["we_checked_them_all"] and not ids:
                 meta = await client.get_ptp_from_hash(meta)
 
-            if not meta.get("edit", False) and not ids:
+            if _should_fetch_tracker_data(meta, ids, tracker_ids):
                 # Reuse information from trackers with fallback
                 await self.tracker_data_manager.get_tracker_data(video, meta, search_term, search_file_folder, meta["category"], only_id=only_id)
 
