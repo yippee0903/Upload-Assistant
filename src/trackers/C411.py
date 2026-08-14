@@ -51,7 +51,37 @@ class C411(FrenchTrackerMixin):
         self.torrent_url: str = "https://c411.org/torrents/"
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
         self.tmdb_manager = TmdbManager(config)
-        self.banned_groups: list[str] = ["k0RE"]
+        _reserved_note = "Internal C411 group: reserved for the team's own uploads"
+        self.banned_groups: list[Any] = ["k0RE"] + [
+            # C411 internal groups: only the teams themselves may upload
+            # these releases. check_banned_group offers the interactive
+            # continue-anyway bypass for that case.
+            [group, _reserved_note]
+            for group in (
+                "AMEN",
+                "BOUBA",
+                "GL0P",
+                "ENIGMA",
+                "BOUC",
+                "HYPERION",
+                "Xaxou",
+                "J4CK",
+                "SpK79",
+                "D4RK",
+                "ACKER",
+                "TLC",
+                "Dramas For Ever",
+                "Dramas.For.Ever",
+                "ZEKEY",
+                "HazzAnim",
+                "Archie",
+                "GISMO65",
+                "FIRESOUL64",
+                "FANKAI",
+                "R3DUCT0",
+                "Katairi",
+            )
+        ]
 
     # ──────────────────────────────────────────────────────────
     #  Audio / naming / French title — inherited from FrenchTrackerMixin

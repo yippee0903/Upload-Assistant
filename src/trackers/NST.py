@@ -46,7 +46,33 @@ class NST(FrenchTrackerMixin, UNIT3D):
         self.rehost_images_manager = RehostImagesManager(config)
         self.approved_image_hosts = ["imgbox", "ptscreens", "onlyimage", "pixhost"]
         self.tmdb_manager = TmdbManager(config)
-        self.banned_groups: list[str] = []
+        _reserved_note = "Internal NST group: reserved for the team's own uploads"
+        self.banned_groups: list[Any] = [
+            # NST internal groups: only the teams themselves may upload
+            # these releases. check_banned_group offers the interactive
+            # continue-anyway bypass for that case.
+            [group, _reserved_note]
+            for group in (
+                "Apama",
+                "KTH",
+                "CLRi",
+                "DRY",
+                "ZEUS",
+                "eMux",
+                "HeavyWeight",
+                "GOTU",
+                "0verflow",
+                "LAiN",
+                "JiMKesa",
+                "mHDgz",
+                "PiXeL",
+                "RiFiFi",
+                "Santi38",
+                "S7KO",
+                "Concombre9610",
+                "WIND",
+            )
+        ]
         self.source_flag = "NST"
 
     # ── FrenchTrackerMixin overrides ──────────────────────────────────

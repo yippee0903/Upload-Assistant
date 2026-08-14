@@ -40,6 +40,7 @@ from src.dupe_checking import DupeChecker
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
+from src.internal_exclusivity import check_internal_destination_bans, check_internal_exclusivity
 from src.languages import languages_manager
 from src.nfo_link import NfoLinkManager
 from src.qbitwait import Wait
@@ -713,6 +714,44 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 return
             # User chose to proceed — clear detag flag so trackers won't skip
             meta.pop("detag_info", None)
+
+    # Internal-exclusivity guard: the origin tracker's rules forbid reposting
+    # its internal releases elsewhere, so the whole upload is blocked.
+    verdict, reason = await check_internal_exclusivity(meta, config)
+    if verdict == "blocked":
+        console.print(f"[bold red]INTERNAL RELEASE DETECTED[/bold red] — {reason}")
+        console.print("[bold white]The origin tracker's rules forbid reposting this release elsewhere.[/bold white]")
+        if not meta.get("unattended", False) or meta.get("unattended_confirm", False):
+            try:
+                if not cli_ui.ask_yes_no(cli_ui.red, "Do you want to continue anyway?", default=False):
+                    console.print("[red]Upload cancelled: internal release.[/red]")
+                    meta["we_are_uploading"] = False
+                    return
+            except EOFError:
+                console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                await cleanup_manager.cleanup()
+                cleanup_manager.reset_terminal()
+                sys.exit(1)
+        else:
+            console.print("[yellow]Unattended mode: internal release — cancelling upload.[/yellow]")
+            meta["we_are_uploading"] = False
+            return
+    elif verdict == "warn":
+        console.print(f"[yellow]Warning: {reason} — proceeding.[/yellow]")
+
+    # Per-destination bans: some origin trackers forbid their internal
+    # releases on specific destinations only.
+    destination_bans = await check_internal_destination_bans(meta, config)
+    if destination_bans:
+        current_trackers = [str(t) for t in meta.get("trackers") or []]
+        for destination, ban_reason in destination_bans:
+            console.print(f"[bold yellow]Dropping {destination} from the upload targets: {ban_reason}.[/bold yellow]")
+            current_trackers = [t for t in current_trackers if t.upper() != destination]
+        meta["trackers"] = current_trackers
+        if not current_trackers:
+            console.print("[red]No upload targets left after dropping banned destinations — cancelling upload.[/red]")
+            meta["we_are_uploading"] = False
+            return
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get("trackers", [])

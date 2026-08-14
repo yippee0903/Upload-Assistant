@@ -567,3 +567,28 @@ class TestName:
         )
         name = self._get_name(meta)
         assert '.DV.HDR10.' in name, f"When DV HDR, HDR10 must be written in title: {name}"
+
+class TestNSTReservedGroups:
+    """NST's internal groups may only be uploaded by the teams themselves:
+    they sit in banned_groups so check_banned_group blocks them with the
+    interactive continue-anyway bypass (and skips NST when unattended)."""
+
+    RESERVED = [
+        "Apama", "KTH", "CLRi", "DRY", "ZEUS", "eMux", "HeavyWeight", "GOTU",
+        "0verflow", "LAiN", "JiMKesa", "mHDgz", "PiXeL", "RiFiFi", "Santi38",
+        "S7KO", "Concombre9610", "WIND",
+    ]
+
+    def test_reserved_groups_are_listed(self):
+        tracker = NST(config=_config())
+        names = [entry[0] if isinstance(entry, list) else entry for entry in tracker.banned_groups]
+        for group in self.RESERVED:
+            assert group in names, f"{group} missing from NST banned_groups"
+
+    def test_check_banned_group_blocks_reserved_tag_unattended(self):
+        from src.trackersetup import TRACKER_SETUP
+
+        tracker = NST(config=_config())
+        setup = TRACKER_SETUP(config=_config())
+        meta = {"tag": "-Apama", "unattended": True}
+        assert asyncio.run(setup.check_banned_group("NST", tracker.banned_groups, meta)) is True

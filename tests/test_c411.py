@@ -2956,3 +2956,43 @@ class TestC411CriterionStripping:
         assert 'criterion' in name.lower(), (
             f"Title word 'Criterion' must not be stripped, got: {name!r}"
         )
+
+
+class TestC411ReservedGroups:
+    """C411's internal groups may only be uploaded by the teams themselves:
+    they sit in banned_groups so check_banned_group blocks them with the
+    interactive continue-anyway bypass (and skips C411 when unattended)."""
+
+    RESERVED = [
+        "AMEN", "BOUBA", "GL0P", "ENIGMA", "BOUC", "HYPERION", "Xaxou", "J4CK",
+        "SpK79", "D4RK", "ACKER", "TLC", "Dramas For Ever", "ZEKEY", "HazzAnim",
+        "Archie", "GISMO65", "FIRESOUL64", "FANKAI", "R3DUCT0", "Katairi",
+    ]
+
+    def _names(self) -> list[str]:
+        tracker = C411(config=_config())
+        return [entry[0] if isinstance(entry, list) else entry for entry in tracker.banned_groups]
+
+    def test_reserved_groups_are_listed(self):
+        names = self._names()
+        for group in self.RESERVED:
+            assert group in names, f"{group} missing from C411 banned_groups"
+
+    def test_existing_ban_is_kept(self):
+        assert "k0RE" in self._names()
+
+    def test_check_banned_group_blocks_reserved_tag_unattended(self):
+        from src.trackersetup import TRACKER_SETUP
+
+        tracker = C411(config=_config())
+        setup = TRACKER_SETUP(config=_config())
+        meta = {"tag": "-BOUBA", "unattended": True}
+        assert asyncio.run(setup.check_banned_group("C411", tracker.banned_groups, meta)) is True
+
+    def test_check_banned_group_matches_dotted_multiword_tag(self):
+        from src.trackersetup import TRACKER_SETUP
+
+        tracker = C411(config=_config())
+        setup = TRACKER_SETUP(config=_config())
+        meta = {"tag": "-Dramas.For.Ever", "unattended": True}
+        assert asyncio.run(setup.check_banned_group("C411", tracker.banned_groups, meta)) is True

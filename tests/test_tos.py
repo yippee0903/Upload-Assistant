@@ -246,7 +246,7 @@ class TestTosSpecificDupes:
         t = self._t()
         expected = ["zYz", "ZKB", "UwU", "Tsundere-Raws", "THESYNDiCATE", "SUPPLY",
                     "SowHD", "SHADOW", "RiFiFi", "REBiRTH", "pERsO", "Oldschool",
-                    "NoNE", "NLX5", "NEO", "HeavyWeight", "DELiRiUS", "COLL3CTiF",
+                    "NYX", "NoNE", "NLX5", "NEO", "HeavyWeight", "DELiRiUS", "COLL3CTiF",
                     "CHiLL", "BTT", "BraD", "A3L"]
         for grp in expected:
             assert grp in t._TOS_INTERNAL_GROUPS, f"{grp} missing from _TOS_INTERNAL_GROUPS"
