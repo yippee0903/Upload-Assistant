@@ -22,6 +22,26 @@ NEW_TRACKERS = {
     "g3mini": "gemini-tracker.org",
     "tos": "theoldschool.cc",
     "acm": "eiga.moi",
+    # Remaining UNIT3D trackers with a standard id_url API (DT is excluded:
+    # its /api/v1/ scheme has no id_url).
+    "cbr": "capybarabr.com",
+    "emuw": "emuwarez.com",
+    "gf": "generation-free.org",
+    "itt": "itatorrents.xyz",
+    "lcd": "locadora.cc",
+    "ldu": "theldu.to",
+    "lt": "lat-team.com",
+    "nst": "nostradamus.foo",
+    "pt": "portugas.org",
+    "ptt": "polishtorrent.top",
+    "r4e": "racing4everyone.eu",
+    "ras": "rastastugan.org",
+    "sam": "samaritano.cc",
+    "shri": "shareisland.org",
+    "tik": "cinematik.net",
+    "tlz": "tlzdigital.com",
+    "ttr": "torrenteros.org",
+    "utp": "utp.to",
 }
 
 
@@ -60,6 +80,19 @@ def test_id_keys_wired_through_prep_and_tracker_keys() -> None:
         assert name in unit3d_trackers, f"{name} missing from trackermeta UNIT3D branch"
 
 
+def test_metadata_reuse_consultation_order() -> None:
+    # Deliberate local preference; dict order is the priority, first valid
+    # answer wins. Guards against upstream merges reshuffling the dict.
+    tracker_keys_maps = re.findall(r"tracker_keys = (\{[^}]*\})", _source("src/get_tracker_data.py"))
+    order = list(ast.literal_eval(tracker_keys_maps[0]))
+    preferred = [
+        "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "sp", "rf",
+        "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "ptp", "tos", "g3mini",
+    ]
+    extra = sorted(k for k in NEW_TRACKERS if k not in preferred)
+    assert order == preferred + extra
+
+
 def test_qbit_auto_search_recognizes_new_trackers() -> None:
     source = _source("src/torrent_clients/qbittorrent.py")
 
@@ -87,3 +120,16 @@ def test_qbit_auto_search_recognizes_new_trackers() -> None:
 
     # PTP must stay last: the priority list prefers smaller trackers first.
     assert tracker_priority[-1] == "ptp"
+
+
+def test_match_tracker_url_flags_wired_trackers_for_removal() -> None:
+    # A cross-seed announce URL must land the tracker in remove_trackers so
+    # the upload target list drops a tracker that already has the release.
+    import asyncio
+
+    from src.torrent_clients.qbittorrent import match_tracker_url
+
+    for key, domain in NEW_TRACKERS.items():
+        meta = {"debug": False}
+        asyncio.run(match_tracker_url([f"https://{domain}/announce/passkey"], meta))
+        assert meta.get("remove_trackers") == [key.upper()], f"{key} announce URL not matched"

@@ -30,6 +30,11 @@ ImageDict: TypeAlias = dict[str, Any]
 
 expected_images = 0
 
+# Sources whose descriptions are written in a language other than English:
+# French, Portuguese, Spanish, Italian, Polish and Nordic sites. Their IDs and
+# images are reused, their description text never is.
+NON_ENGLISH_SOURCE_TRACKERS = frozenset({"TOS", "G3MINI", "GF", "NST", "CBR", "LCD", "SAM", "PT", "EMUW", "LT", "TTR", "ITT", "SHRI", "PTT", "RAS"})
+
 
 def _apply_config(next_config: dict[str, Any]) -> None:
     global config, default_config, trackers_config, expected_images
@@ -581,7 +586,48 @@ async def update_metadata_from_tracker(
                 console.print(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
             found_match = False
 
-    elif tracker_name in ["HUNO", "BLU", "AITHER", "LST", "OE", "ULCX", "RF", "OTW", "YUS", "DP", "SP", "A4K", "HHD", "IHD", "LUME", "STC", "G3MINI", "TOS", "ACM"]:
+    elif tracker_name in [
+        "HUNO",
+        "BLU",
+        "AITHER",
+        "LST",
+        "OE",
+        "ULCX",
+        "RF",
+        "OTW",
+        "YUS",
+        "DP",
+        "SP",
+        "A4K",
+        "HHD",
+        "IHD",
+        "LUME",
+        "STC",
+        "G3MINI",
+        "TOS",
+        "ACM",
+        "CBR",
+        "EMUW",
+        "GF",
+        "ITT",
+        "LCD",
+        "LDU",
+        "LT",
+        "NST",
+        "PT",
+        "PTT",
+        "R4E",
+        "RAS",
+        "SAM",
+        "SHRI",
+        "TIK",
+        "TLZ",
+        "TTR",
+        "UTP",
+    ]:
+        # Non-English sites: reuse IDs and images, but never the description
+        # text, which would land on English-speaking destinations.
+        only_id = only_id or tracker_name in NON_ENGLISH_SOURCE_TRACKERS
         if meta.get(tracker_key) is not None:
             if meta["debug"]:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")

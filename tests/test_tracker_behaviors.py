@@ -29,7 +29,7 @@ class TestSkipNfoDynamicSet:
 
     def test_known_skip_nfo_members(self):
         from src.trackersetup import nfo_skip_trackers
-        expected = {"DP", "FNP", "HHD", "IHD", "LST", "LUME", "STC", "ULCX"}
+        expected = {"DP", "HHD", "IHD", "LST", "LUME", "STC", "ULCX"}
         assert nfo_skip_trackers == expected
 
     def test_is_frozenset(self):
@@ -83,7 +83,7 @@ class TestGetAdditionalFilesSkipNfo:
             "debug": False,
         }
 
-    @pytest.mark.parametrize("tracker_name", ["DP", "FNP", "HHD", "IHD", "LST", "LUME", "STC", "ULCX"])
+    @pytest.mark.parametrize("tracker_name", ["DP", "HHD", "IHD", "LST", "LUME", "STC", "ULCX"])
     def test_get_additional_files_returns_empty(self, tracker_name, meta):
         """skip_nfo trackers that override get_additional_files must return {}."""
         from src.trackersetup import tracker_class_map
@@ -106,7 +106,7 @@ class TestNotagLabelsDynamicDict:
 
     def test_known_notag_members(self):
         from src.trackersetup import notag_labels
-        expected = {"C411": "NOTAG", "FNP": "NOGROUP", "G3MINI": "NoGrP", "GF": "NoTag", "NST": "NoTag", "NXM": "NoGrp", "TORR9": "NoTag", "TOS": "NOTAG"}
+        expected = {"C411": "NOTAG", "G3MINI": "NoGrP", "GF": "NoTag", "NST": "NoTag", "NXM": "NoGrp", "TORR9": "NoTag", "TOS": "NOTAG"}
         assert notag_labels == expected
 
     def test_empty_string_excluded(self):
