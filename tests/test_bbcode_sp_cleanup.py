@@ -39,3 +39,12 @@ def test_other_code_blocks_survive() -> None:
     desc = "[code][center]NFO contents worth keeping[/center][/code]\nSummary."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
     assert "NFO contents worth keeping" in cleaned
+
+
+def test_nfo_block_containing_art_strokes_is_preserved() -> None:
+    # A genuine ASCII-art NFO can contain the same ".4HH" strokes as the
+    # seedpool logo; one token alone must not wipe the block.
+    nfo = "[code][center].4HH  release notes\nripped from a pristine source[/center][/code]"
+    desc = f"{nfo}\nSummary line."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert cleaned == desc
