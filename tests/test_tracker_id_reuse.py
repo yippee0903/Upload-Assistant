@@ -60,6 +60,17 @@ def test_id_keys_wired_through_prep_and_tracker_keys() -> None:
         assert name in unit3d_trackers, f"{name} missing from trackermeta UNIT3D branch"
 
 
+def test_metadata_reuse_consultation_order() -> None:
+    # Deliberate local preference; dict order is the priority, first valid
+    # answer wins. Guards against upstream merges reshuffling the dict.
+    tracker_keys_maps = re.findall(r"tracker_keys = (\{[^}]*\})", _source("src/get_tracker_data.py"))
+    order = list(ast.literal_eval(tracker_keys_maps[0]))
+    assert order == [
+        "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "sp", "rf",
+        "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "ptp", "tos", "g3mini",
+    ]
+
+
 def test_qbit_auto_search_recognizes_new_trackers() -> None:
     source = _source("src/torrent_clients/qbittorrent.py")
 
