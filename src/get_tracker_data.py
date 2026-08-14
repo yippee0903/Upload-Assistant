@@ -110,8 +110,8 @@ class TrackerDataManager:
             # Check if a specific tracker is already set in meta
             if not meta.get("emby", False):
                 tracker_keys = {
-                    # preference some unit3d based trackers first
-                    # since they can return tmdb/imdb/tvdb ids
+                    # dict order is the consultation priority:
+                    # first tracker returning valid data wins
                     "aither": "AITHER",
                     "blu": "BLU",
                     "lst": "LST",
@@ -127,15 +127,15 @@ class TrackerDataManager:
                     "otw": "OTW",
                     "yus": "YUS",
                     "dp": "DP",
-                    "a4k": "A4K",
+                    "lume": "LUME",
                     "hhd": "HHD",
                     "ihd": "IHD",
-                    "lume": "LUME",
+                    "a4k": "A4K",
                     "stc": "STC",
-                    "g3mini": "G3MINI",
-                    "tos": "TOS",
                     "acm": "ACM",
                     "ptp": "PTP",
+                    "tos": "TOS",
+                    "g3mini": "G3MINI",
                 }
             else:
                 # Preference trackers with lesser overall torrents
