@@ -48,3 +48,24 @@ def test_nfo_block_containing_art_strokes_is_preserved() -> None:
     desc = f"{nfo}\nSummary line."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
     assert cleaned == desc
+
+
+def test_seedpool_sample_spoiler_is_removed() -> None:
+    desc = (
+        "A plot summary that must stay.\n\n"
+        "[b][spoiler=Sample: xFAKESAMPLEIDx]https://img.example.invalid/xFAKESAMPLEIDx[/spoiler][/b]"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert cleaned == "A plot summary that must stay."
+
+
+def test_seedpool_sample_spoiler_mid_description_leaves_clean_spacing() -> None:
+    block = "[b][spoiler=Sample: xFAKESAMPLEIDx]https://img.example.invalid/xFAKESAMPLEIDx[/spoiler][/b]"
+    cleaned, _ = BBCODE().clean_unit3d_description(f"Summary.\n\n{block}\n\nMore.", "https://seedpool.org")
+    assert cleaned == "Summary.\n\nMore."
+
+
+def test_regular_spoiler_survives() -> None:
+    desc = "Summary.\n\n[spoiler=Screens]some content[/spoiler]"
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert "[spoiler=Screens]some content[/spoiler]" in cleaned
