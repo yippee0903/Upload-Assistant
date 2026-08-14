@@ -57,6 +57,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             "REBiRTH",
             "pERsO",
             "Oldschool",
+            "NYX",
             "NoNE",
             "NLX5",
             "NEO",
