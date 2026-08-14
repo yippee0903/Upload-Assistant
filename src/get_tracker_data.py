@@ -110,8 +110,9 @@ class TrackerDataManager:
             # Check if a specific tracker is already set in meta
             if not meta.get("emby", False):
                 tracker_keys = {
-                    # dict order is the consultation priority:
-                    # first tracker returning valid data wins
+                    # preference some unit3d based trackers first
+                    # since they can return tmdb/imdb/tvdb ids
+                    # (dict order is the consultation priority: first valid answer wins)
                     "aither": "AITHER",
                     "blu": "BLU",
                     "lst": "LST",
