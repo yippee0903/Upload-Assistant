@@ -509,6 +509,11 @@ class BBCODE:
             desc,
             flags=re.IGNORECASE,
         )
+        # Remove seedpool signature: the ASCII-art block (identified by its
+        # distinctive ".4HH" strokes, so real NFO code blocks survive) and the
+        # closing seedbrr sentence
+        desc = re.sub(r"\s*\[code\]\[center\][^\[]*\.4HH[^\[]*\[/center\]\[/code\]\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
+        desc = re.sub(r"\s*Posted to this fine tracker with seedbrr\.?", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
 
