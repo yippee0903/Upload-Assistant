@@ -36,8 +36,6 @@ from src.trackers.DT import DT
 from src.trackers.EMUW import EMUW
 from src.trackers.FF import FF
 from src.trackers.FL import FL
-from src.trackers.FNP import FNP
-from src.trackers.FRIKI import FRIKI
 from src.trackers.G3MINI import G3MINI
 from src.trackers.GF import GF
 from src.trackers.GPW import GPW
@@ -88,7 +86,6 @@ from src.trackers.TTR import TTR
 from src.trackers.TVC import TVC
 from src.trackers.ULCX import ULCX
 from src.trackers.UTP import UTP
-from src.trackers.YOINK import YOINK
 from src.trackers.YUS import YUS
 
 JsonDict = dict[str, Any]
@@ -1344,10 +1341,8 @@ tracker_class_map: dict[str, type[Any]] = {
     "DP": DP,
     "DT": DT,
     "EMUW": EMUW,
-    "FNP": FNP,
     "FF": FF,
     "FL": FL,
-    "FRIKI": FRIKI,
     "G3MINI": G3MINI,
     "GF": GF,
     "GPW": GPW,
@@ -1398,7 +1393,6 @@ tracker_class_map: dict[str, type[Any]] = {
     "TTR": TTR,
     "ULCX": ULCX,
     "UTP": UTP,
-    "YOINK": YOINK,
     "YUS": YUS,
 }
 
@@ -1414,8 +1408,6 @@ api_trackers = {
     "DP",
     "DT",
     "EMUW",
-    "FNP",
-    "FRIKI",
     "HHD",
     "G3MINI",
     "GF",
@@ -1445,7 +1437,6 @@ api_trackers = {
     "TTR",
     "ULCX",
     "UTP",
-    "YOINK",
     "YUS",
 }
 

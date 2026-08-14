@@ -120,6 +120,78 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 tracker_id = _last_path_id(path)
                 if tracker_id:
                     tracker_ids["acm"] = tracker_id
+            elif _is_host(host, "capybarabr.com"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["cbr"] = tracker_id
+            elif _is_host(host, "emuwarez.com"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["emuw"] = tracker_id
+            elif _is_host(host, "generation-free.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["gf"] = tracker_id
+            elif _is_host(host, "itatorrents.xyz"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["itt"] = tracker_id
+            elif _is_host(host, "locadora.cc"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["lcd"] = tracker_id
+            elif _is_host(host, "theldu.to"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["ldu"] = tracker_id
+            elif _is_host(host, "lat-team.com"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["lt"] = tracker_id
+            elif _is_host(host, "nostradamus.foo"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["nst"] = tracker_id
+            elif _is_host(host, "portugas.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["pt"] = tracker_id
+            elif _is_host(host, "polishtorrent.top"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["ptt"] = tracker_id
+            elif _is_host(host, "racing4everyone.eu"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["r4e"] = tracker_id
+            elif _is_host(host, "rastastugan.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["ras"] = tracker_id
+            elif _is_host(host, "samaritano.cc"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["sam"] = tracker_id
+            elif _is_host(host, "shareisland.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["shri"] = tracker_id
+            elif _is_host(host, "cinematik.net"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["tik"] = tracker_id
+            elif _is_host(host, "tlzdigital.com"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["tlz"] = tracker_id
+            elif _is_host(host, "torrenteros.org"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["ttr"] = tracker_id
+            elif _is_host(host, "utp.to"):
+                tracker_id = _last_path_id(path)
+                if tracker_id:
+                    tracker_ids["utp"] = tracker_id
 
         return tracker_ids
 
