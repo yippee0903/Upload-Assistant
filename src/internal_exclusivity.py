@@ -21,7 +21,13 @@ from src.trackers.TOS import TOS
 INTERNAL_GROUPS: dict[str, dict[str, Optional[int]]] = {
     "TOS": {group.lower(): 1 for group in TOS._TOS_INTERNAL_GROUPS},
     "LST": {group.lower(): 3 for group in ("L0ST", "KIMJI", "coffee", "SQS", "Yuki")},
+    "HDT": {group.lower(): None for group in ("126811", "DownRev")},
 }
+
+# Origins without a queryable API (HDT marks internal releases only with a
+# page icon, and its exclusives only with an uploader banner): a table match
+# alone is authoritative — the tag blocks directly, without verification.
+TABLE_ONLY_ORIGINS = frozenset({"HDT"})
 
 
 # Origin tracker -> destinations its internal releases must never be uploaded
@@ -159,6 +165,13 @@ async def check_internal_exclusivity(meta: dict[str, Any], config: dict[str, Any
     group = tag.lstrip("-")
     warn_trackers: list[str] = []
     for tracker, days in candidates:
+        if tracker in TABLE_ONLY_ORIGINS:
+            # No API to consult: the table itself is the evidence. With a
+            # timed window the upload date is unknowable, so it stays active.
+            if exclusivity_active(days, None):
+                window = "permanent exclusivity" if days is None else f"{days}-day exclusivity"
+                return "blocked", f"{group} is an exclusive group on {tracker} ({window})"
+            continue
         attributes = await _origin_attributes(tracker, meta, config)
         if attributes is None:
             warn_trackers.append(tracker)

@@ -57,6 +57,8 @@ class TestPureFunctions:
         assert ie.lookup_internal_group("-zYz") == [("TOS", 1)]  # TOS internals: 24h window
         assert ie.lookup_internal_group("-ZYZ") == [("TOS", 1)]  # case-insensitive
         assert ie.lookup_internal_group("-L0ST") == [("LST", 3)]  # LST internals: 3-day window
+        assert ie.lookup_internal_group("-126811") == [("HDT", None)]  # HDT exclusives: permanent
+        assert ie.lookup_internal_group("-DownRev") == [("HDT", None)]
         assert ie.lookup_internal_group("-NTb") == []
 
 
@@ -125,6 +127,13 @@ class TestOrchestrator:
         self._patch_fetch(monkeypatch, None, search_attributes=None)
         assert _run({"tag": "-zYz", "tos": "123"})[0] == "warn"
 
+    def test_table_only_origin_blocks_without_any_api_call(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, None, search_attributes=None)
+        verdict, reason = _run({"tag": "-DownRev"})
+        assert verdict == "blocked"
+        assert "DownRev" in reason and "HDT" in reason
+        assert calls == []
+
     def test_clear_on_empty_or_unknown_tag(self, monkeypatch: Any):
         calls = self._patch_fetch(monkeypatch, {"internal": True})
         assert _run({"tag": ""})[0] == "clear"
@@ -142,6 +151,8 @@ def test_table_trackers_are_wired() -> None:
 
     for tracker in ie.INTERNAL_GROUPS:
         assert tracker in tracker_class_map, f"{tracker} not in tracker_class_map"
+        if tracker in ie.TABLE_ONLY_ORIGINS:
+            continue  # no API verification, so no client-ID wiring is required
         assert tracker.lower() in prep_ids, f"{tracker.lower()} missing from prep.py tracker_ids"
 
 
