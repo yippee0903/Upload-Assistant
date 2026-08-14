@@ -2415,11 +2415,14 @@ class COMMON:
         """Get region and distributor information from API response"""
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
+        # Some UNIT3D sites reject the api_token query parameter and redirect
+        # to the login page; all accept the Bearer header, so send both.
         params: dict[str, str] = {"api_token": api_key}
+        headers = {"Authorization": f"Bearer {api_key}"}
         url = f"{torrent_url}{id}"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             console.print(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
@@ -2510,10 +2513,13 @@ class COMMON:
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist: list[dict[str, str]] = []
 
-        # Build the params for the API request
+        # Build the params for the API request. Some UNIT3D sites reject the
+        # api_token query parameter and redirect to the login page; all accept
+        # the Bearer header, so send both.
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
         params: dict[str, Any] = {"api_token": api_key}
+        headers = {"Authorization": f"Bearer {api_key}"}
 
         # Determine the search method and add parameters accordingly
         if file_name:
@@ -2533,7 +2539,7 @@ class COMMON:
         # Make the GET request with proper encoding handled by 'params'
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             console.print(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
