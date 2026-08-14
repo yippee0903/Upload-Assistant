@@ -120,3 +120,16 @@ def test_qbit_auto_search_recognizes_new_trackers() -> None:
 
     # PTP must stay last: the priority list prefers smaller trackers first.
     assert tracker_priority[-1] == "ptp"
+
+
+def test_match_tracker_url_flags_wired_trackers_for_removal() -> None:
+    # A cross-seed announce URL must land the tracker in remove_trackers so
+    # the upload target list drops a tracker that already has the release.
+    import asyncio
+
+    from src.torrent_clients.qbittorrent import match_tracker_url
+
+    for key, domain in NEW_TRACKERS.items():
+        meta = {"debug": False}
+        asyncio.run(match_tracker_url([f"https://{domain}/announce/passkey"], meta))
+        assert meta.get("remove_trackers") == [key.upper()], f"{key} announce URL not matched"
