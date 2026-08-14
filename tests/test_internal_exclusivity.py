@@ -112,3 +112,38 @@ def test_table_trackers_are_wired() -> None:
     for tracker in ie.INTERNAL_GROUPS:
         assert tracker in tracker_class_map, f"{tracker} not in tracker_class_map"
         assert tracker.lower() in prep_ids, f"{tracker.lower()} missing from prep.py tracker_ids"
+
+
+class TestDestinationBans:
+    def _patch_fetch(self, monkeypatch: Any, attributes: Any) -> list[tuple[str, str]]:
+        calls: list[tuple[str, str]] = []
+
+        async def fake_fetch(tracker: str, torrent_id: str, config: Any) -> Any:
+            calls.append((tracker, torrent_id))
+            return attributes
+
+        monkeypatch.setattr(ie, "_fetch_origin_attributes", fake_fetch)
+        return calls
+
+    def _run(self, meta: dict[str, Any]) -> list[tuple[str, str]]:
+        return asyncio.run(ie.check_internal_destination_bans(meta, CONFIG))
+
+    def test_acm_internal_bans_tl(self, monkeypatch: Any):
+        self._patch_fetch(monkeypatch, {"internal": 1})
+        bans = self._run({"acm": "77", "trackers": ["TL", "LST"]})
+        assert [d for d, _ in bans] == ["TL"]
+        assert "ACM" in bans[0][1]
+
+    def test_not_internal_no_ban(self, monkeypatch: Any):
+        self._patch_fetch(monkeypatch, {"internal": False})
+        assert self._run({"acm": "77", "trackers": ["TL"]}) == []
+
+    def test_no_origin_id_no_ban(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, {"internal": 1})
+        assert self._run({"trackers": ["TL"]}) == []
+        assert calls == []
+
+    def test_banned_destination_not_targeted(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, {"internal": 1})
+        assert self._run({"acm": "77", "trackers": ["LST"]}) == []
+        assert calls == []  # no fetch when no targeted destination is at risk

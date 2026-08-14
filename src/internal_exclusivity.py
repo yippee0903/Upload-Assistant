@@ -23,6 +23,15 @@ INTERNAL_GROUPS: dict[str, dict[str, Optional[int]]] = {
 }
 
 
+# Origin tracker -> destinations its internal releases must never be uploaded
+# to. Detection is API-flag only (no group table needed): when the origin
+# torrent is known from the client and flagged internal, the destination is
+# dropped from the upload targets.
+INTERNAL_DESTINATION_BANS: dict[str, frozenset[str]] = {
+    "ACM": frozenset({"TL"}),
+}
+
+
 def _parse_created_at(value: Any) -> Optional[datetime]:
     if not isinstance(value, str):
         return None
@@ -108,3 +117,19 @@ async def check_internal_exclusivity(meta: dict[str, Any], config: dict[str, Any
     if warn_trackers:
         return "warn", f"{group} is listed as an internal group on {', '.join(warn_trackers)} but the origin could not be verified"
     return "clear", ""
+
+
+async def check_internal_destination_bans(meta: dict[str, Any], config: dict[str, Any]) -> list[tuple[str, str]]:
+    """Returns [(destination, reason)] for targeted destinations that must be dropped."""
+    targets = {str(t).upper() for t in meta.get("trackers") or []}
+    bans: list[tuple[str, str]] = []
+    for origin, destinations in INTERNAL_DESTINATION_BANS.items():
+        at_risk = destinations & targets
+        torrent_id = meta.get(origin.lower())
+        if not at_risk or torrent_id is None:
+            continue
+        attributes = await _fetch_origin_attributes(origin, str(torrent_id), config)
+        if attributes and attributes.get("internal"):
+            reason = f"internal release on {origin}, which forbids uploading its internals there"
+            bans.extend((destination, reason) for destination in sorted(at_risk))
+    return bans
