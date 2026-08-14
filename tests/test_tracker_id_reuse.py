@@ -22,6 +22,26 @@ NEW_TRACKERS = {
     "g3mini": "gemini-tracker.org",
     "tos": "theoldschool.cc",
     "acm": "eiga.moi",
+    # Remaining UNIT3D trackers with a standard id_url API (DT is excluded:
+    # its /api/v1/ scheme has no id_url).
+    "cbr": "capybarabr.com",
+    "emuw": "emuwarez.com",
+    "gf": "generation-free.org",
+    "itt": "itatorrents.xyz",
+    "lcd": "locadora.cc",
+    "ldu": "theldu.to",
+    "lt": "lat-team.com",
+    "nst": "nostradamus.foo",
+    "pt": "portugas.org",
+    "ptt": "polishtorrent.top",
+    "r4e": "racing4everyone.eu",
+    "ras": "rastastugan.org",
+    "sam": "samaritano.cc",
+    "shri": "shareisland.org",
+    "tik": "cinematik.net",
+    "tlz": "tlzdigital.com",
+    "ttr": "torrenteros.org",
+    "utp": "utp.to",
 }
 
 
@@ -65,10 +85,12 @@ def test_metadata_reuse_consultation_order() -> None:
     # answer wins. Guards against upstream merges reshuffling the dict.
     tracker_keys_maps = re.findall(r"tracker_keys = (\{[^}]*\})", _source("src/get_tracker_data.py"))
     order = list(ast.literal_eval(tracker_keys_maps[0]))
-    assert order == [
+    preferred = [
         "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "sp", "rf",
         "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "ptp", "tos", "g3mini",
     ]
+    extra = sorted(k for k in NEW_TRACKERS if k not in preferred)
+    assert order == preferred + extra
 
 
 def test_qbit_auto_search_recognizes_new_trackers() -> None:

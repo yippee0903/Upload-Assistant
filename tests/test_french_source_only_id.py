@@ -42,5 +42,13 @@ def test_tos_source_is_forced_to_only_id(monkeypatch: Any) -> None:
     assert _fetch_only_id(monkeypatch, "TOS") is True
 
 
+def test_gf_source_is_forced_to_only_id(monkeypatch: Any) -> None:
+    assert _fetch_only_id(monkeypatch, "GF") is True
+
+
+def test_nst_source_is_forced_to_only_id(monkeypatch: Any) -> None:
+    assert _fetch_only_id(monkeypatch, "NST") is True
+
+
 def test_other_unit3d_source_keeps_descriptions(monkeypatch: Any) -> None:
     assert _fetch_only_id(monkeypatch, "LST") is False

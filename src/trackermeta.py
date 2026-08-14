@@ -581,10 +581,48 @@ async def update_metadata_from_tracker(
                 console.print(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
             found_match = False
 
-    elif tracker_name in ["HUNO", "BLU", "AITHER", "LST", "OE", "ULCX", "RF", "OTW", "YUS", "DP", "SP", "A4K", "HHD", "IHD", "LUME", "STC", "G3MINI", "TOS", "ACM"]:
+    elif tracker_name in [
+        "HUNO",
+        "BLU",
+        "AITHER",
+        "LST",
+        "OE",
+        "ULCX",
+        "RF",
+        "OTW",
+        "YUS",
+        "DP",
+        "SP",
+        "A4K",
+        "HHD",
+        "IHD",
+        "LUME",
+        "STC",
+        "G3MINI",
+        "TOS",
+        "ACM",
+        "CBR",
+        "EMUW",
+        "GF",
+        "ITT",
+        "LCD",
+        "LDU",
+        "LT",
+        "NST",
+        "PT",
+        "PTT",
+        "R4E",
+        "RAS",
+        "SAM",
+        "SHRI",
+        "TIK",
+        "TLZ",
+        "TTR",
+        "UTP",
+    ]:
         # French-language sites: reuse IDs and images, but never the
         # description text, which would land on English-speaking destinations.
-        only_id = only_id or tracker_name in ("TOS", "G3MINI")
+        only_id = only_id or tracker_name in ("TOS", "G3MINI", "GF", "NST")
         if meta.get(tracker_key) is not None:
             if meta["debug"]:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
