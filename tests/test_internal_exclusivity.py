@@ -213,3 +213,86 @@ class TestDestinationBans:
         calls = self._patch_fetch(monkeypatch, {"internal": 1})
         assert self._run({"acm": "77", "tag": "-iZON3", "trackers": ["LST"]}) == []
         assert calls == []  # no API call when no targeted destination is at risk
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int, payload: Any):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> Any:
+        return self._payload
+
+
+class _FakeHttpxClient:
+    response: _FakeResponse = _FakeResponse(200, {})
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    async def __aenter__(self) -> "_FakeHttpxClient":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        pass
+
+    async def get(self, **kwargs: Any) -> _FakeResponse:
+        return _FakeHttpxClient.response
+
+
+FETCH_CONFIG: dict[str, Any] = {"TRACKERS": {"LST": {"api_key": "k"}, "OE": {"api_key": "k"}}}
+
+
+class TestFetchAndSearchHelpers:
+    def _set(self, monkeypatch: Any, status: int, payload: Any) -> None:
+        monkeypatch.setattr(ie.httpx, "AsyncClient", _FakeHttpxClient)
+        _FakeHttpxClient.response = _FakeResponse(status, payload)
+
+    def test_fetch_non_success_status_is_unavailable(self, monkeypatch: Any):
+        self._set(monkeypatch, 404, {"attributes": {"internal": True}})
+        assert asyncio.run(ie._fetch_origin_attributes("LST", "1", FETCH_CONFIG)) is None
+
+    def test_fetch_body_without_attributes(self, monkeypatch: Any):
+        self._set(monkeypatch, 200, {"message": "nope"})
+        assert asyncio.run(ie._fetch_origin_attributes("LST", "1", FETCH_CONFIG)) is None
+
+    def test_fetch_data_list_shape(self, monkeypatch: Any):
+        self._set(monkeypatch, 200, {"data": [{"attributes": {"internal": 1}}]})
+        assert asyncio.run(ie._fetch_origin_attributes("LST", "1", FETCH_CONFIG)) == {"internal": 1}
+
+    def test_fetch_tracker_class_without_id_url(self, monkeypatch: Any):
+        import src.trackersetup as trackersetup
+
+        class _NoIdUrl:
+            def __init__(self, config: Any) -> None:
+                pass
+
+        self._set(monkeypatch, 200, {"attributes": {"internal": 1}})
+        monkeypatch.setitem(trackersetup.tracker_class_map, "LST", _NoIdUrl)
+        assert asyncio.run(ie._fetch_origin_attributes("LST", "1", FETCH_CONFIG)) is None
+
+    def test_search_non_success_status_is_unavailable(self, monkeypatch: Any):
+        self._set(monkeypatch, 500, {"data": [{"attributes": {"internal": 1, "name": "X-zYz"}}]})
+        meta = {"filelist": ["/x/file.mkv"], "tag": "-zYz"}
+        assert asyncio.run(ie._search_origin_attributes("OE", meta, FETCH_CONFIG)) is None
+
+    def test_search_picks_matching_group(self, monkeypatch: Any):
+        self._set(monkeypatch, 200, {"data": [{"attributes": {"internal": 1, "name": "Show 2026 WEB-zYz"}}]})
+        meta = {"filelist": ["/x/file.mkv"], "tag": "-zYz"}
+        assert asyncio.run(ie._search_origin_attributes("OE", meta, FETCH_CONFIG)) == {"internal": 1, "name": "Show 2026 WEB-zYz"}
+
+
+class TestPickSearchResultNormalization:
+    def test_display_name_spaces_match_dotted_tag(self):
+        data = [{"attributes": {"name": "Show 2026 WEB-DL H264-DarQ HONE", "internal": True}}]
+        assert ie._pick_search_result(data, "-DarQ.HONE") is not None
+
+    def test_parenthesized_display_tag_matches_dotted_tag(self):
+        data = [{"attributes": {"name": "Show S01 1080p WEB-JBENT(TAoE)", "internal": True}}]
+        assert ie._pick_search_result(data, "-JBENT.TAoE") is not None
+
+
+def test_parse_created_at_plain_z_suffix() -> None:
+    # target-version is py39: fromisoformat only accepts "Z" from 3.11, so the
+    # suffix must be normalized before parsing.
+    assert ie._parse_created_at("2026-01-01T00:00:00Z") == datetime(2026, 1, 1, tzinfo=timezone.utc)

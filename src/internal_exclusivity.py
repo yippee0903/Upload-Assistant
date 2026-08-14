@@ -73,6 +73,9 @@ INTERNAL_DESTINATION_BANS: dict[str, dict[str, frozenset[str]]] = {
 def _parse_created_at(value: Any) -> Optional[datetime]:
     if not isinstance(value, str):
         return None
+    if value.endswith("Z"):
+        # fromisoformat only accepts a trailing Z from Python 3.11
+        value = value[:-1] + "+00:00"
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError:
@@ -117,8 +120,10 @@ async def _fetch_origin_attributes(tracker: str, torrent_id: str, config: dict[s
         url = f"{instance.id_url}{torrent_id}"
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url=url, params={"api_token": api_key}, headers={"Authorization": f"Bearer {api_key}"})
+            if response.status_code != 200:
+                return None
             json_response = response.json()
-    except (httpx.RequestError, httpx.TimeoutException, ValueError, KeyError):
+    except (httpx.RequestError, httpx.TimeoutException, ValueError, KeyError, AttributeError):
         return None
     if not isinstance(json_response, dict):
         return None
@@ -155,6 +160,8 @@ async def _search_origin_attributes(tracker: str, meta: dict[str, Any], config: 
                 params={"api_token": api_key, "file_name": file_name},
                 headers={"Authorization": f"Bearer {api_key}"},
             )
+            if response.status_code != 200:
+                return None
             json_response = response.json()
     except (httpx.RequestError, httpx.TimeoutException, ValueError, KeyError, AttributeError):
         return None
@@ -167,14 +174,15 @@ async def _search_origin_attributes(tracker: str, meta: dict[str, Any], config: 
 def _pick_search_result(data: list[Any], tag: str) -> Optional[dict[str, Any]]:
     # A file-name search can match several torrents carrying the same file
     # (e.g. a single episode and a season pack): only trust a hit whose
-    # release name ends with the group we are checking.
-    group = tag.lstrip("-").lower()
+    # release name ends with the group we are checking. Comparison is on
+    # alphanumerics so separator variants ("DarQ HONE" vs "DarQ.HONE") match.
+    group = _normalize_group(tag.lstrip("-"))
     for item in data:
         attributes = item.get("attributes") if isinstance(item, dict) else None
         if not isinstance(attributes, dict):
             continue
-        name = str(attributes.get("name") or "").lower()
-        if not group or name.endswith(f"-{group}"):
+        name = _normalize_group(str(attributes.get("name") or ""))
+        if not group or name.endswith(group):
             return attributes
     return None
 

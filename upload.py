@@ -748,6 +748,10 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             console.print(f"[bold yellow]Dropping {destination} from the upload targets: {ban_reason}.[/bold yellow]")
             current_trackers = [t for t in current_trackers if t.upper() != destination]
         meta["trackers"] = current_trackers
+        if not current_trackers:
+            console.print("[red]No upload targets left after dropping banned destinations — cancelling upload.[/red]")
+            meta["we_are_uploading"] = False
+            return
 
     editargs_tracking: tuple[str, ...] = ()
     previous_trackers = meta.get("trackers", [])
