@@ -62,6 +62,17 @@ class TestPureFunctions:
         assert ie.lookup_internal_group("-DownRev") == [("HDT", None)]
         assert ie.lookup_internal_group("-NTb") == []
 
+    def test_lookup_normalizes_separators(self):
+        # OE display names carry "JBENT(TAoE)" / "DarQ HONE"; file names carry
+        # dot-separated variants. All must resolve to the same table entry.
+        assert ie.lookup_internal_group("-JBENT(TAoE)") == [("OE", 3)]
+        assert ie.lookup_internal_group("-JBENT.TAoE") == [("OE", 3)]
+        assert ie.lookup_internal_group("-DarQ.HONE") == [("OE", 3)]
+        assert ie.lookup_internal_group("-DarQ") == [("OE", 3)]  # separate group, no collision
+        assert ie.lookup_internal_group("-Goki") == [("OE", 3)]
+        assert ie.lookup_internal_group("-Tsundere-Raws") == [("TOS", 1)]
+        assert ie.lookup_internal_group("-TAoE") == []  # umbrella tag alone is not listed
+
 
 def _run(meta: dict[str, Any]) -> tuple[str, str]:
     return asyncio.run(ie.check_internal_exclusivity(meta, CONFIG))

@@ -7,6 +7,7 @@
 # `internal` flag when the source torrent ID is known from the client.
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -22,6 +23,31 @@ INTERNAL_GROUPS: dict[str, dict[str, Optional[int]]] = {
     "TOS": {group.lower(): 1 for group in TOS._TOS_INTERNAL_GROUPS},
     "LST": {group.lower(): 3 for group in ("L0ST", "KIMJI", "coffee", "SQS", "Yuki", "hallowed")},
     "HDT": {group.lower(): None for group in ("126811", "DownRev")},
+    "OE": {
+        group.lower(): 3
+        for group in (
+            "BiNGUS",
+            "Breeze",
+            "DarQ",
+            "DarQ HONE",
+            "DBMS",
+            "edge2020",
+            "edwood",
+            "Goki",
+            "Goki(TAoE)",
+            "GRiMM",
+            "JBENT",
+            "JBENT(TAoE)",
+            "NOXXUS",
+            "OnlyMux",
+            "OnlyWeb",
+            "PrimeX",
+            "Ralphy",
+            "sCOOTER",
+            "Vialle",
+            "WhiskeyJack",
+        )
+    },
 }
 
 # Origins without a queryable API (HDT marks internal releases only with a
@@ -65,11 +91,18 @@ def exclusivity_active(days: Optional[int], created_at: Optional[datetime], now:
     return now - created_at < timedelta(days=days)
 
 
+def _normalize_group(group: str) -> str:
+    # Display names and file names write the same tag differently
+    # ("DarQ HONE" vs "DarQ.HONE", "JBENT(TAoE)" vs "JBENT.TAoE"): compare on
+    # alphanumerics only.
+    return re.sub(r"[^a-z0-9]", "", group.lower())
+
+
 def lookup_internal_group(tag: str) -> list[tuple[str, Optional[int]]]:
-    group = tag.lstrip("-").lower()
+    group = _normalize_group(tag.lstrip("-"))
     if not group:
         return []
-    return [(tracker, groups[group]) for tracker, groups in INTERNAL_GROUPS.items() if group in groups]
+    return [(tracker, days) for tracker, groups in INTERNAL_GROUPS.items() for listed, days in groups.items() if _normalize_group(listed) == group]
 
 
 async def _fetch_origin_attributes(tracker: str, torrent_id: str, config: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -200,7 +233,7 @@ async def check_internal_destination_bans(meta: dict[str, Any], config: dict[str
         if not at_risk:
             continue
         origin_id_known = meta.get(origin.lower()) is not None
-        group_is_listed = tag_group in rule["groups"]
+        group_is_listed = _normalize_group(tag_group) in {_normalize_group(g) for g in rule["groups"]}
         if not origin_id_known and not group_is_listed:
             continue
         attributes = await _origin_attributes(origin, meta, config)
