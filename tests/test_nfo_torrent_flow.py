@@ -142,7 +142,7 @@ class TestAutoNfoAttribute:
 
     def test_non_french_trackers_not_in_auto_nfo(self):
         from src.trackersetup import nfo_auto_trackers
-        for tracker in ("BLU", "AITHER", "FNP", "LUME", "HDB", "PTP"):
+        for tracker in ("BLU", "AITHER", "DP", "LUME", "HDB", "PTP"):
             assert tracker not in nfo_auto_trackers, f"{tracker} should not be in nfo_auto_trackers"
 
 
@@ -457,8 +457,8 @@ class TestProactiveKeepNfo:
     def test_auto_nfo_tracker_confirmed_nfo_on_disk_sets_keep_nfo(self, tmp_path):
         meta = self._make_meta(
             tmp_path,
-            trackers=["C411", "FNP"],
-            tracker_upload_flags={"C411": True, "FNP": True},
+            trackers=["C411", "DP"],
+            tracker_upload_flags={"C411": True, "DP": True},
             has_nfo_on_disk=True,
         )
         result = self._run_proactive_detection(meta)
@@ -467,19 +467,19 @@ class TestProactiveKeepNfo:
     def test_no_nfo_on_disk_keep_nfo_stays_false(self, tmp_path):
         meta = self._make_meta(
             tmp_path,
-            trackers=["C411", "FNP"],
-            tracker_upload_flags={"C411": True, "FNP": True},
+            trackers=["C411", "DP"],
+            tracker_upload_flags={"C411": True, "DP": True},
             has_nfo_on_disk=False,
         )
         result = self._run_proactive_detection(meta)
         assert result["keep_nfo"] is False
 
     def test_only_skip_nfo_tracker_does_not_set_keep_nfo(self, tmp_path):
-        """FNP alone (skip_nfo tracker, not auto_nfo) must not set keep_nfo."""
+        """DP alone (skip_nfo tracker, not auto_nfo) must not set keep_nfo."""
         meta = self._make_meta(
             tmp_path,
-            trackers=["FNP", "LUME"],
-            tracker_upload_flags={"FNP": True, "LUME": True},
+            trackers=["DP", "LUME"],
+            tracker_upload_flags={"DP": True, "LUME": True},
             has_nfo_on_disk=True,
         )
         result = self._run_proactive_detection(meta)
@@ -489,8 +489,8 @@ class TestProactiveKeepNfo:
         """C411 in tracker list but upload=False — keep_nfo must not be set."""
         meta = self._make_meta(
             tmp_path,
-            trackers=["C411", "FNP"],
-            tracker_upload_flags={"C411": False, "FNP": True},
+            trackers=["C411", "DP"],
+            tracker_upload_flags={"C411": False, "DP": True},
             has_nfo_on_disk=True,
         )
         result = self._run_proactive_detection(meta)

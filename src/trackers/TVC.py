@@ -796,7 +796,7 @@ class TVC:
         comparison: bool = False,
     ) -> str:
         """
-        Build and write the tracker-specific DESCRIPTION.txt file (FNP multi-block style).
+        Build and write the tracker-specific DESCRIPTION.txt file (multi-block style).
 
         Constructs BBCode-formatted description text for discs, TV packs,
         episodes, or movies using multiple separate [center] blocks.

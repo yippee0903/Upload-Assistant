@@ -2097,7 +2097,6 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "dp": ["https://darkpeers.org"],
         "ff": ["tracker.funfile.org"],
         "fl": ["reactor.filelist", "reactor.thefl.org"],
-        "fnp": ["https://fearnopeer.com"],
         "g3mini": ["gemini-tracker.org"],
         "gf": ["generation-free.org"],
         "gpw": ["https://tracker.greatposterwall.com"],
@@ -2138,7 +2137,6 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "ttr": ["https://torrenteros.org"],
         "tvc": ["https://tvchaosuk.com"],
         "ulcx": ["https://upload.cx"],
-        "yoink": ["yoinked.org"],
         "yus": ["https://yu-scene.net"],
     }
     found_ids: set[str] = set()
