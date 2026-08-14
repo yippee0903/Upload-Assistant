@@ -19,6 +19,7 @@ from src.trackers.TOS import TOS
 # for 24 hours.
 INTERNAL_GROUPS: dict[str, dict[str, Optional[int]]] = {
     "TOS": {group.lower(): 1 for group in TOS._TOS_INTERNAL_GROUPS},
+    "LST": {group.lower(): 3 for group in ("L0ST", "KIMJI", "coffee", "SQS", "Yuki")},
 }
 
 

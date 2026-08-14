@@ -41,6 +41,7 @@ class TestPureFunctions:
         assert ie.lookup_internal_group("") == []
         assert ie.lookup_internal_group("-zYz") == [("TOS", 1)]  # TOS internals: 24h window
         assert ie.lookup_internal_group("-ZYZ") == [("TOS", 1)]  # case-insensitive
+        assert ie.lookup_internal_group("-L0ST") == [("LST", 3)]  # LST internals: 3-day window
         assert ie.lookup_internal_group("-NTb") == []
 
 
