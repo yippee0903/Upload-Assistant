@@ -37,6 +37,21 @@ class TestPureFunctions:
         assert ie._parse_created_at("garbage") is None
         assert ie._parse_created_at(None) is None
 
+    def test_search_term(self):
+        assert ie._search_term({"filelist": ["/media/x/Some.Movie.1962.1080p-GRP.mkv"], "uuid": "ignored"}) == "Some.Movie.1962.1080p-GRP.mkv"
+        assert ie._search_term({"uuid": "Some.Show.S01.1080p-GRP"}) == "Some.Show.S01.1080p-GRP"
+        assert ie._search_term({}) == ""
+
+    def test_pick_search_result_prefers_matching_group(self):
+        data = [
+            {"attributes": {"name": "Show.S01E01.1080p.WEB-OTHER", "internal": False}},
+            {"attributes": {"name": "Show.S01.1080p.WEB-zYz", "internal": True}},
+        ]
+        assert ie._pick_search_result(data, "-zYz")["internal"] is True
+        assert ie._pick_search_result(data, "-KIMJI") is None  # wrong group: no blind first hit
+        assert ie._pick_search_result(data, "")["name"].endswith("-OTHER")  # no tag: first hit
+        assert ie._pick_search_result([], "-zYz") is None
+
     def test_lookup_internal_group(self):
         assert ie.lookup_internal_group("") == []
         assert ie.lookup_internal_group("-zYz") == [("TOS", 1)]  # TOS internals: 24h window
@@ -50,14 +65,19 @@ def _run(meta: dict[str, Any]) -> tuple[str, str]:
 
 
 class TestOrchestrator:
-    def _patch_fetch(self, monkeypatch: Any, attributes: Any) -> list[tuple[str, str]]:
+    def _patch_fetch(self, monkeypatch: Any, attributes: Any, search_attributes: Any = None) -> list[tuple[str, str]]:
         calls: list[tuple[str, str]] = []
 
         async def fake_fetch(tracker: str, torrent_id: str, config: Any) -> Any:
             calls.append((tracker, torrent_id))
             return attributes
 
+        async def fake_search(tracker: str, meta: Any, config: Any) -> Any:
+            calls.append((tracker, "search"))
+            return search_attributes
+
         monkeypatch.setattr(ie, "_fetch_origin_attributes", fake_fetch)
+        monkeypatch.setattr(ie, "_search_origin_attributes", fake_search)
         return calls
 
     def test_blocked_on_confirmed_internal(self, monkeypatch: Any):
@@ -83,15 +103,26 @@ class TestOrchestrator:
         self._patch_fetch(monkeypatch, {"internal": True, "created_at": "2020-01-01T00:00:00.000000Z"})
         assert _run({"tag": "-zYz", "tos": "123"})[0] == "clear"
 
-    def test_warn_without_origin_id(self, monkeypatch: Any):
-        calls = self._patch_fetch(monkeypatch, {"internal": True})
+    def test_no_origin_id_falls_back_to_search(self, monkeypatch: Any):
+        fresh = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        calls = self._patch_fetch(monkeypatch, None, search_attributes={"internal": True, "created_at": fresh})
+        verdict, _reason = _run({"tag": "-zYz"})
+        assert verdict == "blocked"
+        assert calls == [("TOS", "search")]
+
+    def test_search_says_not_internal(self, monkeypatch: Any):
+        self._patch_fetch(monkeypatch, None, search_attributes={"internal": False})
+        assert _run({"tag": "-zYz"})[0] == "clear"
+
+    def test_warn_when_origin_unfindable(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, None, search_attributes=None)
         verdict, reason = _run({"tag": "-zYz"})
         assert verdict == "warn"
         assert "zYz" in reason
-        assert calls == []
+        assert calls == [("TOS", "search")]
 
     def test_warn_on_fetch_failure(self, monkeypatch: Any):
-        self._patch_fetch(monkeypatch, None)
+        self._patch_fetch(monkeypatch, None, search_attributes=None)
         assert _run({"tag": "-zYz", "tos": "123"})[0] == "warn"
 
     def test_clear_on_empty_or_unknown_tag(self, monkeypatch: Any):
@@ -115,14 +146,19 @@ def test_table_trackers_are_wired() -> None:
 
 
 class TestDestinationBans:
-    def _patch_fetch(self, monkeypatch: Any, attributes: Any) -> list[tuple[str, str]]:
+    def _patch_fetch(self, monkeypatch: Any, attributes: Any, search_attributes: Any = None) -> list[tuple[str, str]]:
         calls: list[tuple[str, str]] = []
 
         async def fake_fetch(tracker: str, torrent_id: str, config: Any) -> Any:
             calls.append((tracker, torrent_id))
             return attributes
 
+        async def fake_search(tracker: str, meta: Any, config: Any) -> Any:
+            calls.append((tracker, "search"))
+            return search_attributes
+
         monkeypatch.setattr(ie, "_fetch_origin_attributes", fake_fetch)
+        monkeypatch.setattr(ie, "_search_origin_attributes", fake_search)
         return calls
 
     def _run(self, meta: dict[str, Any]) -> list[tuple[str, str]]:
@@ -138,12 +174,18 @@ class TestDestinationBans:
         self._patch_fetch(monkeypatch, {"internal": False})
         assert self._run({"acm": "77", "trackers": ["TL"]}) == []
 
-    def test_no_origin_id_no_ban(self, monkeypatch: Any):
-        calls = self._patch_fetch(monkeypatch, {"internal": 1})
-        assert self._run({"trackers": ["TL"]}) == []
+    def test_known_group_without_id_triggers_search(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, None, search_attributes={"internal": 1})
+        bans = self._run({"tag": "-iZON3", "trackers": ["TL"]})
+        assert [d for d, _ in bans] == ["TL"]
+        assert calls == [("ACM", "search")]
+
+    def test_unknown_group_without_id_no_ban(self, monkeypatch: Any):
+        calls = self._patch_fetch(monkeypatch, None, search_attributes={"internal": 1})
+        assert self._run({"tag": "-NTb", "trackers": ["TL"]}) == []
         assert calls == []
 
     def test_banned_destination_not_targeted(self, monkeypatch: Any):
         calls = self._patch_fetch(monkeypatch, {"internal": 1})
-        assert self._run({"acm": "77", "trackers": ["LST"]}) == []
-        assert calls == []  # no fetch when no targeted destination is at risk
+        assert self._run({"acm": "77", "tag": "-iZON3", "trackers": ["LST"]}) == []
+        assert calls == []  # no API call when no targeted destination is at risk

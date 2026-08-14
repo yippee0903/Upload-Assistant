@@ -6,6 +6,7 @@
 # check combines the hard-coded table below with the origin tracker's API
 # `internal` flag when the source torrent ID is known from the client.
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -25,10 +26,14 @@ INTERNAL_GROUPS: dict[str, dict[str, Optional[int]]] = {
 
 # Origin tracker -> destinations its internal releases must never be uploaded
 # to. Detection is API-flag only (no group table needed): when the origin
-# torrent is known from the client and flagged internal, the destination is
+# torrent is identified (by client ID or by searching the origin tracker for
+# a known internal group's release) and flagged internal, the destination is
 # dropped from the upload targets.
-INTERNAL_DESTINATION_BANS: dict[str, frozenset[str]] = {
-    "ACM": frozenset({"TL"}),
+INTERNAL_DESTINATION_BANS: dict[str, dict[str, frozenset[str]]] = {
+    "ACM": {
+        "destinations": frozenset({"TL"}),
+        "groups": frozenset({"acm", "arin", "izon3", "kawairemux"}),
+    },
 }
 
 
@@ -87,6 +92,63 @@ async def _fetch_origin_attributes(tracker: str, torrent_id: str, config: dict[s
     return attributes if isinstance(attributes, dict) else None
 
 
+def _search_term(meta: dict[str, Any]) -> str:
+    filelist = meta.get("filelist") or []
+    if filelist:
+        return os.path.basename(str(filelist[0]))
+    return str(meta.get("uuid") or "")
+
+
+async def _search_origin_attributes(tracker: str, meta: dict[str, Any], config: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Search the origin tracker by file name when no torrent ID is known."""
+    from src.trackersetup import tracker_class_map
+
+    api_key = str(config.get("TRACKERS", {}).get(tracker, {}).get("api_key") or "").strip()
+    file_name = _search_term(meta)
+    if not api_key or not file_name:
+        return None
+    try:
+        instance = tracker_class_map[tracker](config=config)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                url=instance.search_url,
+                params={"api_token": api_key, "file_name": file_name},
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            json_response = response.json()
+    except (httpx.RequestError, httpx.TimeoutException, ValueError, KeyError, AttributeError):
+        return None
+    data = json_response.get("data") if isinstance(json_response, dict) else None
+    if not isinstance(data, list):
+        return None
+    return _pick_search_result(data, str(meta.get("tag") or ""))
+
+
+def _pick_search_result(data: list[Any], tag: str) -> Optional[dict[str, Any]]:
+    # A file-name search can match several torrents carrying the same file
+    # (e.g. a single episode and a season pack): only trust a hit whose
+    # release name ends with the group we are checking.
+    group = tag.lstrip("-").lower()
+    for item in data:
+        attributes = item.get("attributes") if isinstance(item, dict) else None
+        if not isinstance(attributes, dict):
+            continue
+        name = str(attributes.get("name") or "").lower()
+        if not group or name.endswith(f"-{group}"):
+            return attributes
+    return None
+
+
+async def _origin_attributes(tracker: str, meta: dict[str, Any], config: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Best effort: fetch by known torrent ID, else search by file name."""
+    torrent_id = meta.get(tracker.lower())
+    if torrent_id is not None:
+        attributes = await _fetch_origin_attributes(tracker, str(torrent_id), config)
+        if attributes is not None:
+            return attributes
+    return await _search_origin_attributes(tracker, meta, config)
+
+
 async def check_internal_exclusivity(meta: dict[str, Any], config: dict[str, Any]) -> tuple[str, str]:
     """Returns (verdict, reason) with verdict in {"blocked", "warn", "clear"}."""
     tag = str(meta.get("tag") or "")
@@ -97,11 +159,7 @@ async def check_internal_exclusivity(meta: dict[str, Any], config: dict[str, Any
     group = tag.lstrip("-")
     warn_trackers: list[str] = []
     for tracker, days in candidates:
-        torrent_id = meta.get(tracker.lower())
-        if torrent_id is None:
-            warn_trackers.append(tracker)
-            continue
-        attributes = await _fetch_origin_attributes(tracker, str(torrent_id), config)
+        attributes = await _origin_attributes(tracker, meta, config)
         if attributes is None:
             warn_trackers.append(tracker)
             continue
@@ -123,12 +181,16 @@ async def check_internal_destination_bans(meta: dict[str, Any], config: dict[str
     """Returns [(destination, reason)] for targeted destinations that must be dropped."""
     targets = {str(t).upper() for t in meta.get("trackers") or []}
     bans: list[tuple[str, str]] = []
-    for origin, destinations in INTERNAL_DESTINATION_BANS.items():
-        at_risk = destinations & targets
-        torrent_id = meta.get(origin.lower())
-        if not at_risk or torrent_id is None:
+    tag_group = str(meta.get("tag") or "").lstrip("-").lower()
+    for origin, rule in INTERNAL_DESTINATION_BANS.items():
+        at_risk = rule["destinations"] & targets
+        if not at_risk:
             continue
-        attributes = await _fetch_origin_attributes(origin, str(torrent_id), config)
+        origin_id_known = meta.get(origin.lower()) is not None
+        group_is_listed = tag_group in rule["groups"]
+        if not origin_id_known and not group_is_listed:
+            continue
+        attributes = await _origin_attributes(origin, meta, config)
         if attributes and attributes.get("internal"):
             reason = f"internal release on {origin}, which forbids uploading its internals there"
             bans.extend((destination, reason) for destination in sorted(at_risk))
