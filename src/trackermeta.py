@@ -30,6 +30,11 @@ ImageDict: TypeAlias = dict[str, Any]
 
 expected_images = 0
 
+# Sources whose descriptions are written in a language other than English:
+# French, Portuguese, Spanish, Italian, Polish and Nordic sites. Their IDs and
+# images are reused, their description text never is.
+NON_ENGLISH_SOURCE_TRACKERS = frozenset({"TOS", "G3MINI", "GF", "NST", "CBR", "LCD", "SAM", "PT", "EMUW", "LT", "TTR", "ITT", "SHRI", "PTT", "RAS"})
+
 
 def _apply_config(next_config: dict[str, Any]) -> None:
     global config, default_config, trackers_config, expected_images
@@ -620,9 +625,9 @@ async def update_metadata_from_tracker(
         "TTR",
         "UTP",
     ]:
-        # French-language sites: reuse IDs and images, but never the
-        # description text, which would land on English-speaking destinations.
-        only_id = only_id or tracker_name in ("TOS", "G3MINI", "GF", "NST")
+        # Non-English sites: reuse IDs and images, but never the description
+        # text, which would land on English-speaking destinations.
+        only_id = only_id or tracker_name in NON_ENGLISH_SOURCE_TRACKERS
         if meta.get(tracker_key) is not None:
             if meta["debug"]:
                 console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
