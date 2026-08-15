@@ -15,6 +15,16 @@ config = {
         # succeeded. Leave empty to disable.
         "webhook_url": "",
 
+        # Route Upload-Assistant's outgoing HTTP(S) traffic (tracker APIs,
+        # image hosts, metadata providers) through an HTTP proxy, e.g. a
+        # VPN container proxy: "http://127.0.0.1:3128".
+        # Leave empty to disable. Explicit HTTP_PROXY/HTTPS_PROXY environment
+        # variables take precedence over this setting.
+        "proxy_url": "",
+        # Comma-separated hosts that bypass the proxy (keep your local
+        # torrent client here so it is not routed through the VPN).
+        "proxy_bypass": "localhost,127.0.0.1",
+
         # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
