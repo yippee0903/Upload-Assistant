@@ -166,7 +166,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         try:
             if await check_image_link(img_url, timeout):
                 try:
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
                         try:
                             async with session.get(img_url) as response:
                                 if response.status == 200:
@@ -251,7 +251,7 @@ async def check_image_link(url: str, timeout: Optional[aiohttp.ClientTimeout] = 
     connector = aiohttp.TCPConnector(ssl=False)  # Disable SSL verification for testing
 
     try:
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector, trust_env=True) as session:
             try:
                 async with session.get(url) as response:
                     if response.status == 200:

@@ -43,6 +43,7 @@ from src.get_tracker_data import TrackerDataManager
 from src.internal_exclusivity import check_internal_destination_bans, check_internal_exclusivity
 from src.languages import languages_manager
 from src.nfo_link import NfoLinkManager
+from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.takescreens import TakeScreensManager
@@ -241,6 +242,7 @@ if os.path.exists(_config_path):
         from data.config import config as _imported_config  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
         config = cast(dict[str, Any], _imported_config)
+        apply_proxy_env(config)
         parser = Args(config)
         client = Clients(config)
         name_manager = NameManager(config)
