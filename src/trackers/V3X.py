@@ -259,7 +259,7 @@ class V3X(FrenchTrackerMixin):
         return None
 
     async def _build_description(self, meta: Meta) -> str:
-        """BBCode description in the C411/TORR9 presentation style: centered,
+        """BBCode description in the C411 presentation style: centered,
         section headers, language flags for audio/subtitles, clickable
         screenshot thumbnails. The MediaInfo report goes into the dedicated
         nfo upload field, not here."""

@@ -10,7 +10,7 @@ Before the fix the regex `(?<=-)` would match right after the hyphen in
 tracker naming to produce duplicated audio/codec tokens, e.g.:
     Cyclo.1995.1080p.WEB-DL.AAC.2.0.H.264.mkv
     → meta["tag"] = "-DL.AAC.2.0.H.264"      (wrong)
-    → TORR9 name: …H264-DL.AAC.2.0.H.264     (malformed)
+    → tracker name: …H264-DL.AAC.2.0.H.264   (malformed)
 
 After the fix, both `(?<!WEB-)` and `(?<!Blu-)` lookbehinds prevent the
 regex from firing right after the hyphens in those source tokens.

@@ -42,10 +42,10 @@ config = {
 
         # If true, warn and ask for confirmation when no English audio or English subtitles are detected.
         # Set false to disable this check globally (useful for non-English content uploaders).
-        # Trackers that don't require English (e.g. C411, TORR9) disable this check automatically.
+        # Trackers that don't require English (e.g. C411, V3X) disable this check automatically.
         "english_language_check": True,
 
-        # If true, warn and ask for confirmation when uploading to French trackers (C411, TORR9, etc.)
+        # If true, warn and ask for confirmation when uploading to French trackers (C411, V3X, etc.)
         # without any French audio or French subtitles detected.
         # Set false to disable this check globally.
         "french_language_check": True,
@@ -389,7 +389,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TORR9, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -975,22 +975,6 @@ config = {
             "link_dir_name": "",
             "api_key": "",
             "anon": False,
-        },
-        "TORR9": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # torr9.net — French private tracker (custom REST API)
-            # Login credentials — used to obtain a Bearer JWT automatically
-            "username": "",
-            "password": "",
-            # Or supply a static Bearer token directly (alternative to username/password)
-            # "api_key": "",
-            # Announce URL with your passkey — found in your Torr9 profile
-            "announce_url": "https://tracker.torr9.net/announce/YOUR_PASSKEY",
-            # Upload anonymously
-            "anon": False,
-            # Include screenshots in the upload description (default: False)
-            "include_screenshots": False,
         },
         "TOS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

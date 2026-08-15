@@ -2139,7 +2139,6 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "tik": ["cinematik.net"],
         "tl": ["tracker.tleechreload", "tracker.torrentleech"],
         "tlz": ["https://tlzdigital.com/"],
-        "torr9": ["tracker.torr9.xyz", "tracker.torr9.net"],
         "tos": ["https://theoldschool.cc"],
         "ttr": ["https://torrenteros.org"],
         "tvc": ["https://tvchaosuk.com"],

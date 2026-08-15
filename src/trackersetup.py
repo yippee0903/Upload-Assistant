@@ -79,7 +79,6 @@ from src.trackers.THR import THR
 from src.trackers.TIK import TIK
 from src.trackers.TL import TL
 from src.trackers.TLZ import TLZ
-from src.trackers.TORR9 import TORR9
 from src.trackers.TOS import TOS
 from src.trackers.TTG import TTG
 from src.trackers.TTR import TTR
@@ -1387,7 +1386,6 @@ tracker_class_map: dict[str, type[Any]] = {
     "TIK": TIK,
     "TL": TL,
     "TLZ": TLZ,
-    "TORR9": TORR9,
     "TOS": TOS,
     "TVC": TVC,
     "TTG": TTG,
@@ -1445,7 +1443,7 @@ api_trackers = {
 # Trackers with a custom (non-UNIT3D) JSON/REST API.
 # Upload flow: same tracker_class.upload() entry point as api_trackers, but no mod-queue/draft handling;
 # descriptions built via tracker_class.edit_desc(). Some entries have tracker-specific quirks (e.g. SN rate-limit delay).
-other_api_trackers = {"ANT", "BHDTV", "C411", "DC", "GPW", "NBL", "NXM", "RTF", "SN", "SPD", "TL", "TORR9", "TVC", "V3X"}
+other_api_trackers = {"ANT", "BHDTV", "C411", "DC", "GPW", "NBL", "NXM", "RTF", "SN", "SPD", "TL", "TVC", "V3X"}
 
 # Trackers without a public API: upload is performed via HTTP form/scraping.
 # Upload flow: tracker_class.upload() handles web requests directly; no API key negotiation.
@@ -1469,7 +1467,7 @@ def determine_keep_nfo(meta: dict, tracker_status: dict, target_trackers: list) 
 
     Sets keep_nfo when:
     - not already set, not a disc release
-    - at least one confirmed auto_nfo tracker (C411, TORR9, …) is in the upload set
+    - at least one confirmed auto_nfo tracker (C411, NXM, …) is in the upload set
     - at least one .nfo file exists on disk next to the content
 
     Lives in trackersetup so it can be imported from tests without triggering

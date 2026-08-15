@@ -5,7 +5,7 @@ when uploading to a mixed tracker set (skip_nfo + auto_nfo):
 
   Step 1 — BASE.torrent hashed WITH NFO
             upload.py proactively sets keep_nfo=True because an auto_nfo
-            tracker (C411/TORR9/…) is confirmed for upload and a .nfo
+            tracker (C411/V3X/…) is confirmed for upload and a .nfo
             file is present on disk.
 
   Step 2 — BASE_NONFO.torrent derived by *stripping* the NFO from BASE
@@ -13,7 +13,7 @@ when uploading to a mixed tracker set (skip_nfo + auto_nfo):
             that straddles the video/NFO boundary needs to be read from
             disk — no full rehash.
 
-  Step 3 — auto_nfo trackers (C411, TORR9) call _recreated_torrent_if_nfo;
+  Step 3 — auto_nfo trackers (C411, V3X) call _recreated_torrent_if_nfo;
             because BASE already contains the NFO they clone it directly
             via create_torrent_for_upload — no additional hash.
 
@@ -116,9 +116,9 @@ class TestAutoNfoAttribute:
         from src.trackers.C411 import C411
         assert getattr(C411, "auto_nfo", False) is True
 
-    def test_torr9_inherits_auto_nfo(self):
-        from src.trackers.TORR9 import TORR9
-        assert getattr(TORR9, "auto_nfo", False) is True
+    def test_v3x_inherits_auto_nfo(self):
+        from src.trackers.V3X import V3X
+        assert getattr(V3X, "auto_nfo", False) is True
 
     def test_nxm_inherits_auto_nfo(self):
         from src.trackers.NXM import NXM
@@ -131,7 +131,7 @@ class TestAutoNfoAttribute:
     def test_nfo_auto_trackers_contains_expected(self):
         from src.trackersetup import nfo_auto_trackers
         # All French-mixin trackers must appear
-        for tracker in ("C411", "TORR9", "NXM", "GF", "G3MINI", "NST", "TOS"):
+        for tracker in ("C411", "V3X", "NXM", "GF", "G3MINI", "NST", "TOS"):
             assert tracker in nfo_auto_trackers, f"{tracker} missing from nfo_auto_trackers"
 
     def test_skip_nfo_trackers_not_in_auto_nfo(self):
@@ -520,11 +520,11 @@ class TestProactiveKeepNfo:
         result = self._run_proactive_detection(meta)
         assert result["keep_nfo"] is True  # preserved as-is
 
-    def test_torr9_confirmed_sets_keep_nfo(self, tmp_path):
+    def test_v3x_confirmed_sets_keep_nfo(self, tmp_path):
         meta = self._make_meta(
             tmp_path,
-            trackers=["TORR9", "LUME"],
-            tracker_upload_flags={"TORR9": True, "LUME": True},
+            trackers=["V3X", "LUME"],
+            tracker_upload_flags={"V3X": True, "LUME": True},
             has_nfo_on_disk=True,
         )
         result = self._run_proactive_detection(meta)
@@ -791,9 +791,9 @@ class TestRecreateTorrentIfNfoNoExtraHash:
 
     def _setup(self, tmp_path: Path, tracker: str) -> tuple[dict[str, Any], Any]:
         from src.trackers.C411 import C411
-        from src.trackers.TORR9 import TORR9
+        from src.trackers.V3X import V3X
 
-        cls = C411 if tracker == "C411" else TORR9
+        cls = C411 if tracker == "C411" else V3X
         config = {
             "TRACKERS": {tracker: {"api_key": "fake", "announce_url": "https://fake.tracker/announce"}},
             "DEFAULT": {"tmdb_api": "fake", "rehash_cooldown": 0},
@@ -830,7 +830,7 @@ class TestRecreateTorrentIfNfoNoExtraHash:
         }
         return meta, tracker_obj
 
-    @pytest.mark.parametrize("tracker", ["C411", "TORR9"])
+    @pytest.mark.parametrize("tracker", ["C411", "V3X"])
     def test_clone_used_when_base_has_nfo(self, tmp_path, tracker):
         """BASE has NFO → create_torrent_for_upload (clone) called, TorrentCreator.create_torrent NOT called."""
         from src.trackers.COMMON import COMMON
@@ -866,7 +866,7 @@ class TestRecreateTorrentIfNfoNoExtraHash:
         assert full_hash_calls == [], \
             "TorrentCreator.create_torrent (full hash) must NOT be called"
 
-    @pytest.mark.parametrize("tracker", ["C411", "TORR9"])
+    @pytest.mark.parametrize("tracker", ["C411", "V3X"])
     def test_full_hash_used_when_base_has_no_nfo(self, tmp_path, tracker):
         """BASE without NFO → _recreated_torrent_if_nfo falls back to full hash."""
         from src.trackers.COMMON import COMMON
