@@ -500,3 +500,69 @@ class TestAnimeDetection:
 
     def test_explicit_anime_beats_documentary(self):
         assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
+
+
+def test_generated_nfo_gets_complete_name_patched(monkeypatch: Any, tmp_path: Any):
+    name = "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
+    uuid = name
+    (tmp_path / "tmp" / uuid).mkdir(parents=True)
+    (tmp_path / "tmp" / uuid / "[V3X].torrent").write_bytes(b"fake-torrent")
+    (tmp_path / "tmp" / uuid / "MEDIAINFO_CLEANPATH.txt").write_text("General\nComplete name : /downloads/original.file.mkv\nfake mediainfo")
+
+    tracker = V3X(_config())
+
+    async def fake_create(meta: Any, tracker_name: Any, source_flag: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": name}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    _FakeClient.response = _FakeResponse(201, {"id": "x"})
+    _FakeClient.captured = {}
+    meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
+    asyncio.run(tracker.upload(meta, ""))
+    assert f"Complete name : {name}.mkv" in _FakeClient.captured["data"]["nfo"]
+
+
+def test_upload_retries_once_on_network_error(monkeypatch: Any, tmp_path: Any):
+    class _FlakyClient(_FakeClient):
+        calls = 0
+
+        async def post(self, url: str, **kwargs: Any) -> _FakeResponse:
+            _FlakyClient.calls += 1
+            if _FlakyClient.calls == 1:
+                raise v3x_module.httpx.ConnectError("boom")
+            _FakeClient.captured = {"url": url, **kwargs}
+            return _FakeClient.response
+
+    name = "Some.Movie.2024.1080p.WEB-GRP"
+    (tmp_path / "tmp" / name).mkdir(parents=True)
+    (tmp_path / "tmp" / name / "[V3X].torrent").write_bytes(b"fake-torrent")
+    tracker = V3X(_config())
+
+    async def fake_create(meta: Any, tracker_name: Any, source_flag: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": name}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FlakyClient)
+    _FakeClient.response = _FakeResponse(201, {"id": "x"})
+    meta = {"base_dir": str(tmp_path), "uuid": name, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
+    assert asyncio.run(tracker.upload(meta, "")) is True
+    assert _FlakyClient.calls == 2

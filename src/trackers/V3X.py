@@ -142,7 +142,7 @@ class V3X(FrenchTrackerMixin):
         C = "#3d85c6"  # accent colour
         parts: list[str] = []
 
-        mi_text = ((await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")) or b"").decode("utf-8", errors="replace")
+        mi_text = await self._get_mediainfo_text(meta)
 
         fr_data: dict[str, Any] = {}
         with contextlib.suppress(Exception):
@@ -255,7 +255,12 @@ class V3X(FrenchTrackerMixin):
             return None
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
-        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
+        # Embed the release NFO in the .torrent when one exists (cheap
+        # patch/clone paths before a full rehash), like the other French trackers.
+        if self._get_nfo_files(meta):
+            await self._recreated_torrent_if_nfo(meta, self.common, self.config, self.tracker, self.source_flag)
+        else:
+            await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         name_result = await self.get_name(meta)
         name = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
@@ -266,17 +271,20 @@ class V3X(FrenchTrackerMixin):
             return False
 
         description = await self._build_description(meta)
-        # The site rules keep the ORIGINAL release NFO; fall back to MediaInfo
-        nfo_bytes = None
-        nfo_files = self._get_nfo_files(meta)
-        if nfo_files:
+        # The site rules keep the ORIGINAL release NFO (shipped untouched);
+        # otherwise fall back to MediaInfo / a generated scene NFO, with the
+        # "Complete name" line patched to the tracker release name.
+        nfo_text = ""
+        is_scene_nfo = bool(self._get_nfo_files(meta))
+        nfo_path = await self._get_or_generate_nfo(meta)
+        if nfo_path:
             try:
-                async with aiofiles.open(nfo_files[0], "rb") as f:
-                    nfo_bytes = await f.read()
+                async with aiofiles.open(nfo_path, "rb") as f:
+                    nfo_text = (await f.read()).decode("utf-8", errors="replace")
             except OSError:
-                nfo_bytes = None
-        if not nfo_bytes:
-            nfo_bytes = await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")
+                nfo_text = ""
+        if nfo_text and not is_scene_nfo:
+            nfo_text = self._patch_mi_filename(nfo_text, name)
 
         data: dict[str, Any] = {
             "name": name,
@@ -285,8 +293,8 @@ class V3X(FrenchTrackerMixin):
             "description": description,
             "anonymous": "true" if (meta.get("anon") or self.config["TRACKERS"].get(self.tracker, {}).get("anon", False)) else "false",
         }
-        if nfo_bytes:
-            data["nfo"] = nfo_bytes.decode("utf-8", errors="replace")
+        if nfo_text:
+            data["nfo"] = nfo_text
         if int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
         # MediaInfo-based tag first (knows VOF/VOQ/VFB/AD/MUET); fall back
@@ -303,12 +311,18 @@ class V3X(FrenchTrackerMixin):
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode, not uploaded."
             return True
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-                response = await client.post(self.upload_url, files=files, data=data, headers=headers)
-        except (httpx.RequestError, httpx.TimeoutException) as e:
-            meta["tracker_status"][self.tracker]["status_message"] = f"data error: upload failed: {type(e).__name__}"
-            return False
+        response = None
+        for attempt, timeout in enumerate((60.0, 120.0)):
+            try:
+                async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                    response = await client.post(self.upload_url, files=files, data=data, headers=headers)
+                break
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                if attempt == 0:
+                    console.print(f"[yellow]{self.tracker}: upload attempt failed ({type(e).__name__}), retrying…[/yellow]")
+                    continue
+                meta["tracker_status"][self.tracker]["status_message"] = f"data error: upload failed: {type(e).__name__}"
+                return False
 
         try:
             response_data = response.json()
