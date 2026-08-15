@@ -5,6 +5,8 @@
 import asyncio
 from typing import Any
 
+import pytest
+
 import src.trackers.V3X as v3x_module
 from src.trackers.V3X import V3X
 
@@ -63,42 +65,116 @@ class TestCategoryMapping:
 
 
 class TestSearchExisting:
-    def _pass_checks(self, monkeypatch: Any, tracker: V3X, result: bool = True) -> None:
+    def _prep(self, monkeypatch: Any, tracker: V3X, checks: bool = True, fr_title: str = "") -> None:
         async def fake_checks(meta: Any) -> bool:
-            return result
+            return checks
+
+        async def fake_fr(meta: Any) -> str:
+            return fr_title
+
+        async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+            return None
 
         monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+        monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+        monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
 
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(
             200,
-            {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}]},
+            {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}], "total": 1},
         )
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
+        self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug"}]
-        assert _FakeClient.captured["params"]["q"] == "Some Movie"
+        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug", "id": "uuid-1"}]
+        # Query uses the longest single word (separator-agnostic substring match)
+        assert _FakeClient.captured["params"]["q"] == "Movie"
 
-    def test_search_http_error_returns_empty(self, monkeypatch: Any):
+    def test_search_filters_irrelevant_results(self, monkeypatch: Any):
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.response = _FakeResponse(
+            200,
+            {
+                "torrents": [
+                    {"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1},
+                    {"id": "u2", "slug": "s2", "name": "Other.Movie.2024.1080p.WEB-GRP", "size": 2},
+                    {"id": "u3", "slug": "s3", "name": "Some.Movie.2024.2160p.WEB-GRP", "size": 3},
+                ],
+                "total": 3,
+            },
+        )
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        meta = {"title": "Some Movie", "year": 2024, "resolution": "1080p"}
+        dupes = asyncio.run(tracker.search_existing(meta))
+        assert [d["name"] for d in dupes] == ["Some.Movie.2024.1080p.WEB-GRP"]
+
+    def test_search_http_error_fails_closed(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(503, {})
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
-        assert asyncio.run(tracker.search_existing({"title": "X"})) == []
+        self._prep(monkeypatch, tracker)
+        meta: dict[str, Any] = {"title": "X"}
+        assert asyncio.run(tracker.search_existing(meta)) == []
+        assert meta["skipping"] == "V3X"
 
     def test_empty_title_skips_search(self, monkeypatch: Any):
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
+        self._prep(monkeypatch, tracker)
         assert asyncio.run(tracker.search_existing({})) == []
 
     def test_failed_language_check_skips_tracker(self, monkeypatch: Any):
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker, result=False)
+        self._prep(monkeypatch, tracker, checks=False)
         meta: dict[str, Any] = {"title": "X"}
         assert asyncio.run(tracker.search_existing(meta)) == []
         assert meta["skipping"] == "V3X"
+
+    def test_search_paginates_until_total(self, monkeypatch: Any):
+        pages = {
+            1: {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-AAA", "size": 1}], "total": 2},
+            2: {"torrents": [{"id": "u2", "slug": "s2", "name": "Some.Movie.2024.1080p.WEB-BBB", "size": 2}], "total": 2},
+        }
+
+        class _PagingClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                page = kwargs.get("params", {}).get("page", 1)
+                return _FakeResponse(200, pages[page])
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _PagingClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+        assert [d["name"] for d in dupes] == ["Some.Movie.2024.1080p.WEB-AAA", "Some.Movie.2024.1080p.WEB-BBB"]
+
+    def test_french_title_adds_second_query(self, monkeypatch: Any):
+        seen_queries: list[str] = []
+
+        class _RecordingClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                seen_queries.append(kwargs.get("params", {}).get("q", ""))
+                return _FakeResponse(200, {"torrents": [], "total": 0})
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RecordingClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker, fr_title="Les Infiltrés")
+        asyncio.run(tracker.search_existing({"title": "The Departed"}))
+        assert seen_queries == ["Departed", "Infiltres"]
+
+    def test_enrichment_adds_file_lists(self, monkeypatch: Any):
+        class _DetailClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                return _FakeResponse(200, {"files": [{"path": "a.mkv", "size": 1}, {"path": "b.srt", "size": 2}]})
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _DetailClient)
+        tracker = V3X(_config())
+        dupes = [{"name": "X", "id": "uuid-1"}, {"name": "Y"}]
+        asyncio.run(tracker._enrich_with_files(dupes))
+        assert dupes[0]["files"] == ["a.mkv", "b.srt"]
+        assert dupes[0]["file_count"] == 2
+        assert "files" not in dupes[1]
 
 
 class TestUpload:
@@ -241,10 +317,9 @@ class TestDocumentaryCategory:
     def test_documentary_keyword_fallback(self):
         assert self._cat({"category": "MOVIE", "keywords": "documentary, mining"}) == "5"
 
-    def test_anime_series_beats_documentary(self):
-        # NST ordering: anime first for TV, documentary first for movies
+    def test_explicit_anime_beats_documentary_both_categories(self):
         assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
-        assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "5"
+        assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "2"
 
 
 def test_scene_nfo_preferred_over_mediainfo(monkeypatch: Any, tmp_path: Any) -> None:
@@ -332,6 +407,7 @@ def test_upload_network_error_reports_failure(monkeypatch: Any, tmp_path: Any) -
     monkeypatch.setattr(tracker, "get_name", fake_get_name)
     monkeypatch.setattr(tracker, "_build_description", fake_desc)
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RaisingClient)
+    monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
     meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "debug": False, "tracker_status": {"V3X": {}}}
     assert asyncio.run(tracker.upload(meta, "")) is False
     assert "upload failed" in str(meta["tracker_status"]["V3X"]["status_message"])
@@ -362,3 +438,297 @@ def test_config_anon_flag_makes_upload_anonymous(monkeypatch: Any, tmp_path: Any
     meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
     asyncio.run(tracker.upload(meta, ""))
     assert _FakeClient.captured["data"]["anonymous"] == "true"
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP", "MULTI,VFF"),
+        ("Some.Movie.2024.MULTi.VF2.2160p.BluRay.REMUX-GRP", "MULTI,VF2"),
+        ("Some.Movie.2024.MULTi.VFQ.1080p.WEB-GRP", "MULTI,VFQ"),
+        ("Some Movie 2024 MULTi VFi 1080p BluRay-GRP", "MULTI,VFI"),
+        ("Some.Show.S01.MULTi.1080p.WEB-GRP", "MULTI"),
+        ("Some.Movie.2024.MULTi.TRUEFRENCH.2160p.WEB-GRP", "MULTI,TRUEFRENCH"),
+        ("Some.Movie.2024.FRENCH.1080p.WEB-GRP", "FRENCH"),
+        ("Some.Movie.2024.VFF.1080p.WEBRip-GRP", "VFF"),
+        ("Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "VOSTFR"),
+        ("Some.Movie.2024.SUBFRENCH.1080p.WEB-GRP", "VOSTFR"),
+        ("Some.Movie.2024.1080p.WEB-GRP", ""),
+    ],
+)
+def test_language_tag_detection(name: str, expected: str):
+    assert V3X._get_language_tag(name) == expected
+
+
+def _prep_upload(monkeypatch: Any, tmp_path: Any, name: str, *, mediainfo: str = "General\nfake mediainfo", client: Any = _FakeClient) -> tuple[V3X, dict[str, Any]]:
+    """Shared upload-test scaffolding: tmp files, stubs, fake HTTP client."""
+    (tmp_path / "tmp" / name).mkdir(parents=True)
+    (tmp_path / "tmp" / name / "[V3X].torrent").write_bytes(b"fake-torrent")
+    (tmp_path / "tmp" / name / "MEDIAINFO_CLEANPATH.txt").write_text(mediainfo)
+    tracker = V3X(_config())
+
+    async def fake_create(*args: Any, **kwargs: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": name}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", client)
+    monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
+    _FakeClient.response = _FakeResponse(201, {"id": "x"})
+    _FakeClient.captured = {}
+    meta = {"base_dir": str(tmp_path), "uuid": name, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
+    return tracker, meta
+
+
+def _run_upload_with_name(monkeypatch: Any, tmp_path: Any, name: str) -> dict[str, Any]:
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, name)
+    asyncio.run(tracker.upload(meta, ""))
+    return _FakeClient.captured["data"]
+
+
+def test_upload_sends_language_field(monkeypatch: Any, tmp_path: Any):
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Show.S01.MULTi.VFF.1080p.WEB.H264-GRP")
+    assert data["language"] == "MULTI,VFF"
+
+
+def test_upload_omits_language_when_undetected(monkeypatch: Any, tmp_path: Any):
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
+    assert "language" not in data
+
+
+def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: Any):
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    _FakeClient.response = _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "size": 1}]})
+    tracker = V3X(_config())
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    seen: dict[str, Any] = {}
+
+    async def fake_filter(dupes: Any, meta: Any) -> Any:
+        seen["dupes"] = list(dupes)
+        return [{**d, "flags": ["filtered"]} for d in dupes]
+
+    async def fake_fr(meta: Any) -> str:
+        return ""
+
+    async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+        return None
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+    monkeypatch.setattr(tracker, "_check_french_lang_dupes", fake_filter)
+    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+    assert seen["dupes"][0]["name"] == "Some.Movie.2024.VOSTFR.1080p.WEB-GRP"
+    assert dupes[0]["flags"] == ["filtered"]
+
+
+def test_edit_desc_is_a_noop():
+    assert asyncio.run(V3X(_config()).edit_desc({})) is None
+
+
+class TestNamingConventions:
+    def test_audio_tokens_are_normalized(self):
+        tracker = V3X(_config())
+        result = tracker._format_name("Some Movie 2024 MULTi VFF 1080p WEB DD 5.1 Atmos H264-GRP")
+        assert ".AC3." in result["name"]
+        assert ".ATMOS." in result["name"]
+
+    def test_atmos_moves_between_codec_and_channels(self):
+        tracker = V3X(_config())
+        result = tracker._format_name("Some Movie 2024 MULTi 2160p WEB DDP 5.1 Atmos H265-GRP")
+        assert ".DDP.ATMOS.5.1." in result["name"]
+
+    def test_web_codec_h_form_without_encode_settings(self):
+        meta = {"type": "WEBDL", "has_encode_settings": False}
+        assert V3X._enforce_web_codec_convention(meta, "Movie.2024.WEB.x265-GRP") == "Movie.2024.WEB.H265-GRP"
+
+    def test_web_codec_x_form_with_encode_settings(self):
+        meta = {"type": "WEBRIP", "has_encode_settings": True}
+        assert V3X._enforce_web_codec_convention(meta, "Movie.2024.WEB.H264-GRP") == "Movie.2024.WEB.x264-GRP"
+
+    def test_notag_label_registered(self):
+        from src.trackersetup import notag_labels
+
+        assert notag_labels["V3X"] == "NOTAG"
+
+
+def test_upload_language_prefers_mediainfo_analysis(monkeypatch: Any, tmp_path: Any):
+    async def fake_audio_string(self: Any, meta: Any) -> str:
+        return "MULTI.VOF"
+
+    monkeypatch.setattr(V3X, "_build_audio_string", fake_audio_string)
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP")
+    assert data["language"] == "MULTI,VOF"
+
+
+class TestAnimeDetection:
+    def _cat(self, meta: dict[str, Any]) -> str:
+        return asyncio.run(V3X(_config()).get_category_id(meta))
+
+    def test_mal_id_marks_anime(self):
+        assert self._cat({"category": "TV", "mal_id": 123}) == "3"
+        assert self._cat({"category": "MOVIE", "mal_id": 123}) == "2"
+
+    def test_animation_genre_marks_anime(self):
+        assert self._cat({"category": "MOVIE", "genres": "Animation, Comedy"}) == "2"
+        assert self._cat({"category": "TV", "genres": "Animation"}) == "3"
+
+    def test_animated_documentary_goes_to_documentary(self):
+        assert self._cat({"category": "MOVIE", "genres": "Animation, Documentary"}) == "5"
+        assert self._cat({"category": "TV", "genres": "Animation, Documentary"}) == "6"
+
+
+def test_generated_nfo_gets_complete_name_patched(monkeypatch: Any, tmp_path: Any):
+    name = "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, name, mediainfo="General\nComplete name : /downloads/original.file.mkv\nfake mediainfo")
+    asyncio.run(tracker.upload(meta, ""))
+    assert f"Complete name : {name}.mkv" in _FakeClient.captured["data"]["nfo"]
+
+
+def test_upload_retries_once_on_network_error(monkeypatch: Any, tmp_path: Any):
+    class _FlakyClient(_FakeClient):
+        calls = 0
+
+        async def post(self, url: str, **kwargs: Any) -> _FakeResponse:
+            _FlakyClient.calls += 1
+            if _FlakyClient.calls == 1:
+                raise v3x_module.httpx.ConnectError("boom")
+            _FakeClient.captured = {"url": url, **kwargs}
+            return _FakeClient.response
+
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP", client=_FlakyClient)
+    assert asyncio.run(tracker.upload(meta, "")) is True
+    assert _FlakyClient.calls == 2
+
+
+def test_description_informations_section(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs.get("append_to_response") == "credits"
+        return {
+            "title": "Un Film",
+            "overview": "Synopsis fr.",
+            "production_countries": [{"name": "France"}],
+            "genres": [{"name": "Drame"}, {"name": "Thriller"}],
+            "release_date": "2010-07-15",
+            "runtime": 148,
+            "vote_average": 8.4,
+            "vote_count": 1234,
+            "credits": {
+                "crew": [
+                    {"job": "Director", "name": "Alice Martin"},
+                    {"job": "Screenplay", "name": "Bob Durand"},
+                    {"job": "Writer", "name": "Bob Durand"},
+                ],
+                "cast": [{"name": "Actor One"}, {"name": "Actor Two"}],
+            },
+        }
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+
+    async def fake_mi(meta: Any) -> str:
+        return "Video\nBit rate : 12.5 Mb/s\n"
+
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {
+        "base_dir": str(tmp_path),
+        "uuid": "X",
+        "title": "Some Movie",
+        "original_title": "Some Movie",
+        "year": 2010,
+        "category": "MOVIE",
+        "tmdb_id": 27205,
+        "imdb_id": 1375666,
+        "service": "NF",
+        "video_encode": "H265",
+        "video_codec": "HEVC",
+        "resolution": "1080p",
+    }
+    desc = asyncio.run(tracker._build_description(meta))
+
+    assert "━━━ Informations ━━━" in desc
+    assert "[b][color=#3d85c6]Titre original :[/color][/b] [i]Some Movie[/i]" in desc
+    assert "[i]France[/i]" in desc
+    assert "[i]Drame, Thriller[/i]" in desc
+    assert "[i]jeudi 15 juillet 2010[/i]" in desc
+    assert "[i]2h28[/i]" in desc
+    assert "Réalisateur :[/color][/b] [i]Alice Martin[/i]" in desc
+    assert "Scénariste :[/color][/b] [i]Bob Durand[/i]" in desc
+    assert "[i]Actor One, Actor Two[/i]" in desc
+    assert "[i]8.4 (1234 votes)[/i]" in desc
+    assert "[url=https://www.imdb.com/title/tt1375666/]IMDb[/url]" in desc
+    assert "[url=https://www.themoviedb.org/movie/27205]TMDB[/url]" in desc
+    assert "Service :[/color][/b] NF" in desc
+    assert "Codec vidéo :[/color][/b] H265 (HEVC)" in desc
+    assert "Débit vidéo :[/color][/b] 12.5 Mb/s" in desc
+    # Informations comes after the poster and before the Synopsis
+    assert desc.index("━━━ Informations ━━━") < desc.index("━━━ Synopsis ━━━")
+
+
+def test_search_paginates_without_total_until_short_page(monkeypatch: Any):
+    calls: list[int] = []
+
+    class _NoTotalClient(_FakeClient):
+        async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+            page = kwargs.get("params", {}).get("page", 1)
+            calls.append(page)
+            if page == 1:
+                torrents = [{"id": f"u{i}", "slug": f"s{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": i} for i in range(100)]
+            else:
+                torrents = [{"id": "last", "slug": "last", "name": "Some.Movie.2024.1080p.WEB-LAST", "size": 1}]
+            return _FakeResponse(200, {"torrents": torrents})
+
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _NoTotalClient)
+    tracker = V3X(_config())
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    async def fake_fr(meta: Any) -> str:
+        return ""
+
+    async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+        return None
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+    # Full first page without a total → a second page is fetched; the short
+    # second page ends the walk. No skipping, all 101 results kept.
+    assert calls == [1, 2]
+    assert len(dupes) == 101
+
+
+def test_description_survives_non_numeric_ids(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+
+    async def fake_mi(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {"base_dir": str(tmp_path), "uuid": "X", "title": "Some Movie", "category": "MOVIE", "imdb_id": "tt1375666", "tmdb_id": "not-a-number"}
+    desc = asyncio.run(tracker._build_description(meta))
+    assert "[url=https://www.imdb.com/title/tt1375666/]IMDb[/url]" in desc
+    assert "themoviedb.org" not in desc

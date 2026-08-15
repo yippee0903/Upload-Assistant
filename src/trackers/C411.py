@@ -15,7 +15,6 @@ import contextlib
 import json
 import os
 import re
-from datetime import datetime
 from typing import Any, Union
 
 import aiofiles
@@ -25,7 +24,6 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
@@ -168,18 +166,7 @@ class C411(FrenchTrackerMixin):
         meta["edition"] = re.sub(r"\bCriterion(?:\s+Collection)?\b", "", edition, flags=re.IGNORECASE).strip()
 
         result = await super().get_name(meta)
-
-        release_type = str(meta.get("type", "")).upper()
-        if release_type in ("WEBDL", "WEBRIP"):
-            if meta.get("has_encode_settings", False):
-                # Re-encoded: codec must be lowercase-x form
-                result["name"] = re.sub(r"\.H264\b", ".x264", result["name"], flags=re.IGNORECASE)
-                result["name"] = re.sub(r"\.H265\b", ".x265", result["name"], flags=re.IGNORECASE)
-            else:
-                # True WEB-DL (no re-encoding): codec must be H-form
-                result["name"] = re.sub(r"\.x264\b", ".H264", result["name"], flags=re.IGNORECASE)
-                result["name"] = re.sub(r"\.x265\b", ".H265", result["name"], flags=re.IGNORECASE)
-
+        result["name"] = self._enforce_web_codec_convention(meta, result["name"])
         return result
 
     def _format_name(self, raw_name: str) -> dict[str, str]:
@@ -199,28 +186,7 @@ class C411(FrenchTrackerMixin):
           ``Hier.J.Arrete``   instead of ``Hier.J.arrete``
         """
         result = super()._format_name(raw_name)
-        dot_name = result["name"]
-
-        # ── C411 audio codec normalization ──
-        # DD → AC3 (but not DDP which stays as-is)
-        dot_name = re.sub(r"\.DD\.", ".AC3.", dot_name)
-        # TrueHD → TRUEHD (case normalization)
-        dot_name = re.sub(r"\.TrueHD\.", ".TRUEHD.", dot_name, flags=re.IGNORECASE)
-        dot_name = re.sub(r"\.TrueHD$", ".TRUEHD", dot_name, flags=re.IGNORECASE)
-        # DTS-HD.MA → DTS.HD.MA (dash to dot)
-        dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
-        dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
-        # DTS:X → DTS.X (colon to dot)
-        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
-        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
-        # Atmos capitalization
-        dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
-        dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
-        # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
-        # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
-        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
-        dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = self._normalize_audio_name_tokens(result["name"])
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split(".")
@@ -833,31 +799,6 @@ class C411(FrenchTrackerMixin):
     #  Description builder   (BBCode — matches C411 site template)
     # ──────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _format_french_date(date_str: str) -> str:
-        """Format YYYY-MM-DD to French full date, e.g. 'jeudi 15 juillet 2010'."""
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-            months = [
-                "",
-                "janvier",
-                "février",
-                "mars",
-                "avril",
-                "mai",
-                "juin",
-                "juillet",
-                "août",
-                "septembre",
-                "octobre",
-                "novembre",
-                "décembre",
-            ]
-            return f"{days[dt.weekday()]} {dt.day} {months[dt.month]} {dt.year}"
-        except (ValueError, IndexError):
-            return date_str
-
     async def _build_description(self, meta: Meta) -> str:
         """Build C411-compliant BBCode description matching site template.
 
@@ -1171,79 +1112,6 @@ class C411(FrenchTrackerMixin):
 
         return "\n".join(parts)
 
-    @staticmethod
-    def _patch_mi_filename(mi_text: str, new_name: str) -> str:
-        """Replace the ‘Complete name’ value in MediaInfo text with *new_name*.
-
-        C411’s API validates that the filename inside the uploaded MediaInfo
-        matches the release name.  Since we rename releases (language tags,
-        -NOTAG label, French title…) the original filename no longer matches.
-        This patches the ‘Complete name’ line while preserving the file extension.
-        """
-        if not mi_text or not new_name:
-            return mi_text
-
-        def _replace_complete_name(match: re.Match[str]) -> str:
-            prefix = match.group(1)  # "Complete name    : "
-            old_value = match.group(2)
-            ext_match = re.search(r"(\.[a-zA-Z0-9]{2,4})$", old_value)
-            ext = ext_match.group(1) if ext_match else ""
-            return f"{prefix}{new_name}{ext}"
-
-        return re.sub(
-            r"^(Complete name\s*:\s*)(.+)$",
-            _replace_complete_name,
-            mi_text,
-            count=1,
-            flags=re.MULTILINE,
-        )
-
-    async def _get_mediainfo_text(self, meta: Meta) -> str:
-        """Read MediaInfo text from temp files.
-
-        The ‘Complete name’ line is patched to match the C411-generated
-        release name so that the API filename-consistency check passes.
-        """
-        base = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
-        content = ""
-
-        # Prefer clean-path, then standard mediainfo
-        for fname in ("MEDIAINFO_CLEANPATH.txt", "MEDIAINFO.txt"):
-            fpath = os.path.join(base, fname)
-            if os.path.exists(fpath):
-                async with aiofiles.open(fpath, encoding="utf-8") as f:
-                    content = await f.read()
-                    if content.strip():
-                        break
-                    content = ""
-
-        # BDInfo for disc releases
-        if not content and meta.get("bdinfo") is not None:
-            bd_path = os.path.join(base, "BD_SUMMARY_00.txt")
-            if os.path.exists(bd_path):
-                async with aiofiles.open(bd_path, encoding="utf-8") as f:
-                    return await f.read()
-
-        # Fallback: use in-memory mediainfo from prep
-        if not content:
-            fallback = str(meta.get("mediainfo_text") or "").strip()
-            if fallback:
-                content = fallback
-
-        if not content:
-            return ""
-
-        # Patch “Complete name” to match the tracker-generated release name
-        try:
-            name_result = await self.get_name(meta)
-            tracker_release_name = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
-            if tracker_release_name:
-                content = self._patch_mi_filename(content, tracker_release_name)
-        except Exception:
-            pass  # If naming fails, return unpatched MI
-
-        return content
-
     async def _build_tmdb_data(self, meta: Meta) -> Union[str, None]:
         """Build tmdbData JSON string for C411.
 
@@ -1395,34 +1263,6 @@ class C411(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
     #  NFO generation
     # ──────────────────────────────────────────────────────────
-
-    async def _get_or_generate_nfo(self, meta: Meta) -> Union[str, None]:
-        """Generate a MediaInfo-based NFO for the upload.
-
-        C411 requires an NFO file for every upload.
-        Either an NFO file generated by MediaInfo,
-        or an NFO file included with the release.
-        """
-        nfo_files = self._get_nfo_files(meta)
-        if nfo_files:
-            return nfo_files[0]
-        else:
-            return await self._get_or_generate_mediainfo_as_nfo(meta)
-
-    async def _get_or_generate_mediainfo_as_nfo(self, meta: Meta) -> Union[str, None]:
-        """Sub-function of _get_or_generate_nfo to get MI file if exists
-        Else, generate a NFO
-        """
-        mi_dir = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
-        mi_clean = os.path.join(mi_dir, "MEDIAINFO_CLEANPATH.txt")
-        mi = os.path.join(mi_dir, "MEDIAINFO.txt")
-        if os.path.isfile(mi_clean):
-            return mi_clean
-        elif os.path.isfile(mi):
-            return mi
-        else:
-            nfo_gen = SceneNfoGenerator(self.config)
-            return await nfo_gen.generate_nfo(meta, self.tracker)
 
     # ──────────────────────────────────────────────────────────
     #  Upload / Search interface

@@ -15,12 +15,15 @@ import glob
 import hashlib
 import os
 import re
+from datetime import datetime
 from typing import Any, Optional, Union
 
+import aiofiles
 from unidecode import unidecode
 
 from src.audio import AD_TRACK_RE, codec_info_from_track
 from src.console import console
+from src.nfo_generator import SceneNfoGenerator
 from src.predb_fr import crosscheck as predb_fr_crosscheck
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -1117,6 +1120,48 @@ class FrenchTrackerMixin:
 
         return self._format_name(name)
 
+    @staticmethod
+    def _normalize_audio_name_tokens(dot_name: str) -> str:
+        """Normalize audio codec tokens in a dotted release name to the
+        French-scene convention: DD→AC3, TRUEHD, DTS.HD.MA, DTS.X, and
+        ATMOS placed between the codec and the channel count.
+        """
+        # DD → AC3 (but not DDP which stays as-is)
+        dot_name = re.sub(r"\.DD\.", ".AC3.", dot_name)
+        # TrueHD → TRUEHD (case normalization)
+        dot_name = re.sub(r"\.TrueHD\.", ".TRUEHD.", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.TrueHD$", ".TRUEHD", dot_name, flags=re.IGNORECASE)
+        # DTS-HD.MA → DTS.HD.MA (dash to dot)
+        dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
+        dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
+        # DTS:X → DTS.X (colon to dot)
+        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
+        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
+        # Atmos capitalization
+        dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
+        # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
+        # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
+        dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        return dot_name
+
+    @staticmethod
+    def _enforce_web_codec_convention(meta: Meta, name: str) -> str:
+        """WEB codec token per the actual MediaInfo, not the type label:
+        untouched WEB streams (no Encoded_Library_Settings) use H264/H265,
+        re-encodes use x264/x265.
+        """
+        if str(meta.get("type", "")).upper() in ("WEBDL", "WEBRIP"):
+            if meta.get("has_encode_settings", False):
+                name = re.sub(r"\.H264\b", ".x264", name, flags=re.IGNORECASE)
+                name = re.sub(r"\.H265\b", ".x265", name, flags=re.IGNORECASE)
+            else:
+                name = re.sub(r"\.x264\b", ".H264", name, flags=re.IGNORECASE)
+                name = re.sub(r"\.x265\b", ".H265", name, flags=re.IGNORECASE)
+        return name
+
     def _format_name(self, raw_name: str) -> dict[str, str]:
         """Clean and format the release name (dot-separated by default).
 
@@ -2114,6 +2159,132 @@ class FrenchTrackerMixin:
         nfo_kb = len(nfo_data) / 1024
         tail_mb = len(last_piece_data) / (1024 * 1024)
         return (nfo_kb, tail_mb)
+
+    @staticmethod
+    def _patch_mi_filename(mi_text: str, new_name: str) -> str:
+        """Replace the ‘Complete name’ value in MediaInfo text with *new_name*.
+
+        French trackers rename releases (language tags, notag label, French
+        title…), so the original filename inside a MediaInfo report no longer
+        matches the generated release name — some sites (e.g. C411) even
+        validate the two against each other.  This patches the ‘Complete
+        name’ line while preserving the file extension.
+        """
+        if not mi_text or not new_name:
+            return mi_text
+
+        def _replace_complete_name(match: re.Match[str]) -> str:
+            prefix = match.group(1)  # "Complete name    : "
+            old_value = match.group(2)
+            ext_match = re.search(r"(\.[a-zA-Z0-9]{2,4})$", old_value)
+            ext = ext_match.group(1) if ext_match else ""
+            return f"{prefix}{new_name}{ext}"
+
+        return re.sub(
+            r"^(Complete name\s*:\s*)(.+)$",
+            _replace_complete_name,
+            mi_text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
+    async def _get_mediainfo_text(self, meta: Meta) -> str:
+        """Read MediaInfo text from temp files (BDInfo/in-memory fallbacks).
+
+        The ‘Complete name’ line is patched to match the tracker-generated
+        release name (some sites, e.g. C411, check the two for consistency).
+        """
+        base = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
+        content = ""
+
+        # Prefer clean-path, then standard mediainfo
+        for fname in ("MEDIAINFO_CLEANPATH.txt", "MEDIAINFO.txt"):
+            fpath = os.path.join(base, fname)
+            if os.path.exists(fpath):
+                async with aiofiles.open(fpath, encoding="utf-8") as f:
+                    content = await f.read()
+                    if content.strip():
+                        break
+                    content = ""
+
+        # BDInfo for disc releases
+        if not content and meta.get("bdinfo") is not None:
+            bd_path = os.path.join(base, "BD_SUMMARY_00.txt")
+            if os.path.exists(bd_path):
+                async with aiofiles.open(bd_path, encoding="utf-8") as f:
+                    return await f.read()
+
+        # Fallback: use in-memory mediainfo from prep
+        if not content:
+            fallback = str(meta.get("mediainfo_text") or "").strip()
+            if fallback:
+                content = fallback
+
+        if not content:
+            return ""
+
+        # Patch “Complete name” to match the tracker-generated release name
+        try:
+            name_result = await self.get_name(meta)
+            tracker_release_name = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
+            if tracker_release_name:
+                content = self._patch_mi_filename(content, tracker_release_name)
+        except Exception:
+            pass  # If naming fails, return unpatched MI
+
+        return content
+
+    async def _get_or_generate_nfo(self, meta: Meta) -> Union[str, None]:
+        """Pick the NFO to upload: the release's own NFO when present,
+        otherwise a MediaInfo file or a generated scene NFO.
+
+        Useful for trackers that expect an NFO with every upload (e.g. C411).
+        """
+        nfo_files = self._get_nfo_files(meta)
+        if nfo_files:
+            return nfo_files[0]
+        else:
+            return await self._get_or_generate_mediainfo_as_nfo(meta)
+
+    async def _get_or_generate_mediainfo_as_nfo(self, meta: Meta) -> Union[str, None]:
+        """Sub-function of _get_or_generate_nfo to get MI file if exists
+        Else, generate a NFO
+        """
+        mi_dir = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""))
+        mi_clean = os.path.join(mi_dir, "MEDIAINFO_CLEANPATH.txt")
+        mi = os.path.join(mi_dir, "MEDIAINFO.txt")
+        if os.path.isfile(mi_clean):
+            return mi_clean
+        elif os.path.isfile(mi):
+            return mi
+        else:
+            nfo_gen = SceneNfoGenerator(self.config)
+            return await nfo_gen.generate_nfo(meta, self.tracker)
+
+    @staticmethod
+    def _format_french_date(date_str: str) -> str:
+        """Format YYYY-MM-DD to French full date, e.g. 'jeudi 15 juillet 2010'."""
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+            months = [
+                "",
+                "janvier",
+                "février",
+                "mars",
+                "avril",
+                "mai",
+                "juin",
+                "juillet",
+                "août",
+                "septembre",
+                "octobre",
+                "novembre",
+                "décembre",
+            ]
+            return f"{days[dt.weekday()]} {dt.day} {months[dt.month]} {dt.year}"
+        except (ValueError, IndexError):
+            return date_str
 
     async def _recreated_torrent_if_nfo(self, meta: dict[str, Any], common: COMMON, config: dict[str, Any], tracker: str, source_flag: str) -> str:
         """Re-create a .torrent if NFO is provided.
