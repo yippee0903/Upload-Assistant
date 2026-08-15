@@ -149,12 +149,14 @@ class V3X(FrenchTrackerMixin):
             parts.append(" [i]Aucun[/i]")
         parts.append("")
 
-        # ── Screenshots: sized clickable thumbnails, two per row ──
+        # ── Screenshots: clickable thumbnails, two per row. The V3X parser
+        # only understands a bare [img] tag (no [img=N] sizing), so small
+        # renderings depend on the image host providing a thumbnail img_url.
         image_list = meta.get("image_list") or []
         if image_list:
             parts.append(f"[b][color={C}][size=18]━━━ Captures d'écran ━━━[/size][/color][/b]")
             thumbs = [
-                f"[url={img.get('web_url') or img.get('raw_url', '')}][img=350]{img.get('img_url') or img.get('raw_url', '')}[/img][/url]"
+                f"[url={img.get('web_url') or img.get('raw_url', '')}][img]{img.get('img_url') or img.get('raw_url', '')}[/img][/url]"
                 for img in image_list
                 if img.get("img_url") or img.get("raw_url")
             ]

@@ -196,9 +196,8 @@ class TestDescription:
         assert "Résolution :" in desc
         assert "FLAG_FR Français — E-AC-3 5.1" in desc  # mixin flag lines included
         assert "FLAG_FR Français (SRT)" in desc
-        # sized clickable thumbnails, two per row
-        assert "[url=https://img.example.invalid/v1][img=350]https://img.example.invalid/1.md.png[/img][/url] [url=https://img.example.invalid/v2]" in desc
-        assert desc.count("[img=350]") == 3
+        # clickable thumbnails, two per row (bare [img]: V3X has no sizing syntax)
+        assert "[url=https://img.example.invalid/v1][img]https://img.example.invalid/1.md.png[/img][/url] [url=https://img.example.invalid/v2]" in desc
         assert "━━━ Release ━━━" in desc
         assert "Some.Movie.2024.2160p.WEB-GRP" in desc
 
