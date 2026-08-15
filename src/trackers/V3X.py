@@ -243,7 +243,7 @@ class V3X(FrenchTrackerMixin):
             "categoryId": await self.get_category_id(meta),
             "rightsDeclared": "true",
             "description": description,
-            "anonymous": "true" if meta.get("anon") else "false",
+            "anonymous": "true" if (meta.get("anon") or self.config["TRACKERS"].get(self.tracker, {}).get("anon", False)) else "false",
         }
         if nfo_bytes:
             data["nfo"] = nfo_bytes.decode("utf-8", errors="replace")

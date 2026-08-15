@@ -1034,6 +1034,8 @@ config = {
         "V3X": {
             "api_key": "V3X api key (both read and upload scopes)",
             "announce_url": "get from V3X",
+            "anon": False,
+            "link_dir_name": "",
         },
         "UTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
