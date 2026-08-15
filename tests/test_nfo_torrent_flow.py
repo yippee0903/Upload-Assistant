@@ -120,10 +120,6 @@ class TestAutoNfoAttribute:
         from src.trackers.V3X import V3X
         assert getattr(V3X, "auto_nfo", False) is True
 
-    def test_nxm_inherits_auto_nfo(self):
-        from src.trackers.NXM import NXM
-        assert getattr(NXM, "auto_nfo", False) is True
-
     def test_nfo_auto_trackers_frozenset_is_frozenset(self):
         from src.trackersetup import nfo_auto_trackers
         assert isinstance(nfo_auto_trackers, frozenset)
@@ -131,7 +127,7 @@ class TestAutoNfoAttribute:
     def test_nfo_auto_trackers_contains_expected(self):
         from src.trackersetup import nfo_auto_trackers
         # All French-mixin trackers must appear
-        for tracker in ("C411", "V3X", "NXM", "GF", "G3MINI", "NST", "TOS"):
+        for tracker in ("C411", "V3X", "GF", "G3MINI", "NST", "TOS"):
             assert tracker in nfo_auto_trackers, f"{tracker} missing from nfo_auto_trackers"
 
     def test_skip_nfo_trackers_not_in_auto_nfo(self):

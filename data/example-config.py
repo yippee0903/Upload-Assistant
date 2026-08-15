@@ -136,12 +136,6 @@ config = {
         # predb is not consistent, can timeout, but can find some releases not found on SRRDB
         "check_predb": False,
 
-        # Optional cross-check of French-tracker uploads against predb.fr (https://predb.fr).
-        # When set, a TMDB or nuke divergence blocks the upload (prompt to bypass when attended,
-        # refused when unattended); group reputation is advisory only. Also sources the canonical
-        # NFO on an exact release match when none exists on disk. No predb.fr match never blocks.
-        # Get your own key from predb.fr.
-        "predb_fr_api_key": "",
 
         # SCREENSHOT HANDLING
 
@@ -781,17 +775,6 @@ config = {
             # Find the announce URL on https://nostradamus.foo/upload
             "announce_url": "https://tracker.nostradamus.foo/<PASSKEY>/announce",
             "anon": False,
-            # Include screenshots in the upload description (default: False)
-            "include_screenshots": False,
-        },
-        "NXM": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # nexum-core.com — French private tracker (custom API)
-            # Get your API key from your nexum-core.com profile settings
-            "api_key": "",
-            # Announce URL with your passkey — found on your nexum-core.com profile page
-            "announce_url": "https://nexum-core.com/announce/YOUR_PASSKEY",
             # Include screenshots in the upload description (default: False)
             "include_screenshots": False,
         },

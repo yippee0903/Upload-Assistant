@@ -2568,7 +2568,7 @@ class TestADFalsePositiveRegression:
 
 
 class TestFrenchMixinNotagGetName:
-    """Tag replacement in FrenchTrackerMixin.get_name() (used by C411, NXM, etc.)."""
+    """Tag replacement in FrenchTrackerMixin.get_name() (used by C411, V3X, etc.)."""
 
     @pytest.fixture
     def c411(self):
