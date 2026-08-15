@@ -13,11 +13,13 @@
 
 import asyncio
 import contextlib
+import os
 import re
 from typing import Any, Optional
 
 import aiofiles
 import httpx
+from torf import Torrent
 from unidecode import unidecode
 
 from src.console import console
@@ -458,6 +460,38 @@ class V3X(FrenchTrackerMixin):
 
         return "\n".join(parts).strip()
 
+    def _rename_torrent_root(self, meta: Meta, name: str) -> None:
+        """Set the [V3X].torrent internal root name to the generated release name.
+
+        Only metadata outside the piece hashes changes, so no rehash happens —
+        but the infohash does change, letting the client seed this torrent
+        separately through the tracker link directory (which the qBittorrent
+        injection names after the torrent root).
+        """
+        if not name:
+            return
+        torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
+        try:
+            torrent = Torrent.read(torrent_path)
+            new_name = name
+            if torrent.mode == "singlefile":
+                # Single-file torrent: the root IS the file — keep its extension
+                ext = os.path.splitext(str(torrent.name))[1]
+                if ext and not new_name.lower().endswith(ext.lower()):
+                    new_name = f"{name}{ext}"
+            if torrent.name == new_name:
+                return
+            torrent.name = new_name
+            torrent.write(torrent_path, overwrite=True)
+            clients_cfg = self.config.get("TORRENT_CLIENTS", {})
+            has_linking = any(str(c.get("linking", "")).strip() for c in clients_cfg.values() if isinstance(c, dict))
+            if not has_linking:
+                console.print(
+                    f"[yellow]{self.tracker}: torrent root renamed to match the site's naming rules, but no client has linking configured — seeding needs the content path to carry that name.[/yellow]"
+                )
+        except Exception as e:
+            console.print(f"[yellow]{self.tracker}: could not rename torrent root ({e}); the fiche will show the original name.[/yellow]")
+
     async def _read_tmp_file(self, meta: Meta, filename: str) -> Optional[bytes]:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{filename}"
         try:
@@ -485,6 +519,10 @@ class V3X(FrenchTrackerMixin):
 
         name_result = await self.get_name(meta)
         name = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
+
+        # The site displays the .torrent's internal name, not the name field:
+        # rewrite the root so the fiche carries the generated release name.
+        await asyncio.to_thread(self._rename_torrent_root, meta, name)
 
         torrent_bytes = await self._read_tmp_file(meta, f"[{self.tracker}].torrent")
         if not torrent_bytes:

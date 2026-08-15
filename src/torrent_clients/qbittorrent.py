@@ -924,7 +924,10 @@ class QbittorrentClientMixin:
             if cross:
                 linking_success = await create_cross_seed_links(meta=meta, torrent=torrent, tracker_dir=tracker_dir, use_hardlink=use_hardlink, tracker=tracker)
             else:
-                src_name = os.path.basename(src.rstrip(os.sep))
+                # Name the link directory after the torrent's internal root so a
+                # tracker-renamed torrent (e.g. V3X) finds its content; for
+                # torrents that keep the source name this is the same value.
+                src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)
                 # Per-tracker skip_nfo: only skip NFO for trackers that don't want it
                 tracker_skip_nfo = tracker.upper() in nfo_skip_trackers
@@ -933,6 +936,8 @@ class QbittorrentClientMixin:
             allow_fallback = client.get("allow_fallback", True)
             if not linking_success and allow_fallback:
                 console.print(f"[yellow]Using original path without linking: {src}")
+                if str(getattr(torrent, "name", "") or "") not in ("", os.path.basename(src.rstrip(os.sep))):
+                    console.print("[bold yellow]This tracker's torrent has a renamed root; seeding from the original path will not find the files.[/bold yellow]")
                 use_hardlink = False
                 use_symlink = False
             elif not linking_success:
