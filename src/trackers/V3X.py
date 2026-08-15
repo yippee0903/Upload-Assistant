@@ -159,8 +159,15 @@ class V3X(FrenchTrackerMixin):
                     incomplete = True
                     break
                 items.extend(page_items)
+                if not page_items:
+                    break
                 total = payload.get("total") if isinstance(payload.get("total"), int) else None
-                if not page_items or total is None or len(items) >= total:
+                if total is not None:
+                    if len(items) >= total:
+                        break
+                elif len(page_items) < 100:
+                    # No usable total: a short page means we reached the end;
+                    # a full page means there may be more — keep going.
                     break
                 page += 1
 
@@ -221,9 +228,12 @@ class V3X(FrenchTrackerMixin):
         DupeChecker can compare filenames instead of falling back to name
         similarity. Failures leave the entry unchanged.
         """
+        enrich_limit = 25  # one request per dupe — bound the sequential cost
+        if len(dupes) > enrich_limit:
+            console.print(f"[yellow]{self.tracker}: enriching only the first {enrich_limit} of {len(dupes)} dupes; the rest fall back to name similarity.[/yellow]")
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         async with httpx.AsyncClient(timeout=20.0) as client:
-            for entry in dupes:
+            for entry in dupes[:enrich_limit]:
                 torrent_id = entry.get("id")
                 if not torrent_id:
                     continue
@@ -332,13 +342,14 @@ class V3X(FrenchTrackerMixin):
             info_lines.append(f"[b][color={C}]Note des spectateurs :[/color][/b] [i]{vote_avg} ({vote_count} votes)[/i]")
 
         ext_links: list[str] = []
-        imdb_id = meta.get("imdb_id", 0)
-        if imdb_id and int(imdb_id) > 0:
+        imdb_digits = re.sub(r"^tt", "", str(meta.get("imdb_id") or ""), flags=re.IGNORECASE)
+        if imdb_digits.isdigit() and int(imdb_digits) > 0:
             imdb_url = meta.get("imdb_info", {}).get("imdb_url", "") if isinstance(meta.get("imdb_info"), dict) else ""
-            ext_links.append(f"[url={imdb_url or f'https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/'}]IMDb[/url]")
-        if int(meta.get("tmdb_id") or 0):
+            ext_links.append(f"[url={imdb_url or f'https://www.imdb.com/title/tt{imdb_digits.zfill(7)}/'}]IMDb[/url]")
+        tmdb_digits = str(meta.get("tmdb_id") or "")
+        if tmdb_digits.isdigit() and int(tmdb_digits) > 0:
             tmdb_cat = "tv" if str(meta.get("category", "")).upper() == "TV" else "movie"
-            ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{meta['tmdb_id']}]TMDB[/url]")
+            ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{tmdb_digits}]TMDB[/url]")
         if meta.get("tvdb_id"):
             ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
         if meta.get("tvmaze_id"):
@@ -466,7 +477,8 @@ class V3X(FrenchTrackerMixin):
     async def _upload(self, meta: Meta, _disctype: str) -> bool:
         # Embed the release NFO in the .torrent when one exists (cheap
         # patch/clone paths before a full rehash), like the other French trackers.
-        if self._get_nfo_files(meta):
+        nfo_files = self._get_nfo_files(meta)
+        if nfo_files:
             await self._recreated_torrent_if_nfo(meta, self.common, self.config, self.tracker, self.source_flag)
         else:
             await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
@@ -484,8 +496,8 @@ class V3X(FrenchTrackerMixin):
         # otherwise fall back to MediaInfo / a generated scene NFO, with the
         # "Complete name" line patched to the tracker release name.
         nfo_text = ""
-        is_scene_nfo = bool(self._get_nfo_files(meta))
-        nfo_path = await self._get_or_generate_nfo(meta)
+        is_scene_nfo = bool(nfo_files)
+        nfo_path = nfo_files[0] if nfo_files else await self._get_or_generate_mediainfo_as_nfo(meta)
         if nfo_path:
             try:
                 async with aiofiles.open(nfo_path, "rb") as f:
