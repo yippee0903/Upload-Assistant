@@ -256,12 +256,82 @@ def test_scene_nfo_preferred_over_mediainfo(monkeypatch: Any, tmp_path: Any) -> 
     assert tracker._get_nfo_files(meta) == [str(release / "some.release.nfo")]
 
 
-def test_v3x_bloat_is_allowed() -> None:
-    import ast
-    import os
-    import re
+def test_v3x_bloat_is_allowed(monkeypatch: Any) -> None:
+    # Behavioral: an English-original release with an extra German track is
+    # bloat for trackers outside bloat_is_allowed (MTV even gets dropped),
+    # but V3X must stay untouched and unwarned.
+    import src.audio as audio_module
 
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(base, "src/audio.py"), encoding="utf-8") as f:
-        match = re.search(r"bloat_is_allowed = (\[[^\]]*\])", f.read())
-    assert match and "V3X" in ast.literal_eval(match.group(1))
+    printed: list[str] = []
+    monkeypatch.setattr(audio_module.console, "print", lambda *a, **k: printed.append(str(a[0]) if a else ""))
+    meta: dict[str, Any] = {"trackers": ["V3X", "MTV"], "debug": False}
+    audio_module.bloated_check(meta, ["de"], is_eng_original_with_non_eng=True)
+    assert "V3X" in meta["trackers"]
+    assert "MTV" not in meta["trackers"]
+    assert meta.get("bloated_trackers") == ["MTV"]
+    assert not any("V3X" in line for line in printed)
+
+
+class _RaisingClient:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    async def __aenter__(self) -> "_RaisingClient":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        pass
+
+    async def get(self, *args: Any, **kwargs: Any) -> Any:
+        raise v3x_module.httpx.RequestError("boom")
+
+    async def post(self, *args: Any, **kwargs: Any) -> Any:
+        raise v3x_module.httpx.RequestError("boom")
+
+
+def test_search_network_error_returns_empty(monkeypatch: Any) -> None:
+    tracker = V3X(_config())
+
+    async def ok(meta: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(tracker, "get_additional_checks", ok)
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RaisingClient)
+    assert asyncio.run(tracker.search_existing({"title": "X"})) == []
+
+
+def test_search_bad_json_shape_returns_empty(monkeypatch: Any) -> None:
+    tracker = V3X(_config())
+
+    async def ok(meta: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(tracker, "get_additional_checks", ok)
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    for payload in (["not", "a", "dict"], {"torrents": "not-a-list"}):
+        _FakeClient.response = _FakeResponse(200, payload)
+        assert asyncio.run(tracker.search_existing({"title": "X"})) == []
+
+
+def test_upload_network_error_reports_failure(monkeypatch: Any, tmp_path: Any) -> None:
+    tracker = V3X(_config())
+    uuid = "Some.Movie.2024.1080p.WEB-GRP"
+    (tmp_path / "tmp" / uuid).mkdir(parents=True)
+    (tmp_path / "tmp" / uuid / "[V3X].torrent").write_bytes(b"fake-torrent")
+
+    async def fake_create(*args: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": uuid}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RaisingClient)
+    meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "debug": False, "tracker_status": {"V3X": {}}}
+    assert asyncio.run(tracker.upload(meta, "")) is False
+    assert "upload failed" in str(meta["tracker_status"]["V3X"]["status_message"])

@@ -73,9 +73,14 @@ class V3X(FrenchTrackerMixin):
                 if response.status_code != 200:
                     console.print(f"[yellow]{self.tracker}: search returned HTTP {response.status_code}[/yellow]")
                     return dupes
-                torrents = response.json().get("torrents", [])
+                payload = response.json()
         except (httpx.RequestError, httpx.TimeoutException, ValueError) as e:
             console.print(f"[yellow]{self.tracker}: search failed: {type(e).__name__}[/yellow]")
+            return dupes
+
+        torrents = payload.get("torrents") if isinstance(payload, dict) else None
+        if not isinstance(torrents, list):
+            console.print(f"[yellow]{self.tracker}: unexpected search response shape[/yellow]")
             return dupes
 
         meta_tmdb = int(meta.get("tmdb_id") or 0)
@@ -176,7 +181,7 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}")
         file_count = self._count_files(meta)
         if file_count:
-            parts.append(f"[b][color={C}]Nombre de fichier :[/color][/b] {file_count}")
+            parts.append(f"[b][color={C}]Nombre de fichiers :[/color][/b] {file_count}")
         group = self._get_release_group(meta)
         if group:
             parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
