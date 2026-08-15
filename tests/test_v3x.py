@@ -114,7 +114,7 @@ class TestUpload:
 
         monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
         monkeypatch.setattr(tracker, "get_name", fake_get_name)
-        monkeypatch.setattr(v3x_module.DescriptionBuilder, "unit3d_edit_desc", staticmethod(fake_desc))
+        monkeypatch.setattr(tracker, "_build_description", fake_desc)
 
     def test_upload_sends_required_contract(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
@@ -153,3 +153,49 @@ def test_v3x_is_registered() -> None:
 
     assert tracker_class_map["V3X"] is V3X
     assert "V3X" in other_api_trackers
+
+
+class TestDescription:
+    def test_description_follows_tracker_template(self, monkeypatch: Any):
+        tracker = V3X(_config())
+
+        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return {"overview": "Un synopsis en français."}
+
+        async def fake_audio_string(meta: Any) -> str:
+            return "MULTI.VFF"
+
+        monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio_string)
+        meta = {
+            "poster": "https://image.tmdb.org/t/p/original/xyz.jpg",
+            "overview": "English fallback.",
+            "source": "BluRay",
+            "resolution": "2160p",
+            "video_encode": "x265",
+            "audio": "DTS-HD MA 5.1",
+            "subtitle_languages": ["French", "English"],
+            "image_list": [{"img_url": "https://img.example.invalid/t.md.png", "web_url": "https://img.example.invalid/v"}],
+        }
+        desc = asyncio.run(tracker._build_description(meta))
+        assert "/t/p/w500/xyz.jpg" in desc  # poster resized
+        assert "Un synopsis en français." in desc  # French synopsis preferred
+        assert "[b]Source :[/b] BluRay" in desc
+        assert "[b]Qualité vidéo :[/b] 2160p" in desc
+        assert "[b]Audio :[/b] MULTI.VFF — DTS-HD MA 5.1" in desc
+        assert "[b]Sous-titres :[/b] French, English" in desc
+        assert "[url=https://img.example.invalid/v][img]https://img.example.invalid/t.md.png[/img][/url]" in desc
+
+    def test_description_survives_missing_data(self, monkeypatch: Any):
+        tracker = V3X(_config())
+
+        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            raise RuntimeError("tmdb down")
+
+        async def fake_audio_string(meta: Any) -> str:
+            return ""
+
+        monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio_string)
+        desc = asyncio.run(tracker._build_description({"overview": "Fallback only."}))
+        assert "Fallback only." in desc

@@ -10,6 +10,8 @@
 #     required: file (.torrent), name, categoryId (subcategory number), rightsDeclared
 #     accepted: description, nfo, tmdbId, anonymous, language
 
+import contextlib
+import re
 from typing import Any, Optional
 
 import aiofiles
@@ -17,6 +19,7 @@ import httpx
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
 
@@ -38,6 +41,7 @@ class V3X(FrenchTrackerMixin):
         self.search_url = f"{self.api_base}/torrents"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
+        self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
 
     async def get_category_id(self, meta: Meta) -> str:
@@ -75,6 +79,53 @@ class V3X(FrenchTrackerMixin):
             dupes.append({"name": torrent.get("name", ""), "size": torrent.get("size", 0), "link": f"{self.torrent_url}{torrent.get('slug') or torrent.get('id', '')}"})
         return dupes
 
+    async def _build_description(self, meta: Meta) -> str:
+        """Sober description following the tracker's own template: poster,
+        French synopsis, technical lines, clickable screenshot thumbnails.
+        The NFO/MediaInfo goes into the dedicated upload field, not here."""
+        parts: list[str] = []
+
+        poster = str(meta.get("poster") or "")
+        if "image.tmdb.org/t/p/" in poster:
+            poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
+        if poster:
+            parts.append(f"[center][img]{poster}[/img][/center]\n")
+
+        fr_data: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr") or {}
+        synopsis = str(fr_data.get("overview", "")).strip() or str(meta.get("overview", "")).strip()
+        if synopsis:
+            parts.append(synopsis + "\n")
+
+        source = str(meta.get("source") or meta.get("type") or "")
+        if source:
+            parts.append(f"[b]Source :[/b] {source}")
+        resolution = str(meta.get("resolution") or "")
+        if resolution:
+            parts.append(f"[b]Qualité vidéo :[/b] {resolution}")
+        codec = str(meta.get("video_encode") or meta.get("video_codec") or "").strip()
+        if codec:
+            parts.append(f"[b]Codec vidéo :[/b] {codec}")
+        language_tag = await self._build_audio_string(meta)
+        audio_codec = str(meta.get("audio") or "").strip()
+        audio_line = " — ".join(x for x in (language_tag, audio_codec) if x)
+        if audio_line:
+            parts.append(f"[b]Audio :[/b] {audio_line}")
+        subtitles = meta.get("subtitle_languages") or []
+        if subtitles:
+            parts.append(f"[b]Sous-titres :[/b] {', '.join(subtitles)}")
+
+        note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
+        if note:
+            parts.append(f"\n[b]Notes :[/b] {note}")
+
+        screenshots = [f"[url={img.get('web_url', '')}][img]{img.get('img_url', '')}[/img][/url]" for img in meta.get("image_list") or [] if img.get("img_url")]
+        if screenshots:
+            parts.append("\n[center]" + " ".join(screenshots) + "[/center]")
+
+        return "\n".join(parts).strip()
+
     async def _read_tmp_file(self, meta: Meta, filename: str) -> Optional[bytes]:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{filename}"
         try:
@@ -94,7 +145,7 @@ class V3X(FrenchTrackerMixin):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: torrent file missing"
             return False
 
-        description = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
+        description = await self._build_description(meta)
         nfo_bytes = await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")
 
         data: dict[str, Any] = {
