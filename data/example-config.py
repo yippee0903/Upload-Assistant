@@ -379,7 +379,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TORR9, TOS, TTG, TTR, TVC, ULCX, UTP, YUS
+        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TORR9, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -1030,6 +1030,10 @@ config = {
             "anon": False,
             # Send to modq for staff approval
             "modq": False,
+        },
+        "V3X": {
+            "api_key": "V3X api key (both read and upload scopes)",
+            "announce_url": "get from V3X",
         },
         "UTP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
