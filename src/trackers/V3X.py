@@ -59,6 +59,23 @@ class V3X(FrenchTrackerMixin):
             return "5"
         return "2" if meta.get("anime") else "8"
 
+    @staticmethod
+    def _get_language_tag(name: str) -> str:
+        """Language field following the site convention: comma-separated
+        tags from the release name, e.g. "MULTI,VFF", "FRENCH" or "VOSTFR".
+        """
+        tokens = set(name.upper().replace("-", ".").replace("_", ".").replace(" ", ".").split("."))
+        parts: list[str] = []
+        if "MULTI" in tokens:
+            parts.append("MULTI")
+        for tag in ("VF2", "VFF", "VFI", "VFQ", "VFB", "TRUEFRENCH", "FRENCH"):
+            if tag in tokens:
+                parts.append(tag)
+                break
+        if not parts and ("VOSTFR" in tokens or "SUBFRENCH" in tokens):
+            return "VOSTFR"
+        return ",".join(parts)
+
     async def search_existing(self, meta: Meta, _disctype: Any = None) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         if not await self.get_additional_checks(meta):
@@ -249,6 +266,9 @@ class V3X(FrenchTrackerMixin):
             data["nfo"] = nfo_bytes.decode("utf-8", errors="replace")
         if int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
+        language = self._get_language_tag(name)
+        if language:
+            data["language"] = language
 
         files = {"file": (f"{name}.torrent", torrent_bytes, "application/x-bittorrent")}
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}

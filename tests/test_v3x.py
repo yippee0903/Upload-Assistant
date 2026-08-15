@@ -5,6 +5,8 @@
 import asyncio
 from typing import Any
 
+import pytest
+
 import src.trackers.V3X as v3x_module
 from src.trackers.V3X import V3X
 
@@ -362,3 +364,60 @@ def test_config_anon_flag_makes_upload_anonymous(monkeypatch: Any, tmp_path: Any
     meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
     asyncio.run(tracker.upload(meta, ""))
     assert _FakeClient.captured["data"]["anonymous"] == "true"
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP", "MULTI,VFF"),
+        ("Some.Movie.2024.MULTi.VF2.2160p.BluRay.REMUX-GRP", "MULTI,VF2"),
+        ("Some.Movie.2024.MULTi.VFQ.1080p.WEB-GRP", "MULTI,VFQ"),
+        ("Some Movie 2024 MULTi VFi 1080p BluRay-GRP", "MULTI,VFI"),
+        ("Some.Show.S01.MULTi.1080p.WEB-GRP", "MULTI"),
+        ("Some.Movie.2024.MULTi.TRUEFRENCH.2160p.WEB-GRP", "MULTI,TRUEFRENCH"),
+        ("Some.Movie.2024.FRENCH.1080p.WEB-GRP", "FRENCH"),
+        ("Some.Movie.2024.VFF.1080p.WEBRip-GRP", "VFF"),
+        ("Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "VOSTFR"),
+        ("Some.Movie.2024.SUBFRENCH.1080p.WEB-GRP", "VOSTFR"),
+        ("Some.Movie.2024.1080p.WEB-GRP", ""),
+    ],
+)
+def test_language_tag_detection(name: str, expected: str):
+    assert V3X._get_language_tag(name) == expected
+
+
+def _run_upload_with_name(monkeypatch: Any, tmp_path: Any, name: str) -> dict[str, Any]:
+    tracker = V3X(_config())
+    uuid = name
+    (tmp_path / "tmp" / uuid).mkdir(parents=True)
+    (tmp_path / "tmp" / uuid / "[V3X].torrent").write_bytes(b"fake-torrent")
+    (tmp_path / "tmp" / uuid / "MEDIAINFO_CLEANPATH.txt").write_text("General\nfake mediainfo")
+
+    async def fake_create(meta: Any, tracker_name: Any, source_flag: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": name}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    _FakeClient.response = _FakeResponse(201, {"id": "x"})
+    _FakeClient.captured = {}
+    meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
+    asyncio.run(tracker.upload(meta, ""))
+    return _FakeClient.captured["data"]
+
+
+def test_upload_sends_language_field(monkeypatch: Any, tmp_path: Any):
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Show.S01.MULTi.VFF.1080p.WEB.H264-GRP")
+    assert data["language"] == "MULTI,VFF"
+
+
+def test_upload_omits_language_when_undetected(monkeypatch: Any, tmp_path: Any):
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
+    assert "language" not in data
