@@ -109,7 +109,12 @@ class V3X(FrenchTrackerMixin):
             # a dupe pre-filter.
             _ = meta_tmdb
             dupes.append({"name": torrent.get("name", ""), "size": torrent.get("size", 0), "link": f"{self.torrent_url}{torrent.get('slug') or torrent.get('id', '')}"})
-        return dupes
+        return await self._check_french_lang_dupes(dupes, meta)
+
+    async def edit_desc(self, meta: Meta) -> None:
+        # Manual-mode hook required by trackerhandle; the description is
+        # built at upload time instead.
+        return None
 
     async def _build_description(self, meta: Meta) -> str:
         """BBCode description in the C411/TORR9 presentation style: centered,

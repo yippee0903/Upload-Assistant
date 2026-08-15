@@ -421,3 +421,28 @@ def test_upload_sends_language_field(monkeypatch: Any, tmp_path: Any):
 def test_upload_omits_language_when_undetected(monkeypatch: Any, tmp_path: Any):
     data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
     assert "language" not in data
+
+
+def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: Any):
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    _FakeClient.response = _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "size": 1}]})
+    tracker = V3X(_config())
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    seen: dict[str, Any] = {}
+
+    async def fake_filter(dupes: Any, meta: Any) -> Any:
+        seen["dupes"] = list(dupes)
+        return [{**d, "flags": ["filtered"]} for d in dupes]
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_check_french_lang_dupes", fake_filter)
+    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+    assert seen["dupes"][0]["name"] == "Some.Movie.2024.VOSTFR.1080p.WEB-GRP"
+    assert dupes[0]["flags"] == ["filtered"]
+
+
+def test_edit_desc_is_a_noop():
+    assert asyncio.run(V3X(_config()).edit_desc({})) is None
