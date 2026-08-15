@@ -65,42 +65,116 @@ class TestCategoryMapping:
 
 
 class TestSearchExisting:
-    def _pass_checks(self, monkeypatch: Any, tracker: V3X, result: bool = True) -> None:
+    def _prep(self, monkeypatch: Any, tracker: V3X, checks: bool = True, fr_title: str = "") -> None:
         async def fake_checks(meta: Any) -> bool:
-            return result
+            return checks
+
+        async def fake_fr(meta: Any) -> str:
+            return fr_title
+
+        async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+            return None
 
         monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+        monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+        monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
 
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(
             200,
-            {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}]},
+            {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}], "total": 1},
         )
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
+        self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug"}]
-        assert _FakeClient.captured["params"]["q"] == "Some Movie"
+        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug", "id": "uuid-1"}]
+        # Query uses the longest single word (separator-agnostic substring match)
+        assert _FakeClient.captured["params"]["q"] == "Movie"
 
-    def test_search_http_error_returns_empty(self, monkeypatch: Any):
+    def test_search_filters_irrelevant_results(self, monkeypatch: Any):
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.response = _FakeResponse(
+            200,
+            {
+                "torrents": [
+                    {"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1},
+                    {"id": "u2", "slug": "s2", "name": "Other.Movie.2024.1080p.WEB-GRP", "size": 2},
+                    {"id": "u3", "slug": "s3", "name": "Some.Movie.2024.2160p.WEB-GRP", "size": 3},
+                ],
+                "total": 3,
+            },
+        )
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        meta = {"title": "Some Movie", "year": 2024, "resolution": "1080p"}
+        dupes = asyncio.run(tracker.search_existing(meta))
+        assert [d["name"] for d in dupes] == ["Some.Movie.2024.1080p.WEB-GRP"]
+
+    def test_search_http_error_fails_closed(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(503, {})
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
-        assert asyncio.run(tracker.search_existing({"title": "X"})) == []
+        self._prep(monkeypatch, tracker)
+        meta: dict[str, Any] = {"title": "X"}
+        assert asyncio.run(tracker.search_existing(meta)) == []
+        assert meta["skipping"] == "V3X"
 
     def test_empty_title_skips_search(self, monkeypatch: Any):
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker)
+        self._prep(monkeypatch, tracker)
         assert asyncio.run(tracker.search_existing({})) == []
 
     def test_failed_language_check_skips_tracker(self, monkeypatch: Any):
         tracker = V3X(_config())
-        self._pass_checks(monkeypatch, tracker, result=False)
+        self._prep(monkeypatch, tracker, checks=False)
         meta: dict[str, Any] = {"title": "X"}
         assert asyncio.run(tracker.search_existing(meta)) == []
         assert meta["skipping"] == "V3X"
+
+    def test_search_paginates_until_total(self, monkeypatch: Any):
+        pages = {
+            1: {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-AAA", "size": 1}], "total": 2},
+            2: {"torrents": [{"id": "u2", "slug": "s2", "name": "Some.Movie.2024.1080p.WEB-BBB", "size": 2}], "total": 2},
+        }
+
+        class _PagingClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                page = kwargs.get("params", {}).get("page", 1)
+                return _FakeResponse(200, pages[page])
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _PagingClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+        assert [d["name"] for d in dupes] == ["Some.Movie.2024.1080p.WEB-AAA", "Some.Movie.2024.1080p.WEB-BBB"]
+
+    def test_french_title_adds_second_query(self, monkeypatch: Any):
+        seen_queries: list[str] = []
+
+        class _RecordingClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                seen_queries.append(kwargs.get("params", {}).get("q", ""))
+                return _FakeResponse(200, {"torrents": [], "total": 0})
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RecordingClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker, fr_title="Les Infiltrés")
+        asyncio.run(tracker.search_existing({"title": "The Departed"}))
+        assert seen_queries == ["Departed", "Infiltres"]
+
+    def test_enrichment_adds_file_lists(self, monkeypatch: Any):
+        class _DetailClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                return _FakeResponse(200, {"files": [{"path": "a.mkv", "size": 1}, {"path": "b.srt", "size": 2}]})
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _DetailClient)
+        tracker = V3X(_config())
+        dupes = [{"name": "X", "id": "uuid-1"}, {"name": "Y"}]
+        asyncio.run(tracker._enrich_with_files(dupes))
+        assert dupes[0]["files"] == ["a.mkv", "b.srt"]
+        assert dupes[0]["file_count"] == 2
+        assert "files" not in dupes[1]
 
 
 class TestUpload:
@@ -333,6 +407,7 @@ def test_upload_network_error_reports_failure(monkeypatch: Any, tmp_path: Any) -
     monkeypatch.setattr(tracker, "get_name", fake_get_name)
     monkeypatch.setattr(tracker, "_build_description", fake_desc)
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RaisingClient)
+    monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
     meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "debug": False, "tracker_status": {"V3X": {}}}
     assert asyncio.run(tracker.upload(meta, "")) is False
     assert "upload failed" in str(meta["tracker_status"]["V3X"]["status_message"])
@@ -436,7 +511,15 @@ def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: An
         seen["dupes"] = list(dupes)
         return [{**d, "flags": ["filtered"]} for d in dupes]
 
+    async def fake_fr(meta: Any) -> str:
+        return ""
+
+    async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+        return None
+
     monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
     monkeypatch.setattr(tracker, "_check_french_lang_dupes", fake_filter)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     assert seen["dupes"][0]["name"] == "Some.Movie.2024.VOSTFR.1080p.WEB-GRP"
@@ -562,6 +645,7 @@ def test_upload_retries_once_on_network_error(monkeypatch: Any, tmp_path: Any):
     monkeypatch.setattr(tracker, "_build_description", fake_desc)
     monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FlakyClient)
+    monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
     _FakeClient.response = _FakeResponse(201, {"id": "x"})
     meta = {"base_dir": str(tmp_path), "uuid": name, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
     assert asyncio.run(tracker.upload(meta, "")) is True

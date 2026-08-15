@@ -11,12 +11,14 @@
 #     required: file (.torrent), name, categoryId (subcategory number), rightsDeclared
 #     accepted: description, nfo, tmdbId, anonymous, language
 
+import asyncio
 import contextlib
 import re
 from typing import Any, Optional
 
 import aiofiles
 import httpx
+from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
@@ -25,6 +27,8 @@ from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
 
 Meta = dict[str, Any]
+
+RETRY_DELAY = 5.0  # seconds between upload retries
 
 
 class V3X(FrenchTrackerMixin):
@@ -99,35 +103,145 @@ class V3X(FrenchTrackerMixin):
         if not await self.get_additional_checks(meta):
             meta["skipping"] = self.tracker
             return dupes
-        search_term = str(meta.get("title") or "")
-        if not search_term:
-            return dupes
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(self.search_url, params={"q": search_term, "perPage": 100})
-                if response.status_code != 200:
-                    console.print(f"[yellow]{self.tracker}: search returned HTTP {response.status_code}[/yellow]")
-                    return dupes
-                payload = response.json()
-        except (httpx.RequestError, httpx.TimeoutException, ValueError) as e:
-            console.print(f"[yellow]{self.tracker}: search failed: {type(e).__name__}[/yellow]")
+
+        title = str(meta.get("title") or "")
+        fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
+        year_str = str(meta.get("year") or "").strip()
+        resolution = str(meta.get("resolution") or "")
+        group = self._get_release_group(meta)
+
+        def _normalize(s: str) -> str:
+            return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
+
+        # The q filter is a raw case-insensitive substring over the stored
+        # NAME, and site names mix dot- and space-separators — so a
+        # multi-word query silently misses half the catalog. Query by the
+        # longest word of each title (separator-agnostic) and rely on the
+        # normalized client-side filters below for precision.
+        def _query_word(s: str) -> str:
+            words = re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split()
+            return max(words, key=len) if words else ""
+
+        queries: list[str] = []
+        ordered_titles = (fr_title, title) if str(meta.get("original_language", "")).lower() == "fr" else (title, fr_title)
+        for t in ordered_titles:
+            word = _query_word(t)
+            if word and word.lower() not in (q.lower() for q in queries):
+                queries.append(word)
+        if not queries:
             return dupes
 
-        torrents = payload.get("torrents") if isinstance(payload, dict) else None
-        if not isinstance(torrents, list):
-            console.print(f"[yellow]{self.tracker}: unexpected search response shape[/yellow]")
-            return dupes
+        title_norm = _normalize(title)
+        fr_title_norm = _normalize(fr_title) if fr_title else ""
+        resolution_norm = _normalize(resolution)
+        group_norm = _normalize(group)
+        seen_names: set[str] = set()
+        debug = bool(meta.get("debug"))
 
-        meta_tmdb = int(meta.get("tmdb_id") or 0)
-        for torrent in torrents:
-            if not isinstance(torrent, dict):
-                continue
-            # The listing has no tmdbId; keep every name match. The detail
-            # endpoint has it, but one request per result is not worth it for
-            # a dupe pre-filter.
-            _ = meta_tmdb
-            dupes.append({"name": torrent.get("name", ""), "size": torrent.get("size", 0), "link": f"{self.torrent_url}{torrent.get('slug') or torrent.get('id', '')}"})
+        for search_term in queries:
+            items: list[Any] = []
+            page = 1
+            incomplete = False
+            total = None
+            while page <= 50:  # hard cap so a misreported total can't loop forever
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.get(self.search_url, params={"q": search_term, "perPage": 100, "page": page})
+                    if response.status_code != 200:
+                        incomplete = True
+                        break
+                    payload = response.json()
+                except (httpx.RequestError, httpx.TimeoutException, ValueError):
+                    incomplete = True
+                    break
+                page_items = payload.get("torrents") if isinstance(payload, dict) else None
+                if not isinstance(page_items, list):
+                    incomplete = True
+                    break
+                items.extend(page_items)
+                total = payload.get("total") if isinstance(payload.get("total"), int) else None
+                if not page_items or total is None or len(items) >= total:
+                    break
+                page += 1
+
+            # A failed page leaves a partial result set — a dupe could sit on
+            # a page we never read. Fail closed: skip the tracker rather than
+            # upload over a possible dupe.
+            if incomplete:
+                console.print(f"[yellow]{self.tracker}: incomplete dupe search for '{search_term}', skipping tracker to avoid a false negative.[/yellow]")
+                meta["skipping"] = self.tracker
+                return []
+
+            for torrent in items:
+                if not isinstance(torrent, dict):
+                    continue
+                name = str(torrent.get("name") or "")
+                if not name:
+                    continue
+                name_norm = _normalize(name)
+                if name_norm in seen_names:
+                    continue
+                # Relevance filters: title (EN or FR), year (movies), resolution, group
+                if not ((title_norm and title_norm in name_norm) or (fr_title_norm and fr_title_norm in name_norm)):
+                    if debug:
+                        console.print(f"[dim]{self.tracker} dupe skip (title mismatch): {name}[/dim]")
+                    continue
+                if year_str and year_str not in name and meta.get("category") != "TV":
+                    if debug:
+                        console.print(f"[dim]{self.tracker} dupe skip (year mismatch): {name}[/dim]")
+                    continue
+                if resolution_norm and resolution_norm not in name_norm:
+                    if debug:
+                        console.print(f"[dim]{self.tracker} dupe skip (resolution mismatch): {name}[/dim]")
+                    continue
+                if group_norm and group_norm not in name_norm:
+                    if debug:
+                        console.print(f"[dim]{self.tracker} dupe skip (group mismatch): {name}[/dim]")
+                    continue
+                seen_names.add(name_norm)
+                dupes.append(
+                    {
+                        "name": name,
+                        "size": torrent.get("size", 0),
+                        "link": f"{self.torrent_url}{torrent.get('slug') or torrent.get('id', '')}",
+                        "id": torrent.get("id"),
+                    }
+                )
+
+        if debug:
+            console.print(f"[cyan]{self.tracker} dupe search found {len(dupes)} result(s)[/cyan]")
+        if dupes:
+            await self._enrich_with_files(dupes, debug=debug)
         return await self._check_french_lang_dupes(dupes, meta)
+
+    async def _enrich_with_files(self, dupes: list[dict[str, Any]], *, debug: bool = False) -> None:
+        """Fetch each dupe's file list via GET /torrents/{uuid}.
+
+        Enriches entries in-place with ``files``/``file_count`` so
+        DupeChecker can compare filenames instead of falling back to name
+        similarity. Failures leave the entry unchanged.
+        """
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for entry in dupes:
+                torrent_id = entry.get("id")
+                if not torrent_id:
+                    continue
+                try:
+                    response = await client.get(f"{self.search_url}/{torrent_id}", headers=headers)
+                    if response.status_code != 200:
+                        continue
+                    detail = response.json()
+                except (httpx.RequestError, httpx.TimeoutException, ValueError):
+                    continue
+                files = detail.get("files") if isinstance(detail, dict) else None
+                if isinstance(files, list):
+                    paths = [f["path"] for f in files if isinstance(f, dict) and f.get("path")]
+                    if paths:
+                        entry["files"] = paths
+                        entry["file_count"] = len(paths)
+                        if debug:
+                            console.print(f"[cyan]{self.tracker} enriched {entry.get('name')!r} with {len(paths)} file(s)[/cyan]")
 
     async def edit_desc(self, meta: Meta) -> None:
         # Manual-mode hook required by trackerhandle; the description is
@@ -194,6 +308,9 @@ class V3X(FrenchTrackerMixin):
         crew = credits.get("crew", []) if isinstance(credits, dict) else []
         cast = credits.get("cast", []) if isinstance(credits, dict) else []
         directors = [p["name"] for p in crew if isinstance(p, dict) and p.get("job") == "Director" and p.get("name")]
+        if not directors and isinstance(meta.get("tmdb_directors"), list):
+            directors = [d.get("name", d) if isinstance(d, dict) else str(d) for d in meta["tmdb_directors"]]
+            directors = [d for d in directors if d]
         if directors:
             label = "Réalisateur" if len(directors) == 1 else "Réalisateurs"
             info_lines.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(directors)}[/i]")
@@ -224,6 +341,8 @@ class V3X(FrenchTrackerMixin):
             ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{meta['tmdb_id']}]TMDB[/url]")
         if meta.get("tvdb_id"):
             ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
+        if meta.get("tvmaze_id"):
+            ext_links.append(f"[url=https://www.tvmaze.com/shows/{meta['tvmaze_id']}]TVmaze[/url]")
         if meta.get("mal_id"):
             ext_links.append(f"[url=https://myanimelist.net/anime/{meta['mal_id']}]MAL[/url]")
 
@@ -313,7 +432,7 @@ class V3X(FrenchTrackerMixin):
         # only understands a bare [img] tag (no [img=N] sizing), so small
         # renderings depend on the image host providing a thumbnail img_url.
         image_list = meta.get("image_list") or []
-        if image_list:
+        if image_list and self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", True):
             parts.append(f"[b][color={C}][size=130]━━━ Captures d'écran ━━━[/size][/color][/b]")
             thumbs = [
                 f"[url={img.get('web_url') or img.get('raw_url', '')}][img]{img.get('img_url') or img.get('raw_url', '')}[/img][/url]"
@@ -337,6 +456,14 @@ class V3X(FrenchTrackerMixin):
             return None
 
     async def upload(self, meta: Meta, _disctype: str) -> bool:
+        try:
+            return await self._upload(meta, _disctype)
+        except Exception as e:
+            meta["tracker_status"][self.tracker]["status_message"] = f"data error: upload failed: {e}"
+            console.print(f"[red]{self.tracker} upload error: {e}[/red]")
+            return False
+
+    async def _upload(self, meta: Meta, _disctype: str) -> bool:
         # Embed the release NFO in the .torrent when one exists (cheap
         # patch/clone paths before a full rehash), like the other French trackers.
         if self._get_nfo_files(meta):
@@ -389,29 +516,64 @@ class V3X(FrenchTrackerMixin):
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
 
         if meta.get("debug"):
-            console.print(f"[cyan]{self.tracker} debug: would upload '{name}' with categoryId={data['categoryId']}[/cyan]")
+            desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+            async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
+                await f.write(description)
+            console.print(f"[cyan]{self.tracker} Debug — request data (description saved to {desc_path}):[/cyan]")
+            console.print(f"  Name:        {name}")
+            console.print(f"  Category:    {data['categoryId']}")
+            console.print(f"  Language:    {data.get('language', '—')}")
+            console.print(f"  Anonymous:   {data['anonymous']}")
+            console.print(f"  NFO:         {'yes' if 'nfo' in data else 'no'}")
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode, not uploaded."
             return True
 
-        response = None
-        for attempt, timeout in enumerate((60.0, 120.0)):
+        def _error_detail(resp: Any) -> Any:
+            try:
+                return resp.json()
+            except ValueError:
+                return str(getattr(resp, "text", ""))[:500]
+
+        response: Any = None
+        timeout = 60.0
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
                     response = await client.post(self.upload_url, files=files, data=data, headers=headers)
-                break
             except (httpx.RequestError, httpx.TimeoutException) as e:
-                if attempt == 0:
-                    console.print(f"[yellow]{self.tracker}: upload attempt failed ({type(e).__name__}), retrying…[/yellow]")
+                if attempt < max_retries - 1:
+                    timeout *= 1.5
+                    console.print(f"[yellow]{self.tracker}: upload attempt failed ({type(e).__name__}), retrying in {RETRY_DELAY:.0f}s…[/yellow]")
+                    await asyncio.sleep(RETRY_DELAY)
                     continue
                 meta["tracker_status"][self.tracker]["status_message"] = f"data error: upload failed: {type(e).__name__}"
                 return False
+            if response.status_code in (200, 201):
+                break
+            if response.status_code in (400, 401, 403, 404, 422):
+                # Client error — a retry cannot succeed, fail fast with the server's own message
+                detail = _error_detail(response)
+                meta["tracker_status"][self.tracker]["status_message"] = {"error": f"HTTP {response.status_code}", "detail": detail}
+                console.print(f"[red]{self.tracker} upload failed: HTTP {response.status_code}[/red]")
+                if detail:
+                    console.print(f"[dim]{detail}[/dim]")
+                return False
+            if attempt < max_retries - 1:
+                console.print(f"[yellow]{self.tracker}: HTTP {response.status_code}, retrying in {RETRY_DELAY:.0f}s… (attempt {attempt + 1}/{max_retries})[/yellow]")
+                await asyncio.sleep(RETRY_DELAY)
+                continue
+            detail = _error_detail(response)
+            meta["tracker_status"][self.tracker]["status_message"] = {"error": f"HTTP {response.status_code}", "detail": detail}
+            console.print(f"[red]{self.tracker} upload failed after {max_retries} attempts: HTTP {response.status_code}[/red]")
+            return False
 
         try:
             response_data = response.json()
         except ValueError:
             response_data = {"error": f"HTTP {response.status_code}"}
 
-        if response.status_code in (200, 201) and isinstance(response_data, dict) and not response_data.get("error"):
+        if isinstance(response_data, dict) and not response_data.get("error"):
             torrent_id = response_data.get("id") or (response_data.get("torrent") or {}).get("id")
             if torrent_id:
                 meta["tracker_status"][self.tracker]["torrent_id"] = str(torrent_id)

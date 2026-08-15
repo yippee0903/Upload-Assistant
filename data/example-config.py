@@ -1045,6 +1045,8 @@ config = {
             "api_key": "V3X api key (both read and upload scopes)",
             "announce_url": "get from V3X",
             "anon": False,
+            # Include screenshot thumbnails in the description (default True)
+            "include_screenshots": True,
             "link_dir_name": "",
         },
         "UTP": {
