@@ -3,7 +3,8 @@
 # V3X (v3x.club) — French private tracker with a custom (non-UNIT3D) API.
 #
 # API surface (api.v3x.club):
-#   GET  /torrents?search=…&page=…      public listing (torrents/total/page/perPage)
+#   GET  /torrents?q=…&page=…           public listing (torrents/total/page/perPage);
+#     the filter param is q — "search" and the like are silently ignored
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
 #   GET  /categories                    public category tree (id/name/children)
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
@@ -59,7 +60,7 @@ class V3X(FrenchTrackerMixin):
             return dupes
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(self.search_url, params={"search": search_term, "perPage": 100})
+                response = await client.get(self.search_url, params={"q": search_term, "perPage": 100})
                 if response.status_code != 200:
                     console.print(f"[yellow]{self.tracker}: search returned HTTP {response.status_code}[/yellow]")
                     return dupes

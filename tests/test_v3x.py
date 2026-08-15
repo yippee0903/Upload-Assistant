@@ -71,7 +71,7 @@ class TestSearchExisting:
         )
         dupes = asyncio.run(V3X(_config()).search_existing({"title": "Some Movie"}))
         assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug"}]
-        assert _FakeClient.captured["params"]["search"] == "Some Movie"
+        assert _FakeClient.captured["params"]["q"] == "Some Movie"
 
     def test_search_http_error_returns_empty(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
