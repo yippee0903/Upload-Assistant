@@ -885,6 +885,7 @@ class C411(FrenchTrackerMixin):
 
         parts.append(f"[center][b][font=Verdana][color={C}][size=28]{fr_title} ({year})[/size][/color][/font][/b]")
         if poster_w500:
+            parts.append("")
             parts.append(f"[img]{poster_w500}[/img]")
         parts.append("[/center]")
         parts.append("")
