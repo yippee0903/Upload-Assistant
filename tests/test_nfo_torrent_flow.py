@@ -1111,3 +1111,25 @@ class TestResolveSrcAndSavePath:
             "Single-file torrent must use the mkv as src regardless of tracker_wants_nfo. "
             "Linking the folder when the torrent expects a bare file causes missing-file errors."
         )
+
+
+class TestResolveSrcBareSingleFile:
+    """A bare single file (no release directory) must resolve to the file
+    itself as link source — resolving to the parent directory would link
+    unrelated sibling files into the tracker link folder."""
+
+    def test_bare_file_with_multifile_torrent_keeps_file_as_src(self, tmp_path):
+        from src.torrent_clients.qbittorrent import QbittorrentClientMixin
+
+        movie = tmp_path / "Movie.2024.1080p.WEB-GRP.mkv"
+        movie.write_bytes(b"x")
+        (tmp_path / "Unrelated.Sibling.mkv").write_bytes(b"y")
+
+        class _FakeTorrent:
+            metainfo = {"info": {"files": [{"length": 1, "path": ["Movie.2024.1080p.WEB-GRP.mkv"]}], "name": "Wrapped.Root"}}
+
+        meta = {"path": str(movie), "filelist": [str(movie)], "keep_nfo": False}
+        obj = QbittorrentClientMixin.__new__(QbittorrentClientMixin)
+        # Caller normalisation for a bare file collapses path to the parent dir
+        src, save_path = obj._resolve_src_and_save_path(str(tmp_path), _FakeTorrent(), meta, "V3X")
+        assert src == str(movie)

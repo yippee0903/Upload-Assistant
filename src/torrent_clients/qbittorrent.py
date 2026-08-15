@@ -760,7 +760,30 @@ class QbittorrentClientMixin:
             # len(filelist) != 1; for single_file+isdir, path arrives as the release dir.
             # meta["path"] may be a raw file path, so capture path (the release dir) as
             # src BEFORE any dirname adjustment below.
-            src = path
+            raw_path = str(meta.get("path", ""))
+            try:
+                info = torrent.metainfo.get("info", {})
+                torrent_file_entries = info.get("files") or []
+                torrent_root = str(info.get("name", "") or "")
+            except Exception:
+                torrent_file_entries = []
+                torrent_root = ""
+            if (
+                torrent_is_multi_file
+                and len(torrent_file_entries) == 1
+                and os.path.isfile(raw_path)
+                and torrent_root
+                and os.path.basename(os.path.normpath(path)) != torrent_root
+            ):
+                # Wrapped single-file torrent (renamed folder root, one file)
+                # over a bare file: only the file itself is needed as link
+                # source — the parent directory is a shared folder that may
+                # hold unrelated sibling files. When path IS the release dir
+                # (root matches) or the torrent has several entries (e.g.
+                # mkv + nfo), the whole directory stays the source.
+                src = raw_path
+            else:
+                src = path
             if not meta.get("keep_folder") and os.path.isdir(path) and (tracker_wants_nfo or torrent_is_multi_file):
                 path = os.path.dirname(path)
         else:
@@ -924,8 +947,15 @@ class QbittorrentClientMixin:
             if cross:
                 linking_success = await create_cross_seed_links(meta=meta, torrent=torrent, tracker_dir=tracker_dir, use_hardlink=use_hardlink, tracker=tracker)
             else:
-                src_name = os.path.basename(src.rstrip(os.sep))
+                # Name the link directory after the torrent's internal root so a
+                # tracker-renamed torrent (e.g. V3X) finds its content; for
+                # torrents that keep the source name this is the same value.
+                src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)
+                if getattr(torrent, "mode", None) == "multifile" and await asyncio.to_thread(os.path.isfile, src):
+                    # Single file wrapped in a torrent folder: link the file
+                    # inside the root directory under its original name.
+                    dst = os.path.join(dst, os.path.basename(src))
                 # Per-tracker skip_nfo: only skip NFO for trackers that don't want it
                 tracker_skip_nfo = tracker.upper() in nfo_skip_trackers
                 linking_success = await async_link_directory(src=src, dst=dst, use_hardlink=use_hardlink, debug=meta.get("debug", False), skip_nfo=tracker_skip_nfo)
@@ -933,6 +963,8 @@ class QbittorrentClientMixin:
             allow_fallback = client.get("allow_fallback", True)
             if not linking_success and allow_fallback:
                 console.print(f"[yellow]Using original path without linking: {src}")
+                if str(getattr(torrent, "name", "") or "") not in ("", os.path.basename(src.rstrip(os.sep))):
+                    console.print("[bold yellow]This tracker's torrent has a renamed root; seeding from the original path will not find the files.[/bold yellow]")
                 use_hardlink = False
                 use_symlink = False
             elif not linking_success:
