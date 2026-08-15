@@ -335,3 +335,30 @@ def test_upload_network_error_reports_failure(monkeypatch: Any, tmp_path: Any) -
     meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "debug": False, "tracker_status": {"V3X": {}}}
     assert asyncio.run(tracker.upload(meta, "")) is False
     assert "upload failed" in str(meta["tracker_status"]["V3X"]["status_message"])
+
+
+def test_config_anon_flag_makes_upload_anonymous(monkeypatch: Any, tmp_path: Any) -> None:
+    config = _config()
+    config["TRACKERS"]["V3X"]["anon"] = True
+    tracker = V3X(config)
+    uuid = "Some.Movie.2024.1080p.WEB-GRP"
+    (tmp_path / "tmp" / uuid).mkdir(parents=True)
+    (tmp_path / "tmp" / uuid / "[V3X].torrent").write_bytes(b"fake-torrent")
+
+    async def fake_create(*args: Any) -> None:
+        pass
+
+    async def fake_get_name(meta: Any) -> dict[str, str]:
+        return {"name": uuid}
+
+    async def fake_desc(*args: Any, **kwargs: Any) -> str:
+        return "desc"
+
+    monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+    monkeypatch.setattr(tracker, "get_name", fake_get_name)
+    monkeypatch.setattr(tracker, "_build_description", fake_desc)
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+    _FakeClient.response = _FakeResponse(201, {"id": "x"})
+    meta = {"base_dir": str(tmp_path), "uuid": uuid, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
+    asyncio.run(tracker.upload(meta, ""))
+    assert _FakeClient.captured["data"]["anonymous"] == "true"
