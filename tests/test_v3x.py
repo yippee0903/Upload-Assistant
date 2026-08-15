@@ -472,3 +472,12 @@ class TestNamingConventions:
         from src.trackersetup import notag_labels
 
         assert notag_labels["V3X"] == "NOTAG"
+
+
+def test_upload_language_prefers_mediainfo_analysis(monkeypatch: Any, tmp_path: Any):
+    async def fake_audio_string(self: Any, meta: Any) -> str:
+        return "MULTI.VOF"
+
+    monkeypatch.setattr(V3X, "_build_audio_string", fake_audio_string)
+    data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP")
+    assert data["language"] == "MULTI,VOF"

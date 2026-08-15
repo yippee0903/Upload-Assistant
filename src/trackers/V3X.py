@@ -281,7 +281,9 @@ class V3X(FrenchTrackerMixin):
             data["nfo"] = nfo_bytes.decode("utf-8", errors="replace")
         if int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
-        language = self._get_language_tag(name)
+        # MediaInfo-based tag first (knows VOF/VOQ/VFB/AD/MUET); fall back
+        # to name tokens when MediaInfo is unavailable (e.g. discs).
+        language = (await self._build_audio_string(meta)).replace(".", ",") or self._get_language_tag(name)
         if language:
             data["language"] = language
 
