@@ -29,7 +29,7 @@ Meta = dict[str, Any]
 
 class V3X(FrenchTrackerMixin):
     WEB_LABEL: str = "WEB"
-    notag_label: str = ""
+    notag_label: str = "NOTAG"
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -44,6 +44,16 @@ class V3X(FrenchTrackerMixin):
         self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        result = await super().get_name(meta)
+        result["name"] = self._enforce_web_codec_convention(meta, result["name"])
+        return result
+
+    def _format_name(self, raw_name: str) -> dict[str, str]:
+        result = super()._format_name(raw_name)
+        result["name"] = self._normalize_audio_name_tokens(result["name"])
+        return result
 
     async def get_category_id(self, meta: Meta) -> str:
         # Subcategory ids: Film=8, Animation=2, Documentaire=5,

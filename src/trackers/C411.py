@@ -168,18 +168,7 @@ class C411(FrenchTrackerMixin):
         meta["edition"] = re.sub(r"\bCriterion(?:\s+Collection)?\b", "", edition, flags=re.IGNORECASE).strip()
 
         result = await super().get_name(meta)
-
-        release_type = str(meta.get("type", "")).upper()
-        if release_type in ("WEBDL", "WEBRIP"):
-            if meta.get("has_encode_settings", False):
-                # Re-encoded: codec must be lowercase-x form
-                result["name"] = re.sub(r"\.H264\b", ".x264", result["name"], flags=re.IGNORECASE)
-                result["name"] = re.sub(r"\.H265\b", ".x265", result["name"], flags=re.IGNORECASE)
-            else:
-                # True WEB-DL (no re-encoding): codec must be H-form
-                result["name"] = re.sub(r"\.x264\b", ".H264", result["name"], flags=re.IGNORECASE)
-                result["name"] = re.sub(r"\.x265\b", ".H265", result["name"], flags=re.IGNORECASE)
-
+        result["name"] = self._enforce_web_codec_convention(meta, result["name"])
         return result
 
     def _format_name(self, raw_name: str) -> dict[str, str]:
@@ -199,28 +188,7 @@ class C411(FrenchTrackerMixin):
           ``Hier.J.Arrete``   instead of ``Hier.J.arrete``
         """
         result = super()._format_name(raw_name)
-        dot_name = result["name"]
-
-        # ── C411 audio codec normalization ──
-        # DD → AC3 (but not DDP which stays as-is)
-        dot_name = re.sub(r"\.DD\.", ".AC3.", dot_name)
-        # TrueHD → TRUEHD (case normalization)
-        dot_name = re.sub(r"\.TrueHD\.", ".TRUEHD.", dot_name, flags=re.IGNORECASE)
-        dot_name = re.sub(r"\.TrueHD$", ".TRUEHD", dot_name, flags=re.IGNORECASE)
-        # DTS-HD.MA → DTS.HD.MA (dash to dot)
-        dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
-        dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
-        # DTS:X → DTS.X (colon to dot)
-        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
-        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
-        # Atmos capitalization
-        dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
-        dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
-        # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
-        # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
-        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
-        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
-        dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        dot_name = self._normalize_audio_name_tokens(result["name"])
 
         # Find where the title ends: first 4-digit year or SXX pattern
         parts = dot_name.split(".")

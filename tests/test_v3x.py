@@ -446,3 +446,29 @@ def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: An
 
 def test_edit_desc_is_a_noop():
     assert asyncio.run(V3X(_config()).edit_desc({})) is None
+
+
+class TestNamingConventions:
+    def test_audio_tokens_are_normalized(self):
+        tracker = V3X(_config())
+        result = tracker._format_name("Some Movie 2024 MULTi VFF 1080p WEB DD 5.1 Atmos H264-GRP")
+        assert ".AC3." in result["name"]
+        assert ".ATMOS." in result["name"]
+
+    def test_atmos_moves_between_codec_and_channels(self):
+        tracker = V3X(_config())
+        result = tracker._format_name("Some Movie 2024 MULTi 2160p WEB DDP 5.1 Atmos H265-GRP")
+        assert ".DDP.ATMOS.5.1." in result["name"]
+
+    def test_web_codec_h_form_without_encode_settings(self):
+        meta = {"type": "WEBDL", "has_encode_settings": False}
+        assert V3X._enforce_web_codec_convention(meta, "Movie.2024.WEB.x265-GRP") == "Movie.2024.WEB.H265-GRP"
+
+    def test_web_codec_x_form_with_encode_settings(self):
+        meta = {"type": "WEBRIP", "has_encode_settings": True}
+        assert V3X._enforce_web_codec_convention(meta, "Movie.2024.WEB.H264-GRP") == "Movie.2024.WEB.x264-GRP"
+
+    def test_notag_label_registered(self):
+        from src.trackersetup import notag_labels
+
+        assert notag_labels["V3X"] == "NOTAG"

@@ -1117,6 +1117,48 @@ class FrenchTrackerMixin:
 
         return self._format_name(name)
 
+    @staticmethod
+    def _normalize_audio_name_tokens(dot_name: str) -> str:
+        """Normalize audio codec tokens in a dotted release name to the
+        French-scene convention: DD→AC3, TRUEHD, DTS.HD.MA, DTS.X, and
+        ATMOS placed between the codec and the channel count.
+        """
+        # DD → AC3 (but not DDP which stays as-is)
+        dot_name = re.sub(r"\.DD\.", ".AC3.", dot_name)
+        # TrueHD → TRUEHD (case normalization)
+        dot_name = re.sub(r"\.TrueHD\.", ".TRUEHD.", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.TrueHD$", ".TRUEHD", dot_name, flags=re.IGNORECASE)
+        # DTS-HD.MA → DTS.HD.MA (dash to dot)
+        dot_name = dot_name.replace(".DTS-HD.MA.", ".DTS.HD.MA.")
+        dot_name = dot_name.replace(".DTS-HD.HRA.", ".DTS.HD.HRA.")
+        # DTS:X → DTS.X (colon to dot)
+        dot_name = dot_name.replace(".DTS:X.", ".DTS.X.")
+        dot_name = dot_name.replace(".DTSX.", ".DTS.X.")
+        # Atmos capitalization
+        dot_name = re.sub(r"\.Atmos\.", ".ATMOS.", dot_name, flags=re.IGNORECASE)
+        dot_name = re.sub(r"\.Atmos$", ".ATMOS", dot_name, flags=re.IGNORECASE)
+        # ATMOS must appear AFTER the audio codec and BEFORE audio channels : DDP.5.1.ATMOS → DDP.ATMOS.5.1
+        # Pattern 1: codec.channels.ATMOS → codec.ATMOS.channels
+        dot_name = re.sub(r"\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)\.ATMOS([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        # Pattern 2: ATMOS.codec.channels → codec.ATMOS.channels
+        dot_name = re.sub(r"\.ATMOS\.(DDP|AC3|EAC3|DTS|TRUEHD|FLAC|AAC|LPCM|DTS\.HD\.MA|DTS\.HD\.HRA|DTS\.X)\.(\d\.\d)([.-])", r".\1.ATMOS.\2\3", dot_name, flags=re.IGNORECASE)
+        return dot_name
+
+    @staticmethod
+    def _enforce_web_codec_convention(meta: Meta, name: str) -> str:
+        """WEB codec token per the actual MediaInfo, not the type label:
+        untouched WEB streams (no Encoded_Library_Settings) use H264/H265,
+        re-encodes use x264/x265.
+        """
+        if str(meta.get("type", "")).upper() in ("WEBDL", "WEBRIP"):
+            if meta.get("has_encode_settings", False):
+                name = re.sub(r"\.H264\b", ".x264", name, flags=re.IGNORECASE)
+                name = re.sub(r"\.H265\b", ".x265", name, flags=re.IGNORECASE)
+            else:
+                name = re.sub(r"\.x264\b", ".H264", name, flags=re.IGNORECASE)
+                name = re.sub(r"\.x265\b", ".H265", name, flags=re.IGNORECASE)
+        return name
+
     def _format_name(self, raw_name: str) -> dict[str, str]:
         """Clean and format the release name (dot-separated by default).
 
