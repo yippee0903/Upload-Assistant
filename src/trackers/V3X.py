@@ -81,49 +81,105 @@ class V3X(FrenchTrackerMixin):
         return dupes
 
     async def _build_description(self, meta: Meta) -> str:
-        """Sober description following the tracker's own template: poster,
-        French synopsis, technical lines, clickable screenshot thumbnails.
-        The NFO/MediaInfo goes into the dedicated upload field, not here."""
+        """BBCode description in the C411/TORR9 presentation style: centered,
+        section headers, language flags for audio/subtitles, clickable
+        screenshot thumbnails. The MediaInfo report goes into the dedicated
+        nfo upload field, not here."""
+        C = "#3d85c6"  # accent colour
         parts: list[str] = []
+
+        mi_text = ((await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")) or b"").decode("utf-8", errors="replace")
+
+        fr_data: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr") or {}
+
+        parts.append("[center]")
 
         poster = str(meta.get("poster") or "")
         if "image.tmdb.org/t/p/" in poster:
             poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
         if poster:
-            parts.append(f"[center][img]{poster}[/img][/center]\n")
+            parts.append(f"[img]{poster}[/img]")
+            parts.append("")
 
-        fr_data: dict[str, Any] = {}
-        with contextlib.suppress(Exception):
-            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr") or {}
-        synopsis = str(fr_data.get("overview", "")).strip() or str(meta.get("overview", "")).strip()
-        if synopsis:
-            parts.append(synopsis + "\n")
+        # ── Synopsis ──
+        parts.append(f"[b][color={C}][size=18]━━━ Synopsis ━━━[/size][/color][/b]")
+        synopsis = str(fr_data.get("overview", "")).strip() or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
+        parts.append(synopsis)
+        parts.append("")
 
+        # ── Informations techniques ──
+        parts.append(f"[b][color={C}][size=18]━━━ Informations techniques ━━━[/size][/color][/b]")
+        type_label = self._get_type_label(meta)
+        if type_label:
+            parts.append(f"[b][color={C}]Type :[/color][/b] [i]{type_label}[/i]")
         source = str(meta.get("source") or meta.get("type") or "")
         if source:
-            parts.append(f"[b]Source :[/b] {source}")
+            parts.append(f"[b][color={C}]Source :[/color][/b] [i]{source}[/i]")
         resolution = str(meta.get("resolution") or "")
         if resolution:
-            parts.append(f"[b]Qualité vidéo :[/b] {resolution}")
+            parts.append(f"[b][color={C}]Résolution :[/color][/b] [i]{resolution}[/i]")
+        container = self._format_container(mi_text)
+        if container:
+            parts.append(f"[b][color={C}]Format vidéo :[/color][/b] [i]{container}[/i]")
         codec = str(meta.get("video_encode") or meta.get("video_codec") or "").strip()
         if codec:
-            parts.append(f"[b]Codec vidéo :[/b] {codec}")
-        language_tag = await self._build_audio_string(meta)
-        audio_codec = str(meta.get("audio") or "").strip()
-        audio_line = " — ".join(x for x in (language_tag, audio_codec) if x)
-        if audio_line:
-            parts.append(f"[b]Audio :[/b] {audio_line}")
-        subtitles = meta.get("subtitle_languages") or []
-        if subtitles:
-            parts.append(f"[b]Sous-titres :[/b] {', '.join(subtitles)}")
+            parts.append(f"[b][color={C}]Codec vidéo :[/color][/b] [i]{codec}[/i]")
+        hdr_badge = self._format_hdr_dv_bbcode(meta)
+        if hdr_badge:
+            parts.append(f"[b][color={C}]HDR :[/color][/b] {hdr_badge}")
+        parts.append("")
 
+        # ── Audio (language flags from the shared French mixin) ──
+        parts.append(f"[b][color={C}][size=18]━━━ Audio(s) ━━━[/size][/color][/b]")
+        audio_lines = self._format_audio_bbcode(mi_text, meta)
+        if audio_lines:
+            parts.extend(f" {line}" for line in audio_lines)
+        else:
+            parts.append(" [i]Non spécifié[/i]")
+        parts.append("")
+
+        # ── Subtitles ──
+        parts.append(f"[b][color={C}][size=18]━━━ Sous-titre(s) ━━━[/size][/color][/b]")
+        sub_lines = self._format_subtitle_bbcode(mi_text, meta)
+        if sub_lines:
+            parts.extend(f" {line}" for line in sub_lines)
+        else:
+            parts.append(" [i]Aucun[/i]")
+        parts.append("")
+
+        # ── Screenshots: sized clickable thumbnails, two per row ──
+        image_list = meta.get("image_list") or []
+        if image_list:
+            parts.append(f"[b][color={C}][size=18]━━━ Captures d'écran ━━━[/size][/color][/b]")
+            thumbs = [
+                f"[url={img.get('web_url') or img.get('raw_url', '')}][img=350]{img.get('img_url') or img.get('raw_url', '')}[/img][/url]"
+                for img in image_list
+                if img.get("img_url") or img.get("raw_url")
+            ]
+            parts.extend(" ".join(thumbs[i : i + 2]) for i in range(0, len(thumbs), 2))
+            parts.append("")
+
+        # ── Release ──
+        parts.append(f"[b][color={C}][size=18]━━━ Release ━━━[/size][/color][/b]")
+        parts.append(f"[b][color={C}]Titre :[/color][/b] [i]{meta.get('uuid', '')}[/i]")
         note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
         if note:
-            parts.append(f"\n[b]Notes :[/b] {note}")
+            parts.append(f"[b][color={C}]Note :[/color][/b] {note}")
+        size_str = self._get_total_size(meta, mi_text)
+        if size_str:
+            parts.append(f"[b][color={C}]Taille totale :[/color][/b] {size_str}")
+        file_count = self._count_files(meta)
+        if file_count:
+            parts.append(f"[b][color={C}]Nombre de fichier :[/color][/b] {file_count}")
+        group = self._get_release_group(meta)
+        if group:
+            parts.append(f"[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]")
 
-        screenshots = [f"[url={img.get('web_url', '')}][img]{img.get('img_url', '')}[/img][/url]" for img in meta.get("image_list") or [] if img.get("img_url")]
-        if screenshots:
-            parts.append("\n[center]" + " ".join(screenshots) + "[/center]")
+        parts.append("[/center]")
+        parts.append("")
+        parts.append(f"[right][size=11]{meta.get('ua_signature', 'Created by Upload Assistant')}[/size][/right]")
 
         return "\n".join(parts).strip()
 

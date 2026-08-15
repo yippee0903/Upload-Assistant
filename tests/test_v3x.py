@@ -156,46 +156,54 @@ def test_v3x_is_registered() -> None:
 
 
 class TestDescription:
-    def test_description_follows_tracker_template(self, monkeypatch: Any):
+    def _tracker(self, monkeypatch: Any, localized: Any = None) -> V3X:
         tracker = V3X(_config())
 
         async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            return {"overview": "Un synopsis en français."}
-
-        async def fake_audio_string(meta: Any) -> str:
-            return "MULTI.VFF"
+            if localized is None:
+                raise RuntimeError("tmdb down")
+            return localized
 
         monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
-        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio_string)
+        monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: ["FLAG_FR Français — E-AC-3 5.1"])
+        monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: ["FLAG_FR Français (SRT)"])
+        return tracker
+
+    def test_description_is_centered_with_sections_and_flags(self, monkeypatch: Any, tmp_path: Any):
+        tracker = self._tracker(monkeypatch, localized={"overview": "Un synopsis en français."})
         meta = {
+            "base_dir": str(tmp_path),
+            "uuid": "Some.Movie.2024.2160p.WEB-GRP",
             "poster": "https://image.tmdb.org/t/p/original/xyz.jpg",
             "overview": "English fallback.",
-            "source": "BluRay",
+            "source": "WEB-DL",
             "resolution": "2160p",
             "video_encode": "x265",
-            "audio": "DTS-HD MA 5.1",
-            "subtitle_languages": ["French", "English"],
-            "image_list": [{"img_url": "https://img.example.invalid/t.md.png", "web_url": "https://img.example.invalid/v"}],
+            "type": "WEBDL",
+            "hdr": "HDR",
+            "tag": "-GRP",
+            "image_list": [
+                {"img_url": "https://img.example.invalid/1.md.png", "web_url": "https://img.example.invalid/v1"},
+                {"img_url": "https://img.example.invalid/2.md.png", "web_url": "https://img.example.invalid/v2"},
+                {"img_url": "https://img.example.invalid/3.md.png", "web_url": "https://img.example.invalid/v3"},
+            ],
         }
         desc = asyncio.run(tracker._build_description(meta))
+        assert desc.startswith("[center]")
         assert "/t/p/w500/xyz.jpg" in desc  # poster resized
         assert "Un synopsis en français." in desc  # French synopsis preferred
-        assert "[b]Source :[/b] BluRay" in desc
-        assert "[b]Qualité vidéo :[/b] 2160p" in desc
-        assert "[b]Audio :[/b] MULTI.VFF — DTS-HD MA 5.1" in desc
-        assert "[b]Sous-titres :[/b] French, English" in desc
-        assert "[url=https://img.example.invalid/v][img]https://img.example.invalid/t.md.png[/img][/url]" in desc
+        assert "━━━ Informations techniques ━━━" in desc
+        assert "Résolution :" in desc
+        assert "FLAG_FR Français — E-AC-3 5.1" in desc  # mixin flag lines included
+        assert "FLAG_FR Français (SRT)" in desc
+        # sized clickable thumbnails, two per row
+        assert "[url=https://img.example.invalid/v1][img=350]https://img.example.invalid/1.md.png[/img][/url] [url=https://img.example.invalid/v2]" in desc
+        assert desc.count("[img=350]") == 3
+        assert "━━━ Release ━━━" in desc
+        assert "Some.Movie.2024.2160p.WEB-GRP" in desc
 
-    def test_description_survives_missing_data(self, monkeypatch: Any):
-        tracker = V3X(_config())
-
-        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError("tmdb down")
-
-        async def fake_audio_string(meta: Any) -> str:
-            return ""
-
-        monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
-        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio_string)
-        desc = asyncio.run(tracker._build_description({"overview": "Fallback only."}))
+    def test_description_survives_missing_data(self, monkeypatch: Any, tmp_path: Any):
+        tracker = self._tracker(monkeypatch, localized=None)
+        desc = asyncio.run(tracker._build_description({"base_dir": str(tmp_path), "uuid": "x", "overview": "Fallback only."}))
         assert "Fallback only." in desc
+        assert desc.startswith("[center]")
