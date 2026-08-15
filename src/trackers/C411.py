@@ -15,7 +15,6 @@ import contextlib
 import json
 import os
 import re
-from datetime import datetime
 from typing import Any, Union
 
 import aiofiles
@@ -799,31 +798,6 @@ class C411(FrenchTrackerMixin):
     # ──────────────────────────────────────────────────────────
     #  Description builder   (BBCode — matches C411 site template)
     # ──────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _format_french_date(date_str: str) -> str:
-        """Format YYYY-MM-DD to French full date, e.g. 'jeudi 15 juillet 2010'."""
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-            months = [
-                "",
-                "janvier",
-                "février",
-                "mars",
-                "avril",
-                "mai",
-                "juin",
-                "juillet",
-                "août",
-                "septembre",
-                "octobre",
-                "novembre",
-                "décembre",
-            ]
-            return f"{days[dt.weekday()]} {dt.day} {months[dt.month]} {dt.year}"
-        except (ValueError, IndexError):
-            return date_str
 
     async def _build_description(self, meta: Meta) -> str:
         """Build C411-compliant BBCode description matching site template.

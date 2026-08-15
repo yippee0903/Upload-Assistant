@@ -146,7 +146,7 @@ class V3X(FrenchTrackerMixin):
 
         fr_data: dict[str, Any] = {}
         with contextlib.suppress(Exception):
-            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="") or {}
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="credits") or {}
 
         parts.append("[center]")
 
@@ -164,6 +164,76 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[img]{poster}[/img]")
             parts.append("")
 
+        # ── Informations (TMDB metadata, C411-style, values in italics) ──
+        info_lines: list[str] = []
+        original_title = str(meta.get("original_title") or meta.get("title") or "").strip()
+        if original_title and original_title != title:
+            info_lines.append(f"[b][color={C}]Titre original :[/color][/b] [i]{original_title}[/i]")
+        countries = fr_data.get("production_countries", meta.get("production_countries", []))
+        if isinstance(countries, list):
+            names = [c.get("name", "") for c in countries if isinstance(c, dict) and c.get("name")]
+            if names:
+                info_lines.append(f"[b][color={C}]Pays :[/color][/b] [i]{', '.join(names)}[/i]")
+        genres_list = fr_data.get("genres", [])
+        genre_names = [g["name"] for g in genres_list if isinstance(g, dict) and g.get("name")] if isinstance(genres_list, list) else []
+        if genre_names:
+            info_lines.append(f"[b][color={C}]Genres :[/color][/b] [i]{', '.join(genre_names)}[/i]")
+        elif meta.get("genres"):
+            info_lines.append(f"[b][color={C}]Genres :[/color][/b] [i]{meta['genres']}[/i]")
+        release_date = str(fr_data.get("release_date") or fr_data.get("first_air_date") or meta.get("release_date") or meta.get("first_air_date") or "").strip()
+        if release_date:
+            info_lines.append(f"[b][color={C}]Date de sortie :[/color][/b] [i]{self._format_french_date(release_date)}[/i]")
+        elif year:
+            info_lines.append(f"[b][color={C}]Date de sortie :[/color][/b] [i]{year}[/i]")
+        runtime = fr_data.get("runtime") or meta.get("runtime", 0)
+        if runtime:
+            h, m = divmod(int(runtime), 60)
+            info_lines.append(f"[b][color={C}]Durée :[/color][/b] [i]{f'{h}h{m:02d}' if h else f'{m}min'}[/i]")
+
+        credits = fr_data.get("credits", {})
+        crew = credits.get("crew", []) if isinstance(credits, dict) else []
+        cast = credits.get("cast", []) if isinstance(credits, dict) else []
+        directors = [p["name"] for p in crew if isinstance(p, dict) and p.get("job") == "Director" and p.get("name")]
+        if directors:
+            label = "Réalisateur" if len(directors) == 1 else "Réalisateurs"
+            info_lines.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(directors)}[/i]")
+        seen_w: set[str] = set()
+        writers: list[str] = []
+        for p in crew:
+            if isinstance(p, dict) and p.get("job") in ("Screenplay", "Writer", "Story") and p.get("name") and p["name"] not in seen_w:
+                writers.append(p["name"])
+                seen_w.add(p["name"])
+        if writers:
+            label = "Scénariste" if len(writers) == 1 else "Scénaristes"
+            info_lines.append(f"[b][color={C}]{label} :[/color][/b] [i]{', '.join(writers)}[/i]")
+        actors = [p["name"] for p in cast[:5] if isinstance(p, dict) and p.get("name")]
+        if actors:
+            info_lines.append(f"[b][color={C}]Acteurs :[/color][/b] [i]{', '.join(actors)}[/i]")
+        vote_avg = fr_data.get("vote_average") or meta.get("vote_average")
+        vote_count = fr_data.get("vote_count") or meta.get("vote_count")
+        if vote_avg and vote_count:
+            info_lines.append(f"[b][color={C}]Note des spectateurs :[/color][/b] [i]{vote_avg} ({vote_count} votes)[/i]")
+
+        ext_links: list[str] = []
+        imdb_id = meta.get("imdb_id", 0)
+        if imdb_id and int(imdb_id) > 0:
+            imdb_url = meta.get("imdb_info", {}).get("imdb_url", "") if isinstance(meta.get("imdb_info"), dict) else ""
+            ext_links.append(f"[url={imdb_url or f'https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}/'}]IMDb[/url]")
+        if int(meta.get("tmdb_id") or 0):
+            tmdb_cat = "tv" if str(meta.get("category", "")).upper() == "TV" else "movie"
+            ext_links.append(f"[url=https://www.themoviedb.org/{tmdb_cat}/{meta['tmdb_id']}]TMDB[/url]")
+        if meta.get("tvdb_id"):
+            ext_links.append(f"[url=https://www.thetvdb.com/?id={meta['tvdb_id']}&tab=series]TVDB[/url]")
+        if meta.get("mal_id"):
+            ext_links.append(f"[url=https://myanimelist.net/anime/{meta['mal_id']}]MAL[/url]")
+
+        if info_lines or ext_links:
+            parts.append(f"[b][color={C}][size=130]━━━ Informations ━━━[/size][/color][/b]")
+            parts.extend(info_lines)
+            if ext_links:
+                parts.append(" | ".join(ext_links))
+            parts.append("")
+
         # ── Synopsis ──
         parts.append(f"[b][color={C}][size=130]━━━ Synopsis ━━━[/size][/color][/b]")
         synopsis = str(fr_data.get("overview", "")).strip() or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
@@ -178,18 +248,30 @@ class V3X(FrenchTrackerMixin):
         source = str(meta.get("source") or meta.get("type") or "")
         if source:
             parts.append(f"[b][color={C}]Source :[/color][/b] {source}")
+        service = str(meta.get("service") or "")
+        if service:
+            parts.append(f"[b][color={C}]Service :[/color][/b] {service}")
         resolution = str(meta.get("resolution") or "")
         if resolution:
             parts.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}")
         container = self._format_container(mi_text)
         if container:
             parts.append(f"[b][color={C}]Format vidéo :[/color][/b] {container}")
-        codec = str(meta.get("video_encode") or meta.get("video_codec") or "").strip()
+        # Prefer the encode label matching the release name; append the raw
+        # MediaInfo format in parentheses when it differs: "H265 (HEVC)".
+        codec = str(meta.get("video_encode") or meta.get("video_codec") or "").strip().replace("H.264", "H264").replace("H.265", "H265")
+        raw_codec = str(meta.get("video_codec") or "").strip()
+        if codec and raw_codec and raw_codec != codec:
+            codec = f"{codec} ({raw_codec})"
         if codec:
             parts.append(f"[b][color={C}]Codec vidéo :[/color][/b] {codec}")
         hdr_badge = self._format_hdr_dv_bbcode(meta)
         if hdr_badge:
             parts.append(f"[b][color={C}]HDR :[/color][/b] {hdr_badge}")
+        if mi_text:
+            vbr_match = re.search(r"(?:^|\n)Bit rate\s*:\s*(.+?)\s*(?:\n|$)", mi_text)
+            if vbr_match:
+                parts.append(f"[b][color={C}]Débit vidéo :[/color][/b] {vbr_match.group(1).strip()}")
         parts.append("")
 
         # ── Audio (language flags from the shared French mixin) ──

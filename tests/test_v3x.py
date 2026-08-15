@@ -566,3 +566,70 @@ def test_upload_retries_once_on_network_error(monkeypatch: Any, tmp_path: Any):
     meta = {"base_dir": str(tmp_path), "uuid": name, "category": "MOVIE", "anon": 0, "debug": False, "tracker_status": {"V3X": {}}}
     assert asyncio.run(tracker.upload(meta, "")) is True
     assert _FlakyClient.calls == 2
+
+
+def test_description_informations_section(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs.get("append_to_response") == "credits"
+        return {
+            "title": "Un Film",
+            "overview": "Synopsis fr.",
+            "production_countries": [{"name": "France"}],
+            "genres": [{"name": "Drame"}, {"name": "Thriller"}],
+            "release_date": "2010-07-15",
+            "runtime": 148,
+            "vote_average": 8.4,
+            "vote_count": 1234,
+            "credits": {
+                "crew": [
+                    {"job": "Director", "name": "Alice Martin"},
+                    {"job": "Screenplay", "name": "Bob Durand"},
+                    {"job": "Writer", "name": "Bob Durand"},
+                ],
+                "cast": [{"name": "Actor One"}, {"name": "Actor Two"}],
+            },
+        }
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+
+    async def fake_mi(meta: Any) -> str:
+        return "Video\nBit rate : 12.5 Mb/s\n"
+
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {
+        "base_dir": str(tmp_path),
+        "uuid": "X",
+        "title": "Some Movie",
+        "original_title": "Some Movie",
+        "year": 2010,
+        "category": "MOVIE",
+        "tmdb_id": 27205,
+        "imdb_id": 1375666,
+        "service": "NF",
+        "video_encode": "H265",
+        "video_codec": "HEVC",
+        "resolution": "1080p",
+    }
+    desc = asyncio.run(tracker._build_description(meta))
+
+    assert "━━━ Informations ━━━" in desc
+    assert "[b][color=#3d85c6]Titre original :[/color][/b] [i]Some Movie[/i]" in desc
+    assert "[i]France[/i]" in desc
+    assert "[i]Drame, Thriller[/i]" in desc
+    assert "[i]jeudi 15 juillet 2010[/i]" in desc
+    assert "[i]2h28[/i]" in desc
+    assert "Réalisateur :[/color][/b] [i]Alice Martin[/i]" in desc
+    assert "Scénariste :[/color][/b] [i]Bob Durand[/i]" in desc
+    assert "[i]Actor One, Actor Two[/i]" in desc
+    assert "[i]8.4 (1234 votes)[/i]" in desc
+    assert "[url=https://www.imdb.com/title/tt1375666/]IMDb[/url]" in desc
+    assert "[url=https://www.themoviedb.org/movie/27205]TMDB[/url]" in desc
+    assert "Service :[/color][/b] NF" in desc
+    assert "Codec vidéo :[/color][/b] H265 (HEVC)" in desc
+    assert "Débit vidéo :[/color][/b] 12.5 Mb/s" in desc
+    # Informations comes after the poster and before the Synopsis
+    assert desc.index("━━━ Informations ━━━") < desc.index("━━━ Synopsis ━━━")

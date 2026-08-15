@@ -15,6 +15,7 @@ import glob
 import hashlib
 import os
 import re
+from datetime import datetime
 from typing import Any, Optional, Union
 
 import aiofiles
@@ -2259,6 +2260,31 @@ class FrenchTrackerMixin:
         else:
             nfo_gen = SceneNfoGenerator(self.config)
             return await nfo_gen.generate_nfo(meta, self.tracker)
+
+    @staticmethod
+    def _format_french_date(date_str: str) -> str:
+        """Format YYYY-MM-DD to French full date, e.g. 'jeudi 15 juillet 2010'."""
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+            months = [
+                "",
+                "janvier",
+                "février",
+                "mars",
+                "avril",
+                "mai",
+                "juin",
+                "juillet",
+                "août",
+                "septembre",
+                "octobre",
+                "novembre",
+                "décembre",
+            ]
+            return f"{days[dt.weekday()]} {dt.day} {months[dt.month]} {dt.year}"
+        except (ValueError, IndexError):
+            return date_str
 
     async def _recreated_torrent_if_nfo(self, meta: dict[str, Any], common: COMMON, config: dict[str, Any], tracker: str, source_flag: str) -> str:
         """Re-create a .torrent if NFO is provided.
