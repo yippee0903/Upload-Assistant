@@ -470,16 +470,18 @@ class V3X(FrenchTrackerMixin):
         """
         if not name:
             return
-        # Seeding a renamed torrent relies on the qBittorrent link directory
-        # taking the torrent's root name. Without a qbit client with linking,
-        # keep the original root so the upload stays seedable — the fiche
-        # will simply show the on-disk release name.
+        # Seeding a renamed torrent relies on the client's link directory
+        # taking the torrent's root name (supported for qBittorrent and
+        # rTorrent). Without such a client, keep the original root so the
+        # upload stays seedable — the fiche will show the on-disk name.
         clients_cfg = self.config.get("TORRENT_CLIENTS", {})
-        has_qbit_linking = any(
-            isinstance(c, dict) and str(c.get("torrent_client", "")).lower() == "qbit" and str(c.get("linking", "") or "").strip() for c in clients_cfg.values()
+        has_link_client = any(
+            isinstance(c, dict) and str(c.get("torrent_client", "")).lower() in ("qbit", "rtorrent") and str(c.get("linking", "") or "").strip() for c in clients_cfg.values()
         )
-        if not has_qbit_linking:
-            console.print(f"[yellow]{self.tracker}: no qBittorrent client with linking configured — keeping the original torrent name so seeding still works.[/yellow]")
+        if not has_link_client:
+            console.print(
+                f"[yellow]{self.tracker}: no qBittorrent/rTorrent client with linking configured — keeping the original torrent name so seeding still works.[/yellow]"
+            )
             return
         torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
         try:

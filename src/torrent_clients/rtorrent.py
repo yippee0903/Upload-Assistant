@@ -130,9 +130,31 @@ class RtorrentClientMixin:
                     console.print(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
                     console.print(f"[cyan]Source path: {src}")
 
-                # Extract only the folder or file name from `src`
-                src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
+                # Name the link destination after the torrent's internal root so
+                # a tracker-renamed torrent (e.g. V3X) finds its content; for
+                # torrents that keep the source name this is the same value.
+                src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
+
+                try:
+                    torrent_is_multi_file = bool(torrent.metainfo.get("info", {}).get("files"))
+                except Exception:
+                    torrent_is_multi_file = False
+                if torrent_is_multi_file and os.path.isfile(src):
+                    # Single file wrapped in a torrent folder: link the file
+                    # inside the root directory under its original name. The
+                    # generic branches below then see dst as already handled.
+                    os.makedirs(dst, exist_ok=True)
+                    dst_file = os.path.join(dst, os.path.basename(src))
+                    if not os.path.exists(dst_file):
+                        try:
+                            if use_hardlink:
+                                os.link(src, dst_file)
+                            else:
+                                os.symlink(src, dst_file)
+                        except OSError as e:
+                            console.print(f"[yellow]Linking failed for wrapped single file: {e}")
+                            shutil.copy2(src, dst_file)
 
                 # path magic
                 if os.path.exists(dst) or os.path.islink(dst):
