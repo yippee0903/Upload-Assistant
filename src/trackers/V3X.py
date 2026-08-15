@@ -92,7 +92,7 @@ class V3X(FrenchTrackerMixin):
 
         fr_data: dict[str, Any] = {}
         with contextlib.suppress(Exception):
-            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr") or {}
+            fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="") or {}
 
         parts.append("[center]")
 
