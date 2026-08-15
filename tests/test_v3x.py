@@ -200,6 +200,9 @@ class TestDescription:
         assert "[url=https://img.example.invalid/v1][img]https://img.example.invalid/1.md.png[/img][/url] [url=https://img.example.invalid/v2]" in desc
         assert "━━━ Release ━━━" in desc
         assert "Some.Movie.2024.2160p.WEB-GRP" in desc
+        # C411 ordering: Release comes before the screenshots section
+        assert desc.index("━━━ Release ━━━") < desc.index("━━━ Captures d'écran ━━━")
+        assert "[url=https://github.com/yippee0903/Upload-Assistant]" in desc  # linked signature
 
     def test_description_survives_missing_data(self, monkeypatch: Any, tmp_path: Any):
         tracker = self._tracker(monkeypatch, localized=None)
