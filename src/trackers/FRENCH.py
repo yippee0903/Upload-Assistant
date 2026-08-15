@@ -2,7 +2,7 @@
 """
 French tracker mixin — shared logic for all French-language trackers.
 
-All French trackers (C411, G3MINI, LACALE, V3X, …) inherit from this mixin
+All French trackers (C411, G3MINI, V3X, …) inherit from this mixin
 to share a single, canonical implementation of:
   · Audio language detection / French dub suffix (VFF, VFQ, VF2, …)
   · Language tag building  (MULTI.VFF, VOSTFR, MUET, …)
@@ -24,7 +24,6 @@ from unidecode import unidecode
 from src.audio import AD_TRACK_RE, codec_info_from_track
 from src.console import console
 from src.nfo_generator import SceneNfoGenerator
-from src.predb_fr import crosscheck as predb_fr_crosscheck
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
 
@@ -382,7 +381,7 @@ class FrenchTrackerMixin:
     auto_nfo: bool = True
 
     # Subclasses may override to change the WEBDL source label in release names
-    # e.g. "WEB" (C411/LACALE/V3X) vs "WEB-DL" (G3MINI)
+    # e.g. "WEB" (C411/V3X) vs "WEB-DL" (G3MINI)
     WEB_LABEL: str = "WEB"
 
     # Whether to include the streaming service name (NF, AMZN, …) in the release name.
@@ -392,7 +391,7 @@ class FrenchTrackerMixin:
     # Whether to prefer the original-language title in release names.
     # When True and the movie is not originally French, the English/original
     # title is used instead of the French TMDB translation.
-    # Set to True for trackers that accept both title languages (e.g. NXM).
+    # Set to True for trackers that accept both title languages (e.g. NST).
     PREFER_ORIGINAL_TITLE: bool = False
 
     # Whether the "UHD" tag should only appear for REMUX / DISC releases.
@@ -413,7 +412,7 @@ class FrenchTrackerMixin:
 
         Subclasses that inherit UNIT3D get this called automatically from
         ``UNIT3D.search_existing()``.  Standalone French trackers (C411,
-        NXM, V3X) must call it explicitly from their own
+        V3X) must call it explicitly from their own
         ``search_existing()``.
 
         Subclasses may override to add extra rules (banned types, etc.).
@@ -430,18 +429,7 @@ class FrenchTrackerMixin:
             if not meta.get("unattended", False):
                 console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
-        return await self.predb_fr_check(meta)
-
-    async def predb_fr_check(self, meta: Meta) -> bool:
-        """Optional predb.fr cross-check (opt-in via DEFAULT.predb_fr_api_key).
-
-        Blocking TMDB/nuke divergences gate the upload (bypassable when
-        attended; refused when unattended); group reputation is advisory.
-        French trackers that override ``get_additional_checks`` without calling
-        ``super()`` should end their success path with
-        ``return await self.predb_fr_check(meta)`` so the cross-check still runs.
-        """
-        return await predb_fr_crosscheck(meta, self.config, self.tracker)  # type: ignore[attr-defined]
+        return True
 
     # ──────────────────────────────────────────────────────────
     #  Edition formatting
@@ -755,8 +743,8 @@ class FrenchTrackerMixin:
     async def search_existing(self, meta: Meta, _: Any = None) -> list[dict[str, Any]]:
         """Wrap the parent's ``search_existing`` with French dupe flagging.
 
-        Trackers that define their *own* ``search_existing`` (C411, V3X,
-        LACALE) take priority via MRO and call
+        Trackers that define their *own* ``search_existing`` (C411, V3X)
+        take priority via MRO and call
         :meth:`_check_french_lang_dupes` explicitly.  This wrapper handles
         trackers that inherit ``search_existing`` from a parent class
         (e.g. G3MINI / TOS inheriting from UNIT3D).
@@ -1976,12 +1964,6 @@ class FrenchTrackerMixin:
             stem = os.path.splitext(path)[0]
             nfo_path = f"{stem}.nfo"
             nfo_files = [nfo_path] if os.path.isfile(nfo_path) else []
-        # A physical NFO always wins.  Only when none exists do we fall back to
-        # the canonical NFO fetched from predb.fr on an exact match (if any).
-        if not nfo_files:
-            predb_nfo = str(meta.get("predb_fr_nfo_file", ""))
-            if predb_nfo and os.path.isfile(predb_nfo):
-                nfo_files = [predb_nfo]
         if nfo_files:
             meta["keep_nfo"] = True
         return nfo_files
@@ -2074,10 +2056,9 @@ class FrenchTrackerMixin:
             rel = os.path.relpath(nfo_path, content_path)
             path_components = rel.replace("\\", "/").split("/")
 
-            # Skip NFOs that live outside the release tree (e.g. a predb.fr NFO
-            # fetched into tmp/): they have no valid in-torrent path. They are
-            # still delivered through the tracker's separate NFO upload field,
-            # exactly like the generated MediaInfo NFO.
+            # Skip NFOs that live outside the release tree: they have no valid
+            # in-torrent path. They are still delivered through the tracker's
+            # separate NFO upload field, exactly like the generated MediaInfo NFO.
             if os.path.isabs(rel) or ".." in path_components:
                 continue
 
