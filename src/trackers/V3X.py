@@ -46,11 +46,17 @@ class V3X(FrenchTrackerMixin):
         self.banned_groups: list[Any] = []
 
     async def get_category_id(self, meta: Meta) -> str:
-        # Subcategory ids: Film=8, Animation=2, Série TV=9, Animation Série=3.
-        # ponytail: Documentaire (5/6) and the other trees are not mapped yet;
-        # add them when a real upload needs it.
+        # Subcategory ids: Film=8, Animation=2, Documentaire=5,
+        # Série TV=9, Animation Série=3, Série Documentaire=6.
+        genres = str(meta.get("genres", "")).lower()
+        keywords = str(meta.get("keywords", "")).lower()
+        is_docu = "documentary" in genres or "documentary" in keywords
         if meta.get("category") == "TV":
-            return "3" if meta.get("anime") else "9"
+            if meta.get("anime"):
+                return "3"
+            return "6" if is_docu else "9"
+        if is_docu:
+            return "5"
         return "2" if meta.get("anime") else "8"
 
     async def search_existing(self, meta: Meta, _disctype: Any = None) -> list[dict[str, Any]]:

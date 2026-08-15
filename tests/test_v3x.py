@@ -209,3 +209,20 @@ class TestDescription:
         desc = asyncio.run(tracker._build_description({"base_dir": str(tmp_path), "uuid": "x", "overview": "Fallback only."}))
         assert "Fallback only." in desc
         assert desc.startswith("[center]")
+
+
+class TestDocumentaryCategory:
+    def _cat(self, meta: dict[str, Any]) -> str:
+        return asyncio.run(V3X(_config()).get_category_id(meta))
+
+    def test_documentary_movie_and_series(self):
+        assert self._cat({"category": "MOVIE", "genres": "Documentary, History"}) == "5"
+        assert self._cat({"category": "TV", "genres": "Documentary"}) == "6"
+
+    def test_documentary_keyword_fallback(self):
+        assert self._cat({"category": "MOVIE", "keywords": "documentary, mining"}) == "5"
+
+    def test_anime_series_beats_documentary(self):
+        # NST ordering: anime first for TV, documentary first for movies
+        assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
+        assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "5"
