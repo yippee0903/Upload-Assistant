@@ -1,6 +1,6 @@
 > **⚠️ This is a fork of [Upload Assistant](https://github.com/Audionut/Upload-Assistant), originally created by [Audionut](https://github.com/Audionut) and [L4G](https://github.com/L4GSP1KE).**
 >
-> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, TORR9, G3MINI, NST, TOS, NXM. HDF and GF are also included but not recommended since there are known issues with their implementation.
+> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, TORR9, G3MINI, NST, TOS, NXM, V3X. HDF and GF are also included but not recommended since there are known issues with their implementation.
 >
 > For the original project, please refer to the [upstream repository](https://github.com/Audionut/Upload-Assistant).
 
@@ -69,8 +69,7 @@ Many thanks to all who have contributed.
 |Cinematik|TIK|DarkPeers|DP|
 |DigitalCore|DC|DesiTorrents|DT|
 |Emuwarez|EMUW|
-|FearNoPeer|FNP|FileList|FL|
-|Friki|FRIKI|FunFile|FF|
+|FileList|FL|FunFile|FF|
 |GreatPosterWall|GPW|hawke-uno|HUNO|
 |HDBits|HDB|HD-Space|HDS|
 |HD-Torrents|HDT|HomieHelpDesk|HHD|
@@ -93,7 +92,7 @@ Many thanks to all who have contributed.
 |ToTheGlory|TTG|TorrentHR|THR|
 |Torrenteros|TTR|TorrentLeech|TL|
 |TVChaosUK|TVC|ULCX|ULCX|
-|UTOPIA|UTP|YOiNKED|YOINK|
+|UTOPIA|UTP|V3X|V3X|
 |YUSCENE|YUS|||
 
 ## **Setup:**

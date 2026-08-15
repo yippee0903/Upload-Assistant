@@ -751,6 +751,7 @@ def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng
         "TL",
         "TORR9",
         "TOS",
+        "V3X",
     ]
     # Trackers that allow specific languages (list of allowed language codes per tracker)
     tracker_allowed_bloat_languages = {
