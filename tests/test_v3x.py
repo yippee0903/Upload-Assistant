@@ -15,6 +15,7 @@ def _config() -> dict[str, Any]:
     return {
         "TRACKERS": {"V3X": {"api_key": "test-key", "announce_url": "https://api.v3x.club/announce/FAKE"}},
         "DEFAULT": {"tmdb_api": "fake"},
+        "TORRENT_CLIENTS": {"qbt": {"torrent_client": "qbit", "linking": "hardlink"}},
     }
 
 
@@ -791,3 +792,24 @@ class TestTorrentRootRename:
         tracker = V3X(_config())
         meta = {"base_dir": str(tmp_path), "uuid": "nope"}
         tracker._rename_torrent_root(meta, "Whatever")  # must not raise
+
+
+def test_rename_skipped_without_qbit_linking(tmp_path: Any):
+    from torf import Torrent
+
+    uuid = "Some.Movie.2024.1080p.WEB-GRP"
+    content = tmp_path / "content" / uuid
+    content.mkdir(parents=True)
+    (content / "movie.mkv").write_bytes(b"x" * 2048)
+    t = Torrent(path=str(content), trackers=["https://tracker.example/announce"], piece_size=16384)
+    t.generate()
+    out = tmp_path / "tmp" / uuid
+    out.mkdir(parents=True)
+    t.write(str(out / "[V3X].torrent"))
+
+    config = _config()
+    config["TORRENT_CLIENTS"] = {"rt": {"torrent_client": "rtorrent"}}
+    tracker = V3X(config)
+    tracker._rename_torrent_root({"base_dir": str(tmp_path), "uuid": uuid}, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
+    # No qbit+linking client: the root must stay untouched so seeding works
+    assert Torrent.read(str(out / "[V3X].torrent")).name == uuid

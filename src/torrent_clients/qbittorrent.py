@@ -760,7 +760,30 @@ class QbittorrentClientMixin:
             # len(filelist) != 1; for single_file+isdir, path arrives as the release dir.
             # meta["path"] may be a raw file path, so capture path (the release dir) as
             # src BEFORE any dirname adjustment below.
-            src = path
+            raw_path = str(meta.get("path", ""))
+            try:
+                info = torrent.metainfo.get("info", {})
+                torrent_file_entries = info.get("files") or []
+                torrent_root = str(info.get("name", "") or "")
+            except Exception:
+                torrent_file_entries = []
+                torrent_root = ""
+            if (
+                torrent_is_multi_file
+                and len(torrent_file_entries) == 1
+                and os.path.isfile(raw_path)
+                and torrent_root
+                and os.path.basename(os.path.normpath(path)) != torrent_root
+            ):
+                # Wrapped single-file torrent (renamed folder root, one file)
+                # over a bare file: only the file itself is needed as link
+                # source — the parent directory is a shared folder that may
+                # hold unrelated sibling files. When path IS the release dir
+                # (root matches) or the torrent has several entries (e.g.
+                # mkv + nfo), the whole directory stays the source.
+                src = raw_path
+            else:
+                src = path
             if not meta.get("keep_folder") and os.path.isdir(path) and (tracker_wants_nfo or torrent_is_multi_file):
                 path = os.path.dirname(path)
         else:

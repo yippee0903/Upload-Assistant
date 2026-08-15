@@ -1014,8 +1014,10 @@ config = {
             # The site displays the .torrent's internal name: UA renames the
             # torrent root to the generated release name (single files are
             # wrapped in a folder so the inner file keeps its original,
-            # cross-seedable name). Seeding it requires a client with linking
-            # enabled (the link folder takes that name).
+            # cross-seedable name). The rename only happens with a qBittorrent
+            # client that has linking enabled — the link folder takes the new
+            # name so seeding works without touching the on-disk content
+            # (unless your content path already carries that exact name).
             "anon": False,
             # Include screenshot thumbnails in the description (default True)
             "include_screenshots": True,
