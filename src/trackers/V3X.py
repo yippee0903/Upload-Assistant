@@ -120,19 +120,19 @@ class V3X(FrenchTrackerMixin):
         parts.append(f"[b][color={C}][size=130]━━━ Informations techniques ━━━[/size][/color][/b]")
         type_label = self._get_type_label(meta)
         if type_label:
-            parts.append(f"[b][color={C}]Type :[/color][/b] [i]{type_label}[/i]")
+            parts.append(f"[b][color={C}]Type :[/color][/b] {type_label}")
         source = str(meta.get("source") or meta.get("type") or "")
         if source:
-            parts.append(f"[b][color={C}]Source :[/color][/b] [i]{source}[/i]")
+            parts.append(f"[b][color={C}]Source :[/color][/b] {source}")
         resolution = str(meta.get("resolution") or "")
         if resolution:
-            parts.append(f"[b][color={C}]Résolution :[/color][/b] [i]{resolution}[/i]")
+            parts.append(f"[b][color={C}]Résolution :[/color][/b] {resolution}")
         container = self._format_container(mi_text)
         if container:
-            parts.append(f"[b][color={C}]Format vidéo :[/color][/b] [i]{container}[/i]")
+            parts.append(f"[b][color={C}]Format vidéo :[/color][/b] {container}")
         codec = str(meta.get("video_encode") or meta.get("video_codec") or "").strip()
         if codec:
-            parts.append(f"[b][color={C}]Codec vidéo :[/color][/b] [i]{codec}[/i]")
+            parts.append(f"[b][color={C}]Codec vidéo :[/color][/b] {codec}")
         hdr_badge = self._format_hdr_dv_bbcode(meta)
         if hdr_badge:
             parts.append(f"[b][color={C}]HDR :[/color][/b] {hdr_badge}")
@@ -142,7 +142,7 @@ class V3X(FrenchTrackerMixin):
         parts.append(f"[b][color={C}][size=130]━━━ Audio(s) ━━━[/size][/color][/b]")
         audio_lines = self._format_audio_bbcode(mi_text, meta)
         if audio_lines:
-            parts.extend(f" {line}" for line in audio_lines)
+            parts.extend(f" [i]{line}[/i]" for line in audio_lines)
         else:
             parts.append(" [i]Non spécifié[/i]")
         parts.append("")
@@ -151,14 +151,14 @@ class V3X(FrenchTrackerMixin):
         parts.append(f"[b][color={C}][size=130]━━━ Sous-titre(s) ━━━[/size][/color][/b]")
         sub_lines = self._format_subtitle_bbcode(mi_text, meta)
         if sub_lines:
-            parts.extend(f" {line}" for line in sub_lines)
+            parts.extend(f" [i]{line}[/i]" for line in sub_lines)
         else:
             parts.append(" [i]Aucun[/i]")
         parts.append("")
 
         # ── Release ──
         parts.append(f"[b][color={C}][size=130]━━━ Release ━━━[/size][/color][/b]")
-        parts.append(f"[b][color={C}]Titre :[/color][/b] [i]{meta.get('uuid', '')}[/i]")
+        parts.append(f"[b][color={C}]Titre :[/color][/b] {meta.get('uuid', '')}")
         note = await DescriptionBuilder(self.tracker, self.config).get_personal_note(meta)
         if note:
             parts.append(f"[b][color={C}]Note :[/color][/b] {note}")
@@ -170,7 +170,7 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[b][color={C}]Nombre de fichier :[/color][/b] {file_count}")
         group = self._get_release_group(meta)
         if group:
-            parts.append(f"[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]")
+            parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
         parts.append("")
 
         # ── Screenshots: clickable thumbnails, two per row. The V3X parser
@@ -185,10 +185,8 @@ class V3X(FrenchTrackerMixin):
                 if img.get("img_url") or img.get("raw_url")
             ]
             parts.extend(" ".join(thumbs[i : i + 2]) for i in range(0, len(thumbs), 2))
-            parts.append("")
 
         parts.append("[/center]")
-        parts.append("")
         ua_sig = meta.get("ua_signature", "Created by Upload Assistant")
         parts.append(f"[right][url=https://github.com/yippee0903/Upload-Assistant][size=75]{ua_sig}[/size][/url][/right]")
 
