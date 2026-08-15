@@ -61,13 +61,21 @@ class V3X(FrenchTrackerMixin):
         genres = str(meta.get("genres", "")).lower()
         keywords = str(meta.get("keywords", "")).lower()
         is_docu = "documentary" in genres or "documentary" in keywords
+        # Explicit anime signals win; a genre-only "animation" yields to the
+        # documentary category (animated documentaries).
+        is_anime_explicit = bool(meta.get("anime") or meta.get("mal_id"))
+        is_animation = "animation" in genres
         if meta.get("category") == "TV":
-            if meta.get("anime"):
+            if is_anime_explicit:
                 return "3"
-            return "6" if is_docu else "9"
+            if is_docu:
+                return "6"
+            return "3" if is_animation else "9"
+        if is_anime_explicit:
+            return "2"
         if is_docu:
             return "5"
-        return "2" if meta.get("anime") else "8"
+        return "2" if is_animation else "8"
 
     @staticmethod
     def _get_language_tag(name: str) -> str:

@@ -243,10 +243,9 @@ class TestDocumentaryCategory:
     def test_documentary_keyword_fallback(self):
         assert self._cat({"category": "MOVIE", "keywords": "documentary, mining"}) == "5"
 
-    def test_anime_series_beats_documentary(self):
-        # NST ordering: anime first for TV, documentary first for movies
+    def test_explicit_anime_beats_documentary_both_categories(self):
         assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
-        assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "5"
+        assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "2"
 
 
 def test_scene_nfo_preferred_over_mediainfo(monkeypatch: Any, tmp_path: Any) -> None:
@@ -481,3 +480,23 @@ def test_upload_language_prefers_mediainfo_analysis(monkeypatch: Any, tmp_path: 
     monkeypatch.setattr(V3X, "_build_audio_string", fake_audio_string)
     data = _run_upload_with_name(monkeypatch, tmp_path, "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP")
     assert data["language"] == "MULTI,VOF"
+
+
+class TestAnimeDetection:
+    def _cat(self, meta: dict[str, Any]) -> str:
+        return asyncio.run(V3X(_config()).get_category_id(meta))
+
+    def test_mal_id_marks_anime(self):
+        assert self._cat({"category": "TV", "mal_id": 123}) == "3"
+        assert self._cat({"category": "MOVIE", "mal_id": 123}) == "2"
+
+    def test_animation_genre_marks_anime(self):
+        assert self._cat({"category": "MOVIE", "genres": "Animation, Comedy"}) == "2"
+        assert self._cat({"category": "TV", "genres": "Animation"}) == "3"
+
+    def test_animated_documentary_goes_to_documentary(self):
+        assert self._cat({"category": "MOVIE", "genres": "Animation, Documentary"}) == "5"
+        assert self._cat({"category": "TV", "genres": "Animation, Documentary"}) == "6"
+
+    def test_explicit_anime_beats_documentary(self):
+        assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
