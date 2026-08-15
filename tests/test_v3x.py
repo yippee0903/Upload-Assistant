@@ -63,23 +63,42 @@ class TestCategoryMapping:
 
 
 class TestSearchExisting:
+    def _pass_checks(self, monkeypatch: Any, tracker: V3X, result: bool = True) -> None:
+        async def fake_checks(meta: Any) -> bool:
+            return result
+
+        monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(
             200,
             {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}]},
         )
-        dupes = asyncio.run(V3X(_config()).search_existing({"title": "Some Movie"}))
+        tracker = V3X(_config())
+        self._pass_checks(monkeypatch, tracker)
+        dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
         assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug"}]
         assert _FakeClient.captured["params"]["q"] == "Some Movie"
 
     def test_search_http_error_returns_empty(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(503, {})
-        assert asyncio.run(V3X(_config()).search_existing({"title": "X"})) == []
+        tracker = V3X(_config())
+        self._pass_checks(monkeypatch, tracker)
+        assert asyncio.run(tracker.search_existing({"title": "X"})) == []
 
-    def test_empty_title_skips_search(self):
-        assert asyncio.run(V3X(_config()).search_existing({})) == []
+    def test_empty_title_skips_search(self, monkeypatch: Any):
+        tracker = V3X(_config())
+        self._pass_checks(monkeypatch, tracker)
+        assert asyncio.run(tracker.search_existing({})) == []
+
+    def test_failed_language_check_skips_tracker(self, monkeypatch: Any):
+        tracker = V3X(_config())
+        self._pass_checks(monkeypatch, tracker, result=False)
+        meta: dict[str, Any] = {"title": "X"}
+        assert asyncio.run(tracker.search_existing(meta)) == []
+        assert meta["skipping"] == "V3X"
 
 
 class TestUpload:
@@ -226,3 +245,23 @@ class TestDocumentaryCategory:
         # NST ordering: anime first for TV, documentary first for movies
         assert self._cat({"category": "TV", "anime": True, "genres": "Documentary"}) == "3"
         assert self._cat({"category": "MOVIE", "anime": True, "genres": "Documentary"}) == "5"
+
+
+def test_scene_nfo_preferred_over_mediainfo(monkeypatch: Any, tmp_path: Any) -> None:
+    tracker = V3X(_config())
+    release = tmp_path / "release"
+    release.mkdir()
+    (release / "some.release.nfo").write_bytes(b"SCENE NFO ART")
+    meta = {"path": str(release), "base_dir": str(tmp_path), "uuid": "x"}
+    assert tracker._get_nfo_files(meta) == [str(release / "some.release.nfo")]
+
+
+def test_v3x_bloat_is_allowed() -> None:
+    import ast
+    import os
+    import re
+
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(base, "src/audio.py"), encoding="utf-8") as f:
+        match = re.search(r"bloat_is_allowed = (\[[^\]]*\])", f.read())
+    assert match and "V3X" in ast.literal_eval(match.group(1))

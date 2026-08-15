@@ -61,6 +61,9 @@ class V3X(FrenchTrackerMixin):
 
     async def search_existing(self, meta: Meta, _disctype: Any = None) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
+        if not await self.get_additional_checks(meta):
+            meta["skipping"] = self.tracker
+            return dupes
         search_term = str(meta.get("title") or "")
         if not search_term:
             return dupes
@@ -218,7 +221,17 @@ class V3X(FrenchTrackerMixin):
             return False
 
         description = await self._build_description(meta)
-        nfo_bytes = await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")
+        # The site rules keep the ORIGINAL release NFO; fall back to MediaInfo
+        nfo_bytes = None
+        nfo_files = self._get_nfo_files(meta)
+        if nfo_files:
+            try:
+                async with aiofiles.open(nfo_files[0], "rb") as f:
+                    nfo_bytes = await f.read()
+            except OSError:
+                nfo_bytes = None
+        if not nfo_bytes:
+            nfo_bytes = await self._read_tmp_file(meta, "MEDIAINFO_CLEANPATH.txt")
 
         data: dict[str, Any] = {
             "name": name,
