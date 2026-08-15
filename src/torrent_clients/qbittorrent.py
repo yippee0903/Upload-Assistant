@@ -929,6 +929,10 @@ class QbittorrentClientMixin:
                 # torrents that keep the source name this is the same value.
                 src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)
+                if getattr(torrent, "mode", None) == "multifile" and await asyncio.to_thread(os.path.isfile, src):
+                    # Single file wrapped in a torrent folder: link the file
+                    # inside the root directory under its original name.
+                    dst = os.path.join(dst, os.path.basename(src))
                 # Per-tracker skip_nfo: only skip NFO for trackers that don't want it
                 tracker_skip_nfo = tracker.upper() in nfo_skip_trackers
                 linking_success = await async_link_directory(src=src, dst=dst, use_hardlink=use_hardlink, debug=meta.get("debug", False), skip_nfo=tracker_skip_nfo)

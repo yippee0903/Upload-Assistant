@@ -473,15 +473,23 @@ class V3X(FrenchTrackerMixin):
         torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
         try:
             torrent = Torrent.read(torrent_path)
-            new_name = name
             if torrent.mode == "singlefile":
-                # Single-file torrent: the root IS the file — keep its extension
-                ext = os.path.splitext(str(torrent.name))[1]
-                if ext and not new_name.lower().endswith(ext.lower()):
-                    new_name = f"{name}{ext}"
-            if torrent.name == new_name:
-                return
-            torrent.name = new_name
+                # Wrap the file in a folder named after the release instead of
+                # renaming the file itself: the fiche shows the folder name
+                # while the inner file keeps its original (cross-seedable)
+                # name. Pieces cover the same byte stream either way — no
+                # rehash needed.
+                info = torrent.metainfo["info"]
+                original_file = str(info["name"])
+                if original_file == name:
+                    return
+                info["files"] = [{"length": info.pop("length"), "path": [original_file]}]
+                info.pop("md5sum", None)
+                info["name"] = name
+            else:
+                if torrent.name == name:
+                    return
+                torrent.name = name
             torrent.write(torrent_path, overwrite=True)
             clients_cfg = self.config.get("TORRENT_CLIENTS", {})
             has_linking = any(str(c.get("linking", "")).strip() for c in clients_cfg.values() if isinstance(c, dict))

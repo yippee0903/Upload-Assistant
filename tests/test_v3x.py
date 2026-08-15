@@ -743,7 +743,7 @@ class TestTorrentRootRename:
         content = tmp_path / "content" / uuid
         if single_file:
             content.parent.mkdir(parents=True, exist_ok=True)
-            content = content.with_suffix(".mkv")
+            content = content.parent / f"{uuid}.mkv"
             content.write_bytes(b"x" * 2048)
         else:
             content.mkdir(parents=True)
@@ -770,15 +770,22 @@ class TestTorrentRootRename:
         assert t.metainfo["info"]["pieces"] == pieces_before
         assert [str(f) for f in t.files] == ["Un.Film.2024.VOSTFR.1080p.WEB-GRP/movie.mkv"]
 
-    def test_single_file_torrent_keeps_extension(self, tmp_path: Any):
+    def test_single_file_torrent_is_wrapped_in_a_folder(self, tmp_path: Any):
         from torf import Torrent
 
         uuid = "Some.Movie.2024.1080p.WEB-GRP"
         path = self._make_torrent(tmp_path, uuid, single_file=True)
+        pieces_before = Torrent.read(path).metainfo["info"]["pieces"]
         tracker = V3X(_config())
         meta = {"base_dir": str(tmp_path), "uuid": uuid}
         tracker._rename_torrent_root(meta, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
-        assert Torrent.read(path).name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP.mkv"
+        t = Torrent.read(path)
+        # Root folder carries the release name; the inner file keeps its
+        # original (cross-seedable) name; pieces are untouched.
+        assert t.mode == "multifile"
+        assert t.name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
+        assert [str(f) for f in t.files] == ["Un.Film.2024.VOSTFR.1080p.WEB-GRP/Some.Movie.2024.1080p.WEB-GRP.mkv"]
+        assert t.metainfo["info"]["pieces"] == pieces_before
 
     def test_missing_torrent_is_tolerated(self, tmp_path: Any):
         tracker = V3X(_config())

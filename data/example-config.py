@@ -1012,8 +1012,10 @@ config = {
             "api_key": "V3X api key (both read and upload scopes)",
             "announce_url": "get from V3X",
             # The site displays the .torrent's internal name: UA renames the
-            # torrent root to the generated release name. Seeding it requires
-            # a client with linking enabled (the link folder takes that name).
+            # torrent root to the generated release name (single files are
+            # wrapped in a folder so the inner file keeps its original,
+            # cross-seedable name). Seeding it requires a client with linking
+            # enabled (the link folder takes that name).
             "anon": False,
             # Include screenshot thumbnails in the description (default True)
             "include_screenshots": True,
