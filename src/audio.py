@@ -749,7 +749,6 @@ def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng
         "SHRI",
         "SP",
         "TL",
-        "TORR9",
         "TOS",
         "V3X",
     ]

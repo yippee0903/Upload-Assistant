@@ -2,7 +2,7 @@
 """
 French tracker mixin — shared logic for all French-language trackers.
 
-All French trackers (C411, G3MINI, LACALE, TORR9, …) inherit from this mixin
+All French trackers (C411, G3MINI, LACALE, V3X, …) inherit from this mixin
 to share a single, canonical implementation of:
   · Audio language detection / French dub suffix (VFF, VFQ, VF2, …)
   · Language tag building  (MULTI.VFF, VOSTFR, MUET, …)
@@ -382,7 +382,7 @@ class FrenchTrackerMixin:
     auto_nfo: bool = True
 
     # Subclasses may override to change the WEBDL source label in release names
-    # e.g. "WEB" (C411/TORR9/LACALE) vs "WEB-DL" (G3MINI)
+    # e.g. "WEB" (C411/LACALE/V3X) vs "WEB-DL" (G3MINI)
     WEB_LABEL: str = "WEB"
 
     # Whether to include the streaming service name (NF, AMZN, …) in the release name.
@@ -392,7 +392,7 @@ class FrenchTrackerMixin:
     # Whether to prefer the original-language title in release names.
     # When True and the movie is not originally French, the English/original
     # title is used instead of the French TMDB translation.
-    # Set to True for trackers that accept both title languages (e.g. TORR9).
+    # Set to True for trackers that accept both title languages (e.g. NXM).
     PREFER_ORIGINAL_TITLE: bool = False
 
     # Whether the "UHD" tag should only appear for REMUX / DISC releases.
@@ -413,7 +413,7 @@ class FrenchTrackerMixin:
 
         Subclasses that inherit UNIT3D get this called automatically from
         ``UNIT3D.search_existing()``.  Standalone French trackers (C411,
-        NXM, TORR9) must call it explicitly from their own
+        NXM, V3X) must call it explicitly from their own
         ``search_existing()``.
 
         Subclasses may override to add extra rules (banned types, etc.).
@@ -755,7 +755,7 @@ class FrenchTrackerMixin:
     async def search_existing(self, meta: Meta, _: Any = None) -> list[dict[str, Any]]:
         """Wrap the parent's ``search_existing`` with French dupe flagging.
 
-        Trackers that define their *own* ``search_existing`` (C411, TORR9,
+        Trackers that define their *own* ``search_existing`` (C411, V3X,
         LACALE) take priority via MRO and call
         :meth:`_check_french_lang_dupes` explicitly.  This wrapper handles
         trackers that inherit ``search_existing`` from a parent class
@@ -1038,7 +1038,7 @@ class FrenchTrackerMixin:
 
         web_lbl = self.WEB_LABEL  # "WEB" or "WEB-DL" depending on tracker
 
-        # Some trackers (e.g. TORR9) want video codec before audio.
+        # Some trackers want video codec before audio.
         # Set AUDIO_BEFORE_VIDEO = False on the subclass to flip the order.
         _audio_first = getattr(self, "AUDIO_BEFORE_VIDEO", True)
 

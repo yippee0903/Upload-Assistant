@@ -662,7 +662,7 @@ class DupeChecker:
                     return True
 
             # ── Name-similarity fallback ──────────────────────────────────────
-            # When the tracker returns no file list (e.g. TORR9 custom API) we
+            # When the tracker returns no file list (custom-API trackers) we
             # cannot do a filename comparison.  If the release group tag
             # matches AND the normalised names are very similar (≥ 0.75), treat
             # this as a confirmed dupe — the entry has already passed all

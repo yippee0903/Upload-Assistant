@@ -1348,7 +1348,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 break
         meta["skip_nfo"] = skip_nfo
 
-        # Proactively detect NFO files when auto-nfo trackers (e.g. C411, TORR9) are
+        # Proactively detect NFO files when auto-nfo trackers (e.g. C411, V3X) are
         # confirmed for upload but the user did not pass --keep-nfo explicitly.
         # This ensures BASE.torrent is created WITH NFO on the first (and only) full hash,
         # so those trackers can clone BASE directly instead of triggering a second rehash.

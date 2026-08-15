@@ -171,18 +171,18 @@ class TestFilenameMatchLogic:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Name-similarity fallback  (TORR9-style trackers with no files)
+#  Name-similarity fallback  (custom-API trackers with no file lists)
 # ═══════════════════════════════════════════════════════════════
 
 
-def _torr9_entry_no_files(**overrides) -> dict[str, Any]:
-    """Build a TORR9-style dupe entry with *no* file list."""
+def _no_files_entry(**overrides) -> dict[str, Any]:
+    """Build a dupe entry with *no* file list (custom-API trackers)."""
     entry: dict[str, Any] = {
         "name": "Atlanta.S04.MULTI.1080p.AMZN.H264.DDP5.1-FRATERNiTY",
         "size": 20_000_000_000,
-        "link": "https://torr9.net/torrents/50343",
+        "link": "https://tracker.example/torrents/50343",
         "id": 50343,
-        # No "files" key at all — TORR9 custom API never returns it
+        # No "files" key at all — some custom APIs never return it
     }
     entry.update(overrides)
     return entry
@@ -214,19 +214,19 @@ def _atlanta_s04_meta(**overrides) -> dict[str, Any]:
 
 
 class TestNameSimilarityFallback:
-    """Name-similarity fallback for trackers that return no file lists (e.g. TORR9)."""
+    """Name-similarity fallback for trackers that return no file lists (e.g. custom APIs)."""
 
     def test_same_group_high_similarity_sets_filename_match(self):
         """
-        Regression — TORR9 Atlanta S04 FRATERNiTY:
+        Regression — Atlanta S04 FRATERNiTY:
         Old naming omits VFF/WEB tokens. No file list is returned by the API.
         The name-similarity fallback must detect this as the same release and
         set filename_match (→ "Exact match found!" in the UI).
         """
         meta = _atlanta_s04_meta()
-        entry = _torr9_entry_no_files()
+        entry = _no_files_entry()
 
-        dupes = _run(_checker().filter_dupes([entry], meta, "TORR9"))
+        dupes = _run(_checker().filter_dupes([entry], meta, "V3X"))
 
         assert dupes, "entry must remain in the dupe list"
         assert meta.get("filename_match"), (
@@ -241,11 +241,11 @@ class TestNameSimilarityFallback:
         """
         meta = _atlanta_s04_meta()
         # Entry from a completely different show by the same group
-        entry = _torr9_entry_no_files(
+        entry = _no_files_entry(
             name="Succession.S04.MULTI.1080p.AMZN.H264.DDP5.1-FRATERNiTY",
         )
 
-        _run(_checker().filter_dupes([entry], meta, "TORR9"))
+        _run(_checker().filter_dupes([entry], meta, "V3X"))
 
         assert not meta.get("filename_match"), (
             "filename_match must NOT be set when the names differ substantially "

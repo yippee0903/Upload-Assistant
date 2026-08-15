@@ -1,6 +1,6 @@
 > **⚠️ This is a fork of [Upload Assistant](https://github.com/Audionut/Upload-Assistant), originally created by [Audionut](https://github.com/Audionut) and [L4G](https://github.com/L4GSP1KE).**
 >
-> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, TORR9, G3MINI, NST, TOS, NXM, V3X. HDF and GF are also included but not recommended since there are known issues with their implementation.
+> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, G3MINI, NST, TOS, NXM, V3X. HDF and GF are also included but not recommended since there are known issues with their implementation.
 >
 > For the original project, please refer to the [upstream repository](https://github.com/Audionut/Upload-Assistant).
 

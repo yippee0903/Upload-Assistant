@@ -6,7 +6,7 @@ import pytest
 from src.trackers.C411 import C411
 from src.trackers.G3MINI import G3MINI
 from src.trackers.GF import GF
-from src.trackers.TORR9 import TORR9
+from src.trackers.V3X import V3X
 from src.trackers.TOS import TOS
 
 
@@ -15,7 +15,7 @@ def _config() -> dict[str, Any]:
         "TRACKERS": {
             "C411": {"api_key": "test-key"},
             "GF": {"api_key": "test-key", "announce_url": "https://generation-free.org/announce/FAKE_PASSKEY"},
-            "TORR9": {"api_key": "test-key", "username": "user", "password": "pass"},
+            "V3X": {"api_key": "test-key"},
             "TOS": {"api_key": "test-key", "announce_url": "https://theoldschool.cc/announce/FAKE_PASSKEY"},
             "G3MINI": {"api_key": "test-key", "announce_url": "https://gemini-tracker.org/announce/FAKE_PASSKEY"},
         },
@@ -96,7 +96,7 @@ def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
 
-@pytest.fixture(params=[C411, GF, TORR9, TOS, G3MINI], ids=["C411", "GF", "TORR9", "TOS", "G3MINI"])
+@pytest.fixture(params=[C411, GF, V3X, TOS, G3MINI], ids=["C411", "GF", "V3X", "TOS", "G3MINI"])
 def tracker(request: pytest.FixtureRequest):
     return request.param(_config())
 
