@@ -17,6 +17,7 @@ from typing_extensions import TypeAlias
 from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
 from src.console import console
+from src.proxy_env import proxy_for
 from src.trackers.COMMON import COMMON
 from src.type_utils import to_int
 
@@ -166,9 +167,9 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         try:
             if await check_image_link(img_url, timeout):
                 try:
-                    async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
                         try:
-                            async with session.get(img_url) as response:
+                            async with session.get(img_url, proxy=proxy_for(img_url)) as response:
                                 if response.status == 200:
                                     image_content = await response.read()
 
@@ -251,9 +252,9 @@ async def check_image_link(url: str, timeout: Optional[aiohttp.ClientTimeout] = 
     connector = aiohttp.TCPConnector(ssl=False)  # Disable SSL verification for testing
 
     try:
-        async with aiohttp.ClientSession(timeout=timeout, connector=connector, trust_env=True) as session:
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
             try:
-                async with session.get(url) as response:
+                async with session.get(url, proxy=proxy_for(url)) as response:
                     if response.status == 200:
                         content_type = response.headers.get("Content-Type", "").lower()
                         if "image" in content_type:
