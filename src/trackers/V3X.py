@@ -96,6 +96,13 @@ class V3X(FrenchTrackerMixin):
 
         parts.append("[center]")
 
+        title = str(fr_data.get("title") or fr_data.get("name") or meta.get("title") or "").strip()
+        year = str(meta.get("year") or "").strip()
+        if title:
+            heading = f"{title} ({year})" if year else title
+            parts.append(f"[b][color={C}][size=200]{heading}[/size][/color][/b]")
+            parts.append("")
+
         poster = str(meta.get("poster") or "")
         if "image.tmdb.org/t/p/" in poster:
             poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
@@ -164,6 +171,7 @@ class V3X(FrenchTrackerMixin):
         group = self._get_release_group(meta)
         if group:
             parts.append(f"[b][color={C}]Groupe :[/color][/b] [i]{group}[/i]")
+        parts.append("")
 
         # ── Screenshots: clickable thumbnails, two per row. The V3X parser
         # only understands a bare [img] tag (no [img=N] sizing), so small
