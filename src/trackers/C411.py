@@ -814,7 +814,10 @@ class C411(FrenchTrackerMixin):
         with contextlib.suppress(Exception):
             fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="credits") or {}
 
-        fr_title = str(fr_data.get("title", "") or meta.get("title", "")).strip()
+        # _get_french_title falls back to the romanized English title when
+        # TMDB has no real French translation (fr_data would otherwise return
+        # the original-language title for movies — e.g. Chinese characters).
+        fr_title = (await self._get_french_title(meta)).strip() or str(meta.get("title", "")).strip()
         fr_overview = str(fr_data.get("overview", "")).strip()
         year = meta.get("year", "")
 
