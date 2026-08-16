@@ -819,10 +819,15 @@ class C411(FrenchTrackerMixin):
         year = meta.get("year", "")
 
         # ── Header: Title + Year + Poster (centered) ──
-        poster = meta.get("poster", "") or ""
-        poster_w500 = poster
-        if "image.tmdb.org/t/p/" in poster:
-            poster_w500 = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
+        # Prefer the French-localized poster from the language=fr TMDB response
+        fr_poster_path = str(fr_data.get("poster_path") or "")
+        if fr_poster_path:
+            poster_w500 = f"https://image.tmdb.org/t/p/w500{fr_poster_path}"
+        else:
+            poster = meta.get("poster", "") or ""
+            poster_w500 = poster
+            if "image.tmdb.org/t/p/" in poster:
+                poster_w500 = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
 
         parts.append(f"[center][b][font=Verdana][color={C}][size=28]{fr_title} ({year})[/size][/color][/font][/b]")
         if poster_w500:
