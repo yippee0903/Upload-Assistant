@@ -936,3 +936,78 @@ class TestG3MINIEncodeCodecLabel:
         name = self._get_name(meta)
         assert 'H265' in name, f"Untouched WEB-DL keeps H265, got: {name!r}"
         assert 'x265' not in name, f"x265 must not appear for a true WEB-DL, got: {name!r}"
+
+
+class TestG3MINIPgsSubtitlesOnEncodes:
+    """PGS subtitles are forbidden on encodes unless additional to a
+    text-based subtitle track of the same language."""
+
+    GOOD_SETTINGS = "cabac=1 / ref=5 / subme=8 / trellis=2"
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, subtitle_tracks: list[dict[str, Any]], **overrides: Any) -> dict[str, Any]:
+        m = _meta_base(
+            type="ENCODE",
+            video_codec="AVC",
+            video_encode=" x264",
+            source="BluRay",
+            is_disc=None,
+            mediainfo={
+                "media": {
+                    "track": [
+                        {"@type": "Video", "Encoded_Library_Settings": self.GOOD_SETTINGS},
+                        {"@type": "Audio", "Language": "fr"},
+                        *subtitle_tracks,
+                    ]
+                }
+            },
+            audio_languages=["French"],
+            subtitle_languages=[],
+        )
+        m.update(overrides)
+        return m
+
+    def test_pgs_only_language_is_rejected(self):
+        """A language whose only subtitle is PGS blocks the encode (Lola Rennt case)."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "en"},
+                {"@type": "Text", "Format": "PGS", "Language": "fr"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is False
+
+    def test_pgs_additional_to_text_track_passes(self):
+        """PGS is fine when a text subtitle of the same language exists."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+                {"@type": "Text", "Format": "PGS", "Language": "fr", "Title": "SDH"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_language_variants_count_as_the_same_language(self):
+        """pt vs pt-BR: the text track covers the PGS variant."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "pt"},
+                {"@type": "Text", "Format": "PGS", "Language": "pt-BR"},
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_remux_is_not_subject_to_the_rule(self):
+        meta = self._meta(
+            [{"@type": "Text", "Format": "PGS", "Language": "fr"}],
+            type="REMUX",
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_no_pgs_passes(self):
+        meta = self._meta([{"@type": "Text", "Format": "UTF-8", "Language": "fr"}])
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True

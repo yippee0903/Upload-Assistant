@@ -176,6 +176,24 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                         return False
                     break
 
+        # PGS subtitles are forbidden on encodes unless they are additional:
+        # a PGS track only passes when a text-based subtitle track of the
+        # same language exists alongside it.
+        if not meta.get("is_disc") and meta.get("type") in {"ENCODE", "WEBRIP"}:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+
+            def _lang(track: dict[str, Any]) -> str:
+                return str(track.get("Language", "") or "").lower().split("-")[0]
+
+            text_sub_langs = {_lang(t) for t in tracks if t.get("@type") == "Text" and "PGS" not in str(t.get("Format", "")).upper()}
+            offending = sorted({_lang(t) or "?" for t in tracks if t.get("@type") == "Text" and "PGS" in str(t.get("Format", "")).upper() and _lang(t) not in text_sub_langs})
+            if offending:
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print(
+                        f"[bold red]{self.tracker}: PGS subtitles are forbidden on encodes unless additional to a text subtitle track — offending language(s): {', '.join(offending)}.[/bold red]"
+                    )
+                return False
+
         return True
 
     # https://gemini-tracker.org/pages/7
