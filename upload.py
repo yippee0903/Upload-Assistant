@@ -46,6 +46,7 @@ from src.nfo_link import NfoLinkManager
 from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
+from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, validate_reused_image_hosts
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
@@ -1127,7 +1128,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 if manual_frames_count > 0:
                     meta["screens"] = manual_frames_count
                 cutoff = int(meta.get("cutoff") or 1)
-                trackers_with_image_host_requirements = {"A4K", "ACM", "BHD", "DC", "GPW", "HUNO", "MTV", "NST", "OE", "PTP", "STC", "TVC", "V3X"}
+                trackers_with_image_host_requirements = TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
                 if len(meta.get("image_list", [])) < cutoff and meta.get("skip_imghost_upload", False) is False:
                     # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                     relevant_trackers = [
@@ -1302,21 +1303,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                     # description) — the screenshot-upload block above was skipped,
                     # but trackers with approved-host requirements still need the
                     # existing images validated and rehosted when necessary.
-                    reused_relevant_trackers = [
-                        t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map
-                    ]
-                    if reused_relevant_trackers:
-                        console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(reused_relevant_trackers)}[/yellow]")
-                    for tracker_name in reused_relevant_trackers:
-                        tracker_instance = tracker_class_map[tracker_name](config=config)
-                        await tracker_instance.check_image_hosts(meta)
-                        images_key = f"{tracker_name}_images_key"
-                        if meta.get(images_key):
-                            console.print(f"[green]{tracker_name}: {len(meta[images_key])} image(s) ready on approved hosts.[/green]")
-                        else:
-                            console.print(
-                                f"[yellow]{tracker_name}: existing images could not be validated/rehosted; the description will fall back to the original links.[/yellow]"
-                            )
+                    await validate_reused_image_hosts(meta, config, tracker_class_map)
 
                 elif meta.get("skip_imghost_upload", False) is True and meta.get("image_list", False) is False:
                     meta["image_list"] = []
