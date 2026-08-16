@@ -63,7 +63,7 @@ class V3X(FrenchTrackerMixin):
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
         self._session_cookies: Optional[httpx.Cookies] = None
-        self.approved_image_hosts = ["imgbox", "imgbb", "postimg"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "ptscreens"]
         self.rehost_images_manager = RehostImagesManager(config)
 
     async def check_image_hosts(self, meta: Meta) -> None:
