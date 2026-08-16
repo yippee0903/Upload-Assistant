@@ -25,7 +25,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups = ["k0re", "Slay3R", "Fenixx", "KMS.Tools.Portable", "MAXAGENT", "Seyter", "Vansik"]
+        # Site "Teams Interdites" list
+        self.banned_groups = ["k0RE", "Slay3R", "EXTREME", "ShadowKernel", "byPlex", "WebVision", "AgoraQc", "DELiRiUS", "MICKEY"]
         self.source_flag = "G3MINI"
         pass
 
