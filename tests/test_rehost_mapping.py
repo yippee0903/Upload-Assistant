@@ -36,3 +36,11 @@ def test_every_approved_host_has_a_domain_in_the_central_mapping():
 def test_mapping_uses_the_imagebam_slug():
     assert URL_HOST_MAPPING["imagebam.com"] == "imagebam"
     assert "bam" not in URL_HOST_MAPPING.values()
+
+
+def test_reused_images_also_go_through_check_image_hosts():
+    """upload.py must validate approved hosts both when uploading new
+    screenshots and when the image list was reused from another tracker's
+    description (cutoff already satisfied)."""
+    source = open("upload.py", encoding="utf-8").read()
+    assert source.count("check_image_hosts(meta)") >= 2
