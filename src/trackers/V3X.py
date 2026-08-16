@@ -598,6 +598,9 @@ class V3X(FrenchTrackerMixin):
         innermost ones.
         """
         text = re.sub(r"\[/?center\]", "", text, flags=re.IGNORECASE)
+        # [quote] renders as an indented block with vertical margins on the
+        # site — ugly inside the fiche's notes section, drop the tags.
+        text = re.sub(r"\[/?quote[^\]]*\]", "", text, flags=re.IGNORECASE)
 
         token_re = re.compile(r"\[spoiler=[^\]]*\]|\[spoiler\]|\[/spoiler\]", re.IGNORECASE)
         stack: list[list[Any]] = []

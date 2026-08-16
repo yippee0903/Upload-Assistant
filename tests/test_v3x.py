@@ -1207,3 +1207,11 @@ class TestFlattenSourceBbcode:
         text = "[spoiler=A][spoiler=B][spoiler=C]deep[/spoiler][/spoiler][/spoiler]"
         out = V3X._flatten_source_bbcode(text)
         assert out == "[spoiler=C]deep[/spoiler]"
+
+
+def test_flatten_strips_quote_blocks():
+    text = "[quote]\n[color=orange][spoiler=Release Notes][color=gray]Source #1: notes[/color][/spoiler][/color]\n[/quote]"
+    out = V3X._flatten_source_bbcode(text)
+    assert "[quote]" not in out and "[/quote]" not in out
+    assert "[spoiler=Release Notes]" in out
+    assert "Source #1: notes" in out

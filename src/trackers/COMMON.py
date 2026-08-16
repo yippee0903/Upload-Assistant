@@ -2625,6 +2625,11 @@ class COMMON:
 
             if description:
                 bbcode = BBCODE()
+                # The cleanup strips the source's tonemapped boilerplate, but
+                # the fact travels with the reused screenshots: record it so
+                # the configured tonemapped_header re-adds the note.
+                if re.search(r"Screenshots have been tonemapped", description, re.IGNORECASE):
+                    meta["tonemapped"] = True
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 if not only_id:
                     console.print(f"[green]Successfully grabbed description from {tracker}")
