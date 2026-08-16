@@ -2215,6 +2215,20 @@ class FrenchTrackerMixin:
 
         return content
 
+    async def _get_source_description(self, meta: Meta) -> str:
+        """Reused/base description text (tmp DESCRIPTION.txt), already cleaned
+        by the description pipeline, for trackers that opt in via the
+        per-tracker ``include_source_description`` config flag.
+        """
+        if not self.config["TRACKERS"].get(self.tracker, {}).get("include_source_description", False):  # type: ignore[attr-defined]
+            return ""
+        path = os.path.join(str(meta.get("base_dir", "")), "tmp", str(meta.get("uuid", "")), "DESCRIPTION.txt")
+        try:
+            async with aiofiles.open(path, encoding="utf-8") as f:
+                return (await f.read()).strip()
+        except OSError:
+            return ""
+
     async def _get_or_generate_nfo(self, meta: Meta) -> Union[str, None]:
         """Pick the NFO to upload: the release's own NFO when present,
         otherwise a MediaInfo file or a generated scene NFO.

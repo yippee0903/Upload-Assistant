@@ -524,6 +524,10 @@ config = {
             "announce_url": "https://c411.org/announce/YOUR_PASSKEY",
             # Include screenshots in the upload description (default: False)
             "include_screenshots": False,
+            # Append the reused/base description (cleaned text grabbed from
+            # another tracker, or your custom description) as a
+            # "Notes de la release d'origine" section in the fiche
+            "include_source_description": False,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1026,6 +1030,10 @@ config = {
             "anon": False,
             # Include screenshot thumbnails in the description (default True)
             "include_screenshots": True,
+            # Append the reused/base description (cleaned text grabbed from
+            # another tracker, or your custom description) as a
+            # "Notes de la release d'origine" section in the fiche
+            "include_source_description": False,
             "link_dir_name": "",
         },
         "UTP": {
