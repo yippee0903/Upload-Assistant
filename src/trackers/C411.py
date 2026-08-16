@@ -1652,6 +1652,10 @@ class C411(FrenchTrackerMixin):
             for dupe in dupes:
                 if str(dupe.get("infohash") or "").lower() == own_infohash:
                     console.print(f"[yellow]C411: this exact torrent (same infohash) is already on the tracker: {dupe.get('name')}[/yellow]")
+                    # Same unattended-abort rule as the normal path below, so
+                    # the upload gate blocks even if the generic DupeChecker
+                    # later discards this entry on name similarity.
+                    meta["_c411_slot_occupied"] = not self._is_corrective_version_meta(meta)
                     return [dupe]
 
         # ── Corrective versions: note but still check dupes ──

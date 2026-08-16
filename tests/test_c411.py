@@ -3102,3 +3102,58 @@ class TestUploadLosslessClassification:
         }
         audio_str = c._get_audio_for_name(meta)
         assert C411._is_lossless_audio(audio_str), audio_str
+
+
+class TestCoexistenceUsesTrackAudio:
+    """Regression: the lossy/lossless coexistence filter must classify the
+    upload from its MediaInfo tracks (like the C411 fiche name), not from the
+    generic meta audio string."""
+
+    XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.MULTI.VFF.1080p.WEB.DTS.HD.MA.5.1.x264-Other</title>
+      <guid>https://c411.org/torrents/301</guid>
+      <link>https://c411.org/torrents/301</link>
+      <size>9000000000</size>
+    </item>
+    <item>
+      <title>Le.Prenom.2012.MULTI.VFF.1080p.WEB.DD.5.1.x264-Other2</title>
+      <guid>https://c411.org/torrents/302</guid>
+      <link>https://c411.org/torrents/302</link>
+      <size>4000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def test_lossless_file_with_lossy_meta_audio_keeps_lossless_dupe(self):
+        c = C411(_config())
+        meta = _meta_base(audio="Dual-Audio DD 2.0", tag="-Other")
+        meta["mediainfo"] = {
+            "media": {
+                "track": [
+                    {"@type": "General"},
+                    {"@type": "Audio", "Format": "DTS", "Format_AdditionalFeatures": "XLL", "Channels": "6", "Language": "en"},
+                    {"@type": "Audio", "Format": "AC-3", "Channels": "2", "Language": "fr"},
+                ]
+            }
+        }
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = self.XML
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+            dupes = asyncio.run(c.search_existing(meta, "nodisc"))
+
+        names = " ".join(d.get("name", "") for d in dupes)
+        # Track-based classification: the upload is lossless, so the lossless
+        # dupe blocks it and the lossy one is removed (permanent coexistence).
+        assert "DTS.HD.MA" in names
+        assert "DD.5.1" not in names
