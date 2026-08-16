@@ -302,18 +302,9 @@ class ACM:
         return f" [{dub} dub only, {inner}]" if inner else f" [{dub} dub only]"
 
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "postimg.cc": "postimg",
-            "pixhost.to": "pixhost",
-            "ptpimg.me": "ptpimg",
-            "imagebam.com": "imagebam",
-        }
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

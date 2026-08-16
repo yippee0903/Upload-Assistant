@@ -181,20 +181,10 @@ class OE(UNIT3D):
         )
 
     async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "imgbox.com": "imgbox",
-            "onlyimage.org": "onlyimage",
-            "imagebam.com": "bam",
-            "ptscreens.com": "ptscreens",
-            "img.passtheima.ge": "passtheimage",
-        }
 
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

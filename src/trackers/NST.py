@@ -205,16 +205,9 @@ class NST(FrenchTrackerMixin, UNIT3D):
     # ── Image host gating ─────────────────────────────────────────────
 
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        url_host_mapping = {
-            "imgbox.com": "imgbox",
-            "ptscreens.com": "ptscreens",
-            "onlyimage.org": "onlyimage",
-            "pixhost.to": "pixhost",
-        }
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

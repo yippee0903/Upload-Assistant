@@ -116,19 +116,9 @@ class A4K(UNIT3D):
         return data
 
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "imgur.com": "imgur",
-            "postimg.cc": "postimg",
-            "ptscreens.com": "ptscreens",
-            "onlyimage.org": "onlyimage",
-            "ptpimg.me": "ptpimg",
-        }
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

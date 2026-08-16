@@ -70,7 +70,7 @@ class HUNO(UNIT3D):
             "YIFY",
             "YTS",
         ]
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "bam"]
+        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "imagebam"]
         pass
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
@@ -129,17 +129,9 @@ class HUNO(UNIT3D):
         return {"stream": str(await self.is_plex_friendly(meta))}
 
     async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "imagebam.com": "bam",
-        }
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

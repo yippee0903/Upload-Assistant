@@ -16,6 +16,28 @@ from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
+# Canonical domain → image-host slug mapping, shared by every tracker.
+# The per-tracker policy lives in each tracker's approved_image_hosts list;
+# this table only serves to recognize where an existing image is hosted.
+URL_HOST_MAPPING: dict[str, str] = {
+    "beyondhd.co": "bhd",
+    "digitalcore.club": "sharex",
+    "ibb.co": "imgbb",
+    "imagebam.com": "imagebam",
+    "img.digitalcore.club": "sharex",
+    "img.passtheima.ge": "passtheimage",
+    "img.pterclub.com": "pterclub",
+    "imgbox.com": "imgbox",
+    "imgur.com": "imgur",
+    "kshare.club": "kshare",
+    "onlyimage.org": "onlyimage",
+    "pixhost.to": "pixhost",
+    "postimg.cc": "postimg",
+    "ptpimg.me": "ptpimg",
+    "ptscreens.com": "ptscreens",
+    "yes.ilikeshots.club": "ilikeshots",
+}
+
 
 def _as_str(value: Any) -> Union[str, None]:
     return value if isinstance(value, str) else None
@@ -54,7 +76,7 @@ class RehostImagesManager:
         self,
         meta: dict[str, Any],
         tracker: str,
-        url_host_mapping: dict[str, str],
+        url_host_mapping: Optional[dict[str, str]] = None,
         img_host_index: int = 1,
         approved_image_hosts: Optional[list[str]] = None,
     ) -> tuple[list[dict[str, str]], bool, bool]:
@@ -73,7 +95,7 @@ class RehostImagesManager:
         self,
         meta: dict[str, Any],
         tracker: str,
-        url_host_mapping: dict[str, str],
+        url_host_mapping: Optional[dict[str, str]] = None,
         approved_image_hosts: Optional[list[str]] = None,
         img_host_index: int = 1,
         file: Optional[str] = None,
@@ -94,7 +116,7 @@ class RehostImagesManager:
 async def _check_hosts(
     meta: dict[str, Any],
     tracker: str,
-    url_host_mapping: dict[str, str],
+    url_host_mapping: Optional[dict[str, str]] = None,
     img_host_index: int = 1,
     approved_image_hosts: Optional[list[str]] = None,
     default_config: Optional[Mapping[str, Any]] = None,
@@ -107,6 +129,8 @@ async def _check_hosts(
         raise ValueError("takescreens_manager is required")
     if uploadscreens_manager is None:
         raise ValueError("uploadscreens_manager is required")
+    if url_host_mapping is None:
+        url_host_mapping = URL_HOST_MAPPING
     if approved_image_hosts is None:
         approved_image_hosts = []
     new_images_key = f"{tracker}_images_key"
@@ -273,7 +297,7 @@ async def _check_hosts(
 async def _handle_image_upload(
     meta: dict[str, Any],
     tracker: str,
-    url_host_mapping: dict[str, str],
+    url_host_mapping: Optional[dict[str, str]] = None,
     approved_image_hosts: Optional[list[str]] = None,
     img_host_index: int = 1,
     file: Optional[str] = None,
@@ -287,6 +311,8 @@ async def _handle_image_upload(
         raise ValueError("takescreens_manager is required")
     if uploadscreens_manager is None:
         raise ValueError("uploadscreens_manager is required")
+    if url_host_mapping is None:
+        url_host_mapping = URL_HOST_MAPPING
     if approved_image_hosts is None:
         approved_image_hosts = []
     original_imghost = meta.get("imghost")

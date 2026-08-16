@@ -1048,21 +1048,14 @@ class TestApprovedImageHosts:
         tracker = V3X(_config())
         seen: dict[str, Any] = {}
 
-        async def fake_check_hosts(meta: Any, tracker_name: Any, url_host_mapping: Any, img_host_index: int, approved_image_hosts: Any) -> Any:
-            seen.update(tracker=tracker_name, mapping=url_host_mapping, hosts=approved_image_hosts)
+        async def fake_check_hosts(meta: Any, tracker_name: Any, img_host_index: int, approved_image_hosts: Any) -> Any:
+            seen.update(tracker=tracker_name, hosts=approved_image_hosts)
             return [], False, False
 
         monkeypatch.setattr(tracker.rehost_images_manager, "check_hosts", fake_check_hosts)
         asyncio.run(tracker.check_image_hosts({}))
         assert seen["tracker"] == "V3X"
         assert seen["hosts"] == ["imgbox", "imgbb", "postimg", "pixhost", "ptscreens"]
-        assert seen["mapping"] == {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "postimg.cc": "postimg",
-            "pixhost.to": "pixhost",
-            "ptscreens.com": "ptscreens",
-        }
 
     def test_description_prefers_rehosted_images(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
