@@ -7,9 +7,15 @@
 #     the filter param is q — "search" and the like are silently ignored
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
 #   GET  /categories                    public category tree (id/name/children)
+#   GET  /api/categories                key-authenticated tree with subcategory ids
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
-#     required: file (.torrent), name, categoryId (subcategory number), rightsDeclared
-#     accepted: description, nfo, tmdbId, anonymous, language
+#                                       (?apikey= also accepted; X-Api-Key is NOT)
+#     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
+#               movies/series also require nfo and tmdbId (or tmdbUrl)
+#     accepted: name, description, descriptionFormat, language, title,
+#               posterUrl, backdropUrl, anonymous
+#   Browse routes (/torrents listing & detail) require a web session cookie —
+#   API keys are rejected there since the 2026-08 site update.
 
 import asyncio
 import contextlib
@@ -36,6 +42,10 @@ RETRY_DELAY = 5.0  # seconds between upload retries
 class V3X(FrenchTrackerMixin):
     WEB_LABEL: str = "WEB"
     notag_label: str = "NOTAG"
+    # Site catalog convention: original title in the release name (the French
+    # title goes in the fiche's separate title field); originally-French
+    # works keep their French title.
+    PREFER_ORIGINAL_TITLE: bool = True
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -50,6 +60,32 @@ class V3X(FrenchTrackerMixin):
         self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
+        self._session_cookies: Optional[httpx.Cookies] = None
+
+    async def _login_session_cookies(self) -> Optional[httpx.Cookies]:
+        """Log in with the site credentials and cache the session cookie.
+
+        Browse routes (listing/detail) only accept a web session since the
+        2026-08 site update — API keys are upload-only there.
+        """
+        if self._session_cookies is not None:
+            return self._session_cookies
+        cfg = self.config["TRACKERS"].get(self.tracker, {})
+        login = str(cfg.get("username", "") or "").strip()
+        password = str(cfg.get("password", "") or "")
+        if not login or not password:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(f"{self.api_base}/auth/login", json={"login": login, "password": password})
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            console.print(f"[yellow]{self.tracker}: login failed: {type(e).__name__}[/yellow]")
+            return None
+        if response.status_code != 200:
+            console.print(f"[yellow]{self.tracker}: login failed (HTTP {response.status_code}) — check the username/password in your config.[/yellow]")
+            return None
+        self._session_cookies = response.cookies
+        return self._session_cookies
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         result = await super().get_name(meta)
@@ -106,6 +142,12 @@ class V3X(FrenchTrackerMixin):
             meta["skipping"] = self.tracker
             return dupes
 
+        cookies = await self._login_session_cookies()
+        if cookies is None:
+            console.print(f"[yellow]{self.tracker}: the dupe search needs the site username/password in your config — skipping tracker to avoid a false negative.[/yellow]")
+            meta["skipping"] = self.tracker
+            return dupes
+
         title = str(meta.get("title") or "")
         fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
         year_str = str(meta.get("year") or "").strip()
@@ -115,21 +157,19 @@ class V3X(FrenchTrackerMixin):
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
-        # The q filter is a raw case-insensitive substring over the stored
-        # NAME, and site names mix dot- and space-separators — so a
-        # multi-word query silently misses half the catalog. Query by the
-        # longest word of each title (separator-agnostic) and rely on the
-        # normalized client-side filters below for precision.
-        def _query_word(s: str) -> str:
-            words = re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split()
-            return max(words, key=len) if words else ""
+        # The q filter matches ordered words against both the stored name and
+        # the French title, separator- and accent-insensitive (improved since
+        # the 2026-08 update). Query the full cleaned title — but never append
+        # the year: TV names carry none and a year token yields zero matches.
+        def _q(s: str) -> str:
+            return " ".join(re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split())
 
         queries: list[str] = []
         ordered_titles = (fr_title, title) if str(meta.get("original_language", "")).lower() == "fr" else (title, fr_title)
         for t in ordered_titles:
-            word = _query_word(t)
-            if word and word.lower() not in (q.lower() for q in queries):
-                queries.append(word)
+            cleaned = _q(t)
+            if cleaned and cleaned.lower() not in (q.lower() for q in queries):
+                queries.append(cleaned)
         if not queries:
             return dupes
 
@@ -147,7 +187,7 @@ class V3X(FrenchTrackerMixin):
             total = None
             while page <= 50:  # hard cap so a misreported total can't loop forever
                 try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with httpx.AsyncClient(timeout=30.0, cookies=cookies) as client:
                         response = await client.get(self.search_url, params={"q": search_term, "perPage": 100, "page": page})
                     if response.status_code != 200:
                         incomplete = True
@@ -233,14 +273,13 @@ class V3X(FrenchTrackerMixin):
         enrich_limit = 25  # one request per dupe — bound the sequential cost
         if len(dupes) > enrich_limit:
             console.print(f"[yellow]{self.tracker}: enriching only the first {enrich_limit} of {len(dupes)} dupes; the rest fall back to name similarity.[/yellow]")
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=20.0, cookies=self._session_cookies) as client:
             for entry in dupes[:enrich_limit]:
                 torrent_id = entry.get("id")
                 if not torrent_id:
                     continue
                 try:
-                    response = await client.get(f"{self.search_url}/{torrent_id}", headers=headers)
+                    response = await client.get(f"{self.search_url}/{torrent_id}")
                     if response.status_code != 200:
                         continue
                     detail = response.json()
@@ -571,6 +610,13 @@ class V3X(FrenchTrackerMixin):
             data["nfo"] = nfo_text
         if int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
+        fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
+        if fr_title:
+            data["title"] = fr_title
+        if meta.get("poster"):
+            data["posterUrl"] = str(meta["poster"])
+        if meta.get("backdrop"):
+            data["backdropUrl"] = str(meta["backdrop"])
         # MediaInfo-based tag first (knows VOF/VOQ/VFB/AD/MUET); fall back
         # to name tokens when MediaInfo is unavailable (e.g. discs).
         language = (await self._build_audio_string(meta)).replace(".", ",") or self._get_language_tag(name)

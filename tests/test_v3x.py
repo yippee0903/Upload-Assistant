@@ -76,9 +76,13 @@ class TestSearchExisting:
         async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
             return None
 
+        async def fake_login() -> Any:
+            return v3x_module.httpx.Cookies()
+
         monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
         monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
         monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+        monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
 
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
@@ -90,8 +94,8 @@ class TestSearchExisting:
         self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
         assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug", "id": "uuid-1"}]
-        # Query uses the longest single word (separator-agnostic substring match)
-        assert _FakeClient.captured["params"]["q"] == "Movie"
+        # Full cleaned title (the API matches ordered words, separator-agnostic)
+        assert _FakeClient.captured["params"]["q"] == "Some Movie"
 
     def test_search_filters_irrelevant_results(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
@@ -162,7 +166,7 @@ class TestSearchExisting:
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker, fr_title="Les Infiltrés")
         asyncio.run(tracker.search_existing({"title": "The Departed"}))
-        assert seen_queries == ["Departed", "Infiltres"]
+        assert seen_queries == ["The Departed", "Les Infiltres"]
 
     def test_enrichment_adds_file_lists(self, monkeypatch: Any):
         class _DetailClient(_FakeClient):
@@ -208,9 +212,13 @@ class TestUpload:
         async def fake_desc(*args: Any, **kwargs: Any) -> str:
             return "desc"
 
+        async def fake_fr_title(meta: Any) -> str:
+            return ""
+
         monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
         monkeypatch.setattr(tracker, "get_name", fake_get_name)
         monkeypatch.setattr(tracker, "_build_description", fake_desc)
+        monkeypatch.setattr(tracker, "_get_french_title", fake_fr_title)
 
     def test_upload_sends_required_contract(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
@@ -477,10 +485,14 @@ def _prep_upload(monkeypatch: Any, tmp_path: Any, name: str, *, mediainfo: str =
     async def fake_desc(*args: Any, **kwargs: Any) -> str:
         return "desc"
 
+    async def fake_fr_title(meta: Any) -> str:
+        return ""
+
     monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
     monkeypatch.setattr(tracker, "get_name", fake_get_name)
     monkeypatch.setattr(tracker, "_build_description", fake_desc)
     monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr_title)
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", client)
     monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
     _FakeClient.response = _FakeResponse(201, {"id": "x"})
@@ -525,10 +537,14 @@ def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: An
     async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
         return None
 
+    async def fake_login() -> Any:
+        return v3x_module.httpx.Cookies()
+
     monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
     monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
     monkeypatch.setattr(tracker, "_check_french_lang_dupes", fake_filter)
+    monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     assert seen["dupes"][0]["name"] == "Some.Movie.2024.VOSTFR.1080p.WEB-GRP"
     assert dupes[0]["flags"] == ["filtered"]
@@ -705,9 +721,13 @@ def test_search_paginates_without_total_until_short_page(monkeypatch: Any):
     async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
         return None
 
+    async def fake_login() -> Any:
+        return v3x_module.httpx.Cookies()
+
     monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
     monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+    monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     # Full first page without a total → a second page is fetched; the short
     # second page ends the walk. No skipping, all 101 results kept.
@@ -833,3 +853,109 @@ def test_rename_allowed_with_rtorrent_linking(tmp_path: Any):
     tracker = V3X(config)
     tracker._rename_torrent_root({"base_dir": str(tmp_path), "uuid": uuid}, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
     assert Torrent.read(str(out / "[V3X].torrent")).name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
+
+
+def test_upload_sends_title_and_artwork_fields(monkeypatch: Any, tmp_path: Any):
+    name = "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, name)
+    meta["frtitle"] = "Un Film"
+    meta["poster"] = "https://image.tmdb.org/t/p/original/poster.jpg"
+    meta["backdrop"] = "https://image.tmdb.org/t/p/original/backdrop.jpg"
+    asyncio.run(tracker.upload(meta, ""))
+    data = _FakeClient.captured["data"]
+    assert data["title"] == "Un Film"
+    assert data["posterUrl"] == "https://image.tmdb.org/t/p/original/poster.jpg"
+    assert data["backdropUrl"] == "https://image.tmdb.org/t/p/original/backdrop.jpg"
+
+
+def test_upload_omits_artwork_when_absent(monkeypatch: Any, tmp_path: Any):
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
+    asyncio.run(tracker.upload(meta, ""))
+    data = _FakeClient.captured["data"]
+    assert "title" not in data
+    assert "posterUrl" not in data
+    assert "backdropUrl" not in data
+
+
+def test_search_skips_without_site_credentials(monkeypatch: Any):
+    tracker = V3X(_config())
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    meta: dict[str, Any] = {"title": "X"}
+    # No username/password in config → login returns None → fail-closed skip
+    assert asyncio.run(tracker.search_existing(meta)) == []
+    assert meta["skipping"] == "V3X"
+
+
+def test_login_returns_cookies_and_caches(monkeypatch: Any):
+    config = _config()
+    config["TRACKERS"]["V3X"]["username"] = "user"
+    config["TRACKERS"]["V3X"]["password"] = "pass"
+    tracker = V3X(config)
+    calls: list[str] = []
+
+    class _LoginResponse:
+        status_code = 200
+        cookies = v3x_module.httpx.Cookies({"v3x_sid": "abc"})
+
+    class _LoginClient(_FakeClient):
+        async def post(self, url: str, **kwargs: Any) -> Any:
+            calls.append(url)
+            assert kwargs["json"] == {"login": "user", "password": "pass"}
+            return _LoginResponse()
+
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _LoginClient)
+    cookies = asyncio.run(tracker._login_session_cookies())
+    assert cookies is not None and cookies.get("v3x_sid") == "abc"
+    # Second call hits the cache, no new request
+    asyncio.run(tracker._login_session_cookies())
+    assert len(calls) == 1
+
+
+def test_prefers_original_title_in_names(monkeypatch: Any):
+    # Original title in the release name (French title goes in the fiche's
+    # title field); originally-French works keep their French title.
+    tracker = V3X(_config())
+
+    async def fake_fr(meta: Any) -> str:
+        return "Les Infiltrés"
+
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    meta = {"title": "The Departed", "original_language": "en", "year": 2006, "resolution": "1080p", "type": "ENCODE", "source": "BluRay", "category": "MOVIE", "tag": "-GRP", "video_encode": "x264"}
+    assert asyncio.run(tracker.get_name(meta))["name"] == "The.Departed.2006.1080p.BluRay.x264-GRP"
+    assert asyncio.run(tracker.get_name(dict(meta, original_language="fr")))["name"] == "Les.Infiltres.2006.1080p.BluRay.x264-GRP"
+
+
+def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
+    constructed: list[Any] = []
+
+    class _CookieClient(_FakeClient):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            constructed.append(kwargs.get("cookies"))
+
+        async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+            if url.endswith("/torrents"):
+                return _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1}], "total": 1})
+            return _FakeResponse(200, {"files": [{"path": "a.mkv", "size": 1}]})
+
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _CookieClient)
+    tracker = V3X(_config())
+    jar = v3x_module.httpx.Cookies({"v3x_sid": "abc"})
+    tracker._session_cookies = jar
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    async def fake_fr(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+    assert dupes and dupes[0]["file_count"] == 1
+    # Both the paginated search client and the enrichment client carry the jar
+    assert len(constructed) >= 2
+    assert all(c is not None and c.get("v3x_sid") == "abc" for c in constructed)
