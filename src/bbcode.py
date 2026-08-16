@@ -567,20 +567,24 @@ class BBCODE:
         # Drop unmatched [url] tags left behind by the removals above — e.g.
         # a stripped site link whose label itself contained brackets, which
         # stops the label capture early and leaves the closing tag behind.
-        url_token_re = re.compile(r"\[url(?:=[^\]]*)?\]|\[/url\]", re.IGNORECASE)
-        url_stack: list[tuple[int, int]] = []
-        url_orphans: list[tuple[int, int]] = []
-        for url_match in url_token_re.finditer(desc):
-            if url_match.group(0).lower().startswith("[/"):
-                if url_stack:
-                    url_stack.pop()
+        def _drop_unmatched(text: str, token_pattern: str) -> str:
+            token_re = re.compile(token_pattern, re.IGNORECASE)
+            stack: list[tuple[int, int]] = []
+            orphans: list[tuple[int, int]] = []
+            for token_match in token_re.finditer(text):
+                if token_match.group(0).startswith("[/"):
+                    if stack:
+                        stack.pop()
+                    else:
+                        orphans.append((token_match.start(), token_match.end()))
                 else:
-                    url_orphans.append((url_match.start(), url_match.end()))
-            else:
-                url_stack.append((url_match.start(), url_match.end()))
-        url_orphans.extend(url_stack)
-        for start, end in sorted(url_orphans, reverse=True):
-            desc = desc[:start] + desc[end:]
+                    stack.append((token_match.start(), token_match.end()))
+            orphans.extend(stack)
+            for start, end in sorted(orphans, reverse=True):
+                text = text[:start] + text[end:]
+            return text
+
+        desc = _drop_unmatched(desc, r"\[url(?:=[^\]]*)?\]|\[/url\]")
 
         # Screenshot headers are orphaned once their images were extracted
         # above (no [img] survives at this point): drop short lines that are
@@ -588,10 +592,13 @@ class BBCODE:
         # [size] decoration ("SCREENSHOTS", "Screens", "Captures d'écran :"…).
         # Decoration = known BBCode tags or any non-alphanumeric character
         # (dashes, dots, ornaments like ❅✧✦…), in any order around the keyword
-        _wrap = r"(?:\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
+        _wrap = r"(?:\[/?(?:center|b|i|u|h[1-6]|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
         _keyword = r"(?:screen\s?shots?|screens|captures?(?:\s+d['’]?[ée]cran)?)"
         orphan_header_re = re.compile(rf"^{_wrap}{_keyword}{_wrap}$", re.IGNORECASE)
         desc = "\n".join(line for line in desc.split("\n") if not orphan_header_re.match(line))
+        # A dropped header line may have carried the opening [hN] of a block
+        # that continues below it: sweep the now-unmatched heading tags.
+        desc = _drop_unmatched(desc, r"\[/?h[1-6]\]")
 
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()

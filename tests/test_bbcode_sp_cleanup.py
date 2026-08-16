@@ -285,3 +285,18 @@ def test_only_uploader_signature_is_removed() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Only-Uploader" not in cleaned
     assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_h3_wrapped_ornament_header_and_leftover_close_are_removed() -> None:
+    desc = (
+        "[h3][center]•❅───✧❅✦ [color=#F69047]Screenshots[/color]"
+        " ✦❅✧───❅•[/center]\n\n"
+        "[center]Find our uploads [url=https://example.com/torrents?name=Group]here[/url][/center][/h3]"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Screenshots" not in cleaned
+    assert "[/h3]" not in cleaned
+    assert "Find our uploads" in cleaned
+    matched = "[h3]intro[/h3]\nBody."
+    cleaned2, _ = BBCODE().clean_unit3d_description(matched, "https://lst.gg")
+    assert "[h3]intro[/h3]" in cleaned2
