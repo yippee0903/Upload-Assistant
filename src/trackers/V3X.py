@@ -601,6 +601,11 @@ class V3X(FrenchTrackerMixin):
         # [quote] renders as an indented block with vertical margins on the
         # site — ugly inside the fiche's notes section, drop the tags.
         text = re.sub(r"\[/?quote[^\]]*\]", "", text, flags=re.IGNORECASE)
+        # [font] is unsupported, and foreign [size=N] values are absolute
+        # scales while the site reads percentages (a size=28 title would
+        # render at 28% — tiny): drop both, keeping the text.
+        text = re.sub(r"\[/?font[^\]]*\]", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[/?size[^\]]*\]", "", text, flags=re.IGNORECASE)
 
         token_re = re.compile(r"\[spoiler=[^\]]*\]|\[spoiler\]|\[/spoiler\]", re.IGNORECASE)
         stack: list[list[Any]] = []

@@ -539,6 +539,11 @@ class BBCODE:
         ).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
+        # ...and the bare (unwrapped) signature line some versions emit
+        desc = re.sub(r"[^\n]*Created by Upload Assistant[^\n]*\n?", "", desc, flags=re.IGNORECASE)
+        # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
+        desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.

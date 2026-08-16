@@ -1215,3 +1215,12 @@ def test_flatten_strips_quote_blocks():
     assert "[quote]" not in out and "[/quote]" not in out
     assert "[spoiler=Release Notes]" in out
     assert "Source #1: notes" in out
+
+
+def test_flatten_strips_font_and_size_tags():
+    text = "[font=Tahoma][size=28][b]Bloodhounds (2023)[/b][/size]\n[size=13]Genre: Drama[/size][/font]"
+    out = V3X._flatten_source_bbcode(text)
+    assert "[font" not in out and "[/font]" not in out
+    assert "[size" not in out and "[/size]" not in out
+    assert "[b]Bloodhounds (2023)[/b]" in out
+    assert "Genre: Drama" in out

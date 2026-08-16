@@ -191,3 +191,23 @@ def test_tonemapped_boilerplate_is_removed() -> None:
     assert "tonemapped" not in cleaned
     assert "Encoder notes kept." in cleaned
     assert "More kept." in cleaned
+
+
+def test_bare_ua_signature_is_removed_but_warning_banner_kept() -> None:
+    desc = (
+        "Kept intro.\n"
+        "[url=https://github.com/Audionut/Upload-Assistant][size=4]Created by Upload Assistant v6.2.3[/size][/url]\n"
+        "[b][color=red]DO NOT UPLOAD TO PUBLIC TRACKERS[/color][/b]\n"
+        "Kept outro."
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Created by Upload Assistant" not in cleaned
+    assert "DO NOT UPLOAD TO PUBLIC TRACKERS" in cleaned
+    assert "Kept intro." in cleaned and "Kept outro." in cleaned
+
+
+def test_note_tags_are_dropped_or_unwrapped() -> None:
+    desc = "Before.\n[note][/note]\n[note]Important note kept[/note]\nAfter."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[note]" not in cleaned and "[/note]" not in cleaned
+    assert "Important note kept" in cleaned
