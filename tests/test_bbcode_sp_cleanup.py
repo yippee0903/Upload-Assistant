@@ -92,3 +92,38 @@ def test_sponsored_sentence_is_removed() -> None:
     assert "sponsored by" not in cleaned
     assert "rendered for you via config.yaml" not in cleaned
     assert "Summary kept." in cleaned
+
+
+def test_dead_ptpimg_comparison_block_is_removed() -> None:
+    desc = (
+        "Summary kept.\n\n"
+        "[b]Source Comparison[/b]\n"
+        "[comparison=FRA BD, USA BD]\n"
+        "https://ptpimg.me/xxfake1.png\n"
+        "https://ptpimg.me/xxfake2.png\n"
+        "[/comparison]\n\n"
+        "[b]Screenshot Comparison[/b]\n"
+        "[comparison=FRA BD, Encode]\n"
+        "https://ptpimg.me/xxfake3.png\n"
+        "[/comparison]\n\n"
+        "Tail kept."
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+    assert "ptpimg.me" not in cleaned
+    assert "comparison" not in cleaned.lower()
+    assert "Summary kept." in cleaned
+    assert "Tail kept." in cleaned
+
+
+def test_live_host_comparison_block_survives() -> None:
+    desc = "[b]Source Comparison[/b]\n[comparison=A, B]\nhttps://img.example.invalid/a.png\nhttps://img.example.invalid/b.png\n[/comparison]\nSummary."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+    assert "[comparison=A, B]" in cleaned
+    assert "img.example.invalid/a.png" in cleaned
+
+
+def test_comparison_without_header_is_also_removed() -> None:
+    desc = "Intro.\n[comparison=A, B]\nhttps://ptpimg.me/xxfake9.png\n[/comparison]\nOutro."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+    assert "ptpimg" not in cleaned
+    assert "Intro." in cleaned and "Outro." in cleaned
