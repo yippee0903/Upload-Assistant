@@ -547,6 +547,7 @@ class BBCODE:
             r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
             r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
+            r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
             desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)

@@ -278,3 +278,10 @@ def test_pm_uploader_reseed_line_is_removed() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Please PM" not in cleaned
     assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_only_uploader_signature_is_removed() -> None:
+    desc = "Kept.\n[center][b]Brought to you by Only-Uploader [/b][/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Only-Uploader" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
