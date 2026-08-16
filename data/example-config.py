@@ -1013,6 +1013,11 @@ config = {
             "modq": False,
         },
         "V3X": {
+            # Note: the site displays the .torrent's internal name, so UA
+            # renames the torrent root to the generated release name. Seeding
+            # it therefore needs a qBittorrent or rTorrent client with linking
+            # enabled (the link folder takes the new name); without one, the
+            # rename is skipped and the fiche shows the on-disk name.
             "api_key": "V3X api key (upload scope)",
             # Site credentials — the dupe search browses the catalog through a
             # web session (API keys are upload-only since the 2026-08 update).
@@ -1020,13 +1025,6 @@ config = {
             "username": "",
             "password": "",
             "announce_url": "get from V3X",
-            # The site displays the .torrent's internal name: UA renames the
-            # torrent root to the generated release name (single files are
-            # wrapped in a folder so the inner file keeps its original,
-            # cross-seedable name). The rename only happens with a qBittorrent
-            # client that has linking enabled — the link folder takes the new
-            # name so seeding works without touching the on-disk content
-            # (unless your content path already carries that exact name).
             "anon": False,
             # Include screenshot thumbnails in the description (default True)
             "include_screenshots": True,
