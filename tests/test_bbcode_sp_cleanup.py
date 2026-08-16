@@ -256,3 +256,18 @@ def test_note_text_mentioning_tool_names_survives() -> None:
     assert "workflow inspired by" in cleaned
     assert "v6.2.3" not in cleaned
     assert "[b]Powered by GG-BOT Upload Assistant[/b]" not in cleaned
+
+
+def test_ornamented_screenshot_header_is_removed() -> None:
+    desc = "Kept notes.\n        •❅───✧❅✦ [color=#F69047]Screenshots[/color] ✦❅✧───❅•\n[img]https://img.example.invalid/a.png[/img]\nKept tail."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Screenshots" not in cleaned
+    assert "❅" not in cleaned
+    assert "Kept notes." in cleaned and "Kept tail." in cleaned
+
+
+def test_hentai_bot_signature_is_removed() -> None:
+    desc = "Kept.\n[center][size=4]Created by Hentai Bot[/size][/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Hentai Bot" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
