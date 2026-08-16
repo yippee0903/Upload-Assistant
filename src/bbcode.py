@@ -522,6 +522,9 @@ class BBCODE:
         desc = re.sub(r"\s*Posted to this fine tracker with [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
         # Same family of tool signatures, variable "sponsor" name.
         desc = re.sub(r"\s*This description is rendered for you via config\.yaml and is sponsored by [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
+        # Boilerplate note about tonemapped screenshots — meaningless once the
+        # screenshots are re-rendered by the destination tracker
+        desc = re.sub(r"\s*Screenshots have been tonemapped for reference\s*\.?", "", desc, flags=re.IGNORECASE)
         # ...and its sample-link spoiler ([b][spoiler=Sample: xyz]url[/spoiler][/b])
         desc = re.sub(r"\s*(\[b\])?\[spoiler=Sample[^\]]*\][\s\S]*?\[/spoiler\](\[/b\])?\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
         # ptpimg.me is dead: comparison blocks whose images live there are all
@@ -536,6 +539,15 @@ class BBCODE:
         ).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
+        # ...and bare (unwrapped) signature lines: only complete lines made of
+        # the marker plus known BBCode wrappers — ordinary note text that
+        # merely mentions a tool name must survive.
+        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
+        for _sig_marker in (r"Created by Upload Assistant(?:\s+v?[\w.]+)?", r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?"):
+            desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*\.?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
+        desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.
@@ -545,6 +557,24 @@ class BBCODE:
         desc = re.sub(r"\[img=[^\]]*\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[img=[^\]]*\]", "", desc, flags=re.IGNORECASE)
         # desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
+
+        # Drop unmatched [url] tags left behind by the removals above — e.g.
+        # a stripped site link whose label itself contained brackets, which
+        # stops the label capture early and leaves the closing tag behind.
+        url_token_re = re.compile(r"\[url(?:=[^\]]*)?\]|\[/url\]", re.IGNORECASE)
+        url_stack: list[tuple[int, int]] = []
+        url_orphans: list[tuple[int, int]] = []
+        for url_match in url_token_re.finditer(desc):
+            if url_match.group(0).lower().startswith("[/"):
+                if url_stack:
+                    url_stack.pop()
+                else:
+                    url_orphans.append((url_match.start(), url_match.end()))
+            else:
+                url_stack.append((url_match.start(), url_match.end()))
+        url_orphans.extend(url_stack)
+        for start, end in sorted(url_orphans, reverse=True):
+            desc = desc[:start] + desc[end:]
 
         # Screenshot headers are orphaned once their images were extracted
         # above (no [img] survives at this point): drop short lines that are
