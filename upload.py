@@ -1305,11 +1305,18 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                     reused_relevant_trackers = [
                         t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map
                     ]
+                    if reused_relevant_trackers:
+                        console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(reused_relevant_trackers)}[/yellow]")
                     for tracker_name in reused_relevant_trackers:
                         tracker_instance = tracker_class_map[tracker_name](config=config)
-                        if meta.get("debug"):
-                            console.print(f"[cyan]Image host debug: validating reused images for {tracker_name}[/cyan]")
                         await tracker_instance.check_image_hosts(meta)
+                        images_key = f"{tracker_name}_images_key"
+                        if meta.get(images_key):
+                            console.print(f"[green]{tracker_name}: {len(meta[images_key])} image(s) ready on approved hosts.[/green]")
+                        else:
+                            console.print(
+                                f"[yellow]{tracker_name}: existing images could not be validated/rehosted; the description will fall back to the original links.[/yellow]"
+                            )
 
                 elif meta.get("skip_imghost_upload", False) is True and meta.get("image_list", False) is False:
                     meta["image_list"] = []
