@@ -521,6 +521,16 @@ class BBCODE:
         desc = re.sub(r"\s*This description is rendered for you via config\.yaml and is sponsored by [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
         # ...and its sample-link spoiler ([b][spoiler=Sample: xyz]url[/spoiler][/b])
         desc = re.sub(r"\s*(\[b\])?\[spoiler=Sample[^\]]*\][\s\S]*?\[/spoiler\](\[/b\])?\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
+        # ptpimg.me is dead: comparison blocks whose images live there are all
+        # broken — drop the block and its "[b]… Comparison[/b]" header line.
+        # A comparison body holds only bare URLs, so [^\[]* spans it safely
+        # and blocks hosted elsewhere are left untouched.
+        desc = re.sub(
+            r"\s*(?:\[b\][^\[\]]*comparison[^\[\]]*\[/b\]\s*)?\[comparison=[^\]]*\][^\[]*ptpimg\.me[^\[]*\[/comparison\]\s*",
+            "\n\n",
+            desc,
+            flags=re.IGNORECASE,
+        ).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
 
