@@ -183,3 +183,76 @@ def test_dead_ptpimg_images_are_dropped_from_imagelist() -> None:
     desc = "[img]https://ptpimg.me/fakedead.png[/img]\n[img]https://img.example.invalid/live.png[/img]\nSummary."
     cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert [i["raw_url"] for i in images] == ["https://img.example.invalid/live.png"]
+
+
+def test_tonemapped_boilerplate_is_removed() -> None:
+    desc = "Encoder notes kept.\nScreenshots have been tonemapped for reference.\nMore kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "tonemapped" not in cleaned
+    assert "Encoder notes kept." in cleaned
+    assert "More kept." in cleaned
+
+
+def test_bare_ua_signature_is_removed_but_warning_banner_kept() -> None:
+    desc = (
+        "Kept intro.\n"
+        "[url=https://github.com/Audionut/Upload-Assistant][size=4]Created by Upload Assistant v6.2.3[/size][/url]\n"
+        "[b][color=red]DO NOT UPLOAD TO PUBLIC TRACKERS[/color][/b]\n"
+        "Kept outro."
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Created by Upload Assistant" not in cleaned
+    assert "DO NOT UPLOAD TO PUBLIC TRACKERS" in cleaned
+    assert "Kept intro." in cleaned and "Kept outro." in cleaned
+
+
+def test_note_tags_are_dropped_or_unwrapped() -> None:
+    desc = "Before.\n[note][/note]\n[note]Important note kept[/note]\nAfter."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[note]" not in cleaned and "[/note]" not in cleaned
+    assert "Important note kept" in cleaned
+
+
+def test_orphan_url_closer_from_bracketed_label_is_removed() -> None:
+    # A stripped site link whose label contains brackets used to leave the
+    # closing [/url] behind (Decision to Leave case)
+    desc = "Source: Some.Remux-GRP | Publisher [GER 2023] [/url] (Thanks!)\nKept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[/url]" not in cleaned
+    assert "Publisher [GER 2023]  (Thanks!)" in cleaned
+    assert "Kept." in cleaned
+
+
+def test_orphan_url_opener_is_removed_too() -> None:
+    desc = "See [url=https://example.invalid/page]the page\nKept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[url" not in cleaned
+    assert "the page" in cleaned
+
+
+def test_balanced_url_tags_survive() -> None:
+    desc = "See [url=https://example.invalid/page]the page[/url] here."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[url=https://example.invalid/page]the page[/url]" in cleaned
+
+
+def test_ggbot_signature_is_removed() -> None:
+    desc = "Kept.\n[center]Powered by GG-BOT Upload Assistant[/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "GG-BOT" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_note_text_mentioning_tool_names_survives() -> None:
+    desc = (
+        "This release was NOT Created by Upload Assistant, everything manual.\n"
+        "Comparison workflow inspired by the one Powered by GG-BOT Upload Assistant docs.\n"
+        "[center][size=4]Created by Upload Assistant v6.2.3[/size][/center]\n"
+        "[b]Powered by GG-BOT Upload Assistant[/b]"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    # Prose lines mentioning the tools stay; pure signature lines go
+    assert "NOT Created by Upload Assistant, everything manual." in cleaned
+    assert "workflow inspired by" in cleaned
+    assert "v6.2.3" not in cleaned
+    assert "[b]Powered by GG-BOT Upload Assistant[/b]" not in cleaned

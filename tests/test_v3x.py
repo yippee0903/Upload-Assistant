@@ -633,7 +633,7 @@ def test_description_informations_section(monkeypatch: Any, tmp_path: Any):
     tracker = V3X(_config())
 
     async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        assert kwargs.get("append_to_response") == "credits"
+        assert kwargs.get("append_to_response") in ("credits", "")
         return {
             "title": "Un Film",
             "overview": "Synopsis fr.",
@@ -1207,3 +1207,49 @@ class TestFlattenSourceBbcode:
         text = "[spoiler=A][spoiler=B][spoiler=C]deep[/spoiler][/spoiler][/spoiler]"
         out = V3X._flatten_source_bbcode(text)
         assert out == "[spoiler=C]deep[/spoiler]"
+
+
+def test_flatten_strips_quote_blocks():
+    text = "[quote]\n[color=orange][spoiler=Release Notes][color=gray]Source #1: notes[/color][/spoiler][/color]\n[/quote]"
+    out = V3X._flatten_source_bbcode(text)
+    assert "[quote]" not in out and "[/quote]" not in out
+    assert "[spoiler=Release Notes]" in out
+    assert "Source #1: notes" in out
+
+
+def test_flatten_strips_font_and_size_tags():
+    text = "[font=Tahoma][size=28][b]Bloodhounds (2023)[/b][/size]\n[size=13]Genre: Drama[/size][/font]"
+    out = V3X._flatten_source_bbcode(text)
+    assert "[font" not in out and "[/font]" not in out
+    assert "[size" not in out and "[/size]" not in out
+    assert "[b]Bloodhounds (2023)[/b]" in out
+    assert "Genre: Drama" in out
+
+
+def test_heading_falls_back_to_romanized_title(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        # TMDB has no French translation: fr response carries the original name
+        return {"name": "你敢不敢", "original_name": "你敢不敢"}
+
+    async def fake_mi(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {"base_dir": str(tmp_path), "uuid": "X", "title": "How Dare You", "category": "TV", "original_language": "zh"}
+    desc = asyncio.run(tracker._build_description(meta))
+    assert "How Dare You" in desc
+    assert "你敢不敢" not in desc.split("Synopsis")[0]
+
+
+def test_flatten_strips_headings_and_comparison_blocks():
+    text = "[h3][color=#F4AACA]Source 1[/color]: CR[/h3]\nREPACK: notes kept\n[comparison=SOURCE, ENCODE]\nhttps://img.example.invalid/a.png\nhttps://img.example.invalid/b.png\n[/comparison]\nTail kept."
+    out = V3X._flatten_source_bbcode(text)
+    assert "[h3]" not in out and "[/h3]" not in out
+    assert "[comparison" not in out
+    assert "img.example.invalid" not in out
+    assert "Source 1" in out and "REPACK: notes kept" in out and "Tail kept." in out

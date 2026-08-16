@@ -342,7 +342,10 @@ class V3X(FrenchTrackerMixin):
 
         parts.append("[center]")
 
-        title = str(fr_data.get("title") or fr_data.get("name") or meta.get("title") or "").strip()
+        # _get_french_title falls back to the romanized English title when
+        # TMDB has no real French translation (fr_data would otherwise return
+        # the original-language title — e.g. Chinese characters).
+        title = (await self._get_french_title(meta)).strip() or str(meta.get("title") or "").strip()
         year = str(meta.get("year") or "").strip()
         if title:
             heading = f"{title} ({year})" if year else title
@@ -598,6 +601,20 @@ class V3X(FrenchTrackerMixin):
         innermost ones.
         """
         text = re.sub(r"\[/?center\]", "", text, flags=re.IGNORECASE)
+        # [quote] renders as an indented block with vertical margins on the
+        # site — ugly inside the fiche's notes section, drop the tags.
+        text = re.sub(r"\[/?quote[^\]]*\]", "", text, flags=re.IGNORECASE)
+        # [font] is unsupported, and foreign [size=N] values are absolute
+        # scales while the site reads percentages (a size=28 title would
+        # render at 28% — tiny): drop both, keeping the text.
+        text = re.sub(r"\[/?font[^\]]*\]", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[/?size[^\]]*\]", "", text, flags=re.IGNORECASE)
+        # [h1]-[h6] headings are UNIT3D-specific and render literally here
+        text = re.sub(r"\[/?h[1-6]\]", "", text, flags=re.IGNORECASE)
+        # [comparison] is UNIT3D-specific too: the tag renders literally and
+        # its images are usually tracker-hosted (hotlink-blocked) — drop the
+        # whole block.
+        text = re.sub(r"\[comparison=[^\]]*\][\s\S]*?\[/comparison\]\s*", "", text, flags=re.IGNORECASE)
 
         token_re = re.compile(r"\[spoiler=[^\]]*\]|\[spoiler\]|\[/spoiler\]", re.IGNORECASE)
         stack: list[list[Any]] = []
