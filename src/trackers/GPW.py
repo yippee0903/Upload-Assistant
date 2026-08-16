@@ -96,14 +96,6 @@ class GPW:
             "YIFY",
         ]
         self.approved_image_hosts = ["kshare", "pixhost", "ptpimg", "pterclub", "ilikeshots", "imgbox"]
-        self.url_host_mapping = {
-            "kshare.club": "kshare",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "ptpimg.me": "ptpimg",
-            "img.pterclub.com": "pterclub",
-            "yes.ilikeshots.club": "ilikeshots",
-        }
 
     async def load_cookies(self, meta: dict[str, Any]) -> Any:
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
@@ -248,7 +240,6 @@ class GPW:
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
-            url_host_mapping=self.url_host_mapping,
             img_host_index=1,
             approved_image_hosts=self.approved_image_hosts,
         )

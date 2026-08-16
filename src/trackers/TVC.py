@@ -40,7 +40,7 @@ class TVC:
         self.torrent_url = "https://tvchaosuk.com/torrents/"
         self.signature = ""
         self.banned_groups = []
-        self.approved_image_hosts = ["imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage"]
+        self.approved_image_hosts = ["imgbb", "ptpimg", "imgbox", "pixhost", "imagebam", "onlyimage"]
         tmdb.API_KEY = config["DEFAULT"]["tmdb_api"]
 
         # TV type mapping as a dict for clarity and maintainability
@@ -426,16 +426,8 @@ class TVC:
         return await asyncio.to_thread(_read)
 
     async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "imgbox.com": "imgbox",
-            "pixhost.to": "pixhost",
-            "imagebam.com": "bam",
-            "onlyimage.org": "onlyimage",
-        }
 
-        await self.rehost_images_manager.check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
+        await self.rehost_images_manager.check_hosts(meta, self.tracker, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
         return
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
