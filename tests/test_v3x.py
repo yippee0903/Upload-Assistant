@@ -1015,6 +1015,16 @@ class TestFrenchLanguageSupersede:
         assert len(dupes) == 1
         assert "french_lang_supersede" in dupes[0].get("flags", [])
 
+    def test_vo_upload_blocked_by_multi_from_another_group(self, monkeypatch: Any):
+        # Empty audio string = plain VO (no French audio, no French subs)
+        dupes = self._search(
+            monkeypatch,
+            "",
+            ["Some.Movie.2024.MULTi.VFF.1080p.WEB-OTHERGRP"],
+        )
+        assert len(dupes) == 1
+        assert "french_lang_supersede" in dupes[0].get("flags", [])
+
     def test_vostfr_upload_not_blocked_by_other_group_vostfr(self, monkeypatch: Any):
         dupes = self._search(
             monkeypatch,
