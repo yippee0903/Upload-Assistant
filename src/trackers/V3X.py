@@ -42,6 +42,10 @@ RETRY_DELAY = 5.0  # seconds between upload retries
 class V3X(FrenchTrackerMixin):
     WEB_LABEL: str = "WEB"
     notag_label: str = "NOTAG"
+    # Site catalog convention: original title in the release name (the French
+    # title goes in the fiche's separate title field); originally-French
+    # works keep their French title.
+    PREFER_ORIGINAL_TITLE: bool = True
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config

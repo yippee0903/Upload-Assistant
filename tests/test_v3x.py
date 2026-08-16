@@ -913,3 +913,9 @@ def test_login_returns_cookies_and_caches(monkeypatch: Any):
     # Second call hits the cache, no new request
     asyncio.run(tracker._login_session_cookies())
     assert len(calls) == 1
+
+
+def test_prefers_original_title_in_names():
+    # Original title in the release name (French title goes in the fiche's
+    # title field); originally-French works keep their French title.
+    assert V3X.PREFER_ORIGINAL_TITLE is True
