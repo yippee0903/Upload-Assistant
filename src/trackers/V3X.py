@@ -32,6 +32,7 @@ from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
+from src.trackers.FRENCH import _FRENCH_AUDIO_THRESHOLD as FRENCH_AUDIO_THRESHOLD
 from src.trackers.FRENCH import FrenchTrackerMixin
 
 Meta = dict[str, Any]
@@ -180,6 +181,13 @@ class V3X(FrenchTrackerMixin):
         seen_names: set[str] = set()
         debug = bool(meta.get("debug"))
 
+        # A VOSTFR/VO upload must be blocked by an equivalent French-audio
+        # release from ANY group, so the group filter below must not drop
+        # those candidates before _check_french_lang_dupes can flag them.
+        upload_audio = await self._build_audio_string(meta)
+        upload_level = max((self._extract_french_lang_tag(part)[1] for part in upload_audio.split(".")), default=0)
+        upload_lacks_french_audio = upload_level < FRENCH_AUDIO_THRESHOLD
+
         for search_term in queries:
             items: list[Any] = []
             page = 1
@@ -244,9 +252,13 @@ class V3X(FrenchTrackerMixin):
                         console.print(f"[dim]{self.tracker} dupe skip (resolution mismatch): {name}[/dim]")
                     continue
                 if group_norm and group_norm not in name_norm:
-                    if debug:
-                        console.print(f"[dim]{self.tracker} dupe skip (group mismatch): {name}[/dim]")
-                    continue
+                    _, existing_level = self._extract_french_lang_tag(name)
+                    if not (upload_lacks_french_audio and existing_level >= FRENCH_AUDIO_THRESHOLD):
+                        if debug:
+                            console.print(f"[dim]{self.tracker} dupe skip (group mismatch): {name}[/dim]")
+                        continue
+                    # Keep: superior French audio from another group — a
+                    # potential language supersede for this VOSTFR/VO upload.
                 seen_names.add(name_norm)
                 dupes.append(
                     {

@@ -959,3 +959,65 @@ def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
     # Both the paginated search client and the enrichment client carry the jar
     assert len(constructed) >= 2
     assert all(c is not None and c.get("v3x_sid") == "abc" for c in constructed)
+
+
+class TestFrenchLanguageSupersede:
+    """VOSTFR uploads must be blocked by an equivalent French-audio release
+    from ANY group; French-audio uploads drop inferior VOSTFR dupes."""
+
+    def _search(self, monkeypatch: Any, upload_audio: str, listing_names: list[str]) -> list[dict[str, Any]]:
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.response = _FakeResponse(
+            200,
+            {"torrents": [{"id": f"u{i}", "slug": f"s{i}", "name": n, "size": i + 1} for i, n in enumerate(listing_names)], "total": len(listing_names)},
+        )
+        tracker = V3X(_config())
+
+        async def fake_checks(meta: Any) -> bool:
+            return True
+
+        async def fake_fr(meta: Any) -> str:
+            return ""
+
+        async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
+            return None
+
+        async def fake_login() -> Any:
+            return v3x_module.httpx.Cookies()
+
+        async def fake_audio(meta: Any) -> str:
+            return upload_audio
+
+        monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+        monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+        monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+        monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
+        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio)
+        meta = {"title": "Some Movie", "year": 2024, "resolution": "1080p", "tag": "-MYGRP"}
+        return asyncio.run(tracker.search_existing(meta))
+
+    def test_vostfr_upload_blocked_by_multi_from_another_group(self, monkeypatch: Any):
+        dupes = self._search(
+            monkeypatch,
+            "VOSTFR",
+            ["Some.Movie.2024.MULTi.VFF.1080p.WEB-OTHERGRP"],
+        )
+        assert len(dupes) == 1
+        assert "french_lang_supersede" in dupes[0].get("flags", [])
+
+    def test_vostfr_upload_not_blocked_by_other_group_vostfr(self, monkeypatch: Any):
+        dupes = self._search(
+            monkeypatch,
+            "VOSTFR",
+            ["Some.Movie.2024.VOSTFR.1080p.WEB-OTHERGRP"],
+        )
+        # Same-language release from another group: normal group filter applies
+        assert dupes == []
+
+    def test_multi_upload_drops_inferior_vostfr(self, monkeypatch: Any):
+        dupes = self._search(
+            monkeypatch,
+            "MULTI.VFF",
+            ["Some.Movie.2024.VOSTFR.1080p.WEB-MYGRP"],
+        )
+        assert dupes == []
