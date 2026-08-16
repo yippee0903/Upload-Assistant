@@ -541,6 +541,8 @@ class BBCODE:
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
         # ...and the bare (unwrapped) signature line some versions emit
         desc = re.sub(r"[^\n]*Created by Upload Assistant[^\n]*\n?", "", desc, flags=re.IGNORECASE)
+        # Sibling tool signature
+        desc = re.sub(r"[^\n]*Powered by GG-BOT Upload Assistant[^\n]*\n?", "", desc, flags=re.IGNORECASE)
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)

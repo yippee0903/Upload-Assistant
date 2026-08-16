@@ -234,3 +234,10 @@ def test_balanced_url_tags_survive() -> None:
     desc = "See [url=https://example.invalid/page]the page[/url] here."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "[url=https://example.invalid/page]the page[/url]" in cleaned
+
+
+def test_ggbot_signature_is_removed() -> None:
+    desc = "Kept.\n[center]Powered by GG-BOT Upload Assistant[/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "GG-BOT" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
