@@ -349,9 +349,16 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[b][color={C}][size=200]{heading}[/size][/color][/b]")
             parts.append("")
 
-        poster = str(meta.get("poster") or "")
-        if "image.tmdb.org/t/p/" in poster:
-            poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
+        # Prefer the French-localized poster (the language=fr TMDB response
+        # already fetched above localizes poster_path when a FR variant exists)
+        fr_poster_path = str(fr_data.get("poster_path") or "")
+        if fr_poster_path:
+            poster = f"https://image.tmdb.org/t/p/w500{fr_poster_path}"
+            meta["fr_poster"] = f"https://image.tmdb.org/t/p/original{fr_poster_path}"
+        else:
+            poster = str(meta.get("poster") or "")
+            if "image.tmdb.org/t/p/" in poster:
+                poster = re.sub(r"/t/p/[^/]+/", "/t/p/w500/", poster)
         if poster:
             parts.append(f"[img]{poster}[/img]")
             parts.append("")
@@ -649,8 +656,10 @@ class V3X(FrenchTrackerMixin):
             data["tmdbUrl"] = f"https://www.imdb.com/title/tt{imdb_digits.zfill(7)}/"
         elif int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
-        if meta.get("poster"):
-            data["posterUrl"] = str(meta["poster"])
+        if meta.get("fr_poster") or meta.get("poster"):
+            # fr_poster is set by _build_description when a French-localized
+            # poster exists on TMDB
+            data["posterUrl"] = str(meta.get("fr_poster") or meta["poster"])
         if meta.get("backdrop"):
             data["backdropUrl"] = str(meta["backdrop"])
         # MediaInfo-based tag first (knows VOF/VOQ/VFB/AD/MUET); fall back

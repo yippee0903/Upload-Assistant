@@ -3232,6 +3232,21 @@ class TestBonusReleasesAreExcluded:
         assert "FRENCH.1080p.WEB.AC3.5.1" not in names
 
 
+class TestFrenchPoster:
+    def test_description_prefers_french_poster(self, monkeypatch: Any):
+        c = C411(_config())
+
+        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return {"title": "Un Film", "poster_path": "/frposter.jpg"}
+
+        monkeypatch.setattr(c.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+        meta = _meta_base()
+        meta["poster"] = "https://image.tmdb.org/t/p/original/default.jpg"
+        desc = asyncio.run(c._build_description(meta))
+        assert "https://image.tmdb.org/t/p/w500/frposter.jpg" in desc
+        assert "default.jpg" not in desc
+
+
 class TestSourceDescriptionSection:
     """Optional 'Notes de la release d'origine' section from DESCRIPTION.txt."""
 

@@ -1101,6 +1101,46 @@ class TestApprovedImageHosts:
         assert "V3X" in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
 
 
+def test_description_prefers_french_poster(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        return {"poster_path": "/frposter.jpg"}
+
+    async def fake_mi(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {"base_dir": str(tmp_path), "uuid": "X", "title": "Some Movie", "category": "MOVIE", "poster": "https://image.tmdb.org/t/p/original/default.jpg"}
+    desc = asyncio.run(tracker._build_description(meta))
+    assert "[img]https://image.tmdb.org/t/p/w500/frposter.jpg[/img]" in desc
+    assert "default.jpg" not in desc
+    # And the upload field will carry the FR poster too
+    assert meta["fr_poster"] == "https://image.tmdb.org/t/p/original/frposter.jpg"
+
+
+def test_description_falls_back_to_default_poster(monkeypatch: Any, tmp_path: Any):
+    tracker = V3X(_config())
+
+    async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+    async def fake_mi(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+    monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+    monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+    meta = {"base_dir": str(tmp_path), "uuid": "X", "title": "Some Movie", "category": "MOVIE", "poster": "https://image.tmdb.org/t/p/original/default.jpg"}
+    desc = asyncio.run(tracker._build_description(meta))
+    assert "[img]https://image.tmdb.org/t/p/w500/default.jpg[/img]" in desc
+    assert "fr_poster" not in meta
+
+
 class TestSourceDescriptionSection:
     """The reused/base description is appended as an optional fiche section."""
 
