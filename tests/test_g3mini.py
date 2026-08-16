@@ -936,3 +936,245 @@ class TestG3MINIEncodeCodecLabel:
         name = self._get_name(meta)
         assert 'H265' in name, f"Untouched WEB-DL keeps H265, got: {name!r}"
         assert 'x265' not in name, f"x265 must not appear for a true WEB-DL, got: {name!r}"
+
+
+class TestG3MINIPgsSubtitlesOnEncodes:
+    """PGS subtitles are forbidden on encodes unless additional to a
+    text-based subtitle track of the same language."""
+
+    GOOD_SETTINGS = "cabac=1 / ref=5 / subme=8 / trellis=2"
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, subtitle_tracks: list[dict[str, Any]], **overrides: Any) -> dict[str, Any]:
+        m = _meta_base(
+            type="ENCODE",
+            video_codec="AVC",
+            video_encode=" x264",
+            source="BluRay",
+            is_disc=None,
+            mediainfo={
+                "media": {
+                    "track": [
+                        {"@type": "Video", "Encoded_Library_Settings": self.GOOD_SETTINGS},
+                        {"@type": "Audio", "Language": "fr"},
+                        *subtitle_tracks,
+                    ]
+                }
+            },
+            audio_languages=["French"],
+            subtitle_languages=[],
+        )
+        m.update(overrides)
+        return m
+
+    def test_pgs_only_language_is_rejected(self):
+        """A language whose only subtitle is PGS blocks the encode (Lola Rennt case)."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "en"},
+                {"@type": "Text", "Format": "PGS", "Language": "fr"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is False
+
+    def test_pgs_additional_to_text_track_passes(self):
+        """PGS is fine when a text subtitle of the same language exists."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+                {"@type": "Text", "Format": "PGS", "Language": "fr", "Title": "SDH"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_language_variants_count_as_the_same_language(self):
+        """pt vs pt-BR: the text track covers the PGS variant."""
+        meta = self._meta(
+            [
+                {"@type": "Text", "Format": "UTF-8", "Language": "pt"},
+                {"@type": "Text", "Format": "PGS", "Language": "pt-BR"},
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+            ]
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_remux_is_not_subject_to_the_rule(self):
+        meta = self._meta(
+            [{"@type": "Text", "Format": "PGS", "Language": "fr"}],
+            type="REMUX",
+        )
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+    def test_no_pgs_passes(self):
+        meta = self._meta([{"@type": "Text", "Format": "UTF-8", "Language": "fr"}])
+        assert asyncio.run(self._g3().get_additional_checks(meta)) is True
+
+
+class TestG3MINIEncodingRules:
+    """x265/AV1 preset minimums, forbidden audio codecs, MULTi subtitle
+    requirement, external subs and archives."""
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, *, video: dict[str, Any] | None = None, audio: list[dict[str, Any]] | None = None, text: list[dict[str, Any]] | None = None, **overrides: Any) -> dict[str, Any]:
+        tracks: list[dict[str, Any]] = [video or {"@type": "Video", "Encoded_Library_Settings": "cabac=1 / subme=8 / trellis=2"}]
+        tracks += audio or [{"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "fr"}]
+        tracks += text or []
+        m = _meta_base(
+            type="ENCODE",
+            video_codec="AVC",
+            video_encode=" x264",
+            source="BluRay",
+            is_disc=None,
+            mediainfo={"media": {"track": tracks}},
+            audio_languages=["French"],
+            subtitle_languages=[],
+            filelist=["/downloads/Movie.2024.mkv"],
+        )
+        m.update(overrides)
+        return m
+
+    def _run(self, meta: dict[str, Any]) -> bool:
+        return asyncio.run(self._g3().get_additional_checks(meta))
+
+    # ── x265 preset ──
+
+    def test_x265_medium_passes(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / subme=2 / rd=3"}, video_encode=" x265")
+        assert self._run(meta) is True
+
+    def test_x265_below_medium_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / subme=1 / rd=2"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    def test_x265_without_settings_is_rejected(self):
+        meta = self._meta(video={"@type": "Video"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    # ── AV1 preset ──
+
+    def test_av1_preset_4_passes(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "preset=4 / crf=30"}, video_encode="AV1")
+        assert self._run(meta) is True
+
+    def test_av1_preset_above_4_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "preset=8 / crf=30"}, video_encode="AV1")
+        assert self._run(meta) is False
+
+    def test_av1_without_preset_is_rejected(self):
+        meta = self._meta(video={"@type": "Video"}, video_encode="AV1")
+        assert self._run(meta) is False
+
+    # ── forbidden audio codecs ──
+
+    def test_mp3_track_is_rejected(self):
+        meta = self._meta(audio=[{"@type": "Audio", "Format": "MP3", "Channels": "2", "Language": "fr"}])
+        assert self._run(meta) is False
+
+    def test_flac_stereo_passes(self):
+        meta = self._meta(audio=[{"@type": "Audio", "Format": "FLAC", "Channels": "2", "Language": "fr"}])
+        assert self._run(meta) is True
+
+    def test_flac_surround_is_rejected(self):
+        meta = self._meta(audio=[{"@type": "Audio", "Format": "FLAC", "Channels": "6", "Language": "fr"}])
+        assert self._run(meta) is False
+
+    def test_remux_is_exempt_from_codec_rules(self):
+        meta = self._meta(audio=[{"@type": "Audio", "Format": "MP3", "Channels": "2", "Language": "fr"}], type="REMUX")
+        assert self._run(meta) is True
+
+    # ── MULTi requires French subs ──
+
+    def test_multi_without_french_subs_is_rejected(self):
+        meta = self._meta(
+            audio=[
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "fr"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "en"},
+            ],
+            original_language="en",
+        )
+        assert self._run(meta) is False
+
+    def test_multi_with_french_subs_passes(self):
+        meta = self._meta(
+            audio=[
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "fr"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "en"},
+            ],
+            text=[{"@type": "Text", "Format": "UTF-8", "Language": "fr"}],
+            original_language="en",
+        )
+        assert self._run(meta) is True
+
+    # ── external files ──
+
+    def test_external_subtitle_file_is_rejected(self):
+        meta = self._meta(filelist=["/downloads/Movie.2024.mkv", "/downloads/Movie.2024.fr.srt"])
+        assert self._run(meta) is False
+
+    def test_archive_is_rejected(self):
+        meta = self._meta(filelist=["/downloads/Movie.2024.mkv", "/downloads/extras.rar"])
+        assert self._run(meta) is False
+
+
+class TestG3MINIReviewRegressions:
+    """Edge cases: partial x265 settings, AD.MULTI tags, unlabelled tracks."""
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, **kwargs: Any) -> dict[str, Any]:
+        return TestG3MINIEncodingRules()._meta(**kwargs)
+
+    def _run(self, meta: dict[str, Any]) -> bool:
+        return asyncio.run(self._g3().get_additional_checks(meta))
+
+    def test_x265_subme_only_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / subme=3"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    def test_x265_rd_only_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / rd=4"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    def test_ad_multi_without_french_subs_is_rejected(self):
+        meta = self._meta(
+            audio=[
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "fr"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "en"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "2", "Language": "fr", "Title": "Audiodescription"},
+            ],
+            original_language="en",
+        )
+        meta["has_audiodesc"] = True
+        assert self._run(meta) is False
+
+    def test_unlabelled_text_track_does_not_vouch_for_unlabelled_pgs(self):
+        meta = self._meta(
+            text=[
+                {"@type": "Text", "Format": "UTF-8"},
+                {"@type": "Text", "Format": "PGS"},
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+            ]
+        )
+        assert self._run(meta) is False
+
+
+class TestX264PartialSettings:
+    """x264 settings missing subme or trellis are unverifiable → rejected."""
+
+    def _run(self, encoding_settings: str) -> bool:
+        meta = TestG3MINIAdditionalChecksX264Preset()._meta(encoding_settings=encoding_settings)
+        return asyncio.run(G3MINI(_config()).get_additional_checks(meta))
+
+    def test_subme_only_is_rejected(self):
+        assert self._run("cabac=1 / subme=9") is False
+
+    def test_trellis_only_is_rejected(self):
+        assert self._run("cabac=1 / trellis=2") is False

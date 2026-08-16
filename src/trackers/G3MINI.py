@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut &amp; wastaken7 — Licensed under UAPL v1.0
+import os
 import re
 from typing import Any
 
@@ -24,7 +25,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups = ["k0re", "Slay3R", "Fenixx", "KMS.Tools.Portable", "MAXAGENT", "Seyter", "Vansik"]
+        # Site "Teams Interdites" list
+        self.banned_groups = ["k0RE", "Slay3R", "EXTREME", "ShadowKernel", "byPlex", "WebVision", "AgoraQc", "DELiRiUS", "MICKEY"]
         self.source_flag = "G3MINI"
         pass
 
@@ -164,17 +166,126 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                     if meta.get("debug", False):
                         console.print(f"[cyan]{self.tracker}: x264 subme={subme}, trellis={trellis}[/cyan]")
 
-                    # Reject if either parameter is at medium level or worse
-                    if (subme is not None and subme < 8) or (trellis is not None and trellis < 2):
-                        details = []
-                        if subme is not None and subme < 8:
-                            details.append(f"subme={subme} (minimum 8 for 'slow')")
-                        if trellis is not None and trellis < 2:
-                            details.append(f"trellis={trellis} (minimum 2 for 'slow')")
+                    # x264 always dumps both parameters; a missing one means the
+                    # settings are unverifiable — reject like a below-minimum value.
+                    details = []
+                    if subme is None or subme < 8:
+                        details.append(f"subme={subme if subme is not None else 'missing'} (minimum 8 for 'slow')")
+                    if trellis is None or trellis < 2:
+                        details.append(f"trellis={trellis if trellis is not None else 'missing'} (minimum 2 for 'slow')")
+                    if details:
                         if not meta.get("unattended") or meta.get("debug"):
                             console.print(f"[bold red]{self.tracker}: x264 encode quality is below the 'slow' preset minimum: {', '.join(details)}.[/bold red]")
                         return False
                     break
+
+        # x265 encodes must use at least the "medium" preset. Same inference
+        # approach as x264: medium = subme=2/rd=3, slow = subme=3/rd=4.
+        if not meta.get("is_disc") and "x265" in meta.get("video_encode", "").lower() and meta.get("type") in {"ENCODE", "WEBRIP"}:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            for track in tracks:
+                if track.get("@type") == "Video":
+                    encoding_settings = str(track.get("Encoded_Library_Settings", "") or "")
+                    if not encoding_settings or encoding_settings == "{}":
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(
+                                f"[bold red]{self.tracker}: No encoding settings found in mediainfo — cannot verify x265 preset quality (minimum: 'medium').[/bold red]"
+                            )
+                        return False
+                    subme_match = re.search(r"\bsubme\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)
+                    rd_match = re.search(r"\brd\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)
+                    subme = int(subme_match.group(1)) if subme_match else None
+                    rd = int(rd_match.group(1)) if rd_match else None
+                    # x265 always dumps both parameters; a missing one means the
+                    # settings are unverifiable — reject like a below-minimum value.
+                    details = []
+                    if subme is None or subme < 2:
+                        details.append(f"subme={subme if subme is not None else 'missing'} (minimum 2 for 'medium')")
+                    if rd is None or rd < 3:
+                        details.append(f"rd={rd if rd is not None else 'missing'} (minimum 3 for 'medium')")
+                    if details:
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(f"[bold red]{self.tracker}: x265 encode quality is below the 'medium' preset minimum: {', '.join(details)}.[/bold red]")
+                        return False
+                    break
+
+        # AV1 encodes must use preset 4 (slower) or better (lower number).
+        if not meta.get("is_disc") and "av1" in meta.get("video_encode", "").lower() and meta.get("type") in {"ENCODE", "WEBRIP"}:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+            for track in tracks:
+                if track.get("@type") == "Video":
+                    encoding_settings = str(track.get("Encoded_Library_Settings", "") or "")
+                    preset_match = re.search(r"\bpreset\s*[=:]\s*(\d+)", encoding_settings, re.IGNORECASE)
+                    if not encoding_settings or encoding_settings == "{}" or not preset_match:
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(f"[bold red]{self.tracker}: No encoding settings found in mediainfo — cannot verify AV1 preset (maximum: 4).[/bold red]")
+                        return False
+                    if int(preset_match.group(1)) > 4:
+                        if not meta.get("unattended") or meta.get("debug"):
+                            console.print(f"[bold red]{self.tracker}: AV1 preset {preset_match.group(1)} is above the allowed maximum of 4 (slower).[/bold red]")
+                        return False
+                    break
+
+        # Forbidden audio codecs on encodes: MP3 always, FLAC beyond stereo.
+        if not meta.get("is_disc") and meta.get("type") in {"ENCODE", "WEBRIP"}:
+            for track in meta.get("mediainfo", {}).get("media", {}).get("track", []):
+                if track.get("@type") != "Audio":
+                    continue
+                fmt = str(track.get("Format", "") or "").upper()
+                channels = int(str(track.get("Channels", "0") or "0"))
+                if fmt == "MP3":
+                    if not meta.get("unattended") or meta.get("debug"):
+                        console.print(f"[bold red]{self.tracker}: MP3 audio tracks are forbidden on encodes.[/bold red]")
+                    return False
+                if fmt == "FLAC" and channels > 2:
+                    if not meta.get("unattended") or meta.get("debug"):
+                        console.print(f"[bold red]{self.tracker}: FLAC audio is only allowed for mono/stereo tracks (found {channels} channels).[/bold red]")
+                    return False
+
+        # A MULTi release must carry VO + VF + French subtitles.
+        audio_tag = await self._build_audio_string(meta)
+        while audio_tag.startswith("AD."):
+            audio_tag = audio_tag[3:]
+        if audio_tag.startswith("MULTI") and not self._has_french_subs(meta):
+            if not meta.get("unattended") or meta.get("debug"):
+                console.print(f"[bold red]{self.tracker}: a MULTi release requires French subtitles (VO + VF + subs FR).[/bold red]")
+            return False
+
+        # Subtitles must be muxed into the MKV (no external files) and
+        # archives are forbidden.
+        _external_subs = (".srt", ".ass", ".ssa", ".sub", ".idx", ".vtt")
+        _archives = (".rar", ".zip", ".7z")
+        for path in meta.get("filelist", []) or []:
+            lower = str(path).lower()
+            if lower.endswith(_external_subs):
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print(
+                        f"[bold red]{self.tracker}: external subtitle files are forbidden — subtitles must be muxed into the MKV ({os.path.basename(str(path))}).[/bold red]"
+                    )
+                return False
+            if lower.endswith(_archives):
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print(f"[bold red]{self.tracker}: archives are forbidden ({os.path.basename(str(path))}).[/bold red]")
+                return False
+
+        # PGS subtitles are forbidden on encodes unless they are additional:
+        # a PGS track only passes when a text-based subtitle track of the
+        # same language exists alongside it.
+        if not meta.get("is_disc") and meta.get("type") in {"ENCODE", "WEBRIP"}:
+            tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
+
+            def _lang(track: dict[str, Any]) -> str:
+                return str(track.get("Language", "") or "").lower().split("-")[0]
+
+            # Unlabelled text tracks must not vouch for unlabelled PGS tracks
+            text_sub_langs = {_lang(t) for t in tracks if t.get("@type") == "Text" and "PGS" not in str(t.get("Format", "")).upper()} - {""}
+            offending = sorted({_lang(t) or "?" for t in tracks if t.get("@type") == "Text" and "PGS" in str(t.get("Format", "")).upper() and _lang(t) not in text_sub_langs})
+            if offending:
+                if not meta.get("unattended") or meta.get("debug"):
+                    console.print(
+                        f"[bold red]{self.tracker}: PGS subtitles are forbidden on encodes unless additional to a text subtitle track — offending language(s): {', '.join(offending)}.[/bold red]"
+                    )
+                return False
 
         return True
 
