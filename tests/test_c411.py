@@ -3230,3 +3230,31 @@ class TestBonusReleasesAreExcluded:
         names = " ".join(d.get("name", "") for d in dupes)
         assert "BONUS" in names
         assert "FRENCH.1080p.WEB.AC3.5.1" not in names
+
+
+class TestSourceDescriptionSection:
+    """Optional 'Notes de la release d'origine' section from DESCRIPTION.txt."""
+
+    def _desc(self, tmp_path: Any, *, flag: bool, content: str | None) -> str:
+        config = _config()
+        config["TRACKERS"]["C411"]["include_source_description"] = flag
+        c = C411(config)
+        uuid = "X"
+        if content is not None:
+            import pathlib
+
+            d = pathlib.Path(tmp_path) / "tmp" / uuid
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "DESCRIPTION.txt").write_text(content, encoding="utf-8")
+        meta = _meta_base()
+        meta.update({"base_dir": str(tmp_path), "uuid": uuid})
+        return asyncio.run(c._build_description(meta))
+
+    def test_section_included_when_enabled(self, tmp_path: Any):
+        desc = self._desc(tmp_path, flag=True, content="Encoder notes worth keeping.")
+        assert "Notes de la release d'origine" in desc
+        assert "Encoder notes worth keeping." in desc
+
+    def test_section_absent_by_default(self, tmp_path: Any):
+        desc = self._desc(tmp_path, flag=False, content="Encoder notes worth keeping.")
+        assert "Notes de la release" not in desc

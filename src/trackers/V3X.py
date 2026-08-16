@@ -507,6 +507,13 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
         parts.append("")
 
+        # ── Notes de la release d'origine (opt-in: include_source_description) ──
+        source_desc = await self._get_source_description(meta)
+        if source_desc:
+            parts.append(f"[b][color={C}][size=130]━━━ Notes de la release d'origine ━━━[/size][/color][/b]")
+            parts.append(source_desc)
+            parts.append("")
+
         # ── Screenshots: clickable thumbnails, two per row. The V3X parser
         # only understands a bare [img] tag (no [img=N] sizing), so small
         # renderings depend on the image host providing a thumbnail img_url.

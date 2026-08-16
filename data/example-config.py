@@ -524,6 +524,10 @@ config = {
             "announce_url": "https://c411.org/announce/YOUR_PASSKEY",
             # Include screenshots in the upload description (default: False)
             "include_screenshots": False,
+            # Append the reused/base description (cleaned text grabbed from
+            # another tracker, or your custom description) as a
+            # "Notes de la release d'origine" section in the fiche
+            "include_source_description": False,
         },
         "CZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1009,6 +1013,11 @@ config = {
             "modq": False,
         },
         "V3X": {
+            # Note: the site displays the .torrent's internal name, so UA
+            # renames the torrent root to the generated release name. Seeding
+            # it therefore needs a qBittorrent or rTorrent client with linking
+            # enabled (the link folder takes the new name); without one, the
+            # rename is skipped and the fiche shows the on-disk name.
             "api_key": "V3X api key (upload scope)",
             # Site credentials — the dupe search browses the catalog through a
             # web session (API keys are upload-only since the 2026-08 update).
@@ -1016,16 +1025,13 @@ config = {
             "username": "",
             "password": "",
             "announce_url": "get from V3X",
-            # The site displays the .torrent's internal name: UA renames the
-            # torrent root to the generated release name (single files are
-            # wrapped in a folder so the inner file keeps its original,
-            # cross-seedable name). The rename only happens with a qBittorrent
-            # client that has linking enabled — the link folder takes the new
-            # name so seeding works without touching the on-disk content
-            # (unless your content path already carries that exact name).
             "anon": False,
             # Include screenshot thumbnails in the description (default True)
             "include_screenshots": True,
+            # Append the reused/base description (cleaned text grabbed from
+            # another tracker, or your custom description) as a
+            # "Notes de la release d'origine" section in the fiche
+            "include_source_description": False,
             "link_dir_name": "",
         },
         "UTP": {
