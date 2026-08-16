@@ -543,8 +543,13 @@ class BBCODE:
         # the marker plus known BBCode wrappers — ordinary note text that
         # merely mentions a tool name must survive.
         _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
-        for _sig_marker in (r"Created by Upload Assistant(?:\s+v?[\w.]+)?", r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?"):
-            desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*\.?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        for _sig_marker in (
+            r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
+            r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
+            r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
+            r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
+        ):
+            desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
@@ -580,10 +585,11 @@ class BBCODE:
         # above (no [img] survives at this point): drop short lines that are
         # just a screenshots keyword, with or without [center]/[b]/[color]/
         # [size] decoration ("SCREENSHOTS", "Screens", "Captures d'écran :"…).
-        _decor = r"(?:\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
-        _punct = r"[\s:.\-=─━—~*·•]*"
+        # Decoration = known BBCode tags or any non-alphanumeric character
+        # (dashes, dots, ornaments like ❅✧✦…), in any order around the keyword
+        _wrap = r"(?:\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
         _keyword = r"(?:screen\s?shots?|screens|captures?(?:\s+d['’]?[ée]cran)?)"
-        orphan_header_re = re.compile(rf"^\s*{_decor}{_punct}{_keyword}{_punct}{_decor}\s*$", re.IGNORECASE)
+        orphan_header_re = re.compile(rf"^{_wrap}{_keyword}{_wrap}$", re.IGNORECASE)
         desc = "\n".join(line for line in desc.split("\n") if not orphan_header_re.match(line))
 
         # Strip trailing whitespace and newlines:
