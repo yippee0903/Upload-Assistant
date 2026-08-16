@@ -183,3 +183,11 @@ def test_dead_ptpimg_images_are_dropped_from_imagelist() -> None:
     desc = "[img]https://ptpimg.me/fakedead.png[/img]\n[img]https://img.example.invalid/live.png[/img]\nSummary."
     cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert [i["raw_url"] for i in images] == ["https://img.example.invalid/live.png"]
+
+
+def test_tonemapped_boilerplate_is_removed() -> None:
+    desc = "Encoder notes kept.\nScreenshots have been tonemapped for reference.\nMore kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "tonemapped" not in cleaned
+    assert "Encoder notes kept." in cleaned
+    assert "More kept." in cleaned

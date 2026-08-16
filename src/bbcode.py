@@ -522,6 +522,9 @@ class BBCODE:
         desc = re.sub(r"\s*Posted to this fine tracker with [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
         # Same family of tool signatures, variable "sponsor" name.
         desc = re.sub(r"\s*This description is rendered for you via config\.yaml and is sponsored by [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
+        # Boilerplate note about tonemapped screenshots — meaningless once the
+        # screenshots are re-rendered by the destination tracker
+        desc = re.sub(r"\s*Screenshots have been tonemapped for reference\s*\.?", "", desc, flags=re.IGNORECASE)
         # ...and its sample-link spoiler ([b][spoiler=Sample: xyz]url[/spoiler][/b])
         desc = re.sub(r"\s*(\[b\])?\[spoiler=Sample[^\]]*\][\s\S]*?\[/spoiler\](\[/b\])?\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
         # ptpimg.me is dead: comparison blocks whose images live there are all
