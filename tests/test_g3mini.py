@@ -1120,3 +1120,47 @@ class TestG3MINIEncodingRules:
     def test_archive_is_rejected(self):
         meta = self._meta(filelist=["/downloads/Movie.2024.mkv", "/downloads/extras.rar"])
         assert self._run(meta) is False
+
+
+class TestG3MINIReviewRegressions:
+    """Edge cases: partial x265 settings, AD.MULTI tags, unlabelled tracks."""
+
+    @staticmethod
+    def _g3() -> G3MINI:
+        return G3MINI(_config())
+
+    def _meta(self, **kwargs: Any) -> dict[str, Any]:
+        return TestG3MINIEncodingRules()._meta(**kwargs)
+
+    def _run(self, meta: dict[str, Any]) -> bool:
+        return asyncio.run(self._g3().get_additional_checks(meta))
+
+    def test_x265_subme_only_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / subme=3"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    def test_x265_rd_only_is_rejected(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "cpuid=x / rd=4"}, video_encode=" x265")
+        assert self._run(meta) is False
+
+    def test_ad_multi_without_french_subs_is_rejected(self):
+        meta = self._meta(
+            audio=[
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "fr"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "6", "Language": "en"},
+                {"@type": "Audio", "Format": "E-AC-3", "Channels": "2", "Language": "fr", "Title": "Audiodescription"},
+            ],
+            original_language="en",
+        )
+        meta["has_audiodesc"] = True
+        assert self._run(meta) is False
+
+    def test_unlabelled_text_track_does_not_vouch_for_unlabelled_pgs(self):
+        meta = self._meta(
+            text=[
+                {"@type": "Text", "Format": "UTF-8"},
+                {"@type": "Text", "Format": "PGS"},
+                {"@type": "Text", "Format": "UTF-8", "Language": "fr"},
+            ]
+        )
+        assert self._run(meta) is False

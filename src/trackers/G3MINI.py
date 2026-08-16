@@ -195,12 +195,14 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                     rd_match = re.search(r"\brd\s*=\s*(\d+)", encoding_settings, re.IGNORECASE)
                     subme = int(subme_match.group(1)) if subme_match else None
                     rd = int(rd_match.group(1)) if rd_match else None
-                    if (subme is not None and subme < 2) or (rd is not None and rd < 3):
-                        details = []
-                        if subme is not None and subme < 2:
-                            details.append(f"subme={subme} (minimum 2 for 'medium')")
-                        if rd is not None and rd < 3:
-                            details.append(f"rd={rd} (minimum 3 for 'medium')")
+                    # x265 always dumps both parameters; a missing one means the
+                    # settings are unverifiable — reject like a below-minimum value.
+                    details = []
+                    if subme is None or subme < 2:
+                        details.append(f"subme={subme if subme is not None else 'missing'} (minimum 2 for 'medium')")
+                    if rd is None or rd < 3:
+                        details.append(f"rd={rd if rd is not None else 'missing'} (minimum 3 for 'medium')")
+                    if details:
                         if not meta.get("unattended") or meta.get("debug"):
                             console.print(f"[bold red]{self.tracker}: x265 encode quality is below the 'medium' preset minimum: {', '.join(details)}.[/bold red]")
                         return False
@@ -241,6 +243,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
 
         # A MULTi release must carry VO + VF + French subtitles.
         audio_tag = await self._build_audio_string(meta)
+        while audio_tag.startswith("AD."):
+            audio_tag = audio_tag[3:]
         if audio_tag.startswith("MULTI") and not self._has_french_subs(meta):
             if not meta.get("unattended") or meta.get("debug"):
                 console.print(f"[bold red]{self.tracker}: a MULTi release requires French subtitles (VO + VF + subs FR).[/bold red]")
@@ -272,7 +276,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             def _lang(track: dict[str, Any]) -> str:
                 return str(track.get("Language", "") or "").lower().split("-")[0]
 
-            text_sub_langs = {_lang(t) for t in tracks if t.get("@type") == "Text" and "PGS" not in str(t.get("Format", "")).upper()}
+            # Unlabelled text tracks must not vouch for unlabelled PGS tracks
+            text_sub_langs = {_lang(t) for t in tracks if t.get("@type") == "Text" and "PGS" not in str(t.get("Format", "")).upper()} - {""}
             offending = sorted({_lang(t) or "?" for t in tracks if t.get("@type") == "Text" and "PGS" in str(t.get("Format", "")).upper() and _lang(t) not in text_sub_langs})
             if offending:
                 if not meta.get("unattended") or meta.get("debug"):
