@@ -2996,3 +2996,109 @@ class TestC411ReservedGroups:
         setup = TRACKER_SETUP(config=_config())
         meta = {"tag": "-Dramas.For.Ever", "unattended": True}
         assert asyncio.run(setup.check_banned_group("C411", tracker.banned_groups, meta)) is True
+
+
+# ─── Same-infohash dupe detection ─────────────────────────────
+
+
+class TestProspectiveInfohash:
+    def _base_torrent(self, tmp_path):
+        from torf import Torrent
+
+        uuid = "Movie.2024.1080p.BluRay.REMUX.AVC-GRP"
+        content = tmp_path / "content" / uuid
+        content.mkdir(parents=True)
+        (content / "movie.mkv").write_bytes(b"x" * 2048)
+        t = Torrent(path=str(content), trackers=["https://fake.tracker/announce"], piece_size=16384)
+        t.generate()
+        out = tmp_path / "tmp" / uuid
+        out.mkdir(parents=True)
+        t.write(str(out / "BASE.torrent"))
+        return uuid
+
+    def test_matches_the_source_flagged_clone(self, tmp_path, monkeypatch):
+        from torf import Torrent
+
+        uuid = self._base_torrent(tmp_path)
+        c = C411(_config())
+        monkeypatch.setattr(c, "_get_nfo_files", lambda meta: [])
+        meta = {"base_dir": str(tmp_path), "uuid": uuid}
+        expected = Torrent.read(str(tmp_path / "tmp" / uuid / "BASE.torrent"))
+        expected.metainfo["info"]["source"] = "C411"
+        assert c._prospective_infohash(meta) == str(expected.infohash).lower()
+
+    def test_empty_when_nfo_will_recreate_the_torrent(self, tmp_path, monkeypatch):
+        uuid = self._base_torrent(tmp_path)
+        c = C411(_config())
+        monkeypatch.setattr(c, "_get_nfo_files", lambda meta: ["/release/movie.nfo"])
+        assert c._prospective_infohash({"base_dir": str(tmp_path), "uuid": uuid}) == ""
+
+    def test_empty_without_base_torrent(self, tmp_path):
+        c = C411(_config())
+        assert c._prospective_infohash({"base_dir": str(tmp_path), "uuid": "nope"}) == ""
+
+
+class TestSameInfohashShortCircuit:
+    XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Totally.Different.Name.1954.MULTI.VFF.2160p.WEB.x265-OTHER</title>
+      <guid>https://c411.org/torrents/222</guid>
+      <link>https://c411.org/torrents/222</link>
+      <size>25237757854</size>
+      <torznab:attr name="infohash" value="AABBCCDDEEFF00112233445566778899AABBCCDD" />
+    </item>
+  </channel>
+</rss>"""
+
+    def test_parser_captures_infohash(self):
+        results = C411._parse_torznab_response(self.XML)
+        assert results[0]["infohash"] == "AABBCCDDEEFF00112233445566778899AABBCCDD"
+
+    def test_same_infohash_is_a_definite_dupe_bypassing_filters(self, monkeypatch):
+        c = C411(_config())
+        meta = _meta_base()
+
+        async def fake_hashless_filters_should_not_matter(*a, **k):
+            raise AssertionError("filters must not run after an infohash match")
+
+        monkeypatch.setattr(c, "_prospective_infohash", lambda m: "aabbccddeeff00112233445566778899aabbccdd")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = self.XML
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+            dupes = asyncio.run(c.search_existing(meta, "nodisc"))
+
+        # The name would fail every relevance/slot filter (different title,
+        # resolution, group) — the identical infohash still makes it a dupe.
+        assert len(dupes) == 1
+        assert dupes[0]["infohash"] == "AABBCCDDEEFF00112233445566778899AABBCCDD"
+
+
+class TestUploadLosslessClassification:
+    def test_remux_with_lossless_track_is_classified_lossless(self):
+        # Generic meta audio understates the file ("DD 2.0"); the track-based
+        # C411 logic must classify it lossless like the fiche name it creates.
+        c = C411(_config())
+        meta = {
+            "audio": "Dual-Audio DD 2.0",
+            "mediainfo": {
+                "media": {
+                    "track": [
+                        {"@type": "General"},
+                        {"@type": "Audio", "Format": "DTS", "Format_AdditionalFeatures": "XLL X", "Channels": "6", "Language": "en"},
+                        {"@type": "Audio", "Format": "AC-3", "Channels": "2", "Language": "fr"},
+                    ]
+                }
+            },
+        }
+        audio_str = c._get_audio_for_name(meta)
+        assert C411._is_lossless_audio(audio_str), audio_str
