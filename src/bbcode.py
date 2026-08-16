@@ -554,6 +554,24 @@ class BBCODE:
         desc = re.sub(r"\[img=[^\]]*\]", "", desc, flags=re.IGNORECASE)
         # desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
+        # Drop unmatched [url] tags left behind by the removals above — e.g.
+        # a stripped site link whose label itself contained brackets, which
+        # stops the label capture early and leaves the closing tag behind.
+        url_token_re = re.compile(r"\[url(?:=[^\]]*)?\]|\[/url\]", re.IGNORECASE)
+        url_stack: list[tuple[int, int]] = []
+        url_orphans: list[tuple[int, int]] = []
+        for url_match in url_token_re.finditer(desc):
+            if url_match.group(0).lower().startswith("[/"):
+                if url_stack:
+                    url_stack.pop()
+                else:
+                    url_orphans.append((url_match.start(), url_match.end()))
+            else:
+                url_stack.append((url_match.start(), url_match.end()))
+        url_orphans.extend(url_stack)
+        for start, end in sorted(url_orphans, reverse=True):
+            desc = desc[:start] + desc[end:]
+
         # Screenshot headers are orphaned once their images were extracted
         # above (no [img] survives at this point): drop short lines that are
         # just a screenshots keyword, with or without [center]/[b]/[color]/

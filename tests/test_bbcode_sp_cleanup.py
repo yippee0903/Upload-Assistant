@@ -211,3 +211,26 @@ def test_note_tags_are_dropped_or_unwrapped() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "[note]" not in cleaned and "[/note]" not in cleaned
     assert "Important note kept" in cleaned
+
+
+def test_orphan_url_closer_from_bracketed_label_is_removed() -> None:
+    # A stripped site link whose label contains brackets used to leave the
+    # closing [/url] behind (Decision to Leave case)
+    desc = "Source: Some.Remux-GRP | Publisher [GER 2023] [/url] (Thanks!)\nKept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[/url]" not in cleaned
+    assert "Publisher [GER 2023]  (Thanks!)" in cleaned
+    assert "Kept." in cleaned
+
+
+def test_orphan_url_opener_is_removed_too() -> None:
+    desc = "See [url=https://example.invalid/page]the page\nKept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[url" not in cleaned
+    assert "the page" in cleaned
+
+
+def test_balanced_url_tags_survive() -> None:
+    desc = "See [url=https://example.invalid/page]the page[/url] here."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[url=https://example.invalid/page]the page[/url]" in cleaned
