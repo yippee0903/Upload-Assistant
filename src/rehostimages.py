@@ -628,6 +628,18 @@ async def _handle_image_upload(
         )
         if uploaded_images:
             meta[new_images_key] = uploaded_images
+        elif not meta.get(new_images_key):
+            # Zero uploads means this host failed outright (e.g. HTTP 413 on
+            # oversized 4K screenshots). Without this, the empty result sails
+            # through the validation below (all([]) is True) and is returned
+            # as success, so the caller never rotates to the next approved
+            # host. Mark the host failed and ask for a retry instead.
+            current_host = str(meta.get("imghost", "") or "")
+            session_failed = cast(list[str], meta.setdefault("failed_image_hosts", []))
+            if current_host and current_host not in session_failed:
+                session_failed.append(current_host)
+            console.print(f"[yellow]No images uploaded to '{current_host}' — trying the next approved host.[/yellow]")
+            return [], True, images_reuploaded
 
         if meta["debug"]:
             console.print(f"[debug] Updated {new_images_key} with {len(uploaded_images)} images.")
