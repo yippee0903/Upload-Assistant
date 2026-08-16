@@ -271,3 +271,10 @@ def test_hentai_bot_signature_is_removed() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Hentai Bot" not in cleaned
     assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_pm_uploader_reseed_line_is_removed() -> None:
+    desc = "Kept.\n[center][b]Please PM some.uploader if you have any issues or need a reseed![/b][/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Please PM" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
