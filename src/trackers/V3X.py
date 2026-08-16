@@ -73,6 +73,8 @@ class V3X(FrenchTrackerMixin):
             "ibb.co": "imgbb",
             "imgbox.com": "imgbox",
             "postimg.cc": "postimg",
+            "pixhost.to": "pixhost",
+            "ptscreens.com": "ptscreens",
         }
         await self.rehost_images_manager.check_hosts(
             meta,
