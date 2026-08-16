@@ -1086,6 +1086,13 @@ class C411(FrenchTrackerMixin):
 
         parts.append("")
 
+        # ── Notes de la release d'origine (opt-in: include_source_description) ──
+        source_desc = await self._get_source_description(meta)
+        if source_desc:
+            parts.append(f"        [color={C}]Notes de la release d'origine[/color]")
+            parts.append(f"    [font=Verdana][size=14]{source_desc}[/size][/font]")
+            parts.append("")
+
         # ── Captures d'écran  (opt-in via config: include_screenshots) ──
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
         image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []

@@ -11,9 +11,11 @@
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
 #                                       (?apikey= also accepted; X-Api-Key is NOT)
 #     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
-#               movies/series also require nfo and tmdbId (or tmdbUrl)
-#     accepted: name, description, descriptionFormat, language, title,
+#               movies/series also require nfo and tmdbUrl (or tmdbId)
+#     accepted: name, description, descriptionFormat, language,
 #               posterUrl, backdropUrl, anonymous
+#     (title exists but must be left empty — the IMDb tmdbUrl auto-fills
+#      the fiche title site-side)
 #   Browse routes (/torrents listing & detail) require a web session cookie —
 #   API keys are rejected there since the 2026-08 site update.
 
@@ -512,6 +514,13 @@ class V3X(FrenchTrackerMixin):
             parts.append(f"[b][color={C}]Groupe :[/color][/b] {group}")
         parts.append("")
 
+        # ── Notes de la release d'origine (opt-in: include_source_description) ──
+        source_desc = await self._get_source_description(meta)
+        if source_desc:
+            parts.append(f"[b][color={C}][size=130]━━━ Notes de la release d'origine ━━━[/size][/color][/b]")
+            parts.append(source_desc)
+            parts.append("")
+
         # ── Screenshots: clickable thumbnails, two per row. The V3X parser
         # only understands a bare [img] tag (no [img=N] sizing), so small
         # renderings depend on the image host providing a thumbnail img_url.
@@ -640,11 +649,13 @@ class V3X(FrenchTrackerMixin):
         }
         if nfo_text:
             data["nfo"] = nfo_text
-        if int(meta.get("tmdb_id") or 0):
+        # Never send the title field — provide the IMDb link (tmdbUrl)
+        # instead so the site auto-fills the fiche title itself.
+        imdb_digits = re.sub(r"^tt", "", str(meta.get("imdb_id") or ""), flags=re.IGNORECASE)
+        if imdb_digits.isdigit() and int(imdb_digits) > 0:
+            data["tmdbUrl"] = f"https://www.imdb.com/title/tt{imdb_digits.zfill(7)}/"
+        elif int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
-        fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
-        if fr_title:
-            data["title"] = fr_title
         if meta.get("fr_poster") or meta.get("poster"):
             # fr_poster is set by _build_description when a French-localized
             # poster exists on TMDB
