@@ -924,7 +924,17 @@ def test_prefers_original_title_in_names(monkeypatch: Any):
         return "Les Infiltrés"
 
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
-    meta = {"title": "The Departed", "original_language": "en", "year": 2006, "resolution": "1080p", "type": "ENCODE", "source": "BluRay", "category": "MOVIE", "tag": "-GRP", "video_encode": "x264"}
+    meta = {
+        "title": "The Departed",
+        "original_language": "en",
+        "year": 2006,
+        "resolution": "1080p",
+        "type": "ENCODE",
+        "source": "BluRay",
+        "category": "MOVIE",
+        "tag": "-GRP",
+        "video_encode": "x264",
+    }
     assert asyncio.run(tracker.get_name(meta))["name"] == "The.Departed.2006.1080p.BluRay.x264-GRP"
     assert asyncio.run(tracker.get_name(dict(meta, original_language="fr")))["name"] == "Les.Infiltres.2006.1080p.BluRay.x264-GRP"
 
@@ -959,3 +969,51 @@ def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
     # Both the paginated search client and the enrichment client carry the jar
     assert len(constructed) >= 2
     assert all(c is not None and c.get("v3x_sid") == "abc" for c in constructed)
+
+
+class TestApprovedImageHosts:
+    def test_check_image_hosts_delegates_with_approved_list(self, monkeypatch: Any):
+        tracker = V3X(_config())
+        seen: dict[str, Any] = {}
+
+        async def fake_check_hosts(meta: Any, tracker_name: Any, url_host_mapping: Any, img_host_index: int, approved_image_hosts: Any) -> Any:
+            seen.update(tracker=tracker_name, mapping=url_host_mapping, hosts=approved_image_hosts)
+            return [], False, False
+
+        monkeypatch.setattr(tracker.rehost_images_manager, "check_hosts", fake_check_hosts)
+        asyncio.run(tracker.check_image_hosts({}))
+        assert seen["tracker"] == "V3X"
+        assert seen["hosts"] == ["imgbox", "imgbb", "postimg"]
+        assert seen["mapping"] == {"ibb.co": "imgbb", "imgbox.com": "imgbox", "postimg.cc": "postimg"}
+
+    def test_description_prefers_rehosted_images(self, monkeypatch: Any, tmp_path: Any):
+        tracker = V3X(_config())
+
+        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return {}
+
+        async def fake_mi(meta: Any) -> str:
+            return ""
+
+        monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+        monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+        monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+        monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+        meta = {
+            "base_dir": str(tmp_path),
+            "uuid": "X",
+            "title": "Some Movie",
+            "category": "MOVIE",
+            "image_list": [{"img_url": "https://original.example/a.png", "web_url": "https://original.example/a"}],
+            "V3X_images_key": [{"img_url": "https://rehosted.example/a.png", "web_url": "https://rehosted.example/a"}],
+        }
+        desc = asyncio.run(tracker._build_description(meta))
+        assert "rehosted.example" in desc
+        assert "original.example" not in desc
+
+    def test_v3x_registered_for_image_host_requirements(self):
+        source = open("upload.py", encoding="utf-8").read()
+        import re as _re
+
+        match = _re.search(r"trackers_with_image_host_requirements = \{([^}]*)\}", source)
+        assert match and '"V3X"' in match.group(1)

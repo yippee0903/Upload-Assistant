@@ -30,6 +30,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
@@ -61,6 +62,24 @@ class V3X(FrenchTrackerMixin):
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
         self._session_cookies: Optional[httpx.Cookies] = None
+        self.approved_image_hosts = ["imgbox", "imgbb", "postimg"]
+        self.rehost_images_manager = RehostImagesManager(config)
+
+    async def check_image_hosts(self, meta: Meta) -> None:
+        """Rehost screenshots to an approved host when needed; the result
+        lands in meta["V3X_images_key"] and the description prefers it."""
+        url_host_mapping = {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "postimg.cc": "postimg",
+        }
+        await self.rehost_images_manager.check_hosts(
+            meta,
+            self.tracker,
+            url_host_mapping=url_host_mapping,
+            img_host_index=1,
+            approved_image_hosts=self.approved_image_hosts,
+        )
 
     async def _login_session_cookies(self) -> Optional[httpx.Cookies]:
         """Log in with the site credentials and cache the session cookie.
@@ -483,7 +502,7 @@ class V3X(FrenchTrackerMixin):
         # ── Screenshots: clickable thumbnails, two per row. The V3X parser
         # only understands a bare [img] tag (no [img=N] sizing), so small
         # renderings depend on the image host providing a thumbnail img_url.
-        image_list = meta.get("image_list") or []
+        image_list = meta.get(f"{self.tracker}_images_key") or meta.get("image_list") or []
         if image_list and self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", True):
             parts.append(f"[b][color={C}][size=130]━━━ Captures d'écran ━━━[/size][/color][/b]")
             thumbs = [
