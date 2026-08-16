@@ -1,11 +1,13 @@
-# The common-image-host arbitration in upload.py relies on a hard-coded set of
-# tracker names. Keep it in sync with the trackers that actually define
-# approved_image_hosts, so a new restricted tracker is not silently skipped.
+# The common-image-host arbitration relies on the central
+# TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS set. Keep it in sync with the trackers
+# that actually define approved_image_hosts, so a new restricted tracker is
+# not silently skipped.
 
 import ast
 import glob
 import os
-import re
+
+from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -27,11 +29,7 @@ def _trackers_with_approved_hosts() -> set[str]:
 
 
 def _hardcoded_arbitration_set() -> set[str]:
-    with open(os.path.join(BASE, "upload.py"), encoding="utf-8") as f:
-        source = f.read()
-    match = re.search(r"trackers_with_image_host_requirements\s*=\s*\{([^}]*)\}", source)
-    assert match, "trackers_with_image_host_requirements not found in upload.py"
-    return set(re.findall(r'"([^"]+)"', match.group(1)))
+    return set(TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS)
 
 
 def test_arbitration_set_matches_trackers_defining_approved_hosts() -> None:

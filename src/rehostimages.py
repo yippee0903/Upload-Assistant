@@ -16,6 +16,34 @@ from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
+# Trackers whose sites only accept screenshots from specific image hosts.
+TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS = frozenset({"A4K", "ACM", "BHD", "DC", "GPW", "HUNO", "MTV", "NST", "OE", "PTP", "STC", "TVC", "V3X"})
+
+
+async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, Any], tracker_class_map: Mapping[str, Any]) -> list[str]:
+    """Validate an already-populated image list against approved hosts.
+
+    Runs each relevant tracker's ``check_image_hosts`` so images reused from
+    another tracker's description get rehosted when needed. No-op when the
+    user asked to skip image hosting or when no image list exists. Returns
+    the trackers that were validated.
+    """
+    if meta.get("skip_imghost_upload", False) or not meta.get("image_list"):
+        return []
+    relevant = [t for t in meta.get("trackers", []) if isinstance(t, str) and t in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS and t in tracker_class_map]
+    if relevant:
+        console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(relevant)}[/yellow]")
+    for tracker_name in relevant:
+        tracker_instance = tracker_class_map[tracker_name](config=config)
+        await tracker_instance.check_image_hosts(meta)
+        images_key = f"{tracker_name}_images_key"
+        if meta.get(images_key):
+            console.print(f"[green]{tracker_name}: {len(meta[images_key])} image(s) ready on approved hosts.[/green]")
+        else:
+            console.print(f"[yellow]{tracker_name}: existing images could not be validated/rehosted; the description will fall back to the original links.[/yellow]")
+    return relevant
+
+
 # Canonical domain → image-host slug mapping, shared by every tracker.
 # The per-tracker policy lives in each tracker's approved_image_hosts list;
 # this table only serves to recognize where an existing image is hosted.

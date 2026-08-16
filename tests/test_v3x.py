@@ -1083,8 +1083,6 @@ class TestApprovedImageHosts:
         assert "original.example" not in desc
 
     def test_v3x_registered_for_image_host_requirements(self):
-        source = open("upload.py", encoding="utf-8").read()
-        import re as _re
+        from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
 
-        match = _re.search(r"trackers_with_image_host_requirements = \{([^}]*)\}", source)
-        assert match and '"V3X"' in match.group(1)
+        assert "V3X" in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS

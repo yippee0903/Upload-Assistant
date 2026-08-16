@@ -46,6 +46,7 @@ from src.nfo_link import NfoLinkManager
 from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
+from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, validate_reused_image_hosts
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
@@ -1127,10 +1128,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 if manual_frames_count > 0:
                     meta["screens"] = manual_frames_count
                 cutoff = int(meta.get("cutoff") or 1)
+                trackers_with_image_host_requirements = TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
                 if len(meta.get("image_list", [])) < cutoff and meta.get("skip_imghost_upload", False) is False:
                     # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
-                    trackers_with_image_host_requirements = {"A4K", "ACM", "BHD", "DC", "GPW", "HUNO", "MTV", "NST", "OE", "PTP", "STC", "TVC", "V3X"}
-
                     relevant_trackers = [
                         t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map
                     ]
@@ -1297,6 +1297,13 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                         if meta["debug"]:
                             console.print("[yellow]Cleaning up resources...[/yellow]")
                         gc.collect()
+
+                elif meta.get("skip_imghost_upload", False) is False and meta.get("image_list"):
+                    # Enough images already (e.g. reused from another tracker's
+                    # description) — the screenshot-upload block above was skipped,
+                    # but trackers with approved-host requirements still need the
+                    # existing images validated and rehosted when necessary.
+                    await validate_reused_image_hosts(meta, config, tracker_class_map)
 
                 elif meta.get("skip_imghost_upload", False) is True and meta.get("image_list", False) is False:
                     meta["image_list"] = []
