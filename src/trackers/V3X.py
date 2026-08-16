@@ -7,9 +7,15 @@
 #     the filter param is q — "search" and the like are silently ignored
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
 #   GET  /categories                    public category tree (id/name/children)
+#   GET  /api/categories                key-authenticated tree with subcategory ids
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
-#     required: file (.torrent), name, categoryId (subcategory number), rightsDeclared
-#     accepted: description, nfo, tmdbId, anonymous, language
+#                                       (?apikey= also accepted; X-Api-Key is NOT)
+#     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
+#               movies/series also require nfo and tmdbId (or tmdbUrl)
+#     accepted: name, description, descriptionFormat, language, title,
+#               posterUrl, backdropUrl, anonymous
+#   Browse routes (/torrents listing & detail) require a web session cookie —
+#   API keys are rejected there since the 2026-08 site update.
 
 import asyncio
 import contextlib
@@ -571,6 +577,13 @@ class V3X(FrenchTrackerMixin):
             data["nfo"] = nfo_text
         if int(meta.get("tmdb_id") or 0):
             data["tmdbId"] = str(meta["tmdb_id"])
+        fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
+        if fr_title:
+            data["title"] = fr_title
+        if meta.get("poster"):
+            data["posterUrl"] = str(meta["poster"])
+        if meta.get("backdrop"):
+            data["backdropUrl"] = str(meta["backdrop"])
         # MediaInfo-based tag first (knows VOF/VOQ/VFB/AD/MUET); fall back
         # to name tokens when MediaInfo is unavailable (e.g. discs).
         language = (await self._build_audio_string(meta)).replace(".", ",") or self._get_language_tag(name)

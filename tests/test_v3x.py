@@ -208,9 +208,13 @@ class TestUpload:
         async def fake_desc(*args: Any, **kwargs: Any) -> str:
             return "desc"
 
+        async def fake_fr_title(meta: Any) -> str:
+            return ""
+
         monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
         monkeypatch.setattr(tracker, "get_name", fake_get_name)
         monkeypatch.setattr(tracker, "_build_description", fake_desc)
+        monkeypatch.setattr(tracker, "_get_french_title", fake_fr_title)
 
     def test_upload_sends_required_contract(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
@@ -477,10 +481,14 @@ def _prep_upload(monkeypatch: Any, tmp_path: Any, name: str, *, mediainfo: str =
     async def fake_desc(*args: Any, **kwargs: Any) -> str:
         return "desc"
 
+    async def fake_fr_title(meta: Any) -> str:
+        return ""
+
     monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
     monkeypatch.setattr(tracker, "get_name", fake_get_name)
     monkeypatch.setattr(tracker, "_build_description", fake_desc)
     monkeypatch.setattr(tracker, "_get_nfo_files", lambda meta: [])
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr_title)
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", client)
     monkeypatch.setattr(v3x_module, "RETRY_DELAY", 0)
     _FakeClient.response = _FakeResponse(201, {"id": "x"})
@@ -833,3 +841,25 @@ def test_rename_allowed_with_rtorrent_linking(tmp_path: Any):
     tracker = V3X(config)
     tracker._rename_torrent_root({"base_dir": str(tmp_path), "uuid": uuid}, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
     assert Torrent.read(str(out / "[V3X].torrent")).name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
+
+
+def test_upload_sends_title_and_artwork_fields(monkeypatch: Any, tmp_path: Any):
+    name = "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, name)
+    meta["frtitle"] = "Un Film"
+    meta["poster"] = "https://image.tmdb.org/t/p/original/poster.jpg"
+    meta["backdrop"] = "https://image.tmdb.org/t/p/original/backdrop.jpg"
+    asyncio.run(tracker.upload(meta, ""))
+    data = _FakeClient.captured["data"]
+    assert data["title"] == "Un Film"
+    assert data["posterUrl"] == "https://image.tmdb.org/t/p/original/poster.jpg"
+    assert data["backdropUrl"] == "https://image.tmdb.org/t/p/original/backdrop.jpg"
+
+
+def test_upload_omits_artwork_when_absent(monkeypatch: Any, tmp_path: Any):
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
+    asyncio.run(tracker.upload(meta, ""))
+    data = _FakeClient.captured["data"]
+    assert "title" not in data
+    assert "posterUrl" not in data
+    assert "backdropUrl" not in data
