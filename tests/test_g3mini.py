@@ -1164,3 +1164,17 @@ class TestG3MINIReviewRegressions:
             ]
         )
         assert self._run(meta) is False
+
+
+class TestX264PartialSettings:
+    """x264 settings missing subme or trellis are unverifiable → rejected."""
+
+    def _run(self, encoding_settings: str) -> bool:
+        meta = TestG3MINIAdditionalChecksX264Preset()._meta(encoding_settings=encoding_settings)
+        return asyncio.run(G3MINI(_config()).get_additional_checks(meta))
+
+    def test_subme_only_is_rejected(self):
+        assert self._run("cabac=1 / subme=9") is False
+
+    def test_trellis_only_is_rejected(self):
+        assert self._run("cabac=1 / trellis=2") is False

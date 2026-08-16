@@ -166,13 +166,14 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
                     if meta.get("debug", False):
                         console.print(f"[cyan]{self.tracker}: x264 subme={subme}, trellis={trellis}[/cyan]")
 
-                    # Reject if either parameter is at medium level or worse
-                    if (subme is not None and subme < 8) or (trellis is not None and trellis < 2):
-                        details = []
-                        if subme is not None and subme < 8:
-                            details.append(f"subme={subme} (minimum 8 for 'slow')")
-                        if trellis is not None and trellis < 2:
-                            details.append(f"trellis={trellis} (minimum 2 for 'slow')")
+                    # x264 always dumps both parameters; a missing one means the
+                    # settings are unverifiable — reject like a below-minimum value.
+                    details = []
+                    if subme is None or subme < 8:
+                        details.append(f"subme={subme if subme is not None else 'missing'} (minimum 8 for 'slow')")
+                    if trellis is None or trellis < 2:
+                        details.append(f"trellis={trellis if trellis is not None else 'missing'} (minimum 2 for 'slow')")
+                    if details:
                         if not meta.get("unattended") or meta.get("debug"):
                             console.print(f"[bold red]{self.tracker}: x264 encode quality is below the 'slow' preset minimum: {', '.join(details)}.[/bold red]")
                         return False
