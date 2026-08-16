@@ -241,3 +241,18 @@ def test_ggbot_signature_is_removed() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "GG-BOT" not in cleaned
     assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_note_text_mentioning_tool_names_survives() -> None:
+    desc = (
+        "This release was NOT Created by Upload Assistant, everything manual.\n"
+        "Comparison workflow inspired by the one Powered by GG-BOT Upload Assistant docs.\n"
+        "[center][size=4]Created by Upload Assistant v6.2.3[/size][/center]\n"
+        "[b]Powered by GG-BOT Upload Assistant[/b]"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    # Prose lines mentioning the tools stay; pure signature lines go
+    assert "NOT Created by Upload Assistant, everything manual." in cleaned
+    assert "workflow inspired by" in cleaned
+    assert "v6.2.3" not in cleaned
+    assert "[b]Powered by GG-BOT Upload Assistant[/b]" not in cleaned

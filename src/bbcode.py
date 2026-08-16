@@ -539,10 +539,12 @@ class BBCODE:
         ).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
-        # ...and the bare (unwrapped) signature line some versions emit
-        desc = re.sub(r"[^\n]*Created by Upload Assistant[^\n]*\n?", "", desc, flags=re.IGNORECASE)
-        # Sibling tool signature
-        desc = re.sub(r"[^\n]*Powered by GG-BOT Upload Assistant[^\n]*\n?", "", desc, flags=re.IGNORECASE)
+        # ...and bare (unwrapped) signature lines: only complete lines made of
+        # the marker plus known BBCode wrappers — ordinary note text that
+        # merely mentions a tool name must survive.
+        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
+        for _sig_marker in (r"Created by Upload Assistant(?:\s+v?[\w.]+)?", r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?"):
+            desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*\.?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
