@@ -153,21 +153,19 @@ class V3X(FrenchTrackerMixin):
         def _normalize(s: str) -> str:
             return re.sub(r"[^a-z0-9]", "", unidecode(s).lower())
 
-        # The q filter is a raw case-insensitive substring over the stored
-        # NAME, and site names mix dot- and space-separators — so a
-        # multi-word query silently misses half the catalog. Query by the
-        # longest word of each title (separator-agnostic) and rely on the
-        # normalized client-side filters below for precision.
-        def _query_word(s: str) -> str:
-            words = re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split()
-            return max(words, key=len) if words else ""
+        # The q filter matches ordered words against both the stored name and
+        # the French title, separator- and accent-insensitive (improved since
+        # the 2026-08 update). Query the full cleaned title — but never append
+        # the year: TV names carry none and a year token yields zero matches.
+        def _q(s: str) -> str:
+            return " ".join(re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split())
 
         queries: list[str] = []
         ordered_titles = (fr_title, title) if str(meta.get("original_language", "")).lower() == "fr" else (title, fr_title)
         for t in ordered_titles:
-            word = _query_word(t)
-            if word and word.lower() not in (q.lower() for q in queries):
-                queries.append(word)
+            cleaned = _q(t)
+            if cleaned and cleaned.lower() not in (q.lower() for q in queries):
+                queries.append(cleaned)
         if not queries:
             return dupes
 

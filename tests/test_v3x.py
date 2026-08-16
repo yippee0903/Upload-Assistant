@@ -94,8 +94,8 @@ class TestSearchExisting:
         self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
         assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug", "id": "uuid-1"}]
-        # Query uses the longest single word (separator-agnostic substring match)
-        assert _FakeClient.captured["params"]["q"] == "Movie"
+        # Full cleaned title (the API matches ordered words, separator-agnostic)
+        assert _FakeClient.captured["params"]["q"] == "Some Movie"
 
     def test_search_filters_irrelevant_results(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
@@ -166,7 +166,7 @@ class TestSearchExisting:
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker, fr_title="Les Infiltrés")
         asyncio.run(tracker.search_existing({"title": "The Departed"}))
-        assert seen_queries == ["Departed", "Infiltres"]
+        assert seen_queries == ["The Departed", "Les Infiltres"]
 
     def test_enrichment_adds_file_lists(self, monkeypatch: Any):
         class _DetailClient(_FakeClient):
