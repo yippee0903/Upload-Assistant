@@ -1658,6 +1658,16 @@ class C411(FrenchTrackerMixin):
                     meta["_c411_slot_occupied"] = not self._is_corrective_version_meta(meta)
                     return [dupe]
 
+        # ── BONUS releases live in their own world ──
+        # A release tagged BONUS carries only the film's bonus content, not
+        # the film itself: it never competes with a film upload, and a BONUS
+        # upload only competes with other BONUS releases.
+        upload_is_bonus = self._is_bonus_release_meta(meta)
+        before_bonus = len(dupes)
+        dupes = [d for d in dupes if self._name_has_bonus_tag(d.get("name", "")) == upload_is_bonus]
+        if meta.get("debug") and len(dupes) < before_bonus:
+            console.print(f"[cyan]C411: {before_bonus - len(dupes)} BONUS-mismatched release(s) excluded from dupe checking[/cyan]")
+
         # ── Corrective versions: note but still check dupes ──
         # PROPER/REPACK/… may replace the original, but we still need to
         # show the user what currently occupies the slot so they can decide.
@@ -1793,6 +1803,15 @@ class C411(FrenchTrackerMixin):
         meta["_c411_slot_occupied"] = len(final_dupes) > 0 and not is_corrective
 
         return final_dupes
+
+    @staticmethod
+    def _name_has_bonus_tag(name: str) -> bool:
+        """True when a release name carries the BONUS token (bonus-only content)."""
+        n = f".{name.upper().replace('-', '.').replace(' ', '.')}."
+        return ".BONUS." in n
+
+    def _is_bonus_release_meta(self, meta: Meta) -> bool:
+        return any(self._name_has_bonus_tag(str(meta.get(field, ""))) for field in ("uuid", "name", "path", "edition"))
 
     def _prospective_infohash(self, meta: Meta) -> str:
         """Infohash the [C411].torrent will have (BASE clone + source flag).

@@ -3179,3 +3179,54 @@ class TestCoexistenceUsesTrackAudio:
         names = " ".join(d.get("name", "") for d in dupes)
         assert "AC3.5.1.x264-Other" in names
 
+
+
+class TestBonusReleasesAreExcluded:
+    """BONUS releases carry only the film's bonus content: they never compete
+    with a film upload, and a BONUS upload only competes with other BONUS."""
+
+    XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.BONUS.VOSTFR.1080p.WEB.AC3.2.0.x264-Other</title>
+      <guid>https://c411.org/torrents/501</guid>
+      <link>https://c411.org/torrents/501</link>
+      <size>4000000000</size>
+    </item>
+    <item>
+      <title>Le.Prenom.2012.FRENCH.1080p.WEB.AC3.5.1.x264-Other2</title>
+      <guid>https://c411.org/torrents/502</guid>
+      <link>https://c411.org/torrents/502</link>
+      <size>8000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def _search(self, **meta_overrides):
+        c = C411(_config())
+        meta = _meta_base(tag="-Mine", original_language="en", **meta_overrides)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = self.XML
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+            return asyncio.run(c.search_existing(meta, "nodisc"))
+
+    def test_film_upload_ignores_bonus_releases(self):
+        dupes = self._search()
+        names = " ".join(d.get("name", "") for d in dupes)
+        assert "BONUS" not in names
+        assert "FRENCH.1080p" in names
+
+    def test_bonus_upload_only_competes_with_bonus(self):
+        dupes = self._search(uuid="Le.Prenom.2012.BONUS.VOSTFR.1080p.WEB.AC3.2.0.x264-Mine")
+        names = " ".join(d.get("name", "") for d in dupes)
+        assert "BONUS" in names
+        assert "FRENCH.1080p.WEB.AC3.5.1" not in names
