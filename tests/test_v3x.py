@@ -76,9 +76,13 @@ class TestSearchExisting:
         async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
             return None
 
+        async def fake_login() -> Any:
+            return v3x_module.httpx.Cookies()
+
         monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
         monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
         monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+        monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
 
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
@@ -533,10 +537,14 @@ def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: An
     async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
         return None
 
+    async def fake_login() -> Any:
+        return v3x_module.httpx.Cookies()
+
     monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
     monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
     monkeypatch.setattr(tracker, "_check_french_lang_dupes", fake_filter)
+    monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     assert seen["dupes"][0]["name"] == "Some.Movie.2024.VOSTFR.1080p.WEB-GRP"
     assert dupes[0]["flags"] == ["filtered"]
@@ -713,9 +721,13 @@ def test_search_paginates_without_total_until_short_page(monkeypatch: Any):
     async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
         return None
 
+    async def fake_login() -> Any:
+        return v3x_module.httpx.Cookies()
+
     monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
     monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
+    monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     # Full first page without a total → a second page is fetched; the short
     # second page ends the walk. No skipping, all 101 results kept.
@@ -863,3 +875,41 @@ def test_upload_omits_artwork_when_absent(monkeypatch: Any, tmp_path: Any):
     assert "title" not in data
     assert "posterUrl" not in data
     assert "backdropUrl" not in data
+
+
+def test_search_skips_without_site_credentials(monkeypatch: Any):
+    tracker = V3X(_config())
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    meta: dict[str, Any] = {"title": "X"}
+    # No username/password in config → login returns None → fail-closed skip
+    assert asyncio.run(tracker.search_existing(meta)) == []
+    assert meta["skipping"] == "V3X"
+
+
+def test_login_returns_cookies_and_caches(monkeypatch: Any):
+    config = _config()
+    config["TRACKERS"]["V3X"]["username"] = "user"
+    config["TRACKERS"]["V3X"]["password"] = "pass"
+    tracker = V3X(config)
+    calls: list[str] = []
+
+    class _LoginResponse:
+        status_code = 200
+        cookies = v3x_module.httpx.Cookies({"v3x_sid": "abc"})
+
+    class _LoginClient(_FakeClient):
+        async def post(self, url: str, **kwargs: Any) -> Any:
+            calls.append(url)
+            assert kwargs["json"] == {"login": "user", "password": "pass"}
+            return _LoginResponse()
+
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _LoginClient)
+    cookies = asyncio.run(tracker._login_session_cookies())
+    assert cookies is not None and cookies.get("v3x_sid") == "abc"
+    # Second call hits the cache, no new request
+    asyncio.run(tracker._login_session_cookies())
+    assert len(calls) == 1

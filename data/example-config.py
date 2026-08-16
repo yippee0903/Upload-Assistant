@@ -1009,7 +1009,12 @@ config = {
             "modq": False,
         },
         "V3X": {
-            "api_key": "V3X api key (both read and upload scopes)",
+            "api_key": "V3X api key (upload scope)",
+            # Site credentials — the dupe search browses the catalog through a
+            # web session (API keys are upload-only since the 2026-08 update).
+            # Without them V3X is skipped at upload time (no blind uploads).
+            "username": "",
+            "password": "",
             "announce_url": "get from V3X",
             # The site displays the .torrent's internal name: UA renames the
             # torrent root to the generated release name (single files are

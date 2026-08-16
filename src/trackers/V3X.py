@@ -56,6 +56,32 @@ class V3X(FrenchTrackerMixin):
         self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
         self.tmdb_manager = TmdbManager(config)
         self.banned_groups: list[Any] = []
+        self._session_cookies: Optional[httpx.Cookies] = None
+
+    async def _login_session_cookies(self) -> Optional[httpx.Cookies]:
+        """Log in with the site credentials and cache the session cookie.
+
+        Browse routes (listing/detail) only accept a web session since the
+        2026-08 site update — API keys are upload-only there.
+        """
+        if self._session_cookies is not None:
+            return self._session_cookies
+        cfg = self.config["TRACKERS"].get(self.tracker, {})
+        login = str(cfg.get("username", "") or "").strip()
+        password = str(cfg.get("password", "") or "")
+        if not login or not password:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(f"{self.api_base}/auth/login", json={"login": login, "password": password})
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            console.print(f"[yellow]{self.tracker}: login failed: {type(e).__name__}[/yellow]")
+            return None
+        if response.status_code != 200:
+            console.print(f"[yellow]{self.tracker}: login failed (HTTP {response.status_code}) — check the username/password in your config.[/yellow]")
+            return None
+        self._session_cookies = response.cookies
+        return self._session_cookies
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         result = await super().get_name(meta)
@@ -112,6 +138,12 @@ class V3X(FrenchTrackerMixin):
             meta["skipping"] = self.tracker
             return dupes
 
+        cookies = await self._login_session_cookies()
+        if cookies is None:
+            console.print(f"[yellow]{self.tracker}: the dupe search needs the site username/password in your config — skipping tracker to avoid a false negative.[/yellow]")
+            meta["skipping"] = self.tracker
+            return dupes
+
         title = str(meta.get("title") or "")
         fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
         year_str = str(meta.get("year") or "").strip()
@@ -153,7 +185,7 @@ class V3X(FrenchTrackerMixin):
             total = None
             while page <= 50:  # hard cap so a misreported total can't loop forever
                 try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with httpx.AsyncClient(timeout=30.0, cookies=cookies) as client:
                         response = await client.get(self.search_url, params={"q": search_term, "perPage": 100, "page": page})
                     if response.status_code != 200:
                         incomplete = True
@@ -239,14 +271,13 @@ class V3X(FrenchTrackerMixin):
         enrich_limit = 25  # one request per dupe — bound the sequential cost
         if len(dupes) > enrich_limit:
             console.print(f"[yellow]{self.tracker}: enriching only the first {enrich_limit} of {len(dupes)} dupes; the rest fall back to name similarity.[/yellow]")
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=20.0, cookies=self._session_cookies) as client:
             for entry in dupes[:enrich_limit]:
                 torrent_id = entry.get("id")
                 if not torrent_id:
                     continue
                 try:
-                    response = await client.get(f"{self.search_url}/{torrent_id}", headers=headers)
+                    response = await client.get(f"{self.search_url}/{torrent_id}")
                     if response.status_code != 200:
                         continue
                     detail = response.json()
