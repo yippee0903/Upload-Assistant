@@ -1184,3 +1184,26 @@ class TestSourceDescriptionSection:
     def test_section_absent_when_file_is_blank(self, monkeypatch: Any, tmp_path: Any):
         desc = self._desc(monkeypatch, tmp_path, flag=True, content="\n\n  \n")
         assert "Notes de la release" not in desc
+
+
+class TestFlattenSourceBbcode:
+    """The site parser supports neither nested spoilers nor inner centers."""
+
+    def test_nested_spoilers_are_unwrapped_keeping_leaves(self):
+        text = "[center][spoiler=Other files][center][spoiler=Ep3]info3[/spoiler][/center][center][spoiler=Ep4]info4[/spoiler][/center][/spoiler][/center]"
+        out = V3X._flatten_source_bbcode(text)
+        assert "[center]" not in out and "[/center]" not in out
+        assert out.count("[spoiler=") == 2
+        assert out.count("[/spoiler]") == 2
+        assert "Other files" not in out
+        assert "[spoiler=Ep3]info3[/spoiler]" in out
+
+    def test_flat_spoilers_are_untouched(self):
+        text = "[spoiler=Logs]x264 log[/spoiler]\nSummary."
+        out = V3X._flatten_source_bbcode(text)
+        assert out == "[spoiler=Logs]x264 log[/spoiler]\nSummary."
+
+    def test_triple_nesting_keeps_only_leaves(self):
+        text = "[spoiler=A][spoiler=B][spoiler=C]deep[/spoiler][/spoiler][/spoiler]"
+        out = V3X._flatten_source_bbcode(text)
+        assert out == "[spoiler=C]deep[/spoiler]"

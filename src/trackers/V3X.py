@@ -515,7 +515,7 @@ class V3X(FrenchTrackerMixin):
         parts.append("")
 
         # ── Notes de la release d'origine (opt-in: include_source_description) ──
-        source_desc = await self._get_source_description(meta)
+        source_desc = self._flatten_source_bbcode(await self._get_source_description(meta))
         if source_desc:
             parts.append(f"[b][color={C}][size=130]━━━ Notes de la release d'origine ━━━[/size][/color][/b]")
             parts.append(source_desc)
@@ -586,6 +586,36 @@ class V3X(FrenchTrackerMixin):
             torrent.write(torrent_path, overwrite=True)
         except Exception as e:
             console.print(f"[yellow]{self.tracker}: could not rename torrent root ({e}); the fiche will show the original name.[/yellow]")
+
+    @staticmethod
+    def _flatten_source_bbcode(text: str) -> str:
+        """Adapt reused-description BBCode to the site's parser.
+
+        The parser handles neither nested [spoiler] blocks (it pairs an
+        opener with the first closer, shifting every following pair) nor
+        [center] tags inside the already-centered fiche: strip the centers
+        and unwrap any spoiler that contains another spoiler, keeping the
+        innermost ones.
+        """
+        text = re.sub(r"\[/?center\]", "", text, flags=re.IGNORECASE)
+
+        token_re = re.compile(r"\[spoiler=[^\]]*\]|\[spoiler\]|\[/spoiler\]", re.IGNORECASE)
+        stack: list[list[Any]] = []
+        removals: list[tuple[int, int]] = []
+        for m in token_re.finditer(text):
+            if not m.group(0).lower().startswith("[/"):
+                stack.append([m.start(), m.end(), False])
+            elif stack:
+                open_start, open_end, has_child = stack.pop()
+                if stack:
+                    stack[-1][2] = True
+                if has_child:
+                    removals.append((open_start, open_end))
+                    removals.append((m.start(), m.end()))
+        for start, end in sorted(removals, reverse=True):
+            text = text[:start] + text[end:]
+
+        return re.sub(r"\n{3,}", "\n\n", text).strip()
 
     async def _read_tmp_file(self, meta: Meta, filename: str) -> Optional[bytes]:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/{filename}"
