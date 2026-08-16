@@ -127,3 +127,36 @@ def test_comparison_without_header_is_also_removed() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
     assert "ptpimg" not in cleaned
     assert "Intro." in cleaned and "Outro." in cleaned
+
+
+def test_orphan_screenshot_headers_are_removed() -> None:
+    desc = (
+        "Notes worth keeping.\n"
+        "[center][b][color=#f7942d]SCREENSHOTS[/color][/b][/center]\n"
+        "[url=https://img.example.invalid/w][img]https://img.example.invalid/a.png[/img][/url]\n"
+    )
+    cleaned, images = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+    assert "SCREENSHOTS" not in cleaned
+    assert "Notes worth keeping." in cleaned
+    assert len(images) == 1
+
+
+def test_orphan_header_variants_are_removed() -> None:
+    variants = [
+        "Screens",
+        "Screenshots:",
+        "[b]Screen shots[/b]",
+        "Captures d'écran :",
+        "[center]— Captures —[/center]",
+    ]
+    for line in variants:
+        desc = f"Kept intro.\n{line}\n[img]https://img.example.invalid/a.png[/img]\nKept outro."
+        cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+        assert "Kept intro." in cleaned and "Kept outro." in cleaned
+        assert cleaned.count("\n") <= 2, f"header not removed for: {line!r} → {cleaned!r}"
+
+
+def test_sentence_containing_screenshots_is_kept() -> None:
+    desc = "These screenshots show the HDR grading difference.\n[img]https://img.example.invalid/a.png[/img]"
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
+    assert "These screenshots show" in cleaned

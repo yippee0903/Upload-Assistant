@@ -539,6 +539,16 @@ class BBCODE:
         desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
         # desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
+        # Screenshot headers are orphaned once their images were extracted
+        # above (no [img] survives at this point): drop short lines that are
+        # just a screenshots keyword, with or without [center]/[b]/[color]/
+        # [size] decoration ("SCREENSHOTS", "Screens", "Captures d'écran :"…).
+        _decor = r"(?:\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
+        _punct = r"[\s:.\-=─━—~*·•]*"
+        _keyword = r"(?:screen\s?shots?|screens|captures?(?:\s+d['’]?[ée]cran)?)"
+        orphan_header_re = re.compile(rf"^\s*{_decor}{_punct}{_keyword}{_punct}{_decor}\s*$", re.IGNORECASE)
+        desc = "\n".join(line for line in desc.split("\n") if not orphan_header_re.match(line))
+
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()
 
