@@ -1086,3 +1086,48 @@ class TestApprovedImageHosts:
         from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
 
         assert "V3X" in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
+
+
+class TestSourceDescriptionSection:
+    """The reused/base description is appended as an optional fiche section."""
+
+    def _desc(self, monkeypatch: Any, tmp_path: Any, *, flag: bool, content: str | None) -> str:
+        config = _config()
+        config["TRACKERS"]["V3X"]["include_source_description"] = flag
+        tracker = V3X(config)
+
+        async def fake_localized(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return {}
+
+        async def fake_mi(meta: Any) -> str:
+            return ""
+
+        monkeypatch.setattr(tracker.tmdb_manager, "get_tmdb_localized_data", fake_localized)
+        monkeypatch.setattr(tracker, "_format_audio_bbcode", lambda mi, meta: [])
+        monkeypatch.setattr(tracker, "_format_subtitle_bbcode", lambda mi, meta: [])
+        monkeypatch.setattr(tracker, "_get_mediainfo_text", fake_mi)
+        uuid = "X"
+        if content is not None:
+            (tmp_path / "tmp" / uuid).mkdir(parents=True, exist_ok=True)
+            (tmp_path / "tmp" / uuid / "DESCRIPTION.txt").write_text(content, encoding="utf-8")
+        meta = {"base_dir": str(tmp_path), "uuid": uuid, "title": "Some Movie", "category": "MOVIE"}
+        return asyncio.run(tracker._build_description(meta))
+
+    def test_section_included_when_enabled(self, monkeypatch: Any, tmp_path: Any):
+        desc = self._desc(monkeypatch, tmp_path, flag=True, content="Encoder notes worth keeping.")
+        assert "━━━ Notes de la release d'origine ━━━" in desc
+        assert "Encoder notes worth keeping." in desc
+        # Before the screenshots/end, after the Release section
+        assert desc.index("━━━ Release ━━━") < desc.index("Notes de la release")
+
+    def test_section_absent_by_default(self, monkeypatch: Any, tmp_path: Any):
+        desc = self._desc(monkeypatch, tmp_path, flag=False, content="Encoder notes worth keeping.")
+        assert "Notes de la release" not in desc
+
+    def test_section_absent_without_content(self, monkeypatch: Any, tmp_path: Any):
+        desc = self._desc(monkeypatch, tmp_path, flag=True, content=None)
+        assert "Notes de la release" not in desc
+
+    def test_section_absent_when_file_is_blank(self, monkeypatch: Any, tmp_path: Any):
+        desc = self._desc(monkeypatch, tmp_path, flag=True, content="\n\n  \n")
+        assert "Notes de la release" not in desc
