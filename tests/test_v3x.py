@@ -915,7 +915,47 @@ def test_login_returns_cookies_and_caches(monkeypatch: Any):
     assert len(calls) == 1
 
 
-def test_prefers_original_title_in_names():
+def test_prefers_original_title_in_names(monkeypatch: Any):
     # Original title in the release name (French title goes in the fiche's
     # title field); originally-French works keep their French title.
-    assert V3X.PREFER_ORIGINAL_TITLE is True
+    tracker = V3X(_config())
+
+    async def fake_fr(meta: Any) -> str:
+        return "Les Infiltrés"
+
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    meta = {"title": "The Departed", "original_language": "en", "year": 2006, "resolution": "1080p", "type": "ENCODE", "source": "BluRay", "category": "MOVIE", "tag": "-GRP", "video_encode": "x264"}
+    assert asyncio.run(tracker.get_name(meta))["name"] == "The.Departed.2006.1080p.BluRay.x264-GRP"
+    assert asyncio.run(tracker.get_name(dict(meta, original_language="fr")))["name"] == "Les.Infiltres.2006.1080p.BluRay.x264-GRP"
+
+
+def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
+    constructed: list[Any] = []
+
+    class _CookieClient(_FakeClient):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            constructed.append(kwargs.get("cookies"))
+
+        async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+            if url.endswith("/torrents"):
+                return _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1}], "total": 1})
+            return _FakeResponse(200, {"files": [{"path": "a.mkv", "size": 1}]})
+
+    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _CookieClient)
+    tracker = V3X(_config())
+    jar = v3x_module.httpx.Cookies({"v3x_sid": "abc"})
+    tracker._session_cookies = jar
+
+    async def fake_checks(meta: Any) -> bool:
+        return True
+
+    async def fake_fr(meta: Any) -> str:
+        return ""
+
+    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
+    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
+    assert dupes and dupes[0]["file_count"] == 1
+    # Both the paginated search client and the enrichment client carry the jar
+    assert len(constructed) >= 2
+    assert all(c is not None and c.get("v3x_sid") == "abc" for c in constructed)
