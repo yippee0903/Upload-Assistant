@@ -855,17 +855,30 @@ def test_rename_allowed_with_rtorrent_linking(tmp_path: Any):
     assert Torrent.read(str(out / "[V3X].torrent")).name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
 
 
-def test_upload_sends_title_and_artwork_fields(monkeypatch: Any, tmp_path: Any):
+def test_upload_sends_imdb_url_and_artwork_fields(monkeypatch: Any, tmp_path: Any):
     name = "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
     tracker, meta = _prep_upload(monkeypatch, tmp_path, name)
-    meta["frtitle"] = "Un Film"
+    meta["imdb_id"] = 47296
     meta["poster"] = "https://image.tmdb.org/t/p/original/poster.jpg"
     meta["backdrop"] = "https://image.tmdb.org/t/p/original/backdrop.jpg"
     asyncio.run(tracker.upload(meta, ""))
     data = _FakeClient.captured["data"]
-    assert data["title"] == "Un Film"
+    # No title field: the IMDb link auto-fills the fiche title site-side
+    assert "title" not in data
+    assert data["tmdbUrl"] == "https://www.imdb.com/title/tt0047296/"
+    assert "tmdbId" not in data
     assert data["posterUrl"] == "https://image.tmdb.org/t/p/original/poster.jpg"
     assert data["backdropUrl"] == "https://image.tmdb.org/t/p/original/backdrop.jpg"
+
+
+def test_upload_falls_back_to_tmdb_id_without_imdb(monkeypatch: Any, tmp_path: Any):
+    tracker, meta = _prep_upload(monkeypatch, tmp_path, "Some.Movie.2024.1080p.WEB-GRP")
+    meta["tmdb_id"] = 693134
+    asyncio.run(tracker.upload(meta, ""))
+    data = _FakeClient.captured["data"]
+    assert data["tmdbId"] == "693134"
+    assert "tmdbUrl" not in data
+    assert "title" not in data
 
 
 def test_upload_omits_artwork_when_absent(monkeypatch: Any, tmp_path: Any):
