@@ -1658,6 +1658,16 @@ class C411(FrenchTrackerMixin):
                     meta["_c411_slot_occupied"] = not self._is_corrective_version_meta(meta)
                     return [dupe]
 
+        # ── BONUS releases live in their own world ──
+        # A release tagged BONUS carries only the film's bonus content, not
+        # the film itself: it never competes with a film upload, and a BONUS
+        # upload only competes with other BONUS releases.
+        upload_is_bonus = self._is_bonus_release_meta(meta)
+        before_bonus = len(dupes)
+        dupes = [d for d in dupes if self._name_has_bonus_tag(d.get("name", "")) == upload_is_bonus]
+        if meta.get("debug") and len(dupes) < before_bonus:
+            console.print(f"[cyan]C411: {before_bonus - len(dupes)} BONUS-mismatched release(s) excluded from dupe checking[/cyan]")
+
         # ── Corrective versions: note but still check dupes ──
         # PROPER/REPACK/… may replace the original, but we still need to
         # show the user what currently occupies the slot so they can decide.
@@ -1692,7 +1702,8 @@ class C411(FrenchTrackerMixin):
         if dupes:
             upload_audio = await self._build_audio_string(meta)
             upload_lang = self._detect_lang_tag_from_name(upload_audio)
-            # Check if any existing dupe is VF2 or MULTI.VF2
+            # Check if any existing dupe is VF2 or MULTI.VF2 (per-slot: the
+            # VF2 > VFF+VFQ supersession only applies within the same slot)
             has_unified = any(self._detect_lang_tag_from_name(d.get("name", "")) in ("VF2", "MULTI.VF2") for d in dupes)
             if not has_unified and upload_lang in _FR_TAGS:
                 # VFF/VFI upload: filter out VFQ-only dupes (they coexist)
@@ -1735,13 +1746,16 @@ class C411(FrenchTrackerMixin):
                                 f"[cyan]C411 coexistence: HDR-only upload — {before - len(dupes)} DV-only dupe(s) removed (temporary coexistence, no DV.HDR10 found)[/cyan]"
                             )
 
-        # ── Lossy / Lossless coexistence (permanent) ──
-        # A lossy version and a lossless version can always coexist in the same slot.
+        # ── Lossy / Lossless coexistence (PURE slots only) ──
+        # PURE slots are defined "Lossless (lossy accepté)": a lossy rip and a
+        # lossless one may coexist there. COMPAT/OPTI/HCOPT slots are single
+        # occupancy regardless of audio class — audio is part of the slot
+        # definition, not a sub-slot.
         # Exception: for VOSTFR uploads, always keep FR-audio releases regardless of
         # lossless/lossy — they must reach _check_french_lang_dupes to be flagged as
         # french_lang_supersede. Without this, a MULTI EAC3 release would be silently
         # removed before the language-hierarchy check can see it.
-        if dupes:
+        if dupes and upload_slot and "PURE" in upload_slot:
             # Classify the upload with the same track-based logic that names
             # C411 releases (_get_audio_for_name picks a lossless track when
             # one exists) — the generic meta audio string can understate a
@@ -1789,6 +1803,15 @@ class C411(FrenchTrackerMixin):
         meta["_c411_slot_occupied"] = len(final_dupes) > 0 and not is_corrective
 
         return final_dupes
+
+    @staticmethod
+    def _name_has_bonus_tag(name: str) -> bool:
+        """True when a release name carries the BONUS token (bonus-only content)."""
+        n = f".{name.upper().replace('-', '.').replace(' ', '.')}."
+        return ".BONUS." in n
+
+    def _is_bonus_release_meta(self, meta: Meta) -> bool:
+        return any(self._name_has_bonus_tag(str(meta.get(field, ""))) for field in ("uuid", "name", "path", "edition"))
 
     def _prospective_infohash(self, meta: Meta) -> str:
         """Infohash the [C411].torrent will have (BASE clone + source flag).

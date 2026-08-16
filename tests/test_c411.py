@@ -3105,31 +3105,43 @@ class TestUploadLosslessClassification:
 
 
 class TestCoexistenceUsesTrackAudio:
-    """Regression: the lossy/lossless coexistence filter must classify the
-    upload from its MediaInfo tracks (like the C411 fiche name), not from the
-    generic meta audio string."""
+    """The lossy/lossless coexistence only applies in PURE slots, and must
+    classify the upload from its MediaInfo tracks (like the C411 fiche name),
+    not from the generic meta audio string."""
 
-    XML = """<?xml version="1.0" encoding="UTF-8"?>
+    PURE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
   <channel>
     <item>
-      <title>Le.Prenom.2012.MULTI.VFF.1080p.WEB.DTS.HD.MA.5.1.x264-Other</title>
+      <title>Le.Prenom.2012.MULTI.VFF.1080p.BluRay.Remux.DTS.HD.MA.5.1.AVC-Other</title>
       <guid>https://c411.org/torrents/301</guid>
       <link>https://c411.org/torrents/301</link>
-      <size>9000000000</size>
+      <size>25000000000</size>
     </item>
     <item>
-      <title>Le.Prenom.2012.MULTI.VFF.1080p.WEB.DD.5.1.x264-Other2</title>
+      <title>Le.Prenom.2012.MULTI.VFF.1080p.BluRay.Remux.AC3.5.1.AVC-Other2</title>
       <guid>https://c411.org/torrents/302</guid>
       <link>https://c411.org/torrents/302</link>
+      <size>18000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    COMPAT_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.FRENCH.1080p.WEB.AC3.5.1.x264-Other</title>
+      <guid>https://c411.org/torrents/303</guid>
+      <link>https://c411.org/torrents/303</link>
       <size>4000000000</size>
     </item>
   </channel>
 </rss>"""
 
-    def test_lossless_file_with_lossy_meta_audio_keeps_lossless_dupe(self):
+    def _search(self, xml: str, **meta_overrides):
         c = C411(_config())
-        meta = _meta_base(audio="Dual-Audio DD 2.0", tag="-Other")
+        meta = _meta_base(audio="Dual-Audio DD 2.0", tag="-Other", original_language="en", **meta_overrides)
         meta["mediainfo"] = {
             "media": {
                 "track": [
@@ -3142,6 +3154,61 @@ class TestCoexistenceUsesTrackAudio:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.text = xml
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_cls.return_value = mock_client
+            return asyncio.run(c.search_existing(meta, "nodisc"))
+
+    def test_pure_slot_lossless_upload_keeps_lossless_dupe_only(self):
+        dupes = self._search(self.PURE_XML, type="REMUX", source="BluRay")
+        names = " ".join(d.get("name", "") for d in dupes)
+        # Track-based classification: the upload is lossless, so the lossless
+        # remux blocks it and the lossy remux is removed (PURE coexistence).
+        assert "DTS.HD.MA" in names
+        assert "AC3.5.1" not in names
+
+    def test_compat_slot_has_no_lossy_lossless_coexistence(self):
+        # COMPAT is single occupancy: a lossy occupant blocks even a
+        # lossless-audio upload of the same slot.
+        dupes = self._search(self.COMPAT_XML)
+        names = " ".join(d.get("name", "") for d in dupes)
+        assert "AC3.5.1.x264-Other" in names
+
+
+
+class TestBonusReleasesAreExcluded:
+    """BONUS releases carry only the film's bonus content: they never compete
+    with a film upload, and a BONUS upload only competes with other BONUS."""
+
+    XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.BONUS.VOSTFR.1080p.WEB.AC3.2.0.x264-Other</title>
+      <guid>https://c411.org/torrents/501</guid>
+      <link>https://c411.org/torrents/501</link>
+      <size>4000000000</size>
+    </item>
+    <item>
+      <title>Le.Prenom.2012.FRENCH.1080p.WEB.AC3.5.1.x264-Other2</title>
+      <guid>https://c411.org/torrents/502</guid>
+      <link>https://c411.org/torrents/502</link>
+      <size>8000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def _search(self, **meta_overrides):
+        c = C411(_config())
+        meta = _meta_base(tag="-Mine", original_language="en", **meta_overrides)
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.text = self.XML
 
         with patch("httpx.AsyncClient") as mock_client_cls:
@@ -3150,10 +3217,16 @@ class TestCoexistenceUsesTrackAudio:
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
-            dupes = asyncio.run(c.search_existing(meta, "nodisc"))
+            return asyncio.run(c.search_existing(meta, "nodisc"))
 
+    def test_film_upload_ignores_bonus_releases(self):
+        dupes = self._search()
         names = " ".join(d.get("name", "") for d in dupes)
-        # Track-based classification: the upload is lossless, so the lossless
-        # dupe blocks it and the lossy one is removed (permanent coexistence).
-        assert "DTS.HD.MA" in names
-        assert "DD.5.1" not in names
+        assert "BONUS" not in names
+        assert "FRENCH.1080p" in names
+
+    def test_bonus_upload_only_competes_with_bonus(self):
+        dupes = self._search(uuid="Le.Prenom.2012.BONUS.VOSTFR.1080p.WEB.AC3.2.0.x264-Mine")
+        names = " ".join(d.get("name", "") for d in dupes)
+        assert "BONUS" in names
+        assert "FRENCH.1080p.WEB.AC3.5.1" not in names
