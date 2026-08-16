@@ -1643,6 +1643,21 @@ class C411(FrenchTrackerMixin):
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
 
+        # ── Same infohash: definite dupe, bypass every filter ──
+        # The upload torrent is a deterministic BASE clone, so an identical
+        # infohash on the tracker means this exact torrent was already
+        # uploaded — no relevance/slot/coexistence rule can change that.
+        own_infohash = self._prospective_infohash(meta)
+        if own_infohash:
+            for dupe in dupes:
+                if str(dupe.get("infohash") or "").lower() == own_infohash:
+                    console.print(f"[yellow]C411: this exact torrent (same infohash) is already on the tracker: {dupe.get('name')}[/yellow]")
+                    # Same unattended-abort rule as the normal path below, so
+                    # the upload gate blocks even if the generic DupeChecker
+                    # later discards this entry on name similarity.
+                    meta["_c411_slot_occupied"] = not self._is_corrective_version_meta(meta)
+                    return [dupe]
+
         # ── Corrective versions: note but still check dupes ──
         # PROPER/REPACK/… may replace the original, but we still need to
         # show the user what currently occupies the slot so they can decide.
@@ -1727,7 +1742,12 @@ class C411(FrenchTrackerMixin):
         # french_lang_supersede. Without this, a MULTI EAC3 release would be silently
         # removed before the language-hierarchy check can see it.
         if dupes:
-            upload_audio_str = str(meta.get("audio", ""))
+            # Classify the upload with the same track-based logic that names
+            # C411 releases (_get_audio_for_name picks a lossless track when
+            # one exists) — the generic meta audio string can understate a
+            # multi-track file (e.g. "DD 2.0" on a REMUX carrying DTS-HD MA),
+            # which would wrongly let the same file coexist with itself.
+            upload_audio_str = self._get_audio_for_name(meta) or str(meta.get("audio", ""))
             upload_lossless = self._is_lossless_audio(upload_audio_str)
             upload_audio_tag = await self._build_audio_string(meta)
             _, upload_lang_level = self._extract_french_lang_tag(upload_audio_tag)
@@ -1769,6 +1789,28 @@ class C411(FrenchTrackerMixin):
         meta["_c411_slot_occupied"] = len(final_dupes) > 0 and not is_corrective
 
         return final_dupes
+
+    def _prospective_infohash(self, meta: Meta) -> str:
+        """Infohash the [C411].torrent will have (BASE clone + source flag).
+
+        Lets the dupe check catch "this exact torrent is already on the
+        tracker" before any relevance/coexistence filtering. Returns "" when
+        BASE.torrent is missing or when NFO embedding will recreate the
+        torrent (hash not predictable here).
+        """
+        base_path = os.path.join(meta.get("base_dir", ""), "tmp", meta.get("uuid", ""), "BASE.torrent")
+        if not os.path.isfile(base_path):
+            return ""
+        if self._get_nfo_files(meta):
+            return ""
+        try:
+            from torf import Torrent
+
+            torrent = Torrent.read(base_path)
+            torrent.metainfo["info"]["source"] = self.source_flag
+            return str(torrent.infohash).lower()
+        except Exception:
+            return ""
 
     @staticmethod
     def _parse_torznab_response(xml_text: str) -> list[dict[str, Any]]:
@@ -1820,6 +1862,7 @@ class C411(FrenchTrackerMixin):
             # Extract torznab attributes (resolution, category, files, etc.)
             files_count = 0
             resolution = ""
+            infohash = ""
             for attr in item.findall("torznab:attr", ns):
                 attr_name = attr.get("name", "")
                 attr_value = attr.get("value", "")
@@ -1828,6 +1871,8 @@ class C411(FrenchTrackerMixin):
                         files_count = int(attr_value)
                 elif attr_name == "resolution":
                     resolution = attr_value
+                elif attr_name == "infohash":
+                    infohash = attr_value
 
             if name:
                 results.append(
@@ -1838,6 +1883,7 @@ class C411(FrenchTrackerMixin):
                         "id": guid or None,
                         "file_count": files_count,
                         "res": resolution or None,
+                        "infohash": infohash or None,
                         "files": [],
                         "trumpable": False,
                         "internal": False,

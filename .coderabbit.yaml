@@ -19,16 +19,22 @@ reviews:
     - path: "src/trackers/**"
       instructions: |
         These are tracker modules for a torrent upload assistant.
-        Each tracker (C411, TORR9, ACM, GF, etc.) implements upload logic for a specific
+        Each tracker (C411, V3X, ACM, GF, etc.) implements upload logic for a specific
         French or international private tracker. Pay attention to:
         - Correct BBCode formatting in description builders
         - Proper async/await usage (all tracker methods are async)
-        - French language conventions in user-facing strings
         - Dupe-checking logic and slot-based filtering (especially C411)
+        Language conventions: console/log messages are ALWAYS English, project-wide —
+        never suggest translating them to French. French belongs only in content sent
+        to the tracker sites themselves (BBCode descriptions, upload field values).
     - path: "tests/**"
       instructions: |
         Test suite using pytest. Tests are synchronous wrappers around async code.
         Ensure assertions are specific and cover edge cases.
+        Do not suggest tests that import or exercise upload.py / process_meta:
+        upload.py runs the user-config load at module level (sys.exit without a
+        config), so it is not importable in tests. Logic that needs behavioral
+        tests should be extracted into src/ modules instead.
     - path: "web_ui/**"
       instructions: |
         Flask-based web UI for the upload assistant.
