@@ -473,6 +473,9 @@ class BBCODE:
             # Add any other known bot image URLs here
         ]
         imagelist = [img for img in imagelist if img["img_url"] not in bot_image_urls and not re.search(r"thumbs", img["img_url"], re.IGNORECASE)]
+        # ptpimg.me is dead: its images (flags, icons, screenshots) must not
+        # be reused as if they were live screenshots
+        imagelist = [img for img in imagelist if "ptpimg.me" not in str(img.get("raw_url", ""))]
 
         # Restore spoiler tags
         if spoiler_placeholders:
@@ -534,9 +537,13 @@ class BBCODE:
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
 
-        # Remove leftover [img] or [URL] tags in the description
+        # Remove leftover [img] or [URL] tags in the description — mostly
+        # images inside [spoiler] blocks, which are shielded from extraction.
+        # The sized form must go WITH its URL and closing tag: stripping only
+        # the [img=N] opener leaves an orphan "url[/img]" behind.
         desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"\[img=[\s\S]*?\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[^\]]*\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[img=[^\]]*\]", "", desc, flags=re.IGNORECASE)
         # desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
 
         # Screenshot headers are orphaned once their images were extracted

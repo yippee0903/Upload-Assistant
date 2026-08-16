@@ -160,3 +160,26 @@ def test_sentence_containing_screenshots_is_kept() -> None:
     desc = "These screenshots show the HDR grading difference.\n[img]https://img.example.invalid/a.png[/img]"
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc")
     assert "These screenshots show" in cleaned
+
+
+def test_sized_img_inside_spoiler_is_fully_removed() -> None:
+    # Regression: stripping only the [img=N] opener left "url[/img]" orphans
+    desc = "[spoiler=Ep1]\n1. [img=18]https://ptpimg.me/fakeflag.png[/img] / E-AC-3 / 224 kb/s\n[/spoiler]\nKept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "[/img]" not in cleaned
+    assert "ptpimg.me" not in cleaned
+    assert "/ E-AC-3 / 224 kb/s" in cleaned
+    assert "Kept." in cleaned
+
+
+def test_sized_img_outside_spoiler_is_still_extracted() -> None:
+    desc = "[img=350]https://img.example.invalid/shot.png[/img]\nSummary."
+    cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert images and images[0]["raw_url"] == "https://img.example.invalid/shot.png"
+    assert "[img" not in cleaned
+
+
+def test_dead_ptpimg_images_are_dropped_from_imagelist() -> None:
+    desc = "[img]https://ptpimg.me/fakedead.png[/img]\n[img]https://img.example.invalid/live.png[/img]\nSummary."
+    cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert [i["raw_url"] for i in images] == ["https://img.example.invalid/live.png"]
