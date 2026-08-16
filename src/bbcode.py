@@ -514,7 +514,11 @@ class BBCODE:
         # logo — a ".4HH" stroke and the closing ".JHHL." line — so a real
         # NFO code block that merely shares one stroke survives.
         desc = re.sub(r"\s*\[code\]\[center\][^\[]*\.4HH[^\[]*\.JHHL\.\s*\[/center\]\[/code\]\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
-        desc = re.sub(r"\s*Posted to this fine tracker with seedbrr\.?", "", desc, flags=re.IGNORECASE)
+        # The tool name after "with" varies per uploader (seedbrr, seed-tools, …);
+        # the bounded character class stops before any BBCode bracket.
+        desc = re.sub(r"\s*Posted to this fine tracker with [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
+        # Same family of tool signatures, variable "sponsor" name.
+        desc = re.sub(r"\s*This description is rendered for you via config\.yaml and is sponsored by [\w -]{1,40}\.?", "", desc, flags=re.IGNORECASE)
         # ...and its sample-link spoiler ([b][spoiler=Sample: xyz]url[/spoiler][/b])
         desc = re.sub(r"\s*(\[b\])?\[spoiler=Sample[^\]]*\][\s\S]*?\[/spoiler\](\[/b\])?\s*", "\n\n", desc, flags=re.IGNORECASE).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)

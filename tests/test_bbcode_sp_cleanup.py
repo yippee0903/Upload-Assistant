@@ -69,3 +69,26 @@ def test_regular_spoiler_survives() -> None:
     desc = "Summary.\n\n[spoiler=Screens]some content[/spoiler]"
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
     assert "[spoiler=Screens]some content[/spoiler]" in cleaned
+
+
+def test_seedpool_sentence_with_other_tool_name_is_removed():
+    # The tool name after "with" varies per uploader (seedbrr, seed-tools, …)
+    desc = "[b][size=12][color=#757575]Created with mkbrr, ffmpeg, and mediainfo. Posted to this fine tracker with seed-tools.[/color][/size][/b]"
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert "Posted to this fine tracker" not in cleaned
+    assert "Created with mkbrr, ffmpeg, and mediainfo." in cleaned
+
+
+def test_seedpool_sentence_does_not_eat_following_text():
+    desc = "Posted to this fine tracker with seed-tools. A plot summary that must stay."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert "A plot summary that must stay." in cleaned
+    assert "Posted to this fine tracker" not in cleaned
+
+
+def test_sponsored_sentence_is_removed() -> None:
+    desc = "Summary kept.\nThis description is rendered for you via config.yaml and is sponsored by Shrek."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
+    assert "sponsored by" not in cleaned
+    assert "rendered for you via config.yaml" not in cleaned
+    assert "Summary kept." in cleaned
