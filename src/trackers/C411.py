@@ -1692,7 +1692,8 @@ class C411(FrenchTrackerMixin):
         if dupes:
             upload_audio = await self._build_audio_string(meta)
             upload_lang = self._detect_lang_tag_from_name(upload_audio)
-            # Check if any existing dupe is VF2 or MULTI.VF2
+            # Check if any existing dupe is VF2 or MULTI.VF2 (per-slot: the
+            # VF2 > VFF+VFQ supersession only applies within the same slot)
             has_unified = any(self._detect_lang_tag_from_name(d.get("name", "")) in ("VF2", "MULTI.VF2") for d in dupes)
             if not has_unified and upload_lang in _FR_TAGS:
                 # VFF/VFI upload: filter out VFQ-only dupes (they coexist)
@@ -1735,13 +1736,16 @@ class C411(FrenchTrackerMixin):
                                 f"[cyan]C411 coexistence: HDR-only upload — {before - len(dupes)} DV-only dupe(s) removed (temporary coexistence, no DV.HDR10 found)[/cyan]"
                             )
 
-        # ── Lossy / Lossless coexistence (permanent) ──
-        # A lossy version and a lossless version can always coexist in the same slot.
+        # ── Lossy / Lossless coexistence (PURE slots only) ──
+        # PURE slots are defined "Lossless (lossy accepté)": a lossy rip and a
+        # lossless one may coexist there. COMPAT/OPTI/HCOPT slots are single
+        # occupancy regardless of audio class — audio is part of the slot
+        # definition, not a sub-slot.
         # Exception: for VOSTFR uploads, always keep FR-audio releases regardless of
         # lossless/lossy — they must reach _check_french_lang_dupes to be flagged as
         # french_lang_supersede. Without this, a MULTI EAC3 release would be silently
         # removed before the language-hierarchy check can see it.
-        if dupes:
+        if dupes and upload_slot and "PURE" in upload_slot:
             # Classify the upload with the same track-based logic that names
             # C411 releases (_get_audio_for_name picks a lossless track when
             # one exists) — the generic meta audio string can understate a
