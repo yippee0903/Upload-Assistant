@@ -1131,9 +1131,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                 trackers_with_image_host_requirements = TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS
                 if len(meta.get("image_list", [])) < cutoff and meta.get("skip_imghost_upload", False) is False:
                     # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
-                    relevant_trackers = [
-                        t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map
-                    ]
+                    # Only trackers still slated for upload constrain the host choice:
+                    # one excluded by the checks above (banned/skipped/dupe) must not
+                    # narrow the approved-host intersection for the remaining ones.
+                    status_map = cast(dict[str, dict[str, Any]], meta.get("tracker_status") or {})
+                    candidate_trackers = [t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str)]
+                    if status_map:
+                        candidate_trackers = [t for t in candidate_trackers if status_map.get(t, {}).get("upload", False)]
+                    relevant_trackers = [t for t in candidate_trackers if t in trackers_with_image_host_requirements and t in tracker_class_map]
 
                     # If all relevant trackers share exactly one common approved host that the user has configured,
                     # and it's not the initially selected host, switch meta['imghost'] to that common host.
