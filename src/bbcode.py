@@ -542,12 +542,14 @@ class BBCODE:
         # ...and bare (unwrapped) signature lines: only complete lines made of
         # the marker plus known BBCode wrappers — ordinary note text that
         # merely mentions a tool name must survive.
-        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
+        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
         for _sig_marker in (
             r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
             r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
             r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
+            r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
+            r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):

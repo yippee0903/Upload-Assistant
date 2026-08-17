@@ -319,3 +319,17 @@ def test_youtube_embed_is_removed() -> None:
     desc = "Kept.\n[youtube]xXxFAKEIDxXx[/youtube]\nAlso kept."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert cleaned == "Kept.\nAlso kept."
+
+
+def test_easy_uploader_signature_is_removed() -> None:
+    desc = (
+        "Kept.\n"
+        "[color=#7760de]⚡ Uploaded using EASY UPLOAD3R ⚡[/color]\n"
+        "[color=#5f5f5f]A UNIT3D plugin proudly developed by [b]SomeDev[/b][/color]\n"
+        "Also kept."
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."
+    prose = "The release was uploaded using EASY UPLOAD3R before being fixed."
+    cleaned2, _ = BBCODE().clean_unit3d_description(prose, "https://lst.gg")
+    assert cleaned2 == prose
