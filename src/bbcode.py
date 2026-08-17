@@ -546,6 +546,7 @@ class BBCODE:
         for _sig_marker in (
             r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
             r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
+            r"Uploaded with (?:\[/?color(?:=[^\]]*)?\]|[^\w\n\[\]])*using GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
             r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
             r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
