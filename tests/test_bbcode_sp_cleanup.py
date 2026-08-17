@@ -313,3 +313,9 @@ def test_shared_with_upload_assistant_signature_is_removed() -> None:
         desc = f"Kept.\n{signature}\nAlso kept."
         cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
         assert cleaned == "Kept.\nAlso kept.", f"signature not fully removed: {signature!r} → {cleaned!r}"
+
+
+def test_youtube_embed_is_removed() -> None:
+    desc = "Kept.\n[youtube]xXxFAKEIDxXx[/youtube]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."

@@ -555,6 +555,8 @@ class BBCODE:
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
+        # Embedded video players don't render outside the source site
+        desc = re.sub(r"\[youtube\][^\[]*\[/youtube\]\n?", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.
