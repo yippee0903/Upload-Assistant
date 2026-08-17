@@ -552,8 +552,13 @@ class DescriptionBuilder:
                     desc_parts.append(f"[center][pre]{title}[/pre][/center]\n")
                 desc_parts.append(f"[center][pre]{episode_overview}[/pre][/center]\n")
 
-        # Description that may come from API requests
-        meta_description_value = meta.get("description", "")
+        # Description that may come from API requests. A tracker whose rules
+        # exclude descriptions written in another language can opt out of the
+        # text reused from other trackers with include_reused_description:
+        # False in its config section — images, NFO and templates still apply.
+        tracker_cfg = cast(dict[str, Any], self.config.get("TRACKERS", {}).get(self.tracker, {}) or {})
+        reused_excluded = meta.get("saved_description") and not bool(tracker_cfg.get("include_reused_description", True))
+        meta_description_value = "" if reused_excluded else meta.get("description", "")
         if isinstance(meta_description_value, str):
             meta_description = meta_description_value
         elif meta_description_value is None:

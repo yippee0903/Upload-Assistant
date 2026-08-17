@@ -973,6 +973,10 @@ config = {
             "anon": False,
             # Upload with Exclusive flag (team of staff only)
             "exclusive": False,
+            # The tracker requires descriptions written in French, so the
+            # (English) description text reused from other trackers is left
+            # out of uploads; reused images, NFO and templates still apply.
+            "include_reused_description": False,
         },
         "TTG": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
