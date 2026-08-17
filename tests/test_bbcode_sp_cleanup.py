@@ -355,3 +355,9 @@ def test_center_wrappers_emptied_by_removals_are_dropped() -> None:
     for desc in cases:
         cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
         assert cleaned == "Kept.\nAlso kept.", f"{desc!r} → {cleaned!r}"
+
+
+def test_ggbot_heart_signature_is_removed() -> None:
+    desc = "Kept.\nUploaded with [color=red]❤[/color] using GG-BOT Upload Assistant\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."
