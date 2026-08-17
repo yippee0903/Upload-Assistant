@@ -1,10 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import cli_ui
 import httpx
 
 from src.console import console
+from src.get_desc import DescriptionBuilder
+from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.UNIT3D import UNIT3D, QueryValue
@@ -33,7 +35,30 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             "Freek911",
             "k0RE",
         ]
+        # Hosts verified to actually render on the site; other common hosts
+        # (pixhost, lostimg) come out as dead images there.
+        self.approved_image_hosts = ["ptscreens", "imgbb", "imgbox"]
+        self.rehost_images_manager = RehostImagesManager(config)
         pass
+
+    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
+        await self.rehost_images_manager.check_hosts(
+            meta,
+            self.tracker,
+            img_host_index=1,
+            approved_image_hosts=self.approved_image_hosts,
+        )
+
+    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
+        image_list = cast(list[dict[str, str]], meta["TOS_images_key"] if "TOS_images_key" in meta else meta.get("image_list", []))
+        return {
+            "description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
+                meta,
+                comparison=True,
+                image_list=image_list,
+                approved_image_hosts=self.approved_image_hosts,
+            )
+        }
 
     # TOS accepts NOTAG
     notag_label: str = "NOTAG"

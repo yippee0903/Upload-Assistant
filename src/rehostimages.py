@@ -17,7 +17,7 @@ from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
 # Trackers whose sites only accept screenshots from specific image hosts.
-TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS = frozenset({"A4K", "ACM", "BHD", "DC", "GPW", "HUNO", "MTV", "NST", "OE", "PTP", "STC", "TVC", "V3X"})
+TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS = frozenset({"A4K", "ACM", "BHD", "DC", "GPW", "HUNO", "MTV", "NST", "OE", "PTP", "STC", "TOS", "TVC", "V3X"})
 
 
 async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, Any], tracker_class_map: Mapping[str, Any]) -> list[str]:
