@@ -345,3 +345,13 @@ def test_empty_code_blocks_are_removed() -> None:
     for desc, expected in cases.items():
         cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
         assert cleaned == expected, f"{desc!r} → {cleaned!r}"
+
+
+def test_center_wrappers_emptied_by_removals_are_dropped() -> None:
+    cases = [
+        "Kept.\n[center][youtube]xXxFAKEIDxXx[/youtube][/center]\nAlso kept.",
+        "Kept.\n[center][note][/note][/center]\nAlso kept.",
+    ]
+    for desc in cases:
+        cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+        assert cleaned == "Kept.\nAlso kept.", f"{desc!r} → {cleaned!r}"

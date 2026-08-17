@@ -562,6 +562,8 @@ class BBCODE:
         # Empty [code] blocks (an NFO placeholder left blank), with any
         # [center] wrapper that would otherwise be left empty too
         desc = re.sub(r"(\[center\])?[^\S\n]*\[code\]\s*\[/code\][^\S\n]*(?(1)\[/center\])[^\S\n]*\n?", "", desc, flags=re.IGNORECASE)
+        # ...and [center] wrappers the removals above left empty
+        desc = re.sub(r"\[center\]\s*\[/center\][^\S\n]*\n?", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.
