@@ -313,3 +313,45 @@ def test_shared_with_upload_assistant_signature_is_removed() -> None:
         desc = f"Kept.\n{signature}\nAlso kept."
         cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
         assert cleaned == "Kept.\nAlso kept.", f"signature not fully removed: {signature!r} → {cleaned!r}"
+
+
+def test_youtube_embed_is_removed() -> None:
+    desc = "Kept.\n[youtube]xXxFAKEIDxXx[/youtube]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."
+
+
+def test_easy_uploader_signature_is_removed() -> None:
+    desc = (
+        "Kept.\n"
+        "[color=#7760de]⚡ Uploaded using EASY UPLOAD3R ⚡[/color]\n"
+        "[color=#5f5f5f]A UNIT3D plugin proudly developed by [b]SomeDev[/b][/color]\n"
+        "Also kept."
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."
+    prose = "The release was uploaded using EASY UPLOAD3R before being fixed."
+    cleaned2, _ = BBCODE().clean_unit3d_description(prose, "https://lst.gg")
+    assert cleaned2 == prose
+
+
+def test_empty_code_blocks_are_removed() -> None:
+    cases = {
+        "[center][code][/code][/center]\nKept.": "Kept.",
+        "Kept.\n[code][/code]\nAlso kept.": "Kept.\nAlso kept.",
+        "[center]Kept [code][/code][/center]": "[center]Kept[/center]",
+        "[code]NFO worth keeping[/code]": "[code]NFO worth keeping[/code]",
+    }
+    for desc, expected in cases.items():
+        cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+        assert cleaned == expected, f"{desc!r} → {cleaned!r}"
+
+
+def test_center_wrappers_emptied_by_removals_are_dropped() -> None:
+    cases = [
+        "Kept.\n[center][youtube]xXxFAKEIDxXx[/youtube][/center]\nAlso kept.",
+        "Kept.\n[center][note][/note][/center]\nAlso kept.",
+    ]
+    for desc in cases:
+        cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+        assert cleaned == "Kept.\nAlso kept.", f"{desc!r} → {cleaned!r}"

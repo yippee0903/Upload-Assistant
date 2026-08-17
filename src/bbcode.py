@@ -542,12 +542,14 @@ class BBCODE:
         # ...and bare (unwrapped) signature lines: only complete lines made of
         # the marker plus known BBCode wrappers — ordinary note text that
         # merely mentions a tool name must survive.
-        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]\s*)*"
+        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
         for _sig_marker in (
             r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
             r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
             r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
+            r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
+            r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
@@ -555,6 +557,13 @@ class BBCODE:
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
+        # Embedded video players don't render outside the source site
+        desc = re.sub(r"\[youtube\][^\[]*\[/youtube\]\n?", "", desc, flags=re.IGNORECASE)
+        # Empty [code] blocks (an NFO placeholder left blank), with any
+        # [center] wrapper that would otherwise be left empty too
+        desc = re.sub(r"(\[center\])?[^\S\n]*\[code\]\s*\[/code\][^\S\n]*(?(1)\[/center\])[^\S\n]*\n?", "", desc, flags=re.IGNORECASE)
+        # ...and [center] wrappers the removals above left empty
+        desc = re.sub(r"\[center\]\s*\[/center\][^\S\n]*\n?", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.
