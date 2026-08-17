@@ -300,3 +300,10 @@ def test_h3_wrapped_ornament_header_and_leftover_close_are_removed() -> None:
     matched = "[h3]intro[/h3]\nBody."
     cleaned2, _ = BBCODE().clean_unit3d_description(matched, "https://lst.gg")
     assert "[h3]intro[/h3]" in cleaned2
+
+
+def test_shared_with_upload_assistant_signature_is_removed() -> None:
+    desc = "Kept.\n[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Shared with Upload-Assistant v3.4 (fork)[/size][/url][/right]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Upload-Assistant" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
