@@ -333,3 +333,15 @@ def test_easy_uploader_signature_is_removed() -> None:
     prose = "The release was uploaded using EASY UPLOAD3R before being fixed."
     cleaned2, _ = BBCODE().clean_unit3d_description(prose, "https://lst.gg")
     assert cleaned2 == prose
+
+
+def test_empty_code_blocks_are_removed() -> None:
+    cases = {
+        "[center][code][/code][/center]\nKept.": "Kept.",
+        "Kept.\n[code][/code]\nAlso kept.": "Kept.\nAlso kept.",
+        "[center]Kept [code][/code][/center]": "[center]Kept[/center]",
+        "[code]NFO worth keeping[/code]": "[code]NFO worth keeping[/code]",
+    }
+    for desc, expected in cases.items():
+        cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+        assert cleaned == expected, f"{desc!r} → {cleaned!r}"

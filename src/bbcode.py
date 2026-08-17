@@ -559,6 +559,9 @@ class BBCODE:
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)
         # Embedded video players don't render outside the source site
         desc = re.sub(r"\[youtube\][^\[]*\[/youtube\]\n?", "", desc, flags=re.IGNORECASE)
+        # Empty [code] blocks (an NFO placeholder left blank), with any
+        # [center] wrapper that would otherwise be left empty too
+        desc = re.sub(r"(\[center\])?[^\S\n]*\[code\]\s*\[/code\][^\S\n]*(?(1)\[/center\])[^\S\n]*\n?", "", desc, flags=re.IGNORECASE)
 
         # Remove leftover [img] or [URL] tags in the description — mostly
         # images inside [spoiler] blocks, which are shielded from extraction.
