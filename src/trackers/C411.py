@@ -24,6 +24,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
@@ -48,6 +49,10 @@ class C411(FrenchTrackerMixin):
         self.upload_url: str = "https://c411.org/api/torrents"
         self.torrent_url: str = "https://c411.org/torrents/"
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
+        # Hosts verified to actually render on the site; other common hosts
+        # (ptscreens, lostimg) come out as dead images there.
+        self.approved_image_hosts = ["pixhost", "imgbb", "onlyimage", "imgbox"]
+        self.rehost_images_manager = RehostImagesManager(config)
         self.tmdb_manager = TmdbManager(config)
         _reserved_note = "Internal C411 group: reserved for the team's own uploads"
         self.banned_groups: list[Any] = ["k0RE"] + [
@@ -96,6 +101,14 @@ class C411(FrenchTrackerMixin):
 
     # C411 wiki: UHD is only allowed when the release is REMUX/BDMV/ISO.
     UHD_ONLY_FOR_REMUX_DISC: bool = True
+
+    async def check_image_hosts(self, meta: Meta) -> None:
+        await self.rehost_images_manager.check_hosts(
+            meta,
+            self.tracker,
+            img_host_index=1,
+            approved_image_hosts=self.approved_image_hosts,
+        )
 
     def _get_audio_for_name(self, meta: Meta) -> str:
         """C411 override: use the first French audio track's codec/channels.
@@ -1098,7 +1111,7 @@ class C411(FrenchTrackerMixin):
 
         # ── Captures d'écran  (opt-in via config: include_screenshots) ──
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
-        image_list: list[dict[str, Any]] = meta.get("image_list", []) if include_screens else []
+        image_list: list[dict[str, Any]] = (meta.get("C411_images_key") or meta.get("image_list", [])) if include_screens else []
         if image_list:
             parts.append(f"        [color={C}]Captures d'écran[/color]")
             parts.append("")
