@@ -550,6 +550,7 @@ class BBCODE:
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
             r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
             r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
+            r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
             r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
