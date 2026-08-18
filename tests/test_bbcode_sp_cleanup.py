@@ -361,3 +361,9 @@ def test_ggbot_heart_signature_is_removed() -> None:
     desc = "Kept.\nUploaded with [color=red]❤[/color] using GG-BOT Upload Assistant\nAlso kept."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert cleaned == "Kept.\nAlso kept."
+
+
+def test_upbrr_signature_is_removed() -> None:
+    desc = "Kept.\n[right][url=https://github.com/autobrr/upbrr]Uploaded by upbrr[/url][/right]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert cleaned == "Kept.\nAlso kept."
