@@ -1111,7 +1111,7 @@ class C411(FrenchTrackerMixin):
 
         # ── Captures d'écran  (opt-in via config: include_screenshots) ──
         include_screens = self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", False)
-        image_list: list[dict[str, Any]] = (meta.get("C411_images_key") or meta.get("image_list", [])) if include_screens else []
+        image_list: list[dict[str, Any]] = (meta["C411_images_key"] if "C411_images_key" in meta else meta.get("image_list", [])) if include_screens else []
         if image_list:
             parts.append(f"        [color={C}]Captures d'écran[/color]")
             parts.append("")
