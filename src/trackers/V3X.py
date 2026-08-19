@@ -32,6 +32,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.nfo_generator import is_multi_episode_nfo
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -675,9 +676,12 @@ class V3X(FrenchTrackerMixin):
         # The site rules keep the ORIGINAL release NFO (shipped untouched);
         # otherwise fall back to MediaInfo / a generated scene NFO, with the
         # "Complete name" line patched to the tracker release name.
+        # A multi-episode MediaInfo concatenation stays in the torrent (for
+        # cross-seed integrity) but is too long for the API NFO field.
+        usable_nfo = bool(nfo_files) and not await is_multi_episode_nfo(nfo_files[0])
         nfo_text = ""
-        is_scene_nfo = bool(nfo_files)
-        nfo_path = nfo_files[0] if nfo_files else await self._get_or_generate_mediainfo_as_nfo(meta)
+        is_scene_nfo = usable_nfo
+        nfo_path = nfo_files[0] if usable_nfo else await self._get_or_generate_mediainfo_as_nfo(meta)
         if nfo_path:
             try:
                 async with aiofiles.open(nfo_path, "rb") as f:

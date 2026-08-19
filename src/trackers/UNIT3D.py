@@ -13,6 +13,7 @@ from typing_extensions import TypeAlias
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.nfo_generator import is_multi_episode_nfo
 from src.trackers.COMMON import COMMON
 
 QueryValue: TypeAlias = Union[str, int, float, bool, None]
@@ -442,6 +443,21 @@ class UNIT3D:
         if not nfo_files and meta.get("keep_nfo", False) and (meta.get("keep_folder", False) or meta.get("isdir", False)):
             search_dir = meta["path"] if os.path.isdir(meta["path"]) or meta.get("isdir", False) else os.path.dirname(meta["path"])
             nfo_files = glob.glob(os.path.join(search_dir, "*.nfo"))
+
+        # A multi-episode MediaInfo concatenation stays in the torrent (for
+        # cross-seed integrity) but is too long for the API NFO field, where
+        # the single-episode MediaInfo dump is sent instead when available.
+        if nfo_files and await is_multi_episode_nfo(nfo_files[0]):
+            mi_fallback = [
+                p
+                for p in (
+                    os.path.join(base_dir, "tmp", uuid, "MEDIAINFO_CLEANPATH.txt"),
+                    os.path.join(base_dir, "tmp", uuid, "MEDIAINFO.txt"),
+                )
+                if os.path.isfile(p)
+            ]
+            if mi_fallback:
+                nfo_files = mi_fallback[:1]
 
         if nfo_files:
             async with aiofiles.open(nfo_files[0], "rb") as f:
