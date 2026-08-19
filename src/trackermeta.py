@@ -18,6 +18,7 @@ from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
 from src.console import console
 from src.proxy_env import proxy_for
+from src.tmdb import resolve_tmdb_namespace
 from src.trackers.COMMON import COMMON
 from src.type_utils import to_int
 
@@ -309,14 +310,27 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         description_path = Path(meta["base_dir"]) / "tmp" / meta["uuid"] / "DESCRIPTION.txt"
         if len(desc) > 0:
             await asyncio.to_thread(description_path.write_text, (desc or "") + "\n", encoding="utf8")
-    if category and not meta.get("manual_category", None):
+    fiche_category = None
+    if category:
         cat_upper = category.upper()
         if "MOVIE" in cat_upper:
-            meta["category"] = "MOVIE"
+            fiche_category = "MOVIE"
         elif "TV" in cat_upper:
-            meta["category"] = "TV"
-        if meta["debug"]:
-            console.print("set Category:", meta["category"])
+            fiche_category = "TV"
+    if not meta.get("manual_category", None):
+        if fiche_category:
+            meta["category"] = fiche_category
+            if meta["debug"]:
+                console.print("set Category:", meta["category"])
+        elif tmdb:
+            # The tracker supplied a TMDB id but no usable MOVIE/TV category
+            # (e.g. "Anime"). A bare TMDB id is ambiguous — the movie and tv
+            # namespaces collide — so resolve its namespace instead of
+            # keeping the filename-based guess alongside the fiche's id.
+            resolved = await resolve_tmdb_namespace(int(tmdb), int(meta.get("imdb_id") or 0))
+            if resolved and resolved != meta.get("category"):
+                meta["category"] = resolved
+                console.print(f"[yellow]Category set to {resolved} from the TMDB id namespace (tracker category '{category}' was inconclusive)[/yellow]")
 
     imagelist_typed = cast(Optional[list[ImageDict]], imagelist)
     if imagelist_typed:  # Ensure imagelist is not empty before setting

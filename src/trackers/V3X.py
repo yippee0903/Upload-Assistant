@@ -32,7 +32,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.nfo_generator import is_multi_episode_nfo
+from src.nfo_generator import decode_nfo, is_multi_episode_nfo
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -685,7 +685,7 @@ class V3X(FrenchTrackerMixin):
         if nfo_path:
             try:
                 async with aiofiles.open(nfo_path, "rb") as f:
-                    nfo_text = (await f.read()).decode("utf-8", errors="replace")
+                    nfo_text = decode_nfo(await f.read())
             except OSError:
                 nfo_text = ""
         if nfo_text and not is_scene_nfo:

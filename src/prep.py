@@ -39,7 +39,7 @@ try:
     from src.rehostimages import RehostImagesManager
     from src.sonarr import SonarrManager
     from src.tags import get_tag, tag_override
-    from src.tmdb import TmdbManager
+    from src.tmdb import TmdbManager, verify_tmdb_imdb_agreement
     from src.tvdb import tvdb_data
     from src.tvmaze import tvmaze_manager
     from src.video import video_manager
@@ -922,6 +922,10 @@ class Prep:
         if meta.get("original_language", None) is None:
             no_original_language = True
 
+        # Cross-check the searched TMDB entry against TMDB's own mapping of
+        # the IMDb id before fetching any metadata from it.
+        await verify_tmdb_imdb_agreement(meta, unattended=unattended)
+
         # if we have all of the ids, search everything all at once
         if int(meta.get("imdb_id") or 0) != 0 and int(meta.get("tvdb_id") or 0) != 0 and int(meta.get("tmdb_id") or 0) != 0 and int(meta.get("tvmaze_id") or 0) != 0:
             meta = await self.metadata_searching_manager.all_ids(meta)
@@ -996,6 +1000,11 @@ class Prep:
             meta["tmdb_id"] = _to_int(tmdb_id)
             meta["original_language"] = original_language
             meta["no_ids"] = filename_search
+
+        # Re-run the cross-check for pairs completed by the late ID
+        # resolutions above (no-op when the pair is unchanged or the TMDB id
+        # itself came from the IMDb mapping).
+        await verify_tmdb_imdb_agreement(meta, unattended=unattended)
 
         tmdb_id_value = _to_int(meta.get("tmdb_id"))
         if tmdb_id_value != 0:
@@ -1379,7 +1388,7 @@ class Prep:
 
         return meta
 
-    async def get_cat(self, _video: str, meta: dict[str, Any]) -> Optional[str]:
+    async def get_cat(self, video: str, meta: dict[str, Any]) -> Optional[str]:
         if meta.get("manual_category"):
             manual_category = meta.get("manual_category")
             return manual_category.upper() if isinstance(manual_category, str) else None
@@ -1416,6 +1425,14 @@ class Prep:
                 if meta.get("debug", False):
                     console.print(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
+
+        # Season packs sometimes number their episodes E01… without any
+        # season token; none of the name patterns match those, but guessit
+        # recognises the episode numbering on the selected video file.
+        if video and guessit_fn(os.path.basename(video)).get("type") == "episode":
+            if meta.get("debug", False):
+                console.print("[cyan]guessit typed the video file as an episode[/cyan]")
+            return "TV"
 
         if "subsplease" in path.lower() or "subsplease" in uuid.lower():
             anime_pattern = r"(?:\s-\s)?(\d{1,3})\s*\((?:\d+p|480p|480i|576i|576p|720p|1080i|1080p|2160p)\)"

@@ -10,6 +10,20 @@ import aiofiles
 from src.console import console
 
 
+def decode_nfo(data: bytes) -> str:
+    """Decode NFO bytes: UTF-8 when valid, else CP437.
+
+    Scene NFOs are drawn in CP437, the DOS codepage — every byte maps to a
+    glyph, so this never fails, and the box art comes out as the intended
+    Unicode drawing characters instead of latin-1 accented letters or
+    replacement-character soup.
+    """
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("cp437")
+
+
 async def is_multi_episode_nfo(nfo_path: str) -> bool:
     """Detect an NFO that concatenates the MediaInfo dump of many episodes.
 

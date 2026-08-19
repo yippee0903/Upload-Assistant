@@ -285,6 +285,91 @@ async def normalize_title(title: str) -> str:
     return title.lower().replace("&", "and").replace("  ", " ").strip()
 
 
+async def _find_by_imdb_id(imdb_id: int) -> dict[str, Any]:
+    """Raw TMDB find() response for an IMDb id (empty dict on failure)."""
+    if not imdb_id:
+        return {}
+    url = f"{TMDB_BASE_URL}/find/tt{imdb_id:07d}"
+    params = {"api_key": tmdb_api_key, "external_source": "imdb_id"}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return typing_cast(dict[str, Any], response.json())
+    except Exception:
+        return {}
+
+
+async def resolve_tmdb_namespace(tmdb_id: int, imdb_id: int = 0) -> Optional[str]:
+    """Return "MOVIE" or "TV" for a bare TMDB id of unknown namespace.
+
+    A TMDB id is only meaningful with its movie/tv namespace and ids collide
+    between the two. Prefer the IMDb cross-reference (exact key lookup); fall
+    back to plain existence when the id lives in only one namespace.
+    """
+    info = await _find_by_imdb_id(imdb_id)
+    if any(int(r.get("id", 0)) == int(tmdb_id) for r in info.get("tv_results", [])):
+        return "TV"
+    if any(int(r.get("id", 0)) == int(tmdb_id) for r in info.get("movie_results", [])):
+        return "MOVIE"
+
+    async def _exists(namespace: str) -> bool:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{TMDB_BASE_URL}/{namespace}/{tmdb_id}", params={"api_key": tmdb_api_key}, timeout=10)
+                return response.status_code == 200
+        except Exception:
+            return False
+
+    matches = [label for namespace, label in (("movie", "MOVIE"), ("tv", "TV")) if await _exists(namespace)]
+    return matches[0] if len(matches) == 1 else None
+
+
+async def verify_tmdb_imdb_agreement(meta: dict[str, Any], unattended: bool = False) -> None:
+    """Cross-check the (category, tmdb_id) pair against TMDB's own mapping
+    for the known IMDb id, before any metadata is fetched.
+
+    The TMDB and IMDb title searches run independently, so when TMDB's
+    find() maps the IMDb id to a different entry than the title search
+    picked, the find() result is the corroborated one (both databases agree
+    on it). Adopt it in unattended mode, ask in interactive mode.
+    """
+    tmdb_id = int(meta.get("tmdb_id") or 0)
+    imdb_id = int(meta.get("imdb_id") or 0)
+    if not tmdb_id or not imdb_id or int(meta.get("tmdb_manual") or 0) or int(meta.get("imdb_manual") or 0):
+        return
+    # The check may run again after late ID-resolution paths; only pay for
+    # a find() when the pair actually changed since the last verification.
+    checked = [str(meta.get("category") or ""), tmdb_id, imdb_id]
+    if meta.get("_ids_cross_checked") == checked:
+        return
+    info = await _find_by_imdb_id(imdb_id)
+    candidates: list[tuple[str, int]] = [("MOVIE", int(r.get("id", 0))) for r in info.get("movie_results", [])]
+    candidates += [("TV", int(r.get("id", 0))) for r in info.get("tv_results", [])]
+    if not candidates:
+        return  # nothing to corroborate against
+    current = (str(meta.get("category") or ""), tmdb_id)
+    if current in candidates:
+        meta["_ids_cross_checked"] = checked
+        return
+    # Prefer the candidate matching the current category, else the first
+    category, corroborated_id = next((c for c in candidates if c[0] == current[0]), candidates[0])
+    console.print(
+        f"[yellow]TMDb/IMDb disagree: the title search picked {current[0].lower()}/{current[1]}, "
+        f"but TMDb maps tt{imdb_id:07d} to {category.lower()}/{corroborated_id}.[/yellow]"
+    )
+    use_corroborated = True
+    if not unattended:
+        try:
+            use_corroborated = cli_ui.ask_yes_no(f"Use the corroborated {category.lower()}/{corroborated_id} instead?", default=True)
+        except EOFError:
+            use_corroborated = True
+    if use_corroborated:
+        meta["category"] = category
+        meta["tmdb_id"] = corroborated_id
+    meta["_ids_cross_checked"] = [str(meta.get("category") or ""), int(meta.get("tmdb_id") or 0), imdb_id]
+
+
 async def get_tmdb_from_imdb(
     imdb_id: Union[str, int],
     tvdb_id: Optional[int] = None,
