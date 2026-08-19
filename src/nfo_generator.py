@@ -10,6 +10,21 @@ import aiofiles
 from src.console import console
 
 
+def is_multi_episode_nfo(nfo_path: str) -> bool:
+    """Detect an NFO that concatenates the MediaInfo dump of many episodes.
+
+    Some season packs ship one giant NFO holding the full MediaInfo of every
+    episode. Such a file is not a release NFO and is far too long for a
+    tracker's NFO field; a single MediaInfo dump contains exactly one
+    "Complete name" line, so two or more means a concatenation.
+    """
+    try:
+        with open(nfo_path, encoding="utf-8", errors="replace") as f:
+            return f.read().count("Complete name") >= 2
+    except OSError:
+        return False
+
+
 class SceneNfoGenerator:
     """Generates MediaInfo-based NFO files for releases."""
 

@@ -24,6 +24,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.nfo_generator import is_multi_episode_nfo
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -1336,7 +1337,10 @@ class C411(FrenchTrackerMixin):
         # ── NFO file (required by C411) ──
         nfo_path = await self._get_or_generate_nfo(meta)
         nfo_bytes = b""
-        if nfo_files:
+        # A multi-episode MediaInfo concatenation stays in the torrent (for
+        # cross-seed integrity) but is too long for the API NFO field, where
+        # the generated single-episode MediaInfo NFO is sent instead.
+        if nfo_files and not is_multi_episode_nfo(nfo_files[0]):
             async with aiofiles.open(nfo_files[0], "rb") as f:
                 nfo_bytes = await f.read()
         elif nfo_path and os.path.exists(nfo_path):
