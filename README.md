@@ -6,7 +6,7 @@
 
 ## What's different from upstream
 
-- **French trackers**: added support for C411, G3MINI, NST, V3X (plus GF and HDF, see the warning above), built on a shared `FRENCH.py` mixin handling French naming conventions (VF/VFF/VFQ/VOQ/VOSTFR/MULTI tags, audio codec placement, HDLight/4KLight), French-content checks before upload, French-localized TMDB titles and posters, and language-aware dupe checking (VF vs VOSTFR).
+- **French trackers**: added support for C411, G3MINI, NST, V3X and reworked TOS (plus GF and HDF, see the warning above), built on a shared `FRENCH.py` mixin handling French naming conventions (VF/VFF/VFQ/VOQ/VOSTFR/MULTI tags, audio codec placement, HDLight/4KLight), French-content checks before upload, French-localized TMDB titles and posters, and language-aware dupe checking (VF vs VOSTFR).
 - **Description reuse and cleanup**: descriptions and images from existing UNIT3D uploads can be reused, with automatic cleanup of foreign tool signatures (GG-BOT, seedpool, upbrr, …), dead image blocks, orphaned screenshot headers and other leftovers; per-tracker opt-out available.
 - **Image hosts**: added lostimg.cc; per-tracker approved image host lists with automatic rehosting when the target site refuses the current host (C411, TOS, V3X, …); rotation to the next host when uploads fail.
 - **NFO handling**: per-tracker NFO inclusion/exclusion, generated mediainfo NFOs, and torrent patching that avoids full rehashes when NFO requirements differ between trackers.
