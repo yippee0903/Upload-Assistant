@@ -24,6 +24,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.nfo_generator import decode_nfo
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -1339,6 +1340,9 @@ class C411(FrenchTrackerMixin):
         if nfo_files:
             async with aiofiles.open(nfo_files[0], "rb") as f:
                 nfo_bytes = await f.read()
+            # The site rejects raw CP437 bytes as "contenu non textuel" —
+            # send valid UTF-8 (the torrent keeps the original file).
+            nfo_bytes = decode_nfo(nfo_bytes).encode("utf-8")
         elif nfo_path and os.path.exists(nfo_path):
             async with aiofiles.open(nfo_path, "rb") as f:
                 nfo_bytes = await f.read()

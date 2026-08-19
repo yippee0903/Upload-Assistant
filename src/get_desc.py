@@ -118,9 +118,11 @@ async def gen_desc(
                 if meta["debug"]:
                     console.print("NFO content read with utf-8 encoding.")
             except UnicodeDecodeError:
+                # Scene NFOs are drawn in CP437 — latin-1 would turn the
+                # box art into accented letters.
                 if meta["debug"]:
-                    console.print("utf-8 decoding failed, trying latin1.")
-                async with aiofiles.open(nfo, encoding="latin1") as nfo_file:
+                    console.print("utf-8 decoding failed, trying cp437.")
+                async with aiofiles.open(nfo, encoding="cp437") as nfo_file:
                     nfo_content = await nfo_file.read()
 
             if not content_written:
