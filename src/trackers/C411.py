@@ -1340,7 +1340,8 @@ class C411(FrenchTrackerMixin):
         # A multi-episode MediaInfo concatenation stays in the torrent (for
         # cross-seed integrity) but is too long for the API NFO field, where
         # the generated single-episode MediaInfo NFO is sent instead.
-        if nfo_files and not is_multi_episode_nfo(nfo_files[0]):
+        used_release_nfo = bool(nfo_files) and not is_multi_episode_nfo(nfo_files[0])
+        if used_release_nfo:
             async with aiofiles.open(nfo_files[0], "rb") as f:
                 nfo_bytes = await f.read()
         elif nfo_path and os.path.exists(nfo_path):
@@ -1463,8 +1464,10 @@ class C411(FrenchTrackerMixin):
                                 if mi_append_to_nfo:
                                     async with aiofiles.open(mi_append_to_nfo, "rb") as f:
                                         mi_bytes = await f.read()
-                                    # If the NFO was rejected for being too large or invalid, send only the mediainfo
-                                    if "volumineux" in api_message.lower() or "invalide" in api_message.lower():
+                                    # If the NFO was rejected for being too large or invalid, send only the mediainfo.
+                                    # Same when nfo_bytes already is the MediaInfo dump (no release NFO
+                                    # was used): appending mi_bytes would duplicate it.
+                                    if "volumineux" in api_message.lower() or "invalide" in api_message.lower() or not used_release_nfo:
                                         console.print("[yellow]C411 - NFO rejected (too large or invalid), retrying with mediainfo only[/yellow]")
                                         nfo_bytes = mi_bytes
                                     else:
