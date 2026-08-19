@@ -2219,15 +2219,21 @@ class FrenchTrackerMixin:
         """Reused/base description text (tmp DESCRIPTION.txt), already cleaned
         by the description pipeline, for trackers that opt in via the
         per-tracker ``include_source_description`` config flag.
+
+        The pipeline's own NFO embed ([spoiler=Scene NFO:] and the like) is
+        stripped: French trackers already send the NFO through their API
+        field, so repeating it in the description is pure redundancy.
         """
         if not self.config["TRACKERS"].get(self.tracker, {}).get("include_source_description", False):  # type: ignore[attr-defined]
             return ""
         path = os.path.join(str(meta.get("base_dir", "")), "tmp", str(meta.get("uuid", "")), "DESCRIPTION.txt")
         try:
             async with aiofiles.open(path, encoding="utf-8") as f:
-                return (await f.read()).strip()
+                content = await f.read()
         except OSError:
             return ""
+        content = re.sub(r"\[center\]\[spoiler=(?:Scene|FraMeSToR) NFO:\].*?\[/center\]", "", content, flags=re.DOTALL)
+        return content.strip()
 
     async def _get_or_generate_nfo(self, meta: Meta) -> Union[str, None]:
         """Pick the NFO to upload: the release's own NFO when present,
