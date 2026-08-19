@@ -10,7 +10,7 @@ import aiofiles
 from src.console import console
 
 
-def is_multi_episode_nfo(nfo_path: str) -> bool:
+async def is_multi_episode_nfo(nfo_path: str) -> bool:
     """Detect an NFO that concatenates the MediaInfo dump of many episodes.
 
     Some season packs ship one giant NFO holding the full MediaInfo of every
@@ -19,8 +19,8 @@ def is_multi_episode_nfo(nfo_path: str) -> bool:
     "Complete name" line, so two or more means a concatenation.
     """
     try:
-        with open(nfo_path, encoding="utf-8", errors="replace") as f:
-            return f.read().count("Complete name") >= 2
+        async with aiofiles.open(nfo_path, encoding="utf-8", errors="replace") as f:
+            return (await f.read()).count("Complete name") >= 2
     except OSError:
         return False
 

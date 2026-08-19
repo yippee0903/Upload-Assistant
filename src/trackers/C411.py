@@ -1340,7 +1340,7 @@ class C411(FrenchTrackerMixin):
         # A multi-episode MediaInfo concatenation stays in the torrent (for
         # cross-seed integrity) but is too long for the API NFO field, where
         # the generated single-episode MediaInfo NFO is sent instead.
-        used_release_nfo = bool(nfo_files) and not is_multi_episode_nfo(nfo_files[0])
+        used_release_nfo = bool(nfo_files) and not await is_multi_episode_nfo(nfo_files[0])
         if used_release_nfo:
             async with aiofiles.open(nfo_files[0], "rb") as f:
                 nfo_bytes = await f.read()

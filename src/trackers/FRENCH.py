@@ -2236,7 +2236,7 @@ class FrenchTrackerMixin:
         Useful for trackers that expect an NFO with every upload (e.g. C411).
         """
         nfo_files = self._get_nfo_files(meta)
-        if nfo_files and not is_multi_episode_nfo(nfo_files[0]):
+        if nfo_files and not await is_multi_episode_nfo(nfo_files[0]):
             return nfo_files[0]
         else:
             return await self._get_or_generate_mediainfo_as_nfo(meta)

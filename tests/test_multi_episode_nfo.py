@@ -27,20 +27,26 @@ def _write(tmp_path, content):
     return str(path)
 
 
+def _is_multi(path):
+    import asyncio
+
+    return asyncio.run(is_multi_episode_nfo(path))
+
+
 def test_single_mediainfo_dump_is_not_multi(tmp_path):
-    assert is_multi_episode_nfo(_write(tmp_path, SINGLE_MI)) is False
+    assert _is_multi(_write(tmp_path, SINGLE_MI)) is False
 
 
 def test_scene_nfo_is_not_multi(tmp_path):
-    assert is_multi_episode_nfo(_write(tmp_path, SCENE_NFO)) is False
+    assert _is_multi(_write(tmp_path, SCENE_NFO)) is False
 
 
 def test_concatenated_dumps_are_multi(tmp_path):
-    assert is_multi_episode_nfo(_write(tmp_path, MULTI_MI)) is True
+    assert _is_multi(_write(tmp_path, MULTI_MI)) is True
 
 
 def test_missing_file_is_not_multi(tmp_path):
-    assert is_multi_episode_nfo(str(tmp_path / "absent.nfo")) is False
+    assert _is_multi(str(tmp_path / "absent.nfo")) is False
 
 
 def _unit3d(tmp_path, nfo_content):

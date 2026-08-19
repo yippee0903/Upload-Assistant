@@ -447,7 +447,7 @@ class UNIT3D:
         # A multi-episode MediaInfo concatenation stays in the torrent (for
         # cross-seed integrity) but is too long for the API NFO field, where
         # the single-episode MediaInfo dump is sent instead when available.
-        if nfo_files and is_multi_episode_nfo(nfo_files[0]):
+        if nfo_files and await is_multi_episode_nfo(nfo_files[0]):
             mi_fallback = [
                 p
                 for p in (
