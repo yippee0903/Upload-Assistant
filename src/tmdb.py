@@ -338,6 +338,11 @@ async def verify_tmdb_imdb_agreement(meta: dict[str, Any], unattended: bool = Fa
     imdb_id = int(meta.get("imdb_id") or 0)
     if not tmdb_id or not imdb_id or int(meta.get("tmdb_manual") or 0) or int(meta.get("imdb_manual") or 0):
         return
+    # The check may run again after late ID-resolution paths; only pay for
+    # a find() when the pair actually changed since the last verification.
+    checked = [str(meta.get("category") or ""), tmdb_id, imdb_id]
+    if meta.get("_ids_cross_checked") == checked:
+        return
     info = await _find_by_imdb_id(imdb_id)
     candidates: list[tuple[str, int]] = [("MOVIE", int(r.get("id", 0))) for r in info.get("movie_results", [])]
     candidates += [("TV", int(r.get("id", 0))) for r in info.get("tv_results", [])]
@@ -345,6 +350,7 @@ async def verify_tmdb_imdb_agreement(meta: dict[str, Any], unattended: bool = Fa
         return  # nothing to corroborate against
     current = (str(meta.get("category") or ""), tmdb_id)
     if current in candidates:
+        meta["_ids_cross_checked"] = checked
         return
     # Prefer the candidate matching the current category, else the first
     category, corroborated_id = next((c for c in candidates if c[0] == current[0]), candidates[0])
@@ -361,6 +367,7 @@ async def verify_tmdb_imdb_agreement(meta: dict[str, Any], unattended: bool = Fa
     if use_corroborated:
         meta["category"] = category
         meta["tmdb_id"] = corroborated_id
+    meta["_ids_cross_checked"] = [str(meta.get("category") or ""), int(meta.get("tmdb_id") or 0), imdb_id]
 
 
 async def get_tmdb_from_imdb(

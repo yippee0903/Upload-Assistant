@@ -1001,6 +1001,11 @@ class Prep:
             meta["original_language"] = original_language
             meta["no_ids"] = filename_search
 
+        # Re-run the cross-check for pairs completed by the late ID
+        # resolutions above (no-op when the pair is unchanged or the TMDB id
+        # itself came from the IMDb mapping).
+        await verify_tmdb_imdb_agreement(meta, unattended=unattended)
+
         tmdb_id_value = _to_int(meta.get("tmdb_id"))
         if tmdb_id_value != 0:
             await self.tmdb_manager.set_tmdb_metadata(meta, filename)

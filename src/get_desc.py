@@ -16,6 +16,7 @@ from pymediainfo import MediaInfo
 from src.bbcode import BBCODE
 from src.console import console
 from src.languages import languages_manager
+from src.nfo_generator import decode_nfo
 from src.takescreens import TakeScreensManager
 from src.trackers.COMMON import COMMON
 from src.uploadscreens import UploadScreensManager
@@ -112,18 +113,8 @@ async def gen_desc(
 
         if nfo_files:
             nfo = nfo_files[0]
-            try:
-                async with aiofiles.open(nfo, encoding="utf-8") as nfo_file:
-                    nfo_content = await nfo_file.read()
-                if meta["debug"]:
-                    console.print("NFO content read with utf-8 encoding.")
-            except UnicodeDecodeError:
-                # Scene NFOs are drawn in CP437 — latin-1 would turn the
-                # box art into accented letters.
-                if meta["debug"]:
-                    console.print("utf-8 decoding failed, trying cp437.")
-                async with aiofiles.open(nfo, encoding="cp437") as nfo_file:
-                    nfo_content = await nfo_file.read()
+            async with aiofiles.open(nfo, "rb") as nfo_file:
+                nfo_content = decode_nfo(await nfo_file.read())
 
             if not content_written:
                 if scene_nfo is True:

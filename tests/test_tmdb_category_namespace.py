@@ -104,6 +104,23 @@ def test_agreement_check_no_candidates_is_noop(monkeypatch):
     assert (meta["category"], meta["tmdb_id"]) == ("MOVIE", 555)
 
 
+def test_agreement_check_is_idempotent_until_pair_changes(monkeypatch):
+    calls = []
+
+    async def fake_find(imdb_id):
+        calls.append(imdb_id)
+        return {"movie_results": [{"id": 555}], "tv_results": []}
+
+    monkeypatch.setattr(tmdb, "_find_by_imdb_id", fake_find)
+    meta = {"category": "MOVIE", "tmdb_id": 555, "imdb_id": 42}
+    asyncio.run(tmdb.verify_tmdb_imdb_agreement(meta, unattended=True))
+    asyncio.run(tmdb.verify_tmdb_imdb_agreement(meta, unattended=True))
+    assert calls == [42]
+    meta["imdb_id"] = 43
+    asyncio.run(tmdb.verify_tmdb_imdb_agreement(meta, unattended=True))
+    assert calls == [42, 43]
+
+
 def test_agreement_check_skips_manual_ids(monkeypatch):
     async def boom(_imdb_id):
         raise AssertionError("find must not run for manual ids")
