@@ -1105,6 +1105,8 @@ class C411(FrenchTrackerMixin):
 
         # ── Notes de la release d'origine (opt-in: include_source_description) ──
         source_desc = await self._get_source_description(meta)
+        # The site parser does not understand [comparison] blocks.
+        source_desc = re.sub(r"\[comparison=[^\]]*\].*?\[/comparison\]", "", source_desc, flags=re.DOTALL | re.IGNORECASE).strip()
         if source_desc:
             parts.append(f"        [color={C}]Notes de la release d'origine[/color]")
             parts.append(f"    [font=Verdana][size=14]{source_desc}[/size][/font]")

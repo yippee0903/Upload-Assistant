@@ -3284,6 +3284,23 @@ class TestSourceDescriptionSection:
         assert "Notes de la release d'origine" in desc
         assert "Encoder notes worth keeping." in desc
 
+    def test_comparison_blocks_are_stripped(self, tmp_path: Any):
+        content = (
+            "Encoder notes worth keeping.\n"
+            "[comparison=Source, Encode]\nhttps://img.host/a.png\nhttps://img.host/b.png\n[/comparison]\n"
+            "Still relevant."
+        )
+        desc = self._desc(tmp_path, flag=True, content=content)
+        assert "Encoder notes worth keeping." in desc
+        assert "Still relevant." in desc
+        assert "comparison" not in desc.lower()
+        assert "img.host/a.png" not in desc
+        assert "img.host/b.png" not in desc
+
+    def test_comparison_only_description_drops_the_section(self, tmp_path: Any):
+        desc = self._desc(tmp_path, flag=True, content="[comparison=A, B]\nhttps://img.host/a.png\n[/comparison]")
+        assert "Notes de la release" not in desc
+
     def test_section_absent_by_default(self, tmp_path: Any):
         desc = self._desc(tmp_path, flag=False, content="Encoder notes worth keeping.")
         assert "Notes de la release" not in desc
