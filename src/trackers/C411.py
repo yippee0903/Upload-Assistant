@@ -1131,7 +1131,8 @@ class C411(FrenchTrackerMixin):
                         img_lines.append(f"[img]{thumb}[/img]")
             if img_lines:
                 parts.append("[center]")
-                parts.append("\n".join(img_lines))
+                # Two thumbnails per row, as on V3X.
+                parts.extend(" ".join(img_lines[i : i + 2]) for i in range(0, len(img_lines), 2))
                 parts.append("[/center]")
 
         # ── UA Signature ──
