@@ -71,6 +71,11 @@ def _as_str(value: Any) -> Union[str, None]:
     return value if isinstance(value, str) else None
 
 
+def _dedupe_by_url(records: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Drop duplicate records while keeping the screenshot order."""
+    return list({d.get("raw_url") or json.dumps(d, sort_keys=True): d for d in records}.values())
+
+
 def _safe_remove(path: str) -> bool:
     try:
         if os.path.exists(path):
@@ -229,7 +234,9 @@ async def _check_hosts(
         except Exception as e:
             console.print(f"[red]Failed to load reuploaded images: {e}")
 
-    valid_reuploaded_images: list[dict[str, str]] = []
+    # Every rehost pass appends its own copy of the screenshots, so the file
+    # may hold one set per host; a description only gets one of them.
+    reuploaded_by_host: dict[str, list[dict[str, str]]] = {}
     for image in reuploaded_images:
         raw_url = _as_str(image.get("raw_url"))
         if not raw_url:
@@ -251,10 +258,12 @@ async def _check_hosts(
         if mapped_host:
             mapped_host = url_host_mapping.get(mapped_host, mapped_host)
             if mapped_host in approved_image_hosts:
-                valid_reuploaded_images.append(image)
+                reuploaded_by_host.setdefault(mapped_host, []).append(image)
             elif meta["debug"]:
                 console.print(f"[red]URL '{raw_url}' from reuploaded_images.json is not recognized as an approved host.")
 
+    # Most complete set wins; ties go to the host written first.
+    valid_reuploaded_images = max(reuploaded_by_host.values(), key=len, default=[])
     if valid_reuploaded_images:
         meta[new_images_key] = valid_reuploaded_images
         if tracker == "covers":
@@ -681,8 +690,7 @@ async def _handle_image_upload(
             except Exception:
                 existing_data = []
 
-            updated_data = existing_data + meta[new_images_key]
-            updated_data = [dict(s) for s in {tuple(d.items()) for d in updated_data}]
+            updated_data = _dedupe_by_url(existing_data + meta[new_images_key])
 
             if tracker == "covers" and "release_url" in meta:
                 for image in updated_data:
