@@ -3295,6 +3295,7 @@ class TestSourceDescriptionSection:
         assert "Still relevant." in desc
         assert "comparison" not in desc.lower()
         assert "img.host/a.png" not in desc
+        assert "img.host/b.png" not in desc
 
     def test_comparison_only_description_drops_the_section(self, tmp_path: Any):
         desc = self._desc(tmp_path, flag=True, content="[comparison=A, B]\nhttps://img.host/a.png\n[/comparison]")
