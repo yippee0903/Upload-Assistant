@@ -10,3 +10,7 @@ def test_nested_include_paths_are_reduced_to_basenames():
 
 def test_top_level_paths_and_globs_pass_through():
     assert TorrentCreator.build_mkbrr_include_string(["Release/a.mkv", "*.mkv"]) == "*.mkv,a.mkv"
+
+
+def test_same_basename_in_two_folders_is_listed_once():
+    assert TorrentCreator.build_mkbrr_include_string(["Release/CD1/movie.mkv", "Release/CD2/movie.mkv"]) == "movie.mkv"
