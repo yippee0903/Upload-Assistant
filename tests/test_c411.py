@@ -1397,8 +1397,11 @@ class TestDescription:
         desc = asyncio.run(c._build_description(meta))
         assert "[color=#3d85c6]Captures d'écran[/color]" in desc
         # Thumbnails are embedded, linked to the full-size image
-        assert '[url=https://img.host/view/1][img]https://img.host/1.md.png[/img][/url]' in desc
-        assert '[url=https://img.host/2.png][img]https://img.host/2.md.png[/img][/url]' in desc
+        # Two thumbnails per row
+        assert (
+            '[url=https://img.host/view/1][img]https://img.host/1.md.png[/img][/url] '
+            '[url=https://img.host/2.png][img]https://img.host/2.md.png[/img][/url]'
+        ) in desc
 
     def test_with_screenshots_no_thumbnail(self):
         # Hosts without a separate thumbnail fall back to the full-size URL
