@@ -185,6 +185,13 @@ class TorrentCreator:
         exclude_str = ",".join(sorted(exclude_files) + manual_patterns)
         return exclude_str
 
+    @staticmethod
+    def build_mkbrr_include_string(include: Sequence[str]) -> str:
+        # mkbrr matches --include patterns against the file's basename only, so
+        # "Release/Episode.Dir/file.mkv" would never match; keep just the basename.
+        # Unwanted siblings (samples) are still dropped by the --exclude list.
+        return ",".join(sorted({os.path.basename(p) for p in include}))
+
     @classmethod
     async def create_torrent(
         cls,
@@ -353,13 +360,7 @@ class TorrentCreator:
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), meta["filelist"])
                             cmd.extend(["--exclude", exclude_str])
                             if include:
-                                # mkbrr matches --include patterns relative to the input directory,
-                                # not its parent. Strip any leading "FolderName/" prefix so that
-                                # patterns like "FolderName/file.mkv" become just "file.mkv".
-                                folder_prefix = os.path.basename(str(path)) + "/"
-                                mkbrr_include = [p[len(folder_prefix) :] if p.startswith(folder_prefix) else p for p in include]
-                                include_str = ",".join(sorted(mkbrr_include))
-                                cmd.extend(["--include", include_str])
+                                cmd.extend(["--include", cls.build_mkbrr_include_string(include)])
 
                         cmd.extend(["-o", output_path])
                         if meta["debug"]:
