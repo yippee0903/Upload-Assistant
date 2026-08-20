@@ -51,3 +51,12 @@ def test_only_one_host_set_is_used(tmp_path: pathlib.Path):
 def test_most_complete_set_wins(tmp_path: pathlib.Path):
     stored = [_img("ptscreens.com", i) for i in range(3)] + [_img("pixhost.to", i) for i in range(6)]
     assert _run(tmp_path, stored) == [_img("pixhost.to", i) for i in range(6)]
+
+
+def test_dedupe_keeps_order_and_records_without_raw_url():
+    from src.rehostimages import _dedupe_by_url
+
+    a, b = _img("pixhost.to", 1), _img("pixhost.to", 2)
+    blank_1 = {"img_url": "https://x/1.png", "raw_url": ""}
+    blank_2 = {"img_url": "https://x/2.png", "raw_url": None}
+    assert _dedupe_by_url([b, a, b, blank_1, blank_2, blank_1]) == [b, a, blank_1, blank_2]

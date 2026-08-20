@@ -71,6 +71,11 @@ def _as_str(value: Any) -> Union[str, None]:
     return value if isinstance(value, str) else None
 
 
+def _dedupe_by_url(records: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Drop duplicate records while keeping the screenshot order."""
+    return list({d.get("raw_url") or json.dumps(d, sort_keys=True): d for d in records}.values())
+
+
 def _safe_remove(path: str) -> bool:
     try:
         if os.path.exists(path):
@@ -685,8 +690,7 @@ async def _handle_image_upload(
             except Exception:
                 existing_data = []
 
-            # Dedupe by URL while keeping the screenshot order.
-            updated_data = list({d.get("raw_url", json.dumps(d, sort_keys=True)): d for d in existing_data + meta[new_images_key]}.values())
+            updated_data = _dedupe_by_url(existing_data + meta[new_images_key])
 
             if tracker == "covers" and "release_url" in meta:
                 for image in updated_data:
