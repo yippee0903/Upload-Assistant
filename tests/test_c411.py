@@ -1403,6 +1403,17 @@ class TestDescription:
             '[url=https://img.host/2.png][img]https://img.host/2.md.png[/img][/url]'
         ) in desc
 
+    def test_with_odd_screenshot_count(self):
+        meta = _meta_base(image_list=[
+            {'img_url': f'https://img.host/{i}.md.png', 'raw_url': f'https://img.host/{i}.png', 'web_url': f'https://img.host/view/{i}'}
+            for i in (1, 2, 3)
+        ])
+        c = C411(_config({'include_screenshots': True}))
+        desc = asyncio.run(c._build_description(meta))
+        thumb = '[url=https://img.host/view/{0}][img]https://img.host/{0}.md.png[/img][/url]'
+        # First two share a row, the third starts the next one
+        assert f"{thumb.format(1)} {thumb.format(2)}\n{thumb.format(3)}\n" in desc
+
     def test_with_screenshots_no_thumbnail(self):
         # Hosts without a separate thumbnail fall back to the full-size URL
         meta = _meta_base(image_list=[
