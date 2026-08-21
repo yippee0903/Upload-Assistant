@@ -64,6 +64,15 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = 10.0
 
 
+def par_scale_factors(par: float, dar: float, width: float, height: float) -> tuple[float, float]:
+    """(w_scale, h_scale) that turn coded dimensions into the displayed aspect ratio for anamorphic video."""
+    if par == 1:
+        return 1.0, 1.0
+    if par < 1:
+        return 1.0, width / (dar * height)
+    return par, 1.0
+
+
 async def run_ffmpeg(command: Any) -> tuple[Optional[int], bytes, bytes]:
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
     if platform.system() == "Linux":
@@ -447,7 +456,6 @@ async def dvd_screenshots(meta: dict[str, Any], disc_num: int, num_screens: int 
         return
 
     ifo_mi = MediaInfo.parse(f"{meta['discs'][disc_num]['path']}/VTS_{meta['discs'][disc_num]['main_set'][0][:2]}_0.IFO", mediainfo_options={"inform_version": "1"})
-    sar = 1.0
     w_sar = 1.0
     h_sar = 1.0
     par: float = 1.0
@@ -470,15 +478,7 @@ async def dvd_screenshots(meta: dict[str, Any], disc_num: int, num_screens: int 
             width = float(track.width)
             height = float(track.height)
             frame_rate = float(track.frame_rate)
-    if par < 1:
-        new_height: float = dar * height
-        sar = width / new_height
-        w_sar = 1.0
-        h_sar = sar
-    else:
-        sar = par
-        w_sar = sar
-        h_sar = 1.0
+    w_sar, h_sar = par_scale_factors(par, dar, width, height)
 
     async def _is_vob_good(n: int, loops: int, _num_screens: int) -> tuple[float, float]:
         max_loops = 6
@@ -819,16 +819,7 @@ async def screenshots(
         dar = safe_float(video_track.get("DisplayAspectRatio"), 16.0 / 9.0, "DisplayAspectRatio")
         frame_rate = safe_float(video_track.get("FrameRate"), 24.0, "FrameRate")
 
-        if par == 1:
-            sar = w_sar = h_sar = 1.0
-        elif par < 1:
-            new_height = dar * height
-            sar = width / new_height
-            w_sar = 1.0
-            h_sar = sar
-        else:
-            sar = w_sar = par
-            h_sar = 1
+        w_sar, h_sar = par_scale_factors(par, dar, width, height)
     except Exception as e:
         console.print(f"[red]Error processing MediaInfo.json: {e}")
         if meta.get("debug", False):
