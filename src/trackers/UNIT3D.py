@@ -160,14 +160,13 @@ class UNIT3D:
                                 result["description"] = attributes.get("description", "")
                             dupes.append(result)
                     else:
-                        console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                        self._dupe_search_failed(meta, f"HTTP {response.status_code}")
+                        return []
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 302:
-                meta["tracker_status"][self.tracker]["status_message"] = (
-                    "data error: Redirect (302). This may indicate a problem with authentication. Please verify that your API key is valid."
-                )
+                self._dupe_search_failed(meta, "redirect (302), the API key may be invalid")
             else:
-                meta["tracker_status"][self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
+                self._dupe_search_failed(meta, f"HTTP {e.response.status_code} - {e.response.text}")
         except httpx.TimeoutException:
             self._dupe_search_failed(meta, "request timed out after 10 seconds")
         except httpx.RequestError as e:
