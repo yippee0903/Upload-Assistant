@@ -293,6 +293,7 @@ class Args:
                 "sharex",
                 "utppm",
                 "lostimg",
+                "postimg",
             ],
         )
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")

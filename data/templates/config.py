@@ -48,9 +48,11 @@ config = {
         "utppm_api": "",
         # lostimg.cc API key
         "lostimg_api": "",
+        # postimages.org API key (https://postimages.org/login/api)
+        "postimg_api": "",
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg
+        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
         "img_host_1": "imgbb",
         "img_host_2": "imgbox",
 

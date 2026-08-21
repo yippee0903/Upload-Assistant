@@ -548,6 +548,52 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Unexpected error with Lostimg: {e}")
                 return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
 
+        elif img_host == "postimg":
+            url = "https://api.postimage.org/1/upload"
+            api_key = config["DEFAULT"].get("postimg_api")
+
+            if not api_key:
+                console.print("[red]Postimages API key not found in config.")
+                return {"status": "failed", "reason": "Missing Postimages API key"}
+
+            try:
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+                    data = {
+                        "key": api_key,
+                        "image": base64.b64encode(await img_file.read()).decode("ascii"),
+                        "name": os.path.splitext(os.path.basename(image))[0],
+                        "type": os.path.splitext(image)[1].lstrip(".").lower() or "png",
+                        # Fixed client tokens expected by the API.
+                        "version": "1.0.1",
+                        "o": "2b819584285c102318568238c7d4a4c7",
+                        "m": "fb733cccce28e7db3ff9f17d7ccff3d1",
+                    }
+                    response = await client.post(url, data=data, timeout=timeout)
+
+                    if response.status_code != 200:
+                        console.print(f"[yellow]Postimages failed with status code {response.status_code}, trying next image host")
+                        return {"status": "failed", "reason": f"Postimages upload failed with status code {response.status_code}"}
+
+                    links = {tag: (re.search(rf"<{tag}>(.*?)</{tag}>", response.text, re.DOTALL) or [None, ""])[1].strip() for tag in ("hotlink", "page", "thumbnail")}
+
+                    if not links["hotlink"]:
+                        console.print(f"[yellow]No hotlink in Postimages response: {response.text[:300]}")
+                        return {"status": "failed", "reason": "No hotlink in Postimages response"}
+
+                    raw_url = links["hotlink"]
+                    img_url = links["thumbnail"] or raw_url
+                    web_url = links["page"] or raw_url
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to Postimages timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]Postimages request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+            except Exception as e:
+                console.print(f"[red]Unexpected error with Postimages: {e}")
+                return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
+
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
             url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
