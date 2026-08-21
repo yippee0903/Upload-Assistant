@@ -837,7 +837,10 @@ async def _upload_screens(
             console.print(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
             console.print(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
             console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta['image_list']={len(image_list)}, cutoff={meta.get('cutoff', 1)}[/blue]")
-        if (len(successfully_uploaded) + len(image_list)) < images_needed and not using_custom_img_list:
+        short = (len(successfully_uploaded) + len(image_list)) < images_needed
+        # On the initial host a shortfall switches; on a fallback host only a total failure does —
+        # a partial fallback result is stored below (the next host would re-upload the whole set).
+        if short and not using_custom_img_list and (not retry_mode or not successfully_uploaded):
             # Mark this host as failed so we don't retry it for other trackers
             failed_hosts = cast(list[str], meta.setdefault("failed_image_hosts", []))
             if img_host not in failed_hosts:
