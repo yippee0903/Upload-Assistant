@@ -86,8 +86,8 @@ def test_metadata_reuse_consultation_order() -> None:
     tracker_keys_maps = re.findall(r"tracker_keys = (\{[^}]*\})", _source("src/get_tracker_data.py"))
     order = list(ast.literal_eval(tracker_keys_maps[0]))
     preferred = [
-        "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "sp", "rf",
-        "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "ptp", "tos", "g3mini",
+        "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "rf",
+        "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "sp", "ptp", "tos", "g3mini",
     ]
     extra = sorted(k for k in NEW_TRACKERS if k not in preferred)
     assert order == preferred + extra

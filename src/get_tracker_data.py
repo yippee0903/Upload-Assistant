@@ -123,7 +123,6 @@ class TrackerDataManager:
                     "btn": "BTN",
                     "bhd": "BHD",
                     "hdb": "HDB",
-                    "sp": "SP",
                     "rf": "RF",
                     "otw": "OTW",
                     "yus": "YUS",
@@ -134,6 +133,8 @@ class TrackerDataManager:
                     "a4k": "A4K",
                     "stc": "STC",
                     "acm": "ACM",
+                    # SP descriptions often carry noise, consult it late
+                    "sp": "SP",
                     "ptp": "PTP",
                     "tos": "TOS",
                     "g3mini": "G3MINI",
