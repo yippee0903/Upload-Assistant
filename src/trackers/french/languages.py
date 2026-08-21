@@ -3,7 +3,7 @@
 import re
 from typing import Any, Optional, Union
 
-from src.audio import AD_TRACK_RE
+from src.audio import AD_TRACK_RE, audio_track_fact
 
 Meta = dict[str, Any]
 
@@ -413,24 +413,23 @@ class FrenchLanguageMixin:
         fr_variants: list[str] = []
 
         for track in audio_tracks:
-            lang = track.get("Language", "")
-            if not isinstance(lang, str):
+            fact = audio_track_fact(track)
+            base, region = fact["base_language"], fact["region"]
+            if base not in ("fr", "fre", "fra", "french", "français", "francais"):
                 continue
-            ll = lang.lower().strip()
 
-            # Check raw Language tag for region codes
-            if ll == "fr-fr" and "fr-fr" not in fr_variants:
+            # Region subtag first (fr-FR / fr-CA / fr-BE); Swiss French counts as VFF
+            if region in ("fr", "ch") and "fr-fr" not in fr_variants:
                 fr_variants.append("fr-fr")
-            elif ll in ("fr-ca", "fr-qc") and "fr-ca" not in fr_variants:
+            elif region in ("ca", "qc") and "fr-ca" not in fr_variants:
                 fr_variants.append("fr-ca")
-            elif ll == "fr-be" and "fr-be" not in fr_variants:
+            elif region == "be" and "fr-be" not in fr_variants:
                 fr_variants.append("fr-be")
-            elif ll == "fr-ch":
-                if "fr-fr" not in fr_variants:
-                    fr_variants.append("fr-fr")  # Swiss French → treat as VFF
-            elif ll in ("fr", "fre", "fra", "french", "français", "francais"):
+            elif region in ("fr", "ch", "ca", "qc", "be"):
+                pass  # variant already recorded
+            elif not region:
                 # Generic French — check Title for explicit VFF/VFQ/VFB or region keywords
-                title = str(track.get("Title", "")).upper()
+                title = fact["title"].upper()
                 # Canadian French indicators
                 is_canadian = (
                     "VFQ" in title

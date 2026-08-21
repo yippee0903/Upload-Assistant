@@ -6,7 +6,7 @@ import re
 import traceback
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypedDict, Union, cast
 
 import cli_ui
 import langcodes
@@ -29,6 +29,56 @@ TrackDict = dict[str, Any]
 # (e.g. Italian "ad alta voce", English noun "Ad"). Only the
 # "audio description" alternative is case-insensitive.
 AD_TRACK_RE = re.compile(r"(?i:\baudio[\s_-]?description\b)|\bAD\b")
+
+
+class AudioTrackFact(TypedDict):
+    """One audio track, as facts rather than raw MediaInfo keys.
+
+    Produced once per release (see audio_track_facts) so that trackers do not
+    re-parse MediaInfo. The region subtag is kept: "fr-CA" and "fr-FR" are
+    different dubs (VFQ vs VFF), which a display name alone cannot tell apart.
+    """
+
+    index: int
+    language: str  # raw tag, lowercased ("fr-ca", "fr", "en", "")
+    base_language: str  # primary subtag ("fr")
+    region: str  # region subtag, lowercased ("ca"), or ""
+    title: str
+    format: str
+    channels: int
+    default: bool
+    commentary: bool
+    audio_description: bool
+
+
+def audio_track_fact(track: Mapping[str, Any], index: int = 0) -> AudioTrackFact:
+    """Facts for one MediaInfo audio track dict."""
+    language = str(track.get("Language") or "").strip().lower()
+    base, _, region = language.replace("_", "-").partition("-")
+    title = str(track.get("Title") or track.get("title") or "")
+    try:
+        channels = int(str(track.get("Channels") or 0))
+    except (TypeError, ValueError):
+        channels = 0
+    return {
+        "index": index,
+        "language": language,
+        "base_language": base,
+        "region": region,
+        "title": title,
+        "format": str(track.get("Format") or ""),
+        "channels": channels,
+        "default": str(track.get("Default") or "").lower() == "yes",
+        "commentary": "comment" in title.lower(),
+        "audio_description": bool(AD_TRACK_RE.search(title)),
+    }
+
+
+def audio_track_facts(meta: Mapping[str, Any]) -> list[AudioTrackFact]:
+    """Facts for every audio track of meta["mediainfo"], in stream order."""
+    tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+    return [audio_track_fact(t, i) for i, t in enumerate(t for t in tracks if t.get("@type") == "Audio")]
+
 
 # ── Shared codec mapping tables ──────────────────────────────────────
 # Used by both _get_audio_v2 (global meta['audio']) and
