@@ -95,7 +95,7 @@ class GPW:
             "Xiaomi",
             "YIFY",
         ]
-        self.approved_image_hosts = ["kshare", "pixhost", "ptpimg", "pterclub", "ilikeshots", "imgbox"]
+        self.approved_image_hosts = ["kshare", "pixhost", "pterclub", "ilikeshots", "imgbox"]
 
     async def load_cookies(self, meta: dict[str, Any]) -> Any:
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")

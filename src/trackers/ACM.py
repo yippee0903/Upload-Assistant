@@ -85,7 +85,7 @@ class ACM:
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "ptpimg", "imagebam"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "imagebam"]
         self.banned_groups: list[str] = []
 
     async def get_type_id(self, meta: dict[str, Any]) -> str:

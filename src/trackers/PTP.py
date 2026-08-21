@@ -89,7 +89,7 @@ class PTP:
             "LAMA",
             "WORLD",
         ]
-        self.approved_image_hosts = ["ptpimg", "pixhost"]
+        self.approved_image_hosts = ["pixhost"]
 
         self.sub_lang_map = {
             ("Arabic", "ara", "ar"): 22,
@@ -487,24 +487,6 @@ class PTP:
             console.print_exception()
 
         return []
-
-    async def ptpimg_url_rehost(self, image_url: str) -> str:
-        payload = {"format": "json", "api_key": self.config["DEFAULT"]["ptpimg_api"], "link-upload": image_url}
-        headers = {"referer": "https://ptpimg.me/index.php"}
-        url = "https://ptpimg.me/upload.php"
-
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.post(url, headers=headers, data=payload)
-        try:
-            response = response.json()
-            ptpimg_code = response[0]["code"]
-            ptpimg_ext = response[0]["ext"]
-            img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
-        except Exception:
-            console.print("[red]PTPIMG image rehost failed")
-            img_url = image_url
-            # img_url = ptpimg_upload(image_url, ptpimg_api)
-        return img_url
 
     def _selected_poster_host(self, meta: dict[str, Any]) -> str:
         default_config = cast(dict[str, Any], self.config.get("DEFAULT", {}))

@@ -68,7 +68,7 @@ class HUNO(UNIT3D):
             "YIFY",
             "YTS",
         ]
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "imagebam"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "pixhost", "imagebam"]
         pass
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:

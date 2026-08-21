@@ -23,7 +23,7 @@ class A4K(UNIT3D):
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.approved_image_hosts = ["ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
+        self.approved_image_hosts = ["onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
         self.banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
         pass
 

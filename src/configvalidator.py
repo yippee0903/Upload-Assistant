@@ -34,7 +34,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "img_host_2": (str,),
     "img_host_3": (str,),
     "imgbb_api": (str,),
-    "ptpimg_api": (str,),
     "lensdump_api": (str,),
     "ptscreens_api": (str,),
     "onlyimage_api": (str,),

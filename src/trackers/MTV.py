@@ -37,7 +37,7 @@ class MTV:
         self.upload_url = "https://www.morethantv.me/upload.php"
         self.forum_link = "https://www.morethantv.me/wiki.php?action=article&id=73"
         self.search_url = "https://www.morethantv.me/api/torznab"
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb"]
+        self.approved_image_hosts = ["imgbox", "imgbb"]
         self.banned_groups = [
             "3LTON",
             "[Oj]",

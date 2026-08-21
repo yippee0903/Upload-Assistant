@@ -6,7 +6,7 @@ def test_image_size_ok():
     assert image_size_ok("imgbb", 31_000_000) is True
     assert image_size_ok("imgbb", 31_000_001) is False
     assert image_size_ok("imgbox", 10_000_001) is False
-    assert image_size_ok("ptpimg", 10**9) is True
+    assert image_size_ok("lensdump", 10**9) is True
     assert image_size_ok("imgur", 100_000) is False  # recognised, not uploadable
     assert image_size_ok(None, 100_000) is False
     assert image_size_ok("nope", 100_000) is False

@@ -38,7 +38,7 @@ class TVC:
         self.torrent_url = "https://tvchaosuk.com/torrents/"
         self.signature = ""
         self.banned_groups = []
-        self.approved_image_hosts = ["imgbb", "ptpimg", "imgbox", "pixhost", "imagebam", "onlyimage"]
+        self.approved_image_hosts = ["imgbb", "imgbox", "pixhost", "imagebam", "onlyimage"]
         tmdb.API_KEY = config["DEFAULT"]["tmdb_api"]
 
         # TV type mapping as a dict for clarity and maintainability

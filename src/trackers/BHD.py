@@ -63,7 +63,7 @@ class BHD:
             "OFT",
             "TGS",
         ]
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "imagebam"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "pixhost", "bhd", "imagebam"]
         pass
 
     async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:

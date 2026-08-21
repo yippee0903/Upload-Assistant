@@ -16,7 +16,6 @@ MIN_IMAGE_BYTES = 75_000
 
 IMAGE_HOSTS: dict[str, ImageHost] = {
     "imgbb": ImageHost(("ibb.co", "imgbb.com"), ("imgbb_api",), 31_000_000),
-    "ptpimg": ImageHost(("ptpimg.me",), ("ptpimg_api",)),
     "imgbox": ImageHost(("imgbox.com",), (), 10_000_000),
     "pixhost": ImageHost(("pixhost.to",), (), 10_000_000),
     "lensdump": ImageHost(("lensdump.com",), ("lensdump_api",)),

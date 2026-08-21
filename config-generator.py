@@ -410,7 +410,7 @@ def get_img_host(
 
         valid_host = False
         while not valid_host:
-            host_input = input(f"\n[i] Enter image host #{i}{existing_display} (e.g., ptpimg, imgbb, imgbox): ").strip().lower()
+            host_input = input(f"\n[i] Enter image host #{i}{existing_display} (e.g., imgbb, imgbox, pixhost): ").strip().lower()
 
             if host_input == "" and existing_host:
                 host_input = existing_host

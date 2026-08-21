@@ -26,7 +26,7 @@ class OE(UNIT3D):
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
         self.banned_groups = [
             "0neshot",
             "3LT0N",
