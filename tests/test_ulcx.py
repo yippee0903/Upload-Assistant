@@ -240,11 +240,13 @@ class TestULCXDescription:
         raw = (
             "Plot.\n"
             "[center][b][url=https://www.youtube.com/watch?v=abc123][Trailer on YouTube][/url][/b][/center]\n"
-            "[url=https://youtu.be/abc123]Trailer[/url]\n"
+            "[center][url=https://youtu.be/abc123][b]Trailer[/b][/url][/center]\n"
+            "[url]https://youtu.be/abc123[/url] [b]Tagline kept.[/b]\n"
             "https://www.youtube.com/watch?v=abc123\n"
             "[center][url=https://example.com/review]Review[/url][/center]"
         )
         cleaned = self._desc(ulcx, raw)
-        assert "youtu" not in cleaned
-        assert "[center][b][/b][/center]" not in cleaned and "[center][/center]" not in cleaned
-        assert "Plot." in cleaned and "[url=https://example.com/review]Review[/url]" in cleaned
+        assert cleaned == "Plot.\n [b]Tagline kept.[/b]\n\n[center][url=https://example.com/review]Review[/url][/center]"
+
+    def test_nested_empty_wrappers_collapse(self, ulcx):
+        assert self._desc(ulcx, "[center][b][center][b][/b][/center][/b][/center]") == ""

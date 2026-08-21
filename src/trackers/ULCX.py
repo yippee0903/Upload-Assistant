@@ -228,10 +228,11 @@ class ULCX(UNIT3D):
 
         # Trailers are not allowed in descriptions: drop YouTube links, then
         # any [b]/[center] wrapper they leave empty.
-        _yt = r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/\S*"
-        desc = re.sub(rf"\[url={_yt}?\][^\[]*\[/url\]|{_yt}", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"\[(b|center)\]\s*\[/\1\]\n?", "", desc, flags=re.IGNORECASE)
-        desc = re.sub(r"\[(b|center)\]\s*\[/\1\]\n?", "", desc, flags=re.IGNORECASE)
+        _yt = r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s\[\]]*"
+        desc = re.sub(rf"\[url={_yt}\](?:(?!\[/url\]).)*\[/url\]|\[url\]{_yt}\[/url\]|{_yt}", "", desc, flags=re.IGNORECASE | re.DOTALL)
+        empty_wrapper = re.compile(r"\[(b|center)\]\s*\[/\1\]\n?", flags=re.IGNORECASE)
+        while (stripped := empty_wrapper.sub("", desc)) != desc:
+            desc = stripped
 
         if is_adult(meta):
             pattern = r"(\[center\](?:(?!\[/center\]).)*\[/center\])"
