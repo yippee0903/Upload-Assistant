@@ -1298,6 +1298,13 @@ class Prep:
 
             meta = await tag_override(meta)
 
+            # Auto --personalrelease when the detected group is one of ours
+            personal_groups = {str(g).lstrip("-").lower() for g in (self.config["DEFAULT"].get("personal_release_groups") or []) if g}
+            if personal_groups and str(meta.get("tag") or "").lstrip("-").lower() in personal_groups and not meta.get("personalrelease"):
+                meta["personalrelease"] = True
+                if meta.get("debug"):
+                    console.print(f"[green]Release group {meta['tag']} is in personal_release_groups; setting personalrelease.[/green]")
+
             if meta["tag"][1:].startswith(meta["channels"]):
                 meta["tag"] = meta["tag"].replace(f"-{meta['channels']}", "")
 

@@ -9,6 +9,8 @@ config = {
 
         # will print a notice if an update is available
         "update_notification": True,
+        # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
+        "personal_release_groups": [],
         # will print the changelog if an update is available
         "verbose_notification": False,
 
