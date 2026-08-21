@@ -159,6 +159,10 @@ class TestULCXRules:
     def test_no_tmdb_match_is_rejected(self, ulcx):
         assert self._passes(ulcx, tmdb_id=0) is False
 
+    def test_hevc_below_2160p_is_exempt_for_uhd_sources(self, ulcx):
+        assert self._passes(ulcx, video_codec="HEVC", resolution="1080p") is False
+        assert self._passes(ulcx, video_codec="HEVC", resolution="1080p", uhd="UHD") is True
+
     def test_av1_live_action_rejected_unattended_but_allowed_for_animation(self, ulcx):
         assert self._passes(ulcx, video_codec="AV1") is False
         assert self._passes(ulcx, video_codec="AV1", keywords="animation") is True

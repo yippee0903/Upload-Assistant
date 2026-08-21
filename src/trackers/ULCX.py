@@ -85,6 +85,7 @@ class ULCX(UNIT3D):
         if (
             meta["video_codec"] == "HEVC"
             and meta["resolution"] != "2160p"
+            and not meta.get("uhd")
             and not is_animated
             and not ask_to_continue(meta, f"This content might not fit the HEVC rules. ({self.tracker})")
         ):
