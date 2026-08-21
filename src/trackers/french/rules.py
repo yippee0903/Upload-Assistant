@@ -68,9 +68,35 @@ class FrenchRulesMixin:
         """The shared French language rule; kwargs tune check_language_requirements per tracker."""
         options: dict[str, Any] = {"languages_to_check": list(FRENCH_LANG_VALUES), "check_audio": True, "check_subtitle": True, "require_both": False}
         options.update(kwargs)
-        if await self.common.check_language_requirements(meta, self.tracker, **options):
+        if not await self.common.check_language_requirements(meta, self.tracker, **options):
+            return self._rule_failed(meta, "french_language", f"Language requirements not met ({self.rule('french_language').summary}).")
+        # The shared check accepts French subtitles on their own; here they
+        # only count alongside an original-language audio track (VOSTFR).
+        # A dub in a third language with French subtitles is neither VF nor
+        # VOSTFR. Unknown original language or audio tracks are not judged.
+        if self._has_audio_in(meta, options["languages_to_check"]) or self._has_original_audio(meta):
             return True
-        return self._rule_failed(meta, "french_language", f"Language requirements not met ({self.rule('french_language').summary}).")
+        return self._rule_failed(
+            meta,
+            "french_language",
+            f"Language requirements not met ({self.rule('french_language').summary}).",
+            ("French subtitles only count with an original-language audio track.",),
+        )
+
+    def _has_audio_in(self, meta: Meta, languages: list[str]) -> bool:
+        wanted = {lang.lower() for lang in languages}
+        return any(lang.lower() in wanted for lang in self.common._coerce_language_values(meta.get("audio_languages", [])))
+
+    def _has_original_audio(self, meta: Meta) -> bool:
+        """True when an audio track is in the original language — or when that cannot be judged."""
+        original = meta.get("original_language") or ""
+        if isinstance(original, list):
+            original = original[0] if original and isinstance(original[0], str) else ""
+        if not original.strip() or meta.get("audio_languages") is None:
+            return True
+        candidates = self.common._expand_language_candidates(original.strip(), self.common._build_language_alias_lookup())
+        audio = {self.common._normalize_language_token(lang) for lang in self.common._coerce_language_values(meta.get("audio_languages", []))}
+        return bool(candidates & audio)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         """Default French language check for all French trackers.

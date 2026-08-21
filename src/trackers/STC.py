@@ -22,7 +22,7 @@ class STC(UNIT3D):
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_groups = [""]
-        self.approved_image_hosts = ["imgbox", "imgbb"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "ptscreens"]
         pass
 
     skip_nfo: bool = True
