@@ -49,6 +49,10 @@ class UploadHelper:
                 return name
             return str(entry)
 
+        def _format_dupes(entries: list[Union[DupeEntry, str]]) -> str:
+            # the same torrent can come back several times (pending + live, two search URLs); show it once
+            return "\n".join(dict.fromkeys(_format_dupe(d) for d in entries))
+
         dupes_list: list[Union[DupeEntry, str]] = dupes
         upload: bool = False
         meta["were_trumping"] = False
@@ -87,7 +91,7 @@ class UploadHelper:
             if meta.get("trumpable_id") or (meta.get("season_pack_contains_episode") and meta.get(f"{tracker_name}_matched_episode_ids", [])):
                 trumpable_dupes = [entry for entry in dupes_list if isinstance(entry, dict) and entry.get("trumpable")]
                 if trumpable_dupes:
-                    trumpable_text = "\n".join(_format_dupe(d) for d in trumpable_dupes)
+                    trumpable_text = _format_dupes(trumpable_dupes)
                     console.print("[bold red]Trumpable found![/bold red]")
                 elif meta.get("season_pack_contains_episode") and meta.get(f"{tracker_name}_matched_episode_ids", []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f"{tracker_name}_matched_episode_ids", []))
@@ -133,7 +137,7 @@ class UploadHelper:
             french_supersede = any(isinstance(d, dict) and "french_lang_supersede" in (d.get("flags") or []) for d in dupes_list)
 
             if (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False))) and not skip_dupe_asking:
-                dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
+                dupe_text = _format_dupes(dupes_list)
 
                 if trumpable_text and (meta.get("trumpable_id") or (meta.get("season_pack_contains_episode") and meta.get(f"{tracker_name}_matched_episode_ids", []))):
                     console.print(f"[bold cyan]{trumpable_text}[/bold cyan]")
@@ -191,7 +195,7 @@ class UploadHelper:
                             sys.exit(1)
                     elif dupes_list:
                         # Rebuild dupe_text in case dupes was filtered after trump decline
-                        dupe_text = "\n".join(_format_dupe(d) for d in dupes_list)
+                        dupe_text = _format_dupes(dupes_list)
                         if meta.get("season_pack_exists", False):
                             # Display only the matched season pack info from dupe_checking
                             season_pack_name = meta.get("season_pack_name", "")
