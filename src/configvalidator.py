@@ -22,6 +22,7 @@ REQUIRED_DEFAULT_KEYS: dict[str, type] = {
 # Expected types for common DEFAULT keys (for type validation, not required)
 DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "update_notification": (bool,),
+    "update_notification_cache_hours": (int, float),
     "verbose_notification": (bool,),
     "webhook_url": (str,),
     "tmdb_api": (str,),

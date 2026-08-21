@@ -1554,7 +1554,24 @@ async def update_notification(base_dir: str) -> Optional[str]:
     if not notice:
         return local_version
 
-    remote_version, remote_content = get_remote_version(remote_version_url)
+    # Cache the remote check so every run doesn't pay a network round-trip
+    cache_path = os.path.join(base_dir, "data", "update_check.json")
+    try:
+        cache_hours = max(0.0, float(config["DEFAULT"].get("update_notification_cache_hours", 4)))
+    except (TypeError, ValueError):
+        cache_hours = 4.0
+    remote_version = remote_content = None
+    try:
+        cached = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+        if time.time() - float(cached["checked_at"]) < cache_hours * 3600:
+            remote_version, remote_content = str(cached["remote_version"]), str(cached["remote_content"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    if not remote_version:
+        remote_version, remote_content = get_remote_version(remote_version_url)
+        if remote_version and remote_content:
+            with contextlib.suppress(OSError):
+                Path(cache_path).write_text(json.dumps({"checked_at": time.time(), "remote_version": remote_version, "remote_content": remote_content}), encoding="utf-8")
     if not remote_version:
         return local_version
 
