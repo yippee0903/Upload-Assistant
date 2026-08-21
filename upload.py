@@ -1188,6 +1188,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                         image_list_count = 0
 
                         for idx in range(start_index, len(host_order)):
+                            if host_order[idx] in (meta.get("failed_image_hosts") or []):
+                                continue  # already exhausted by upload_screens' own fallback chain
                             meta["imghost"] = host_order[idx]
                             await uploadscreens_manager.upload_screens(meta, meta["screens"], 1, 0, meta["screens"], [], return_dict=return_dict, allowed_hosts=allowed_hosts)
                             image_list_count = len(meta.get("image_list", []) or [])
