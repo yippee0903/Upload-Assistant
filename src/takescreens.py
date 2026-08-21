@@ -1128,9 +1128,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
     try:
 
         def set_ffmpeg_threads() -> list[str]:
-            threads_value = "1"
-            os.environ["FFREPORT"] = "level=32"  # Reduce ffmpeg logging overhead
-            return ["-threads", threads_value]
+            return ["-threads", "1"]
 
         if width <= 0 or height <= 0:
             return None
