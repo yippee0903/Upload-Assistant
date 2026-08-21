@@ -46,7 +46,14 @@ from src.nfo_link import NfoLinkManager
 from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
-from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, check_tracker_image_hosts, choose_common_host, configured_image_hosts, validate_reused_image_hosts
+from src.rehostimages import (
+    TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS,
+    check_tracker_image_hosts,
+    choose_common_host,
+    configured_image_hosts,
+    trackers_lacking_images,
+    validate_reused_image_hosts,
+)
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
@@ -1186,25 +1193,38 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                             host_order = list(allowed_hosts)
 
                         start_index = host_order.index(current_img_host) if current_img_host in host_order else 0
-                        image_list_count = 0
+                        tried_hosts: list[str] = []
 
-                        for idx in range(start_index, len(host_order)):
-                            if host_order[idx] in (meta.get("failed_image_hosts") or []):
-                                continue  # already exhausted by upload_screens' own fallback chain
-                            meta["imghost"] = host_order[idx]
-                            await uploadscreens_manager.upload_screens(meta, meta["screens"], 1, 0, meta["screens"], [], return_dict=return_dict, allowed_hosts=allowed_hosts)
-                            image_list_count = len(meta.get("image_list", []) or [])
-                            if meta.get("debug"):
-                                console.print(f"[cyan]Image host debug: post-upload_screens image_list={image_list_count}[/cyan]")
+                        async def try_hosts(hosts: list[str], allowed: Optional[list[str]]) -> int:
+                            count = 0
+                            for idx, host in enumerate(hosts):
+                                if host in (meta.get("failed_image_hosts") or []):
+                                    continue  # already exhausted by upload_screens' own fallback chain
+                                tried_hosts.append(host)
+                                meta["imghost"] = host
+                                await uploadscreens_manager.upload_screens(meta, meta["screens"], 1, 0, meta["screens"], [], return_dict=return_dict, allowed_hosts=allowed)
+                                count = len(meta.get("image_list", []) or [])
+                                if meta.get("debug"):
+                                    console.print(f"[cyan]Image host debug: post-upload_screens image_list={count}[/cyan]")
+                                if count >= min_successful_uploads:
+                                    break
+                                if idx + 1 < len(hosts):
+                                    console.print(
+                                        f"[yellow]Only {count} images uploaded; minimum is {min_successful_uploads}. Switching to next host: {hosts[idx + 1]}[/yellow]"
+                                    )
+                            return count
 
-                            if image_list_count >= min_successful_uploads:
-                                break
+                        image_list_count = await try_hosts(host_order[start_index:], allowed_hosts)
 
-                            if idx + 1 < len(host_order):
-                                console.print(
-                                    f"[yellow]Only {image_list_count} images uploaded; minimum is {min_successful_uploads}. "
-                                    f"Switching to next host: {host_order[idx + 1]}[/yellow]"
-                                )
+                        if image_list_count < min_successful_uploads and allowed_hosts:
+                            # No host common to every tracker works: upload to any
+                            # working host, then rehost per tracker below — each
+                            # strict tracker gets a host it approves, or is skipped.
+                            remaining = [h for h in configured_image_hosts(config) if h not in tried_hosts and h not in (meta.get("failed_image_hosts") or [])]
+                            console.print(
+                                f"[yellow]No common image host is working ({', '.join(tried_hosts)}); trying {', '.join(remaining) or 'nothing'} and rehosting per tracker.[/yellow]"
+                            )
+                            image_list_count = await try_hosts(remaining, None)
 
                         if image_list_count < min_successful_uploads:
                             raise Exception(f"Minimum of {min_successful_uploads} successful image uploads required, but only {image_list_count} were uploaded.")
@@ -1223,6 +1243,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                                 console.print(
                                     f"[cyan]Image host debug: post-upload after  {tracker_name}.check_image_hosts() image_list={len(meta.get('image_list', []) or [])} {key}={len(meta.get(key, []) or [])}[/cyan]"  # noqa: E501
                                 )
+                        for tracker_name in trackers_lacking_images(meta, relevant_trackers, min_successful_uploads):
+                            approved = getattr(tracker_class_map[tracker_name](config=config), "approved_image_hosts", None) or []
+                            console.print(f"[bold red]{tracker_name}: no working approved image host ({', '.join(approved)}); skipping this tracker.[/bold red]")
+                            tracker_status_entry = cast(dict[str, Any], meta.setdefault("tracker_status", {})).setdefault(tracker_name, {})
+                            tracker_status_entry["upload"] = False
+                            tracker_status_entry["status_message"] = "skipped: no working approved image host"
                     except asyncio.CancelledError:
                         console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
                         return

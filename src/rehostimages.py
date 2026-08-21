@@ -65,6 +65,11 @@ def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
     return hosts
 
 
+def trackers_lacking_images(meta: Mapping[str, Any], trackers: Sequence[str], minimum: int) -> list[str]:
+    """Trackers whose per-tracker image list ended up with fewer than `minimum` entries."""
+    return [t for t in trackers if len(meta.get(f"{t}_images_key") or []) < minimum]
+
+
 def choose_common_host(
     approved_by_tracker: Mapping[str, Any],
     configured_hosts: Sequence[str],
@@ -307,7 +312,8 @@ async def _check_hosts(
         console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
-    max_retries = len(approved_image_hosts)
+    # The index walks the configured img_host_N slots, so bound it by those.
+    max_retries = len(configured_image_hosts({"DEFAULT": default_config}))
 
     while img_host_index <= max_retries:
         image_list, retry_mode, images_reuploaded = await _handle_image_upload(
@@ -610,7 +616,7 @@ async def _handle_image_upload(
         failed_hosts = meta["failed_image_hosts"]
 
         # Add a max retry limit to prevent infinite loop
-        max_retries = len(approved_image_hosts)
+        max_retries = len(configured_image_hosts({"DEFAULT": default_config}))
         while img_host_index <= max_retries:
             current_img_host_key = f"img_host_{img_host_index}"
             current_img_host = _as_str(default_config.get(current_img_host_key))
