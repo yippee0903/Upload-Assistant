@@ -40,7 +40,6 @@ def test_zero_uploads_marks_host_failed_and_requests_retry(tmp_path: pathlib.Pat
         _handle_image_upload(
             meta,
             "V3X",
-            {"pixhost.to": "pixhost", "ibb.co": "imgbb"},
             approved_image_hosts=["pixhost", "imgbb"],
             img_host_index=1,
             default_config=default_config,

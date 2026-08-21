@@ -20,6 +20,7 @@ from pymediainfo import MediaInfo
 
 from src.cleanup import cleanup_manager
 from src.console import console
+from src.imagehosts import MIN_IMAGE_BYTES, image_size_ok
 
 default_config: dict[str, Any] = {}
 task_limit = 1
@@ -278,43 +279,14 @@ async def disc_screenshots(
             image_size = os.path.getsize(image_path)
             if meta["debug"]:
                 console.print(f"[yellow]Checking image {image_path} (size: {image_size} bytes) for image host: {img_host}[/yellow]")
-            if image_size <= 75000:
+            if image_size <= MIN_IMAGE_BYTES:
                 console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
                 retake = True
-            else:
-                if img_host and "imgbb" in img_host:
-                    if image_size <= 31000000:
-                        if meta["debug"]:
-                            console.print(f"[green]Image {image_path} meets size requirements for imgbb.[/green]")
-                    else:
-                        console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for imgbb, retaking.")
-                        retake = True
-                elif img_host and img_host in ["imgbox", "pixhost"]:
-                    if 75000 < image_size <= 10000000:
-                        if meta["debug"]:
-                            console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-                    else:
-                        console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
-                        retake = True
-                elif img_host and img_host in [
-                    "ptpimg",
-                    "lensdump",
-                    "ptscreens",
-                    "onlyimage",
-                    "dalexni",
-                    "zipline",
-                    "passtheimage",
-                    "seedpool_cdn",
-                    "sharex",
-                    "utppm",
-                    "lostimg",
-                    "postimg",
-                ]:
-                    if meta["debug"]:
-                        console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-                else:
-                    console.print(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
-                    retake = True
+            elif not image_size_ok(img_host, image_size):
+                console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
+                retake = True
+            elif meta["debug"]:
+                console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
 
             if retake:
                 retry_attempts = 3
@@ -328,24 +300,9 @@ async def disc_screenshots(
                         random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic
                         screenshot_response = await capture_disc_task(index, file_path, str(random_time), image_path, keyframe, loglevel, hdr_tonemap, meta)
                         new_size = os.path.getsize(image_path)
-                        valid_image = False
-
-                        if img_host and "imgbb" in img_host:
-                            if new_size > 75000 and new_size <= 31000000:
-                                console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                                valid_image = True
-                        elif img_host and img_host in ["imgbox", "pixhost"]:
-                            if new_size > 75000 and new_size <= 10000000:
-                                console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                                valid_image = True
-                        elif (
-                            img_host
-                            and img_host
-                            in ["ptpimg", "lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm", "lostimg", "postimg"]
-                            and new_size > 75000
-                        ):
+                        valid_image = image_size_ok(img_host, new_size)
+                        if valid_image:
                             console.print(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
-                            valid_image = True
 
                         if valid_image:
                             valid_results.append(image_path)
@@ -686,7 +643,7 @@ async def dvd_screenshots(meta: dict[str, Any], disc_num: int, num_screens: int 
                             continue
 
                         retaken_size = os.path.getsize(screenshot_result)
-                        if retaken_size > 75000:
+                        if retaken_size > MIN_IMAGE_BYTES:
                             console.print(f"[green]Successfully retaken screenshot for: {screenshot_result} ({retaken_size} bytes)[/green]")
                             valid_results.append(screenshot_result)
                             break
@@ -1053,43 +1010,14 @@ async def screenshots(
         if meta["debug"]:
             console.print(f"[yellow]Checking image {image_path} (size: {image_size} bytes) for image host: {img_host}[/yellow]")
         if not manual_frames:
-            if image_size <= 75000:
+            if image_size <= MIN_IMAGE_BYTES:
                 console.print(f"[yellow]Image {image_path} is incredibly small, retaking.")
                 retake = True
-            else:
-                if img_host and "imgbb" in img_host:
-                    if image_size <= 31000000:
-                        if meta["debug"]:
-                            console.print(f"[green]Image {image_path} meets size requirements for imgbb.[/green]")
-                    else:
-                        console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for imgbb, retaking.")
-                        retake = True
-                elif img_host and img_host in ["imgbox", "pixhost"]:
-                    if 75000 < image_size <= 10000000:
-                        if meta["debug"]:
-                            console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-                    else:
-                        console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
-                        retake = True
-                elif img_host and img_host in [
-                    "ptpimg",
-                    "lensdump",
-                    "ptscreens",
-                    "onlyimage",
-                    "dalexni",
-                    "zipline",
-                    "passtheimage",
-                    "seedpool_cdn",
-                    "sharex",
-                    "utppm",
-                    "lostimg",
-                    "postimg",
-                ]:
-                    if meta["debug"]:
-                        console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
-                else:
-                    console.print(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
-                    retake = True
+            elif not image_size_ok(img_host, image_size):
+                console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
+                retake = True
+            elif meta["debug"]:
+                console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
 
         if retake:
             retry_attempts = 5
@@ -1122,37 +1050,9 @@ async def screenshots(
                                 continue
 
                             new_size = os.path.getsize(screenshot_path)
-                            valid_image = False
-
-                            if img_host and "imgbb" in img_host:
-                                if 75000 < new_size <= 31000000:
-                                    console.print(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
-                                    valid_image = True
-                            elif img_host and img_host in ["imgbox", "pixhost"]:
-                                if 75000 < new_size <= 10000000:
-                                    console.print(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
-                                    valid_image = True
-                            elif (
-                                img_host
-                                and img_host
-                                in [
-                                    "ptpimg",
-                                    "lensdump",
-                                    "ptscreens",
-                                    "onlyimage",
-                                    "dalexni",
-                                    "zipline",
-                                    "passtheimage",
-                                    "seedpool_cdn",
-                                    "sharex",
-                                    "utppm",
-                                    "lostimg",
-                                    "postimg",
-                                ]
-                                and new_size > 75000
-                            ):
+                            valid_image = image_size_ok(img_host, new_size)
+                            if valid_image:
                                 console.print(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
-                                valid_image = True
 
                             if valid_image:
                                 valid_results.append(screenshot_path)
@@ -1183,21 +1083,7 @@ async def screenshots(
                             continue
 
                         new_size = os.path.getsize(screenshot_path)
-                        valid_image = False
-
-                        if img_host and "imgbb" in img_host:
-                            if 75000 < new_size <= 31000000:
-                                valid_image = True
-                        elif img_host and img_host in ["imgbox", "pixhost"]:
-                            if 75000 < new_size <= 10000000:
-                                valid_image = True
-                        elif (
-                            img_host
-                            and img_host
-                            in ["ptpimg", "lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm", "lostimg", "postimg"]
-                            and new_size > 75000
-                        ):
-                            valid_image = True
+                        valid_image = image_size_ok(img_host, new_size)
 
                         if valid_image:
                             valid_results.append(screenshot_path)

@@ -6,6 +6,8 @@ Validates the user's config.py against expected structure and types.
 
 from typing import Any, Optional, cast
 
+from src.imagehosts import IMAGE_HOST_CONFIG_KEYS, UPLOAD_HOSTS
+
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
 
@@ -88,42 +90,8 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
 }
 
 # Valid image hosts
-VALID_IMAGE_HOSTS = [
-    "imgbb",
-    "ptpimg",
-    "imgbox",
-    "pixhost",
-    "lensdump",
-    "ptscreens",
-    "onlyimage",
-    "dalexni",
-    "zipline",
-    "passtheimage",
-    "seedpool_cdn",
-    "sharex",
-    "utppm",
-    "lostimg",
-    "postimg",
-    "",
-]
+VALID_IMAGE_HOSTS = [*UPLOAD_HOSTS, ""]
 
-# Image hosts that require API keys and their corresponding config key names
-IMAGE_HOST_API_KEYS: dict[str, str] = {
-    "imgbb": "imgbb_api",
-    "ptpimg": "ptpimg_api",
-    "lensdump": "lensdump_api",
-    "ptscreens": "ptscreens_api",
-    "onlyimage": "onlyimage_api",
-    "dalexni": "dalexni_api",
-    "passtheimage": "passtheima_ge_api",
-    "seedpool_cdn": "seedpool_cdn_api",
-    "sharex": "sharex_api_key",
-    "zipline": "zipline_api_key",
-    "utppm": "utppm_api",
-    "lostimg": "lostimg_api",
-    "postimg": "postimg_api",
-    # imgbox and pixhost don't require API keys
-}
 
 # Valid torrent client types (must match example-config.py)
 VALID_TORRENT_CLIENTS = ["qbit", "rtorrent", "deluge", "transmission", "watch"]
@@ -352,8 +320,7 @@ def validate_config(config: Any, active_trackers: Optional[list[str]] = None, ac
 
         # Check that each active host has its required API key
         for host in active_hosts:
-            if host in IMAGE_HOST_API_KEYS:
-                api_key_name = IMAGE_HOST_API_KEYS[host]
+            for api_key_name in IMAGE_HOST_CONFIG_KEYS.get(host, ()):
                 api_key_value = default_section.get(api_key_name, "")
                 if not api_key_value or (isinstance(api_key_value, str) and not api_key_value.strip()):
                     errors.append(f"Image host '{host}' requires API key '{api_key_name}' but it is not set")

@@ -5,9 +5,10 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Optional, TypedDict, Union, cast
+from typing import Any, Callable, Optional, TypedDict, cast
 
 from src.console import console
+from src.imagehosts import IMAGE_HOST_CONFIG_KEYS, UPLOAD_HOSTS
 
 
 class LinkedSetting(TypedDict):
@@ -377,23 +378,7 @@ def get_img_host(
     example_defaults: ConfigDict,
     config_comments: ConfigComments,
 ) -> None:
-    img_host_api_map: dict[str, Union[str, list[str], None]] = {
-        "imgbb": "imgbb_api",
-        "ptpimg": "ptpimg_api",
-        "lensdump": "lensdump_api",
-        "ptscreens": "ptscreens_api",
-        "onlyimage": "onlyimage_api",
-        "dalexni": "dalexni_api",
-        "ziplinestudio": ["zipline_url", "zipline_api_key"],
-        "passtheimage": "passtheima_ge_api",
-        "seedpool_cdn": "seedpool_cdn_api",
-        "sharex": ["sharex_url", "sharex_api_key"],
-        "utppm": "utppm_api",
-        "lostimg": "lostimg_api",
-        "postimg": "postimg_api",
-        "imgbox": None,
-        "pixhost": None,
-    }
+    img_host_api_map: dict[str, tuple[str, ...]] = {slug: IMAGE_HOST_CONFIG_KEYS.get(slug, ()) for slug in UPLOAD_HOSTS}
 
     console.print("\n==== IMAGE HOST CONFIGURATION ====", markup=False)
     console.print("[i] Available image hosts: " + ", ".join(img_host_api_map.keys()), markup=False)
@@ -436,14 +421,10 @@ def get_img_host(
                 config_defaults[host_key] = host_input
 
                 # Configure API key(s) for this host, if needed
-                api_keys = img_host_api_map.get(host_input)
-                if api_keys is None:
+                api_keys = img_host_api_map[host_input]
+                if not api_keys:
                     console.print(f"[i] {host_input} doesn't require an API key.", markup=False)
                     continue
-
-                # Convert single string to list for consistent handling
-                if isinstance(api_keys, str):
-                    api_keys = [api_keys]
 
                 # Process each key for this host
                 for api_key in api_keys:

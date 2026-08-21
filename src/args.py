@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import Any, Optional, cast
 
 from src.console import console
+from src.imagehosts import UPLOAD_HOSTS
 
 
 class ShortHelpFormatter(argparse.HelpFormatter):
@@ -278,23 +279,7 @@ class Args:
             nargs=1,
             required=False,
             help="Image Host",
-            choices=[
-                "imgbb",
-                "ptpimg",
-                "imgbox",
-                "pixhost",
-                "lensdump",
-                "ptscreens",
-                "onlyimage",
-                "dalexni",
-                "zipline",
-                "passtheimage",
-                "seedpool_cdn",
-                "sharex",
-                "utppm",
-                "lostimg",
-                "postimg",
-            ],
+            choices=list(UPLOAD_HOSTS),
         )
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")
         parser.add_argument("-th", "--torrenthash", nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
