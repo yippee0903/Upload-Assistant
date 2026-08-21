@@ -375,8 +375,11 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     response = await client.post(url, files={"file": (filename, file_bytes)}, headers=headers, timeout=timeout)
                     if response.status_code == 200:
                         response_data = response.json()
-                        if "files" in response_data:
-                            img_url = response_data["files"][0]
+                        files = response_data.get("files") or []
+                        # Zipline v3 returns a list of URL strings, v4 a list of {"url": ...} objects
+                        first = files[0] if files else None
+                        img_url = first.get("url") if isinstance(first, dict) else first
+                        if isinstance(img_url, str) and img_url:
                             raw_url = img_url.replace("/u/", "/r/")
                             web_url = img_url.replace("/u/", "/r/")
                             return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
