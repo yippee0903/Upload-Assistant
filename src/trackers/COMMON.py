@@ -2601,12 +2601,12 @@ class COMMON:
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.get("region") and meta.get("is_disc") == "BDMV":
+                if not meta.get("region") and meta.get("is_disc") in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta["region"] = region_name
-                if not meta.get("distributor") and meta.get("is_disc") == "BDMV":
+                if not meta.get("distributor") and meta.get("is_disc") in ("BDMV", "DVD"):
                     distributor_id = attributes.get("distributor_id")
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
@@ -2628,12 +2628,12 @@ class COMMON:
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.get("region") and meta.get("is_disc") == "BDMV":
+                    if not meta.get("region") and meta.get("is_disc") in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta["region"] = region_name
-                    if not meta.get("distributor") and meta.get("is_disc") == "BDMV":
+                    if not meta.get("distributor") and meta.get("is_disc") in ("BDMV", "DVD"):
                         distributor_id = attributes.get("distributor_id")
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:

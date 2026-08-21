@@ -779,7 +779,7 @@ class Prep:
         ping_unit3d_config = self.config["DEFAULT"].get("ping_unit3d", False)
         if (
             (not meta.get("region") or not meta.get("distributor"))
-            and meta["is_disc"] == "BDMV"
+            and meta["is_disc"] in ("BDMV", "DVD")
             and ping_unit3d_config
             and not meta.get("edit", False)
             and not meta.get("emby", False)
