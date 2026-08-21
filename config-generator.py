@@ -390,6 +390,7 @@ def get_img_host(
         "sharex": ["sharex_url", "sharex_api_key"],
         "utppm": "utppm_api",
         "lostimg": "lostimg_api",
+        "postimg": "postimg_api",
         "imgbox": None,
         "pixhost": None,
     }

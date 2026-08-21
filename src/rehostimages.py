@@ -49,20 +49,26 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
 # this table only serves to recognize where an existing image is hosted.
 URL_HOST_MAPPING: dict[str, str] = {
     "beyondhd.co": "bhd",
+    "cdn.seedpool.org": "seedpool_cdn",
     "digitalcore.club": "sharex",
     "ibb.co": "imgbb",
     "imagebam.com": "imagebam",
     "img.digitalcore.club": "sharex",
     "img.passtheima.ge": "passtheimage",
     "img.pterclub.com": "pterclub",
+    "imgbb.com": "imgbb",
     "imgbox.com": "imgbox",
     "imgur.com": "imgur",
     "kshare.club": "kshare",
+    "lensdump.com": "lensdump",
+    "lostimg.cc": "lostimg",
     "onlyimage.org": "onlyimage",
+    "passtheima.ge": "passtheimage",
     "pixhost.to": "pixhost",
     "postimg.cc": "postimg",
     "ptpimg.me": "ptpimg",
     "ptscreens.com": "ptscreens",
+    "utp.pm": "utppm",
     "yes.ilikeshots.club": "ilikeshots",
 }
 

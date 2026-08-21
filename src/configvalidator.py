@@ -33,6 +33,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "ptscreens_api": (str,),
     "onlyimage_api": (str,),
     "lostimg_api": (str,),
+    "postimg_api": (str,),
     "add_logo": (bool,),
     "logo_size": (str, int),
     "episode_overview": (bool,),
@@ -102,6 +103,7 @@ VALID_IMAGE_HOSTS = [
     "sharex",
     "utppm",
     "lostimg",
+    "postimg",
     "",
 ]
 
@@ -119,6 +121,7 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
     "zipline": "zipline_api_key",
     "utppm": "utppm_api",
     "lostimg": "lostimg_api",
+    "postimg": "postimg_api",
     # imgbox and pixhost don't require API keys
 }
 
