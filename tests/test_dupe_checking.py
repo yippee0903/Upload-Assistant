@@ -518,3 +518,20 @@ class TestRefineHdrTerms:
         file_hdr = _run(DupeChecker.refine_hdr_terms("solo 2018 2160p 4klight dolby vision ddp 7 1 x265-qtz"))
         target_hdr = _run(DupeChecker.refine_hdr_terms("DV HDR"))
         assert _run(DupeChecker.has_matching_hdr(file_hdr, target_hdr, {"type": "ENCODE"}, tracker="C411"))
+
+
+class TestSizeTolerance:
+    def _dupes(self, tolerance, dupe_size):
+        checker = DupeChecker(config={"DEFAULT": {"dupe_size_difference_tolerance": tolerance}})
+        meta = _base_meta(source_size=10_000_000_000)
+        entry = {"name": "Interstellar 2014 IMAX 1080p BluRay DTS-HD MA 5.1 x264-LEGi0N", "size": dupe_size, "files": [], "link": "x"}
+        return _run(checker.filter_dupes([entry], meta, "BLU"))
+
+    def test_both_directions_excluded_beyond_tolerance(self):
+        assert self._dupes(10, 12_000_000_000) == []  # 20% larger
+        assert self._dupes(10, 8_000_000_000) == []  # 20% smaller
+        assert self._dupes(10, "12.5 GB") == []  # string sizes parsed
+
+    def test_within_tolerance_or_disabled_is_kept(self):
+        assert len(self._dupes(10, 10_500_000_000)) == 1
+        assert len(self._dupes(None, 12_000_000_000)) == 1

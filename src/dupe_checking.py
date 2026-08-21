@@ -25,6 +25,24 @@ SD_VS_HD_SKIP_TRACKERS = frozenset({"BHD", "AITHER"})
 X264_SIZE_TOLERANCE_TRACKERS = frozenset({"AITHER", "BHD", "HUNO", "OE", "ULCX"})
 
 
+_SIZE_UNITS = {"B": 1, "KB": 1024, "KIB": 1024, "MB": 1024**2, "MIB": 1024**2, "GB": 1024**3, "GIB": 1024**3, "TB": 1024**4, "TIB": 1024**4}
+
+
+def parse_size_to_bytes(value: Any) -> Optional[int]:
+    """Bytes from an int/str byte count or a '1.5 GB'-style string; None when unparseable."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    match = re.fullmatch(r"\s*([\d.,]+)\s*([KMGT]i?B|B)?\s*", str(value), re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return int(float(match.group(1).replace(",", "")) * _SIZE_UNITS[(match.group(2) or "B").upper()])
+    except (ValueError, KeyError):
+        return None
+
+
 class DupeEntry(TypedDict, total=False):
     name: str
     size: Optional[Union[int, str]]
@@ -226,6 +244,19 @@ class DupeChecker:
             """
             each = str(entry.get("name", ""))
             sized = entry.get("size")  # This may come as a string, such as "1.5 GB"
+
+            # Optional: drop dupes whose size differs from ours by at least N percent (either direction)
+            tolerance = self.config.get("DEFAULT", {}).get("dupe_size_difference_tolerance")
+            upload_size = coerce_int(meta.get("source_size"))
+            dupe_size = parse_size_to_bytes(sized)
+            if tolerance is not None and upload_size and dupe_size:
+                try:
+                    diff_pct = abs(dupe_size - upload_size) / upload_size * 100
+                    if diff_pct >= float(tolerance):
+                        await log_exclusion(f"size difference ({diff_pct:.2f}%) exceeds tolerance ({tolerance}%)", each)
+                        return True
+                except (TypeError, ValueError):
+                    pass
 
             files_value = cast(list[Any], entry.get("files") or [])
             # Normalise to basename only: some trackers (e.g. G3MINI) store
