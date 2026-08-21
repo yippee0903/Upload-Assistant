@@ -3,6 +3,7 @@ import asyncio
 import os
 import re
 import shutil
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, Optional, Union, cast
@@ -495,7 +496,13 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 else:
                     qbt_client = await self.init_qbittorrent_client(client)
 
+                search_start = time.time()
                 found_hash = await self.search_qbit_for_torrent(meta, client, qbt_client, qbt_session, proxy_url)
+                search_duration = time.time() - search_start
+                if meta.get("debug"):
+                    console.print(f"qBittorrent search took {search_duration:.2f}s")
+                if search_duration > 3 and not str(client.get("qui_proxy_url") or "").strip():
+                    console.print(f"[yellow]qBittorrent search took {search_duration:.1f}s; configuring 'qui_proxy_url' for this client makes it much faster.[/yellow]")
 
                 # Clean up session if we created one
                 if qbt_session:
