@@ -226,6 +226,13 @@ class ULCX(UNIT3D):
     async def get_description(self, meta: Meta) -> dict[str, str]:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
 
+        # Trailers are not allowed in descriptions: drop YouTube links, then
+        # any [b]/[center] wrapper they leave empty.
+        _yt = r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/\S*"
+        desc = re.sub(rf"\[url={_yt}?\][^\[]*\[/url\]|{_yt}", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[(b|center)\]\s*\[/\1\]\n?", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[(b|center)\]\s*\[/\1\]\n?", "", desc, flags=re.IGNORECASE)
+
         if is_adult(meta):
             pattern = r"(\[center\](?:(?!\[/center\]).)*\[/center\])"
 

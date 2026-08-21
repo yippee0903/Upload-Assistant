@@ -225,3 +225,26 @@ class TestULCXRules:
         # means nothing was reused from a description, not that none will exist.
         assert self._passes(ulcx, image_list=[], screens=6) is True
         assert self._passes(ulcx, image_list=[], screens=2) is False
+
+
+class TestULCXDescription:
+    @pytest.fixture
+    def ulcx(self):
+        return ULCX(config=_config())
+
+    def _desc(self, ulcx, raw: str) -> str:
+        with patch("src.trackers.ULCX.DescriptionBuilder.unit3d_edit_desc", return_value=raw):
+            return _run(ulcx.get_description({"tmdb_id": 1, "keywords": [], "combined_genres": ""}))["description"]
+
+    def test_trailer_links_are_removed(self, ulcx):
+        raw = (
+            "Plot.\n"
+            "[center][b][url=https://www.youtube.com/watch?v=abc123][Trailer on YouTube][/url][/b][/center]\n"
+            "[url=https://youtu.be/abc123]Trailer[/url]\n"
+            "https://www.youtube.com/watch?v=abc123\n"
+            "[center][url=https://example.com/review]Review[/url][/center]"
+        )
+        cleaned = self._desc(ulcx, raw)
+        assert "youtu" not in cleaned
+        assert "[center][b][/b][/center]" not in cleaned and "[center][/center]" not in cleaned
+        assert "Plot." in cleaned and "[url=https://example.com/review]Review[/url]" in cleaned
