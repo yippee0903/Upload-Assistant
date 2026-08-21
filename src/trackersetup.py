@@ -139,7 +139,11 @@ class TRACKER_SETUP:
         for tracker in removed_trackers:
             console.print(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.", markup=False)
 
-        return [t for t in valid_trackers if self._has_required_credentials(t, debug=bool(meta.get("debug")))]
+        return self.with_required_credentials(valid_trackers, debug=bool(meta.get("debug")))
+
+    def with_required_credentials(self, trackers: list[str], debug: bool = False) -> list[str]:
+        """The given trackers minus those whose example-config credentials are empty in the user's config."""
+        return [t for t in trackers if self._has_required_credentials(t, debug=debug)]
 
     def _has_required_credentials(self, tracker: str, debug: bool = False) -> bool:
         """False when the example config declares api_key/announce_url for this tracker and the user left it empty (fail fast, before screenshots)."""

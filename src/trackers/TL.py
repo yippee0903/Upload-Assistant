@@ -77,7 +77,7 @@ class TL:
         process_screenshot = not self.tracker_config.get("img_rehost", True) or self.tracker_config.get("api_upload", True)
 
         # Custom Header
-        desc_parts.append(await builder.get_custom_header())
+        desc_parts.append(await builder.get_custom_header(meta))
 
         # Logo
         logo, logo_size = await builder.get_logo_section(meta)
@@ -134,7 +134,7 @@ class TL:
             images = cast(list[dict[str, Any]], meta.get("image_list", []))
             if images:
                 # Screenshot Header
-                desc_parts.append(await builder.screenshot_header())
+                desc_parts.append(await builder.screenshot_header(meta))
                 # Screenshots
                 screenshots_block = ""
                 for i, image in enumerate(images):

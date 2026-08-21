@@ -240,7 +240,7 @@ class GPW:
         desc_parts: list[str] = []
 
         # Custom Header
-        custom_header = await builder.get_custom_header()
+        custom_header = await builder.get_custom_header(meta)
         desc_parts.append(custom_header)
 
         # Logo
@@ -279,7 +279,7 @@ class GPW:
             desc_parts.append("[center]\n" + menu_screenshots_block + "[/center]")
 
         # Screenshot Header
-        screenshot_header = await builder.screenshot_header()
+        screenshot_header = await builder.screenshot_header(meta)
         desc_parts.append(screenshot_header)
 
         # Screenshots

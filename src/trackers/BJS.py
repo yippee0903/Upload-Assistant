@@ -345,7 +345,7 @@ class BJS:
         desc_parts: list[str] = []
 
         # Custom Header
-        desc_parts.append(await builder.get_custom_header())
+        desc_parts.append(await builder.get_custom_header(meta))
 
         # Logo
         logo_resize_url = str(meta.get("tmdb_logo", ""))

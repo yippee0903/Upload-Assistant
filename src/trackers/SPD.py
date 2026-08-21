@@ -201,7 +201,7 @@ class SPD:
         title, episode_image, episode_overview = await builder.get_tv_info(meta, resize=True)
         if user_description or episode_overview:  # Avoid unnecessary descriptions
             # Custom Header
-            desc_parts.append(await builder.get_custom_header())
+            desc_parts.append(await builder.get_custom_header(meta))
 
             # Logo
             logo_resize_url = str(meta.get("tmdb_logo", ""))

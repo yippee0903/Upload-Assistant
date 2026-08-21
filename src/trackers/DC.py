@@ -43,7 +43,7 @@ class DC:
         desc_parts: list[str] = []
 
         # Custom Header
-        custom_header = await builder.get_custom_header()
+        custom_header = await builder.get_custom_header(meta)
         desc_parts.append(custom_header)
 
         # TV

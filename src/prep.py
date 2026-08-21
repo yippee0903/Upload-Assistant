@@ -613,8 +613,11 @@ class Prep:
             trackers = [t.strip().upper() for t in trackers.split(",")] if "," in trackers else [trackers.strip().upper()]
         else:
             trackers = [t.strip().upper() for t in trackers]
-        meta["trackers"] = trackers
         meta["requested_trackers"] = trackers
+        # Drop trackers whose credentials are empty now, before dupe checks, screenshots and torrent creation
+        from src.trackersetup import TRACKER_SETUP  # local import: trackersetup imports the trackers, which import prep helpers
+
+        meta["trackers"] = TRACKER_SETUP(self.config).with_required_credentials(trackers, debug=bool(meta.get("debug")))
 
         # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.get("skip_trackers", False) and not meta.get("edit", False):
