@@ -481,10 +481,11 @@ class AZTrackerBase:
 
     async def get_screenshots(self, meta: Meta) -> Optional[list[str]]:
         screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
-        local_files = sorted(screenshot_dir.glob("*.png"))
+        local_files = sorted(path for path in screenshot_dir.glob("*.png") if path.is_file() and not path.stem.upper().startswith(("POSTER", "COVER")))
         results: list[str] = []
 
-        limit = 3 if meta.get("tv_pack", "") == 0 else 15
+        # single episodes get 3 screenshots; movies and season packs up to 15
+        limit = 3 if (meta.get("category") == "TV" and meta.get("tv_pack", "") == 0) else 15
 
         disc_menu_links = [img.get("raw_url") for img in meta.get("menu_images", []) if img.get("raw_url")][
             :12
