@@ -31,7 +31,7 @@ config = {
 
         # image host api keys
         "imgbb_api": "",
-                "lensdump_api": "",
+        "lensdump_api": "",
         "ptscreens_api": "",
         "onlyimage_api": "",
         "dalexni_api": "",
