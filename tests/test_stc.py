@@ -99,3 +99,9 @@ class TestSTCEnglishLanguageCheck:
             "combined_genres": "",
         }
         assert _run(stc.get_additional_checks(meta)) is False
+
+
+def test_approved_image_hosts() -> None:
+    # Rules only ask for lossless thumbnails linking to full-size images;
+    # ptscreens and pixhost keep the PNG intact and are in use on the site.
+    assert STC(config=_config()).approved_image_hosts == ["imgbox", "imgbb", "ptscreens", "pixhost"]
