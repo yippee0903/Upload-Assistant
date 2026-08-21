@@ -2074,8 +2074,6 @@ async def do_the_thing(base_dir: str) -> None:
                         console,
                         list(api_trackers),
                         tracker_class_map,
-                        list(http_trackers),
-                        list(other_api_trackers),
                     )
                     if use_discord and bot:
                         await DiscordNotifier.send_upload_status_notification(config, bot, meta)

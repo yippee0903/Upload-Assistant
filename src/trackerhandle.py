@@ -13,8 +13,6 @@ from cogs.redaction import Redaction
 from src.cleanup import cleanup_manager
 from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
-from src.trackers.PTP import PTP
-from src.trackers.THR import THR
 from src.trackersetup import TRACKER_SETUP
 
 Meta: TypeAlias = dict[str, Any]
@@ -61,8 +59,6 @@ async def process_trackers(
     console: Any,
     api_trackers: Sequence[str],
     tracker_class_map: Mapping[str, Any],
-    http_trackers: Sequence[str],
-    other_api_trackers: Sequence[str],
 ) -> None:
     tracker_setup = TRACKER_SETUP(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
@@ -111,9 +107,6 @@ async def process_trackers(
             console.print(f"[red]Error printing {tracker} result: {e}[/red]")
 
     async def process_single_tracker(tracker: str) -> None:
-        tracker_class: Any = None
-        if tracker not in {"MANUAL", "THR", "PTP"}:
-            tracker_class = tracker_class_map[tracker](config=config)
         if str(meta.get("name", "")).endswith("DUPE?"):
             meta["name"] = str(meta.get("name", "")).replace(" DUPE?", "")
 
@@ -121,110 +114,7 @@ async def process_trackers(
         disctype_value = str(disctype) if disctype is not None else ""
         tracker = tracker.replace(" ", "").upper().strip()
 
-        if tracker in api_trackers:
-            tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                try:
-                    modq, draft, tracker_caps = await check_mod_q_and_draft(tracker_class, meta)
-                    if tracker_caps.get("mod_q") and modq == "Yes":
-                        console.print(f"{tracker} (modq: {modq})")
-                    if (tracker_caps.get("draft") or tracker_caps.get("draft_live")) and draft in ["Yes", "Draft"]:
-                        console.print(f"{tracker} (draft: {draft})")
-                    is_uploaded = False
-                    try:
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta, disctype_value)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
-                    except Exception as e:
-                        console.print(f"[red]Upload failed: {e}")
-                        console.print(traceback.format_exc())
-                        return
-                except Exception:
-                    console.print(traceback.format_exc())
-                    return
-
-                if is_uploaded is None:
-                    console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
-                    is_uploaded = False
-
-                status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
-                if is_uploaded and "status_message" in status and "data error" not in str(status["status_message"]):
-                    await client.add_to_client(meta, tracker_class.tracker)
-                    print_tracker_result(tracker, tracker_class, status, True)
-                else:
-                    print_tracker_result(tracker, tracker_class, status, False)
-                    console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
-
-        elif tracker in other_api_trackers:
-            tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                try:
-                    is_uploaded = False
-                    try:
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta, disctype_value)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
-                    except Exception as e:
-                        console.print(f"[red]Upload failed: {e}")
-                        console.print(traceback.format_exc())
-                        return
-                    if tracker == "SN":
-                        await asyncio.sleep(16)
-                except Exception:
-                    console.print(traceback.format_exc())
-                    return
-
-                # Detect and handle None return value from upload method
-                if is_uploaded is None:
-                    console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
-                    is_uploaded = False
-
-                status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
-                if is_uploaded and "status_message" in status and "data error" not in str(status["status_message"]):
-                    await client.add_to_client(meta, tracker_class.tracker)
-                    print_tracker_result(tracker, tracker_class, status, True)
-                else:
-                    print_tracker_result(tracker, tracker_class, status, False)
-                    console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
-
-        elif tracker in http_trackers:
-            tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                try:
-                    is_uploaded = False
-                    try:
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta, disctype_value)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
-                    except Exception as e:
-                        console.print(f"[red]Upload failed: {e}")
-                        console.print(traceback.format_exc())
-                        return
-
-                except Exception:
-                    console.print(traceback.format_exc())
-                    return
-
-                # Detect and handle None return value from upload method
-                if is_uploaded is None:
-                    console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
-                    is_uploaded = False
-
-                status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
-                if is_uploaded and "status_message" in status and "data error" not in str(status["status_message"]):
-                    await client.add_to_client(meta, tracker_class.tracker)
-                    print_tracker_result(tracker, tracker_class, status, True)
-                else:
-                    print_tracker_result(tracker, tracker_class, status, False)
-                    console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
-
-        elif tracker == "MANUAL":
+        if tracker == "MANUAL":
             if meta["unattended"]:
                 do_manual = True
             else:
@@ -251,60 +141,47 @@ async def process_trackers(
                     console.print(f"[green]{meta['name']}")
                     console.print(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
-        elif tracker == "THR":
-            tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                thr = THR(config=config)
-                thr_any = cast(Any, thr)
-                is_uploaded = False
-                try:
-                    upload_start_time = time.time()
-                    is_uploaded = await thr_any.upload(meta, disctype_value)
-                    upload_duration = time.time() - upload_start_time
-                    meta[f"{tracker}_upload_duration"] = upload_duration
-                except Exception as e:
-                    console.print(f"[red]Upload failed: {e}")
-                    console.print(traceback.format_exc())
-                    return
-                if is_uploaded:
-                    await client.add_to_client(meta, "THR")
-                    status = cast(StatusDict, meta.get("tracker_status") or {}).get("THR", {})
-                    print_tracker_result(tracker, thr, status, True)
-                else:
-                    status = cast(StatusDict, meta.get("tracker_status") or {}).get("THR", {})
-                    print_tracker_result(tracker, thr, status, False)
-                    console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
+            return
 
-        elif tracker == "PTP":
-            tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                try:
-                    ptp = PTP(config=config)
-                    groupID = meta.get("ptp_groupID", None)
-                    ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
-                    is_uploaded = False
-                    try:
-                        upload_start_time = time.time()
-                        is_uploaded = await ptp.upload(meta, ptpUrl, ptpData, disctype_value)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
-                        await asyncio.sleep(5)
-                    except Exception as e:
-                        console.print(f"[red]Upload failed: {e}")
-                        console.print(traceback.format_exc())
-                        return
-                    status = cast(StatusDict, meta.get("tracker_status") or {}).get(ptp.tracker, {})
-                    if is_uploaded and "status_message" in status and "data error" not in str(status["status_message"]):
-                        await client.add_to_client(meta, "PTP")
-                        print_tracker_result(tracker, ptp, status, True)
-                    else:
-                        print_tracker_result(tracker, ptp, status, False)
-                        console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
-                except Exception:
-                    console.print(traceback.format_exc())
-                    return
+        tracker_status = cast(StatusDict, meta.get("tracker_status") or {})
+        if not cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False):
+            return
+
+        tracker_class: Any = tracker_class_map[tracker](config=config)
+        is_uploaded: Optional[bool] = False
+        try:
+            if tracker in api_trackers:
+                modq, draft, tracker_caps = await check_mod_q_and_draft(tracker_class, meta)
+                if tracker_caps.get("mod_q") and modq == "Yes":
+                    console.print(f"{tracker} (modq: {modq})")
+                if (tracker_caps.get("draft") or tracker_caps.get("draft_live")) and draft in ["Yes", "Draft"]:
+                    console.print(f"{tracker} (draft: {draft})")
+            try:
+                upload_start_time = time.time()
+                is_uploaded = await tracker_class.upload(meta, disctype_value)
+                meta[f"{tracker}_upload_duration"] = time.time() - upload_start_time
+            except Exception as e:
+                console.print(f"[red]Upload failed: {e}")
+                console.print(traceback.format_exc())
+                return
+            post_upload_delay = getattr(tracker_class, "post_upload_delay", 0)
+            if post_upload_delay:
+                await asyncio.sleep(post_upload_delay)
+        except Exception:
+            console.print(traceback.format_exc())
+            return
+
+        if is_uploaded is None:
+            console.print(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
+            is_uploaded = False
+
+        status = cast(StatusDict, meta.get("tracker_status") or {}).get(tracker_class.tracker, {})
+        if is_uploaded and "status_message" in status and "data error" not in str(status["status_message"]):
+            await client.add_to_client(meta, tracker_class.tracker)
+            print_tracker_result(tracker, tracker_class, status, True)
+        else:
+            print_tracker_result(tracker, tracker_class, status, False)
+            console.print(f"[red]{tracker} upload failed or returned data error.[/red]")
 
     multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
     discs = cast(list[Any], meta.get("discs") or [])

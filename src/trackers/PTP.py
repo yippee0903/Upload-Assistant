@@ -30,6 +30,8 @@ from src.uploadscreens import UploadScreensManager
 
 
 class PTP:
+    post_upload_delay = 5
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.takescreens_manager = TakeScreensManager(config)
@@ -1599,7 +1601,11 @@ class PTP:
 
         return url, data
 
-    async def upload(self, meta: dict[str, Any], url: str, data: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+        url, data = await self.fill_upload_form(meta.get("ptp_groupID"), meta)
+        return await self._submit_upload(meta, url, data)
+
+    async def _submit_upload(self, meta: dict[str, Any], url: str, data: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
         base_piece_mb = int(meta.get("base_torrent_piece_mb", 0) or 0)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"
