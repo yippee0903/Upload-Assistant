@@ -17,7 +17,7 @@ try:
     import guessit
 
     from src.apply_overrides import ApplyOverrides
-    from src.audio import AudioManager
+    from src.audio import AudioManager, audio_track_facts
     from src.bluray_com import get_bluray_releases
     from src.cleanup import cleanup_manager
     from src.clients import Clients
