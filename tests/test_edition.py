@@ -235,3 +235,15 @@ class TestFrenchEditionFormatting:
     def test_format_edition(self, uppercased: str, expected: str) -> None:
         from src.trackers.FRENCH import FrenchTrackerMixin  # noqa: WPS433
         assert FrenchTrackerMixin._format_edition(uppercased) == expected
+
+
+class TestRepackTokens:
+    def test_tv2_broadcaster_is_not_a_repack(self) -> None:
+        video = 'Show.S01E01.1080p.TV2.WEB-DL.H.264-GROUP.mkv'
+        _edition, repack, _hybrid = _run(get_edition(video, None, [video], '', _meta_base()))
+        assert repack == ''
+
+    def test_v2_token_is_a_repack(self) -> None:
+        video = 'Show.S01E01.V2.1080p.WEB-DL.H.264-GROUP.mkv'
+        _edition, repack, _hybrid = _run(get_edition(video, None, [video], '', _meta_base()))
+        assert repack == 'REPACK'
