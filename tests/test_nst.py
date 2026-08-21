@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 
 from src.trackers.NST import NST
+from french_fixtures import audio_track as _audio_track, mediainfo as _mi, sub_track as _sub_track
+from french_fixtures import sub_track as _text_track
 
 # ─── Helpers ──────────────────────────────────────────────────
 
@@ -65,21 +67,8 @@ def _meta_base(**overrides: Any) -> dict[str, Any]:
     m.update(overrides)
     return m
 
-def _audio_track(lang: str = 'fr', **kw: Any) -> dict[str, Any]:
-    t: dict[str, Any] = {'@type': 'Audio', 'Language': lang}
-    t.update(kw)
-    return t
 
-def _text_track(lang: str = "fr", **kw: Any) -> dict[str, Any]:
-    t: dict[str, Any] = {"@type": "Text", "Language": lang}
-    t.update(kw)
-    return t
 
-def _mi(audio: list[dict[str, Any]], subs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    tracks = list(audio)
-    if subs:
-        tracks.extend(subs)
-    return {'media': {'track': tracks}}
 
 # ═══════════════════════════════════════════════════════════════
 #   URL Configuration

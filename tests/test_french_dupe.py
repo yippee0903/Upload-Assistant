@@ -20,6 +20,7 @@ from src.trackers.FRENCH import (
     _FRENCH_AUDIO_THRESHOLD,
 )
 from src.trackers.C411 import C411
+from french_fixtures import audio_track as _audio_track, mediainfo as _mi, sub_track as _sub_track
 
 
 def _config() -> dict[str, Any]:
@@ -33,24 +34,10 @@ def _config() -> dict[str, Any]:
 # ─── Helpers ──────────────────────────────────────────────────
 
 
-def _audio_track(lang: str = 'fr', **kw: Any) -> dict[str, Any]:
-    """Build a minimal audio track."""
-    t: dict[str, Any] = {'@type': 'Audio', 'Language': lang}
-    t.update(kw)
-    return t
 
 
-def _sub_track(lang: str = 'fr') -> dict[str, Any]:
-    """Build a minimal subtitle track."""
-    return {'@type': 'Text', 'Language': lang}
 
 
-def _mi(audio: list[dict[str, Any]], subs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    """Build mediainfo with given audio/sub tracks."""
-    tracks = list(audio)
-    if subs:
-        tracks.extend(subs)
-    return {'media': {'track': tracks}}
 
 
 def _meta_base(**overrides: Any) -> dict[str, Any]:

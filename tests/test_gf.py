@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.trackers.GF import GF
+from french_fixtures import audio_track as _audio_track, mediainfo as _mi, sub_track as _sub_track
 
 # ─── Helpers ──────────────────────────────────────────────────
 
@@ -85,22 +86,10 @@ def _meta_base(**overrides: Any) -> dict[str, Any]:
     return m
 
 
-def _audio_track(lang: str = 'fr', **kw: Any) -> dict[str, Any]:
-    t: dict[str, Any] = {'@type': 'Audio', 'Language': lang}
-    t.update(kw)
-    return t
 
 
-def _sub_track(lang: str = 'fr') -> dict[str, Any]:
-    return {'@type': 'Text', 'Language': lang}
 
 
-def _mi(audio: list[dict[str, Any]], subs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    tracks: list[dict[str, Any]] = [{'@type': 'General'}]
-    tracks.extend(audio)
-    if subs:
-        tracks.extend(subs)
-    return {'media': {'track': tracks}}
 
 
 def _run(coro):
