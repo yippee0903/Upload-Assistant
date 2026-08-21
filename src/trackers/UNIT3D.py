@@ -169,14 +169,20 @@ class UNIT3D:
             else:
                 meta["tracker_status"][self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
         except httpx.TimeoutException:
-            console.print("[bold red]Request timed out after 10 seconds")
+            self._dupe_search_failed(meta, "request timed out after 10 seconds")
         except httpx.RequestError as e:
-            console.print(f"[bold red]Unable to search for existing torrents: {e}")
+            self._dupe_search_failed(meta, str(e))
         except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
+            self._dupe_search_failed(meta, f"unexpected error: {e}")
             await asyncio.sleep(5)
 
         return dupes
+
+    def _dupe_search_failed(self, meta: dict[str, Any], reason: str) -> None:
+        """A failed search is not "no dupes": skip the tracker rather than upload over a possible dupe."""
+        console.print(f"[bold red]{self.tracker}: dupe search failed ({reason}); skipping tracker to avoid a false negative.[/bold red]")
+        meta["tracker_status"][self.tracker]["status_message"] = f"dupe search failed: {reason}"
+        meta["skipping"] = self.tracker
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         return {"name": meta["name"]}
