@@ -478,9 +478,9 @@ class ANT:
 
         params = {"t": "search", "o": "json"}
         if meta["tmdb"] != 0:
-            params["tmdb"] = meta["tmdb"]
+            params["tmdbid"] = str(meta["tmdb"])
         elif int(meta["imdb_id"]) != 0:
-            params["imdb"] = meta["imdb"]
+            params["imdbid"] = str(meta["imdb"])
 
         headers = {"X-API-Key": api_key.strip(), "User-Agent": f"Upload Assistant/2.4 ({platform.system()} {platform.release()})"}
 
