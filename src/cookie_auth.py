@@ -29,6 +29,63 @@ def _attr_to_string(value: Union[str, AttributeValueList, None]) -> str:
     return ""
 
 
+def extract_upload_error(html: str) -> str:
+    """Extract the useful error message from common tracker upload pages."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    def clean(value: str) -> str:
+        return " ".join(value.split()).strip(" :-")
+
+    # Modern tracker themes usually put all upload errors in this notification.
+    for element in soup.select(".notification-border-e .notification-body"):
+        message = clean(element.get_text(" ", strip=True))
+        if message:
+            return message
+
+    # Older themes mark the error heading, while the actual message is in its
+    # next sibling or in the nearest small container.
+    for element in soup.select("[class*='error']"):
+        element_message = clean(element.get_text(" ", strip=True))
+        if element_message and element_message.lower() not in {"error", "erro"}:
+            return element_message
+        for parent in [element, *element.parents]:
+            message = clean(parent.get_text(" ", strip=True))
+            if len(message) > len(element_message) and len(message) < 500:
+                message = re.sub(r"^(?:erro|error)\b", "", message, flags=re.IGNORECASE)
+                if message := clean(message):
+                    return message
+
+    for heading in soup.select("h1, h2, h3, h4"):
+        if not re.search(r"error|failed", heading.get_text(" ", strip=True), re.IGNORECASE):
+            continue
+        sibling = heading.find_next_sibling(["p", "div"])
+        message = clean(sibling.get_text(" ", strip=True)) if sibling else ""
+        if message:
+            return message
+
+    # A few trackers only return their upload-blocking notice.
+    for heading in soup.select("h1.dnu_header, h2.dnu_header, h3.dnu_header, #dnu_header"):
+        message = clean(heading.get_text(" ", strip=True))
+        if re.search(r"proib|permitid|not allowed|forbidden", message, re.IGNORECASE):
+            return message
+
+    # Some legacy pages render the complete error as one text node.
+    for text_parent in soup.select("td, div, p, h1, h2, h3, h4, b, span, font"):
+        raw_message = clean(text_parent.get_text(" ", strip=True))
+        if not re.match(r"^(?:error\s*:|upload failed!)", raw_message, re.IGNORECASE):
+            continue
+        for parent in [text_parent, *text_parent.parents]:
+            message = clean(parent.get_text(" ", strip=True))
+            if len(message) > 500 or not re.match(r"^(?:error\s*:|upload failed!)", message, re.IGNORECASE):
+                continue
+            message = re.sub(r"^(?:error\s*:|upload failed!?)\s*", "", message, flags=re.IGNORECASE)
+            message = re.sub(r"\s+Back$", "", message, flags=re.IGNORECASE)
+            if message := clean(message):
+                return message
+
+    return ""
+
+
 class CookieValidator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -681,6 +738,9 @@ class CookieAuthUploader:
             message.append(f"Expected status code '{success_status_code}', got '{response.status_code}'.")
         else:
             message.append("Unknown upload error.")
+
+        if error_message := extract_upload_error(response.text):
+            message.append(f"Tracker error: {error_message}")
 
         failure_path = await self.common.save_html_file(meta, tracker, response.text, "Failed_Upload")
         message.append(
