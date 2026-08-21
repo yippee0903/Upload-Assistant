@@ -27,5 +27,5 @@ bd query '<expr>'                     # query issues with a filter expression
 ## Notes
 
 - External PRs are **not** a triage surface for this repo.
-- The `.beads/` directory is committed to the repo — issue data travels with the code.
+- `.beads/` is excluded locally (`.git/info/exclude`) — issues are local to this machine only and never reach GitHub.
 - Use `bd --help` or `bd <command> --help` for full flag reference.

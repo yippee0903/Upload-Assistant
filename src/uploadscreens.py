@@ -4,7 +4,6 @@ import base64
 import contextlib
 import gc
 import glob
-import json
 import os
 import re
 import time
@@ -71,46 +70,6 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     return {"status": "failed", "reason": "Imgbox upload failed. No valid URLs returned."}
             except Exception as e:
                 return {"status": "failed", "reason": f"Error during Imgbox upload: {str(e)}"}
-
-        elif img_host == "ptpimg":
-            try:
-                payload = {"format": "json", "api_key": config["DEFAULT"]["ptpimg_api"].strip()}
-            except KeyError:
-                return {"status": "failed", "reason": "Missing ptpimg API key in config"}
-
-            try:
-                async with httpx.AsyncClient() as client:
-                    async with aiofiles.open(image, "rb") as file:
-                        files = {"file-upload[0]": (os.path.basename(image), await file.read())}
-                        headers = {"referer": "https://ptpimg.me/index.php"}
-
-                    try:
-                        response = await client.post("https://ptpimg.me/upload.php", headers=headers, data=payload, files=files, timeout=timeout)
-
-                        response.raise_for_status()
-                        response_data = cast(list[dict[str, Any]], response.json())
-
-                        if not response_data or "code" not in response_data[0]:
-                            return {"status": "failed", "reason": "Invalid JSON response from ptpimg"}
-
-                        code = str(response_data[0]["code"])
-                        ext = str(response_data[0]["ext"])
-                        img_url = f"https://ptpimg.me/{code}.{ext}"
-                        raw_url = img_url
-                        web_url = img_url
-
-                    except httpx.TimeoutException:
-                        console.print("[red][ptpimg] Request timed out.")
-                        return {"status": "failed", "reason": "Request timed out"}
-                    except json.JSONDecodeError as e:
-                        console.print(f"[red][ptpimg] JSONDecodeError: {str(e)}")
-                        return {"status": "failed", "reason": "Invalid JSON response from ptpimg"}
-                    except ValueError as e:
-                        console.print(f"[red][ptpimg] ValueError: {str(e)}")
-                        return {"status": "failed", "reason": f"Request failed: {str(e)}"}
-            except Exception as e:
-                console.print(f"[red][ptpimg] Exception: {str(e)}")
-                return {"status": "failed", "reason": f"Error during ptpimg upload: {str(e)}"}
 
         elif img_host == "imgbb":
             url = "https://api.imgbb.com/1/upload"
@@ -355,13 +314,18 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Request failed with error: {e}")
                 return {"status": "failed", "reason": str(e)}
 
-        elif img_host == "zipline":
-            url = config["DEFAULT"].get("zipline_url")
-            api_key = config["DEFAULT"].get("zipline_api_key")
+        elif img_host in ("zipline", "midnightscene"):
+            # MidnightScene runs a Zipline instance with a fixed URL
+            if img_host == "midnightscene":
+                url = "https://img.midnightscene.cc/api/upload"
+                api_key = config["DEFAULT"].get("midnightscene_api_key")
+            else:
+                url = config["DEFAULT"].get("zipline_url")
+                api_key = config["DEFAULT"].get("zipline_api_key")
 
             if not url or not api_key:
-                console.print("[red]Error: Missing Zipline URL or API key in config.")
-                return {"status": "failed", "reason": "Missing Zipline URL or API key"}
+                console.print(f"[red]Error: Missing {img_host} URL or API key in config.")
+                return {"status": "failed", "reason": f"Missing {img_host} URL or API key"}
 
             try:
                 async with aiofiles.open(image, "rb") as img_file:
@@ -375,8 +339,11 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     response = await client.post(url, files={"file": (filename, file_bytes)}, headers=headers, timeout=timeout)
                     if response.status_code == 200:
                         response_data = response.json()
-                        if "files" in response_data:
-                            img_url = response_data["files"][0]
+                        files = response_data.get("files") or []
+                        # Zipline v3 returns a list of URL strings, v4 a list of {"url": ...} objects
+                        first = files[0] if files else None
+                        img_url = first.get("url") if isinstance(first, dict) else first
+                        if isinstance(img_url, str) and img_url:
                             raw_url = img_url.replace("/u/", "/r/")
                             web_url = img_url.replace("/u/", "/r/")
                             return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
@@ -870,26 +837,28 @@ async def _upload_screens(
             console.print(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
             console.print(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
             console.print(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta['image_list']={len(image_list)}, cutoff={meta.get('cutoff', 1)}[/blue]")
-        if (len(successfully_uploaded) + len(image_list)) < images_needed and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
+        short = (len(successfully_uploaded) + len(image_list)) < images_needed
+        # On the initial host a shortfall switches; on a fallback host only a total failure does —
+        # a partial fallback result is stored below (the next host would re-upload the whole set).
+        if short and not using_custom_img_list and (not retry_mode or not successfully_uploaded):
             # Mark this host as failed so we don't retry it for other trackers
-            if "failed_image_hosts" not in meta:
-                meta["failed_image_hosts"] = []
-            if img_host not in meta["failed_image_hosts"]:
-                meta["failed_image_hosts"].append(img_host)
+            failed_hosts = cast(list[str], meta.setdefault("failed_image_hosts", []))
+            if img_host not in failed_hosts:
+                failed_hosts.append(img_host)
             if meta["debug"]:
                 console.print(f"[yellow]Marked '{img_host}' as failed for this session.[/yellow]")
 
-            img_host_num += 1
-            next_host_key = f"img_host_{img_host_num}"
-            if next_host_key in default_config:
-                meta["imghost"] = default_config[next_host_key]
-                console.print(f"[cyan]Switching to the next image host: {meta['imghost']}[/cyan]")
-
+            # Keep walking img_host_N after a fallback also fails (the chain used to stop at img_host_2)
+            for next_host_num in range(img_host_num + 1, 10):
+                next_host = str(default_config.get(f"img_host_{next_host_num}") or "").strip()
+                if not next_host or next_host in failed_hosts or (allowed_hosts is not None and next_host not in allowed_hosts):
+                    continue
+                meta["imghost"] = next_host
+                console.print(f"[cyan]Switching to the next image host: {next_host}[/cyan]")
                 gc.collect()
-                return await _upload_screens(config, meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
-            else:
-                console.print("[red]No more image hosts available. Aborting upload process.")
-                return image_list, len(image_list)
+                return await _upload_screens(config, meta, screens, next_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True, allowed_hosts=allowed_hosts)
+            console.print("[red]No more image hosts available. Aborting upload process.")
+            return image_list, len(image_list)
 
         # Process and store successfully uploaded images
         new_images: list[ImageDict] = []

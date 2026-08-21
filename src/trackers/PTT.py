@@ -22,6 +22,14 @@ class PTT(UNIT3D):
         self.banned_groups = ["ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2"]
         pass
 
+    async def get_category_id(self, meta: dict[str, Any], category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {"MOVIE": "1", "TV": "9"}
+        if mapping_only:
+            return category_id
+        if reverse:
+            return {v: k for k, v in category_id.items()}
+        return {"category_id": category_id.get(category or str(meta.get("category", "")), "0")}
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ptt_name = str(meta.get("name", ""))
         imdb_info = cast(dict[str, Any], meta.get("imdb_info", {}))

@@ -172,7 +172,7 @@ class FF:
         desc_parts: list[str] = []
 
         # Custom Header
-        desc_parts.append(await builder.get_custom_header())
+        desc_parts.append(await builder.get_custom_header(meta))
 
         # Logo
         logo_resize_url = meta.get("tmdb_logo", "")
@@ -226,7 +226,7 @@ class FF:
         # Screenshot Header
         images = meta.get("image_list", [])
         if isinstance(images, list) and images:
-            desc_parts.append(await builder.screenshot_header())
+            desc_parts.append(await builder.screenshot_header(meta))
 
             # Screenshots
             screenshots_block = ""

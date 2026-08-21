@@ -96,6 +96,17 @@ class SAM(UNIT3D):
 
         return {"name": re.sub(r"\s{2,}", " ", sam_name)}
 
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {"MOVIE": "1", "TV": "2", "ANIME": "3"}
+        if mapping_only:
+            return category_id
+        if reverse:
+            return {v: k for k, v in category_id.items()}
+        resolved = category or str(meta.get("category", ""))
+        if resolved == "TV" and meta.get("anime") is True:
+            resolved = "ANIME"
+        return {"category_id": category_id.get(resolved, "0")}
+
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),

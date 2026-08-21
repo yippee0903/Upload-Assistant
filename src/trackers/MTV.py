@@ -14,9 +14,8 @@ import pyotp
 from defusedxml import ElementTree as ET
 
 from src.console import console
-from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -33,13 +32,12 @@ class MTV:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "MTV"
         self.source_flag = "MTV"
         self.upload_url = "https://www.morethantv.me/upload.php"
         self.forum_link = "https://www.morethantv.me/wiki.php?action=article&id=73"
         self.search_url = "https://www.morethantv.me/api/torznab"
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb"]
+        self.approved_image_hosts = ["imgbox", "imgbb"]
         self.banned_groups = [
             "3LTON",
             "[Oj]",
@@ -102,16 +100,6 @@ class MTV:
     async def async_json_dumps(self, obj: Any) -> str:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, json.dumps, obj)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         common = COMMON(config=self.config)
@@ -678,17 +666,14 @@ class MTV:
         return False
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
-        if meta["type"] not in ["WEBDL"] and meta.get("tag", "") and any(x in meta["tag"] for x in ["EVO"]):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for raw type content at {self.tracker}[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "MTV"
-                    return []
-            else:
-                meta["skipping"] = "MTV"
-                return []
+        if (
+            meta["type"] not in ["WEBDL"]
+            and meta.get("tag", "")
+            and any(x in meta["tag"] for x in ["EVO"])
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for raw type content at {self.tracker}")
+        ):
+            meta["skipping"] = "MTV"
+            return []
 
         allowed_anime = [
             "Thighs",
@@ -764,17 +749,11 @@ class MTV:
             genres_list.append(str(genres_value))
         keywords_lower = {k.lower() for k in keywords_list if k}
         genres_lower = {g.lower() for g in genres_list if g}
-        if any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "MTV"
-                    return []
-            else:
-                meta["skipping"] = "MTV"
-                return []
+        if (any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres)) and not ask_to_continue(
+            meta, f"Porn/xxx is not allowed at {self.tracker}."
+        ):
+            meta["skipping"] = "MTV"
+            return []
 
         dupes: list[dict[str, Any]] = []
 

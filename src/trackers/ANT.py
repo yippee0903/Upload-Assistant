@@ -3,7 +3,6 @@ import asyncio
 import json
 import os
 import platform
-import re
 from pathlib import Path
 from typing import Any, Union
 
@@ -15,7 +14,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -305,9 +304,7 @@ class ANT:
         else:
             data.update({"noreleasegroup": 1})
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                 console.print("[bold red]Adult content detected[/bold red]")
                 if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
@@ -412,7 +409,7 @@ class ANT:
         user_desc: str = await builder.get_user_description(meta)
         if user_desc:
             # Custom Header
-            desc_parts.append(await builder.get_custom_header())
+            desc_parts.append(await builder.get_custom_header(meta))
 
             # Logo
             logo_resize_url = str(meta.get("tmdb_logo", ""))
@@ -481,9 +478,9 @@ class ANT:
 
         params = {"t": "search", "o": "json"}
         if meta["tmdb"] != 0:
-            params["tmdb"] = meta["tmdb"]
+            params["tmdbid"] = str(meta["tmdb"])
         elif int(meta["imdb_id"]) != 0:
-            params["imdb"] = meta["imdb"]
+            params["imdbid"] = str(meta["imdb"])
 
         headers = {"X-API-Key": api_key.strip(), "User-Agent": f"Upload Assistant/2.4 ({platform.system()} {platform.release()})"}
 

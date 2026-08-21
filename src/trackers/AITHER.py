@@ -8,6 +8,8 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class AITHER(UNIT3D):
+    REGION_IDS = {"FIN": "244", "SWE": "246", "CZE": "247", "EST": "248"}
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="AITHER")
         self.config = config

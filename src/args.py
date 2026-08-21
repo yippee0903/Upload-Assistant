@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import Any, Optional, cast
 
 from src.console import console
+from src.imagehosts import UPLOAD_HOSTS
 
 
 class ShortHelpFormatter(argparse.HelpFormatter):
@@ -103,7 +104,7 @@ class Args:
             default=None,
         )
         parser.add_argument("--unit3d", action="store_true", required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
-        parser.add_argument("-s", "--screens", nargs=1, required=False, help="Number of screenshots", default=int(self.config["DEFAULT"]["screens"]))
+        parser.add_argument("-s", "--screens", nargs=1, type=int, required=False, help="Number of screenshots", default=int(self.config["DEFAULT"]["screens"]))
         parser.add_argument(
             "-comps",
             "--comparison",
@@ -278,23 +279,7 @@ class Args:
             nargs=1,
             required=False,
             help="Image Host",
-            choices=[
-                "imgbb",
-                "ptpimg",
-                "imgbox",
-                "pixhost",
-                "lensdump",
-                "ptscreens",
-                "onlyimage",
-                "dalexni",
-                "zipline",
-                "passtheimage",
-                "seedpool_cdn",
-                "sharex",
-                "utppm",
-                "lostimg",
-                "postimg",
-            ],
+            choices=list(UPLOAD_HOSTS),
         )
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")
         parser.add_argument("-th", "--torrenthash", nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
@@ -360,6 +345,9 @@ class Args:
             dest="force_recheck",
         )
         parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BHD, LST)")
+        parser.add_argument("-feat", "--featured", action="store_true", required=False, help="Featured torrent (UNIT3D, staff only)")
+        parser.add_argument("-dup", "--double-upload", dest="doubleup", action="store_true", required=False, help="Double upload (UNIT3D, internal/staff only)")
+        parser.add_argument("-stk", "--sticky", action="store_true", required=False, help="Sticky/pinned torrent (UNIT3D, staff only)")
         parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
@@ -407,6 +395,7 @@ class Args:
             "-fl",
             "--freeleech",
             nargs=1,
+            type=int,
             required=False,
             help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values",
             default=0,

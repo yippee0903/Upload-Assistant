@@ -95,7 +95,7 @@ class GPW:
             "Xiaomi",
             "YIFY",
         ]
-        self.approved_image_hosts = ["kshare", "pixhost", "ptpimg", "pterclub", "ilikeshots", "imgbox"]
+        self.approved_image_hosts = ["kshare", "pixhost", "pterclub", "ilikeshots", "imgbox"]
 
     async def load_cookies(self, meta: dict[str, Any]) -> Any:
         cookie_file = os.path.abspath(f"{meta['base_dir']}/data/cookies/{self.tracker}.txt")
@@ -235,22 +235,12 @@ class GPW:
 
         return title if title and title != meta.get("title") else ""
 
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
-
     async def get_release_desc(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []
 
         # Custom Header
-        custom_header = await builder.get_custom_header()
+        custom_header = await builder.get_custom_header(meta)
         desc_parts.append(custom_header)
 
         # Logo
@@ -289,7 +279,7 @@ class GPW:
             desc_parts.append("[center]\n" + menu_screenshots_block + "[/center]")
 
         # Screenshot Header
-        screenshot_header = await builder.screenshot_header()
+        screenshot_header = await builder.screenshot_header(meta)
         desc_parts.append(screenshot_header)
 
         # Screenshots

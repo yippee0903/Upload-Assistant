@@ -8,8 +8,7 @@ import aiofiles
 from src.bbcode import BBCODE
 from src.console import console
 from src.languages import languages_manager
-from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -21,14 +20,13 @@ class OE(UNIT3D):
         super().__init__(config, tracker_name="OE")
         self.config: Config = config
         self.common = COMMON(config)
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "OE"
         self.base_url = "https://onlyencodes.cc"
         self.id_url = f"{self.base_url}/api/torrents/"
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
         self.banned_groups = [
             "0neshot",
             "3LT0N",
@@ -168,9 +166,7 @@ class OE(UNIT3D):
         pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             if not meta["unattended"]:
                 console.print("[bold red]Erotic not allowed at OE.")
             return False
@@ -179,16 +175,6 @@ class OE(UNIT3D):
             meta["is_disc"] != "BDMV"
             and not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True)
         )
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding="utf8") as f:

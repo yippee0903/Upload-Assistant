@@ -224,18 +224,7 @@ class GF(FrenchTrackerMixin, UNIT3D):
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         """Enforce French language requirements and auto-generate NFO."""
-        french_languages = ["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca"]
-
-        if not await self.common.check_language_requirements(
-            meta,
-            self.tracker,
-            languages_to_check=french_languages,
-            check_audio=True,
-            check_subtitle=True,
-            require_both=False,
-        ):
-            if not meta.get("unattended", False):
-                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+        if not await self._check_french_language(meta, languages_to_check=["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca"]):
             return False
 
         # Auto-generate NFO if not provided (GF requires NFO for VOSTFR & multi)

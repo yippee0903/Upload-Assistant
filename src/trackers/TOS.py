@@ -1,18 +1,43 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import os
+import re
 from typing import Any, Optional, cast
 
-import cli_ui
 import httpx
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, mi_tracks
 from src.trackers.FRENCH import FrenchTrackerMixin
+from src.trackers.french.rules import FRENCH_LANGUAGE_RULE, Rule
 from src.trackers.UNIT3D import UNIT3D, QueryValue
+
+_SAFE_FILENAME = re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
+
+# Minimum video bitrate (kbps): codec -> resolution -> type
+_MIN_KBPS: dict[str, dict[str, dict[str, int]]] = {
+    "x264": {"720p": {"WEBDL": 3000, "ENCODE": 4000}, "1080p": {"WEBDL": 5000, "ENCODE": 8000}, "2160p": {"WEBDL": 10000, "ENCODE": 16000}},
+    "x265": {"720p": {"WEBDL": 2000, "ENCODE": 3000}, "1080p": {"WEBDL": 3500, "ENCODE": 6000}, "2160p": {"WEBDL": 8000, "ENCODE": 12000}},
+    "AV1": {"720p": {"WEBDL": 2000, "ENCODE": 2400}, "1080p": {"WEBDL": 3000, "ENCODE": 4000}, "2160p": {"WEBDL": 5000, "ENCODE": 8000}},
+}
+_ANIME_MIN_KBPS: dict[str, dict[str, dict[str, int]]] = {
+    "x264": {"720p": {"WEBDL": 1800, "ENCODE": 2300}, "1080p": {"WEBDL": 3000, "ENCODE": 5000}, "2160p": {"WEBDL": 6000, "ENCODE": 10000}},
+    "x265": {"720p": {"WEBDL": 1200, "ENCODE": 1800}, "1080p": {"WEBDL": 2000, "ENCODE": 3500}, "2160p": {"WEBDL": 4000, "ENCODE": 8000}},
+    "AV1": {"720p": {"WEBDL": 1200, "ENCODE": 1500}, "1080p": {"WEBDL": 1500, "ENCODE": 2000}, "2160p": {"WEBDL": 3000, "ENCODE": 4000}},
+}
+_CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x265": "x265", "HEVC": "x265", "AV1": "AV1"}
 
 
 class TOS(FrenchTrackerMixin, UNIT3D):
+    RULES = (
+        FRENCH_LANGUAGE_RULE,
+        Rule("no_light_reencode", "strict", "No 4KLight/HDLight re-encodes", evidence="name"),
+        Rule("safe_filenames", "strict", "File and folder names limited to letters, digits, space . - _ + [ ]", evidence="filesystem"),
+        Rule("scene_nfo", "strict", "Scene releases must ship their NFO", evidence="filesystem"),
+        Rule("video_bitrate_minimum", "waivable", "Minimum video bitrate per codec/resolution/type (lower thresholds for anime)"),
+        Rule("video_bitrate_unknown", "waivable", "Video bitrate must be readable from MediaInfo to verify the minimum"),
+    )
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="TOS")
         self.config = config
@@ -38,16 +63,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         # Hosts verified to actually render on the site; other common hosts
         # (pixhost, lostimg) come out as dead images there.
         self.approved_image_hosts = ["ptscreens", "imgbb", "imgbox"]
-        self.rehost_images_manager = RehostImagesManager(config)
         pass
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
         image_list = cast(list[dict[str, str]], meta["TOS_images_key"] if "TOS_images_key" in meta else meta.get("image_list", []))
@@ -438,149 +454,60 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         return {"name": name}
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        import os
-        import re as _re
-
-        # TOS forbids light re-encodes (4KLight / HDLight). The minimum-bitrate
-        # check below catches most of them indirectly, but this rejects the label
-        # itself — regardless of bitrate — with a clear reason. Detected from the
-        # source filename (uuid), like the rest of the 4klight/hdlight handling.
+        # Light re-encodes are detected from the source filename (uuid), like the rest of the 4klight/hdlight handling.
         uuid = str(meta.get("uuid", "")).lower()
-        if "4klight" in uuid or "hdlight" in uuid:
-            if not meta.get("unattended", False):
-                console.print(f"[bold red]{self.tracker}: 4KLight/HDLight re-encodes are not allowed on TOS.[/bold red]")
+        if ("4klight" in uuid or "hdlight" in uuid) and not self._rule_failed(meta, "no_light_reencode", "4KLight/HDLight re-encodes are not allowed."):
             return False
 
-        # TOS rejects filenames with special characters (e.g. parentheses).
-        # Check both the release folder name and all individual files.
-        _SAFE_FILENAME = _re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
         path_basename = os.path.basename(os.path.normpath(str(meta.get("path", ""))))
         candidate_names = [path_basename] + [os.path.basename(f) for f in meta.get("filelist", [])]
         problem_files = [n for n in candidate_names if n and not _SAFE_FILENAME.match(n)]
-        if problem_files:
-            if not meta.get("unattended", False):
-                console.print(f"[bold red]{self.tracker}: Release contains filename(s) with special characters not accepted by TOS.[/bold red]")
-                for f in problem_files[:3]:
-                    console.print(f"[bold yellow]  → {f}[/bold yellow]")
+        if problem_files and not self._rule_failed(meta, "safe_filenames", "Release contains filename(s) with special characters.", tuple(problem_files[:3])):
             return False
 
-        # Check language requirements: must be French audio OR original audio with French subtitles
-        french_languages = ["french", "fre", "fra", "fr", "français", "francais"]
-        if not await self.common.check_language_requirements(
-            meta,
-            self.tracker,
-            languages_to_check=french_languages,
-            check_audio=True,
-            check_subtitle=True,
-            require_both=False,
-            original_language=True,
+        if not await self._check_french_language(meta, languages_to_check=["french", "fre", "fra", "fr", "français", "francais"], original_language=True):
+            return False
+
+        if (
+            meta.get("scene", False)
+            and not meta.get("nfo")
+            and not meta.get("auto_nfo")
+            and not self._rule_failed(meta, "scene_nfo", "Scene release detected but no NFO file found.")
         ):
-            if not meta.get("unattended", False):
-                console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
-        # Check if it's a Scene release without NFO - TOS requires NFO for Scene releases
-        if meta.get("scene", False) and not meta.get("nfo") and not meta.get("auto_nfo"):
-            console.print(f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]")
-            return False
+        return await self._check_minimum_bitrate(meta)
 
-        # ── Minimum bitrate requirements (kbps) per codec / resolution / type ──
-        # Anime has lower thresholds per TOS rules.
+    async def _check_minimum_bitrate(self, meta: dict[str, Any]) -> bool:
+        """Minimum video bitrate (kbps) per codec / resolution / type; anime has lower thresholds."""
+        if meta.get("is_disc") or meta.get("type") not in ("ENCODE", "WEBDL"):
+            return True
         is_anime = bool(meta.get("anime", False))
+        thresholds = _ANIME_MIN_KBPS if is_anime else _MIN_KBPS
+        resolution = meta.get("resolution", "")
+        release_type = meta.get("type", "")
+        video_codec = meta.get("video_codec", "")
+        codec_key = _CODEC_KEYS.get(video_codec)
+        if not codec_key or resolution not in thresholds.get(codec_key, {}):
+            if meta.get("debug"):
+                console.print(f"[dim]{self.tracker}: No bitrate rules for {video_codec} at {resolution} — skipping check.[/dim]")
+            return True
 
-        bitrate_minimums: dict[str, dict[str, dict[str, int]]] = {
-            "x264": {
-                "720p": {"WEBDL": 3000, "ENCODE": 4000},
-                "1080p": {"WEBDL": 5000, "ENCODE": 8000},
-                "2160p": {"WEBDL": 10000, "ENCODE": 16000},
-            },
-            "x265": {
-                "720p": {"WEBDL": 2000, "ENCODE": 3000},
-                "1080p": {"WEBDL": 3500, "ENCODE": 6000},
-                "2160p": {"WEBDL": 8000, "ENCODE": 12000},
-            },
-            "AV1": {
-                "720p": {"WEBDL": 2000, "ENCODE": 2400},
-                "1080p": {"WEBDL": 3000, "ENCODE": 4000},
-                "2160p": {"WEBDL": 5000, "ENCODE": 8000},
-            },
-        }
+        min_kbps = thresholds[codec_key][resolution][release_type]
+        video_track = next((t for t in mi_tracks(meta, "Video")), None)
+        raw_br = video_track.get("BitRate") if video_track else None
+        try:
+            bit_rate_kbps = int(raw_br) / 1000 if raw_br else None
+        except (ValueError, TypeError):
+            bit_rate_kbps = None
 
-        anime_minimums: dict[str, dict[str, dict[str, int]]] = {
-            "x264": {
-                "720p": {"WEBDL": 1800, "ENCODE": 2300},
-                "1080p": {"WEBDL": 3000, "ENCODE": 5000},
-                "2160p": {"WEBDL": 6000, "ENCODE": 10000},
-            },
-            "x265": {
-                "720p": {"WEBDL": 1200, "ENCODE": 1800},
-                "1080p": {"WEBDL": 2000, "ENCODE": 3500},
-                "2160p": {"WEBDL": 4000, "ENCODE": 8000},
-            },
-            "AV1": {
-                "720p": {"WEBDL": 1200, "ENCODE": 1500},
-                "1080p": {"WEBDL": 1500, "ENCODE": 2000},
-                "2160p": {"WEBDL": 3000, "ENCODE": 4000},
-            },
-        }
-
-        # Map video_codec values to our table keys
-        codec_map: dict[str, str] = {
-            "H264": "x264",
-            "x264": "x264",
-            "AVC": "x264",
-            "H265": "x265",
-            "x265": "x265",
-            "HEVC": "x265",
-            "AV1": "AV1",
-        }
-
-        bitrate_error = False
-        thresholds_table = anime_minimums if is_anime else bitrate_minimums
-
-        if not meta.get("is_disc") and meta.get("type") in ("ENCODE", "WEBDL"):
-            resolution = meta.get("resolution", "")
-            release_type = meta.get("type", "")
-            video_codec = meta.get("video_codec", "")
-            codec_key = codec_map.get(video_codec)
-
-            if not codec_key:
-                if meta.get("debug"):
-                    console.print(f"[dim]{self.tracker}: No bitrate rules for codec '{video_codec}' — skipping check.[/dim]")
-            elif resolution not in thresholds_table.get(codec_key, {}):
-                if meta.get("debug"):
-                    console.print(f"[dim]{self.tracker}: No bitrate rules for {codec_key} at {resolution} — skipping check.[/dim]")
-            else:
-                min_kbps = thresholds_table[codec_key][resolution][release_type]
-                tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
-                video_track = next((t for t in tracks if t.get("@type") == "Video"), None)
-                if video_track is None:
-                    if not meta.get("unattended", False):
-                        console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                    bitrate_error = True
-                else:
-                    raw_br = video_track.get("BitRate")
-                    try:
-                        bit_rate_kbps = int(raw_br) / 1000 if raw_br else None
-                    except (ValueError, TypeError):
-                        bit_rate_kbps = None
-
-                    if bit_rate_kbps is None:
-                        if not meta.get("unattended", False):
-                            console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                        bitrate_error = True
-                    elif bit_rate_kbps < min_kbps:
-                        label = f"{codec_key} (anime)" if is_anime else codec_key
-                        if not meta.get("unattended", False):
-                            console.print(f"[bold red]{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for {label}.[/bold red]")
-                            console.print(f"[bold yellow]Must be >= {min_kbps} kbps for {resolution}.[/bold yellow]")
-                        bitrate_error = True
-
-        if bitrate_error:
-            if meta.get("unattended", False):
-                return False
-            return cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
-
+        if bit_rate_kbps is None:
+            return self._rule_failed(meta, "video_bitrate_unknown", "Could not determine video bitrate from mediainfo.")
+        if bit_rate_kbps < min_kbps:
+            label = f"{codec_key} (anime)" if is_anime else codec_key
+            return self._rule_failed(
+                meta, "video_bitrate_minimum", f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for {label}.", (f"Must be >= {min_kbps} kbps for {resolution}.",)
+            )
         return True
 
     async def _build_audio_string(self, meta):

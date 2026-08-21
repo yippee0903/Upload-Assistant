@@ -418,7 +418,7 @@ async def exportInfo(
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
             if result.returncode == 0 and result.stdout:
                 media_info = result.stdout
@@ -459,7 +459,7 @@ async def exportInfo(
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30)
+            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
             if result.returncode == 0 and result.stdout:
                 media_info_json = result.stdout

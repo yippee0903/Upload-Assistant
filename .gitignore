@@ -30,3 +30,4 @@ venv/*
 .pyright
 web_ui/static/js/node_modules/
 graphify-out/
+data/update_check.json

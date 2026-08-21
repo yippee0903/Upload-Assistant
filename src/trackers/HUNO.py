@@ -8,7 +8,6 @@ import aiofiles
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -18,7 +17,6 @@ class HUNO(UNIT3D):
         super().__init__(config, tracker_name="HUNO")
         self.config = config
         self.common = COMMON(config)
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "HUNO"
         self.base_url = "https://hawke.uno"
         self.id_url = f"{self.base_url}/api/torrents/"
@@ -70,7 +68,7 @@ class HUNO(UNIT3D):
             "YIFY",
             "YTS",
         ]
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "imagebam"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "pixhost", "imagebam"]
         pass
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
@@ -128,14 +126,6 @@ class HUNO(UNIT3D):
     async def get_stream(self, meta: dict[str, Any]) -> dict[str, str]:
         return {"stream": str(await self.is_plex_friendly(meta))}
 
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
         image_list = meta["HUNO_images_key"] if "HUNO_images_key" in meta else meta["image_list"]
 
@@ -144,7 +134,7 @@ class HUNO(UNIT3D):
         }
 
     async def get_mediainfo(self, meta: dict[str, Any]) -> dict[str, str]:
-        if meta["bdinfo"] is not None:
+        if meta.get("is_disc") == "BDMV":
             mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
         else:
             async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:

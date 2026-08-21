@@ -10,7 +10,7 @@ import httpx
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 
 
 class RTF:
@@ -197,9 +197,7 @@ class RTF:
             List of dictionaries containing information about existing torrents (dupes).
             Returns empty list if content is ineligible or search fails.
         """
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             console.print("[bold red]Erotic not allowed at RTF.")
             meta["skipping"] = "RTF"
             return []

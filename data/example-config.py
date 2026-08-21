@@ -6,6 +6,10 @@ config = {
 
         # will print a notice if an update is available
         "update_notification": True,
+        # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
+        "personal_release_groups": [],
+        # Drop dupe-search results whose size differs from yours by at least this many percent (either direction). 0/None = off
+        "dupe_size_difference_tolerance": None,
         # will print the changelog if an update is available
         "verbose_notification": False,
 
@@ -57,7 +61,7 @@ config = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -67,7 +71,6 @@ config = {
 
         # image host api keys
         "imgbb_api": "",
-        "ptpimg_api": "",
         "lensdump_api": "",
         "ptscreens_api": "",
         "onlyimage_api": "",
@@ -87,6 +90,8 @@ config = {
         "lostimg_api": "",
         # postimages.org API key (https://postimages.org/login/api)
         "postimg_api": "",
+        # img.midnightscene.cc API key (MidnightScene members)
+        "midnightscene_api_key": "",
 
         # GETTING METADATA
 
@@ -264,6 +269,11 @@ config = {
         # Allows adding a custom signature, in BBCode, at the bottom of the description section
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_signature": "",
+
+        # Per release-group overrides of the text fields above (custom_description_header, screenshot_header, custom_signature).
+        # Matched against the detected group tag, case-insensitive; also accepted inside a tracker section.
+        # "tag_overrides": {"GRP": {"custom_signature": "[center]Encoded by GRP[/center]"}},
+        "tag_overrides": {},
 
         # Add bluray.com link to description
         # Requires "get_bluray_info" to be set to True
@@ -1077,6 +1087,8 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # Optional: stateless API key (qBittorrent 5.2+); when set, qbit_user/qbit_pass are ignored
+            "qbit_api_key": "",
             # List of trackers to activate "super-seed" (or "initial seeding") mode when adding the torrent.
             # https://www.bittorrent.org/beps/bep_0016.html
             # Super-seed mode is NOT recommended for general use.
@@ -1127,6 +1139,8 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # Optional: stateless API key (qBittorrent 5.2+); when set, qbit_user/qbit_pass are ignored
+            "qbit_api_key": "",
         },
         "rtorrent": {
             "torrent_client": "rtorrent",

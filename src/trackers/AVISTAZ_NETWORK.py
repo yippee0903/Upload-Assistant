@@ -21,7 +21,7 @@ from src.console import console
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -225,15 +225,14 @@ class AZTrackerBase:
                     meta["skipping"] = f"{self.tracker}"
                     return duplicates
 
-        if meta["type"] not in ["WEBDL"] and self.tracker == "PHD" and meta.get("tag", "") in ["FGT", "EVO"]:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for web-dl[/bold red]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    meta["skipping"] = f"{self.tracker}"
-                    return duplicates
-            else:
-                meta["skipping"] = f"{self.tracker}"
-                return duplicates
+        if (
+            meta["type"] not in ["WEBDL"]
+            and self.tracker == "PHD"
+            and str(meta.get("tag") or "").lstrip("-") in ["FGT", "EVO"]
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for web-dl")
+        ):
+            meta["skipping"] = f"{self.tracker}"
+            return duplicates
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
@@ -482,10 +481,11 @@ class AZTrackerBase:
 
     async def get_screenshots(self, meta: Meta) -> Optional[list[str]]:
         screenshot_dir = Path(meta["base_dir"]) / "tmp" / meta["uuid"]
-        local_files = sorted(screenshot_dir.glob("*.png"))
+        local_files = sorted(path for path in screenshot_dir.glob("*.png") if path.is_file() and not path.stem.upper().startswith(("POSTER", "COVER")))
         results: list[str] = []
 
-        limit = 3 if meta.get("tv_pack", "") == 0 else 15
+        # single episodes get 3 screenshots; movies and season packs up to 15
+        limit = 3 if (meta.get("category") == "TV" and meta.get("tv_pack", "") == 0) else 15
 
         disc_menu_links = [img.get("raw_url") for img in meta.get("menu_images", []) if img.get("raw_url")][
             :12

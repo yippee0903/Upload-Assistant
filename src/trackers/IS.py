@@ -47,7 +47,7 @@ class IS:
         desc_parts: list[str] = []
 
         # Custom Header
-        desc_parts.append(await builder.get_custom_header())
+        desc_parts.append(await builder.get_custom_header(meta))
 
         # TV
         title, _, episode_overview = await builder.get_tv_info(meta, resize=True)

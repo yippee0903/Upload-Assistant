@@ -6,12 +6,10 @@ import re
 from typing import Any, Optional, Union, cast
 
 import aiofiles
-import cli_ui
 import httpx
 
 from src.console import console
-from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 
 
 class BHD:
@@ -25,7 +23,6 @@ class BHD:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "BHD"
         self.source_flag = "BHD"
         self.upload_url = "https://beyond-hd.me/api/upload/"
@@ -66,18 +63,8 @@ class BHD:
             "OFT",
             "TGS",
         ]
-        self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "imagebam"]
+        self.approved_image_hosts = ["imgbox", "imgbb", "pixhost", "bhd", "imagebam"]
         pass
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return None
 
     async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
         common = COMMON(config=self.config)
@@ -364,17 +351,9 @@ class BHD:
                 "-irobot",
                 "-beyondhd",
             )
-        ):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "BHD"
-                    return []
-            else:
-                meta["skipping"] = "BHD"
-                return []
+        ) and not ask_to_continue(meta, "This is an internal BHD release, skipping upload"):
+            meta["skipping"] = "BHD"
+            return []
 
         if not meta["valid_mi_settings"]:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
@@ -387,31 +366,18 @@ class BHD:
             meta["skipping"] = "BHD"
             return []
 
-        if meta["type"] not in ["WEBDL"] and meta.get("tag", "") and any(x in meta["tag"] for x in ["EVO"]):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for raw type content at BHD[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "BHD"
-                    return []
-            else:
-                meta["skipping"] = "BHD"
-                return []
+        if (
+            meta["type"] not in ["WEBDL"]
+            and meta.get("tag", "")
+            and any(x in meta["tag"] for x in ["EVO"])
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for raw type content at BHD")
+        ):
+            meta["skipping"] = "BHD"
+            return []
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print("[bold red]Porn/xxx is not allowed at BHD.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "BHD"
-                    return []
-            else:
-                meta["skipping"] = "BHD"
-                return []
+        if is_adult(meta) and not ask_to_continue(meta, "Porn/xxx is not allowed at BHD."):
+            meta["skipping"] = "BHD"
+            return []
 
         dupes: list[dict[str, Any]] = []
         category = meta["category"]

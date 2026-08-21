@@ -4,7 +4,7 @@ import glob
 import json
 import os
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -12,6 +12,7 @@ import aiofiles
 from aiofiles import os as aio_os
 
 from src.console import console
+from src.imagehosts import host_slug
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
@@ -34,8 +35,7 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
     if relevant:
         console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(relevant)}[/yellow]")
     for tracker_name in relevant:
-        tracker_instance = tracker_class_map[tracker_name](config=config)
-        await tracker_instance.check_image_hosts(meta)
+        await check_tracker_image_hosts(meta, config, tracker_class_map[tracker_name](config=config))
         images_key = f"{tracker_name}_images_key"
         if meta.get(images_key):
             console.print(f"[green]{tracker_name}: {len(meta[images_key])} image(s) ready on approved hosts.[/green]")
@@ -44,33 +44,55 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
     return relevant
 
 
-# Canonical domain → image-host slug mapping, shared by every tracker.
-# The per-tracker policy lives in each tracker's approved_image_hosts list;
-# this table only serves to recognize where an existing image is hosted.
-URL_HOST_MAPPING: dict[str, str] = {
-    "beyondhd.co": "bhd",
-    "cdn.seedpool.org": "seedpool_cdn",
-    "digitalcore.club": "sharex",
-    "ibb.co": "imgbb",
-    "imagebam.com": "imagebam",
-    "img.digitalcore.club": "sharex",
-    "img.passtheima.ge": "passtheimage",
-    "img.pterclub.com": "pterclub",
-    "imgbb.com": "imgbb",
-    "imgbox.com": "imgbox",
-    "imgur.com": "imgur",
-    "kshare.club": "kshare",
-    "lensdump.com": "lensdump",
-    "lostimg.cc": "lostimg",
-    "onlyimage.org": "onlyimage",
-    "passtheima.ge": "passtheimage",
-    "pixhost.to": "pixhost",
-    "postimg.cc": "postimg",
-    "ptpimg.me": "ptpimg",
-    "ptscreens.com": "ptscreens",
-    "utp.pm": "utppm",
-    "yes.ilikeshots.club": "ilikeshots",
-}
+async def check_tracker_image_hosts(meta: dict[str, Any], config: dict[str, Any], tracker_instance: Any) -> None:
+    """Rehost meta["image_list"] onto a host the tracker accepts; the result lands in meta[f"{tracker}_images_key"]."""
+    await RehostImagesManager(config).check_hosts(
+        meta,
+        tracker_instance.tracker,
+        img_host_index=1,
+        approved_image_hosts=tracker_instance.approved_image_hosts,
+    )
+
+
+def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
+    """img_host_1..img_host_9 from config, in priority order, deduplicated."""
+    default_cfg = config.get("DEFAULT", {}) if isinstance(config.get("DEFAULT", {}), dict) else {}
+    hosts: list[str] = []
+    for index in range(1, 10):
+        host = default_cfg.get(f"img_host_{index}")
+        if host and str(host) not in hosts:
+            hosts.append(str(host))
+    return hosts
+
+
+def choose_common_host(
+    approved_by_tracker: Mapping[str, Any],
+    configured_hosts: Sequence[str],
+    current_host: str,
+) -> tuple[Optional[list[str]], Optional[str]]:
+    """Pick image hosts every tracker accepts.
+
+    Returns (allowed_hosts, preferred_host): allowed_hosts is the list upload_screens
+    may use (None = no constraint could be computed); preferred_host is the host to
+    switch to when current_host is not acceptable to all trackers (None = keep it).
+    Configured hosts win, in config priority; otherwise the common set, sorted.
+    """
+    approved_sets: list[set[str]] = []
+    for approved in approved_by_tracker.values():
+        if not approved or not isinstance(approved, (list, set, tuple)):
+            return None, None
+        approved_sets.append({str(h) for h in cast(Iterable[Any], approved)})
+    if not approved_sets or not configured_hosts:
+        return None, None
+
+    common = set.intersection(*approved_sets)
+    common_configured = [h for h in configured_hosts if h in common]
+    if common_configured:
+        return common_configured, (None if current_host in common_configured else common_configured[0])
+    if common:
+        ordered = sorted(common)
+        return ordered, (None if current_host in common else ordered[0])
+    return None, None
 
 
 def _as_str(value: Any) -> Union[str, None]:
@@ -92,13 +114,6 @@ def _safe_remove(path: str) -> bool:
     return False
 
 
-async def match_host(hostname: str, approved_hosts: Iterable[str]) -> str:
-    for approved_host in approved_hosts:
-        if hostname == approved_host or hostname.endswith(f".{approved_host}"):
-            return approved_host
-    return hostname
-
-
 async def sanitize_filename(filename: str) -> str:
     # Replace invalid characters like colons with an underscore
     return re.sub(r'[<>:"/\\|?*]', "_", filename)
@@ -115,14 +130,12 @@ class RehostImagesManager:
         self,
         meta: dict[str, Any],
         tracker: str,
-        url_host_mapping: Optional[dict[str, str]] = None,
         img_host_index: int = 1,
         approved_image_hosts: Optional[list[str]] = None,
     ) -> tuple[list[dict[str, str]], bool, bool]:
         return await _check_hosts(
             meta,
             tracker,
-            url_host_mapping,
             img_host_index=img_host_index,
             approved_image_hosts=approved_image_hosts,
             default_config=self.default_config,
@@ -134,7 +147,6 @@ class RehostImagesManager:
         self,
         meta: dict[str, Any],
         tracker: str,
-        url_host_mapping: Optional[dict[str, str]] = None,
         approved_image_hosts: Optional[list[str]] = None,
         img_host_index: int = 1,
         file: Optional[str] = None,
@@ -142,7 +154,6 @@ class RehostImagesManager:
         return await _handle_image_upload(
             meta,
             tracker,
-            url_host_mapping,
             approved_image_hosts=approved_image_hosts,
             img_host_index=img_host_index,
             file=file,
@@ -155,7 +166,6 @@ class RehostImagesManager:
 async def _check_hosts(
     meta: dict[str, Any],
     tracker: str,
-    url_host_mapping: Optional[dict[str, str]] = None,
     img_host_index: int = 1,
     approved_image_hosts: Optional[list[str]] = None,
     default_config: Optional[Mapping[str, Any]] = None,
@@ -168,8 +178,6 @@ async def _check_hosts(
         raise ValueError("takescreens_manager is required")
     if uploadscreens_manager is None:
         raise ValueError("uploadscreens_manager is required")
-    if url_host_mapping is None:
-        url_host_mapping = URL_HOST_MAPPING
     if approved_image_hosts is None:
         approved_image_hosts = []
     new_images_key = f"{tracker}_images_key"
@@ -202,10 +210,9 @@ async def _check_hosts(
 
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = await match_host(hostname, url_host_mapping.keys())
+            mapped_host = host_slug(hostname)
 
             if mapped_host:
-                mapped_host = url_host_mapping.get(mapped_host, mapped_host)
                 if mapped_host in approved_image_hosts:
                     approved_images.append(image)
                     if meta["debug"]:
@@ -259,10 +266,9 @@ async def _check_hosts(
 
         parsed_url = urlparse(raw_url)
         hostname = parsed_url.netloc
-        mapped_host = await match_host(hostname, url_host_mapping.keys())
+        mapped_host = host_slug(hostname)
 
         if mapped_host:
-            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
             if mapped_host in approved_image_hosts:
                 reuploaded_by_host.setdefault(mapped_host, []).append(image)
             elif meta["debug"]:
@@ -286,8 +292,7 @@ async def _check_hosts(
         for image in tracker_images:
             raw_url = _as_str(image.get("raw_url")) or ""
             netloc = urlparse(raw_url).netloc
-            matched_host = await match_host(netloc, url_host_mapping.keys())
-            mapped_host = url_host_mapping.get(matched_host, matched_host)
+            mapped_host = host_slug(netloc)
             valid_hosts.append(mapped_host in approved_image_hosts)
 
         # Then check if all are valid
@@ -308,7 +313,6 @@ async def _check_hosts(
         image_list, retry_mode, images_reuploaded = await _handle_image_upload(
             meta,
             tracker,
-            url_host_mapping,
             approved_image_hosts,
             img_host_index=img_host_index,
             default_config=default_config,
@@ -340,7 +344,6 @@ async def _check_hosts(
 async def _handle_image_upload(
     meta: dict[str, Any],
     tracker: str,
-    url_host_mapping: Optional[dict[str, str]] = None,
     approved_image_hosts: Optional[list[str]] = None,
     img_host_index: int = 1,
     file: Optional[str] = None,
@@ -354,8 +357,6 @@ async def _handle_image_upload(
         raise ValueError("takescreens_manager is required")
     if uploadscreens_manager is None:
         raise ValueError("uploadscreens_manager is required")
-    if url_host_mapping is None:
-        url_host_mapping = URL_HOST_MAPPING
     if approved_image_hosts is None:
         approved_image_hosts = []
     original_imghost = meta.get("imghost")
@@ -665,8 +666,7 @@ async def _handle_image_upload(
             raw_url = image["raw_url"]
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = await match_host(hostname, url_host_mapping.keys())
-            mapped_host = url_host_mapping.get(mapped_host, mapped_host)
+            mapped_host = host_slug(hostname)
 
             if mapped_host not in approved_image_hosts:
                 console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
@@ -678,8 +678,7 @@ async def _handle_image_upload(
         valid_hosts: list[bool] = []
         for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
             netloc = urlparse(image["raw_url"]).netloc
-            matched_host = await match_host(netloc, url_host_mapping.keys())
-            mapped_host = url_host_mapping.get(matched_host, matched_host)
+            mapped_host = host_slug(netloc)
             valid_hosts.append(mapped_host in approved_image_hosts)
         if all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
             output_file = os.path.join(meta["base_dir"], "tmp", meta["uuid"], "covers.json") if tracker == "covers" else os.path.join(screenshots_dir, "reuploaded_images.json")

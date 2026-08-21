@@ -99,13 +99,16 @@ class DP(UNIT3D):
         if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True):
             return False
 
-        if meta["type"] not in ["WEBDL"] and meta.get("tag", "") in ["EVO"]:
-            if not meta["unattended"]:
-                console.print(f"[bold red]{self.tracker} does not allow EVO for non-WEBDL types, skipping upload.")
+        group = str(meta.get("tag") or "").lstrip("-").strip().upper()
+        if group == "EVO" and meta["type"] != "WEBDL":
+            console.print(f"[bold red]{self.tracker} only allows EVO releases when they are WEB-DLs. Skipping upload.")
+            return False
+        if group == "HDT" and meta["type"] != "REMUX":
+            console.print(f"[bold red]{self.tracker} only allows HDT releases when they are Remuxes. Skipping upload.")
             return False
 
-        if meta.get("hardcoded_subs", False) and not meta["unattended"]:
-            console.print(f"[bold red]{self.tracker} does not allow hardcoded subtitles.")
+        if meta.get("hardcoded_subs", False):
+            console.print(f"[bold red]{self.tracker} does not allow hardcoded subtitles. Skipping upload.")
             return False
 
         return should_continue

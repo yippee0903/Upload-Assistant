@@ -16,6 +16,11 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
+def _has_token(value: str, token: str) -> bool:
+    """Whole-token match: "V2" must not match the broadcaster "TV2"."""
+    return re.search(rf"(?<![A-Z0-9]){re.escape(token)}(?![A-Z0-9])", value, flags=re.IGNORECASE) is not None
+
+
 async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: Union[str, list[str]], meta: dict[str, Any]) -> tuple[str, str, str]:
     edition = ""
     imdb_info = cast(dict[str, Any], meta.get("imdb_info", {}))
@@ -354,11 +359,11 @@ async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: li
 
     # Handle repack info
     repack = ""
-    if "REPACK" in (video.upper() or edition.upper()) or "V2" in video:
+    if "REPACK" in (video.upper() or edition.upper()) or _has_token(video, "V2"):
         repack = "REPACK"
-    if "REPACK2" in (video.upper() or edition.upper()) or "V3" in video:
+    if "REPACK2" in (video.upper() or edition.upper()) or _has_token(video, "V3"):
         repack = "REPACK2"
-    if "REPACK3" in (video.upper() or edition.upper()) or "V4" in video:
+    if "REPACK3" in (video.upper() or edition.upper()) or _has_token(video, "V4"):
         repack = "REPACK3"
     if "PROPER" in (video.upper() or edition.upper()):
         repack = "PROPER"

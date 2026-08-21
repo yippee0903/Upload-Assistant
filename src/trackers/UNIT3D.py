@@ -67,13 +67,18 @@ class UNIT3D:
             "accept": "application/json",
         }
 
-        category_id = str((await self.get_category_id(meta))["category_id"])
         params_dict: dict[str, str] = {
-            "tmdbId": str(meta["tmdb"]),
-            "categories[]": category_id,
             "name": "",
             "perPage": "100",
         }
+        if meta.get("tmdb"):
+            # TMDb identifies the work across the tracker's subcategories (TV vs Anime),
+            # so don't also filter by category or sibling-category dupes are missed.
+            params_dict["tmdbId"] = str(meta["tmdb"])
+        else:
+            # No TMDb id: keep the category filter and tmdbId=0 rather than an unconstrained query
+            params_dict["tmdbId"] = "0"
+            params_dict["categories[]"] = str((await self.get_category_id(meta))["category_id"])
         params_list: Optional[ParamsList] = None
         if self.tracker not in ["OTW"]:
             resolutions = await self.get_resolution_id(meta)
@@ -290,8 +295,12 @@ class UNIT3D:
 
         return {}
 
+    # Site-local region ids that are not in the shared UNIT3D table (or differ from it); subclasses override.
+    REGION_IDS: dict[str, str] = {}
+
     async def get_region_id(self, meta: dict[str, Any]) -> dict[str, str]:
-        region_id = await self.common.unit3d_region_ids(meta.get("region", ""))
+        region = str(meta.get("region") or "").upper()
+        region_id = self.REGION_IDS.get(region) or await self.common.unit3d_region_ids(region)
         if region_id:
             return {"region_id": region_id}
 
@@ -320,7 +329,21 @@ class UNIT3D:
         return {"sd": f"{meta['sd']}"}
 
     async def get_keywords(self, meta: dict[str, Any]) -> dict[str, str]:
-        return {"keywords": meta.get("keywords", "")}
+        """Keywords joined with ", ", cut at whole words to fit UNIT3D's 255-char column."""
+        kept: list[str] = []
+        length = 0
+        for keyword in str(meta.get("keywords", "")).split(","):
+            keyword = keyword.strip()
+            if not keyword:
+                continue
+            needed = len(keyword) + (2 if kept else 0)
+            if length + needed > 255:
+                if not kept:
+                    kept.append(keyword[:255])
+                break
+            kept.append(keyword)
+            length += needed
+        return {"keywords": ", ".join(kept)}
 
     async def get_personal_release(self, meta: dict[str, Any]) -> dict[str, str]:
         personal_release = "1" if meta.get("personalrelease", False) else "0"
@@ -347,8 +370,8 @@ class UNIT3D:
 
         return data
 
-    async def get_featured(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"featured": "0"}
+    async def get_featured(self, meta: dict[str, Any]) -> dict[str, str]:
+        return {"featured": await self.get_flag(meta, "featured")}
 
     async def get_free(self, meta: dict[str, Any]) -> dict[str, str]:
         free = "0"
@@ -357,11 +380,16 @@ class UNIT3D:
 
         return {"free": free}
 
-    async def get_doubleup(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"doubleup": "0"}
+    async def get_doubleup(self, meta: dict[str, Any]) -> dict[str, str]:
+        doubleup = "0"
+        for flag in ("doubleup", "double_upload", "double_up"):  # config spellings in the wild
+            doubleup = await self.get_flag(meta, flag)
+            if doubleup == "1":
+                break
+        return {"doubleup": doubleup}
 
-    async def get_sticky(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"sticky": "0"}
+    async def get_sticky(self, meta: dict[str, Any]) -> dict[str, str]:
+        return {"sticky": await self.get_flag(meta, "sticky")}
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, str]:
         _REQUIRED_GETTERS = {"get_name", "get_category_id", "get_type_id", "get_resolution_id"}

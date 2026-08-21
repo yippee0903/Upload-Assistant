@@ -29,22 +29,6 @@ PIECE_SIZE_MAX = 134_217_728  # 128 MiB
 Meta: TypeAlias = MutableMapping[str, Any]
 
 
-def calculate_piece_size(
-    total_size: int,
-    min_size: int,
-    max_size: int,
-    meta: Mapping[str, Any],
-    piece_size: Optional[int] = None,
-) -> int:
-    return TorrentCreator.calculate_piece_size(
-        total_size=total_size,
-        min_size=min_size,
-        max_size=max_size,
-        meta=meta,
-        piece_size=piece_size,
-    )
-
-
 class CustomTorrent(torf.Torrent):
     def __init__(self, meta: Mapping[str, Any], *args: Any, **kwargs: Any) -> None:
         self._meta = meta
@@ -776,43 +760,3 @@ class TorrentCreator:
             raise FileNotFoundError(f"mkbrr binary not found: {binary_path}")
 
         return binary_path
-
-
-def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str]) -> str:
-    return TorrentCreator.build_mkbrr_exclude_string(root_folder, filelist)
-
-
-async def create_torrent(
-    meta: Meta,
-    path: Union[str, os.PathLike[str]],
-    output_filename: str,
-    tracker_url: Optional[str] = None,
-    piece_size: int = 0,
-) -> Union[str, Torrent]:
-    return await TorrentCreator.create_torrent(
-        meta=meta,
-        path=path,
-        output_filename=output_filename,
-        tracker_url=tracker_url,
-        piece_size=piece_size,
-    )
-
-
-def torf_cb(torrent: Torrent, filepath: str, pieces_done: int, pieces_total: int) -> None:
-    TorrentCreator.torf_cb(torrent, filepath, pieces_done, pieces_total)
-
-
-def create_random_torrents(base_dir: str, uuid: str, num: Union[int, str], path: str) -> None:
-    TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
-
-
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, content_path: Optional[str] = None) -> bool:
-    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid, content_path)
-
-
-async def strip_nfo_from_torrent(source_torrent_path: str, output_torrent_path: str, content_path: str) -> bool:
-    return await TorrentCreator.strip_nfo_from_torrent(source_torrent_path, output_torrent_path, content_path)
-
-
-def get_mkbrr_path(meta: Mapping[str, Any]) -> str:
-    return TorrentCreator.get_mkbrr_path(meta)

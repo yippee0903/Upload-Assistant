@@ -24,6 +24,39 @@ from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
 
+ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "adult", "orgy")
+
+
+def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?", default: bool = False) -> bool:
+    """Warn and let an interactive user override; unattended runs (without unattended_confirm) skip."""
+    if meta.get("unattended") and not meta.get("unattended_confirm", False):
+        console.print(f"[yellow]{msg} (unattended: skipping)[/yellow]")
+        return False
+    console.print(f"[bold red]{msg}[/bold red]")
+    return bool(cli_ui.ask_yes_no(question, default=default))
+
+
+def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
+    """True when TMDb keywords/genres contain an adult-content marker."""
+    genres = f"{meta.get('keywords', '')}, {meta.get('combined_genres', '')}"
+    return any(re.search(rf"(^|,\s*){re.escape(k)}(\s*,|$)", genres, re.IGNORECASE) for k in (*ADULT_KEYWORDS, *extra_keywords))
+
+
+def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:
+    """MediaInfo tracks of one @type ("General", "Video", "Audio", "Text") from meta["mediainfo"]."""
+    tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+    return [t for t in tracks if t.get("@type") == track_type]
+
+
+def is_lossless_dts(track: dict[str, Any]) -> bool:
+    commercial = str(track.get("Format_Commercial_IfAny") or "")
+    return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
+
+
+def is_lossless(track: dict[str, Any]) -> bool:
+    return track.get("Compression_Mode") == "Lossless" or track.get("Format") in ("FLAC", "PCM", "MLP FBA") or is_lossless_dts(track)
+
+
 # Module-level lock to serialize concurrent writes to pack_image_links.json
 _pack_image_links_lock: asyncio.Lock = asyncio.Lock()
 
@@ -2569,12 +2602,12 @@ class COMMON:
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.get("region") and meta.get("is_disc") == "BDMV":
+                if not meta.get("region") and meta.get("is_disc") in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta["region"] = region_name
-                if not meta.get("distributor") and meta.get("is_disc") == "BDMV":
+                if not meta.get("distributor") and meta.get("is_disc") in ("BDMV", "DVD"):
                     distributor_id = attributes.get("distributor_id")
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
@@ -2596,12 +2629,12 @@ class COMMON:
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.get("region") and meta.get("is_disc") == "BDMV":
+                    if not meta.get("region") and meta.get("is_disc") in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta["region"] = region_name
-                    if not meta.get("distributor") and meta.get("is_disc") == "BDMV":
+                    if not meta.get("distributor") and meta.get("is_disc") in ("BDMV", "DVD"):
                         distributor_id = attributes.get("distributor_id")
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
@@ -2751,102 +2784,6 @@ class COMMON:
         return ptgen_text
 
     class MediaInfoParser:
-        # Language to ISO country code mapping
-        LANGUAGE_CODE_MAP = {
-            "afrikaans": ("https://ptpimg.me/i9pt6k.png", "20"),
-            "albanian": ("https://ptpimg.me/sfhik8.png", "20"),
-            "amharic": ("https://ptpimg.me/zm816y.png", "20"),
-            "arabic": ("https://ptpimg.me/5g8i9u.png", "26x10"),
-            "armenian": ("https://ptpimg.me/zm816y.png", "20"),
-            "azerbaijani": ("https://ptpimg.me/h3rbe0.png", "20"),
-            "basque": ("https://ptpimg.me/xj51b9.png", "20"),
-            "belarusian": ("https://ptpimg.me/iushg1.png", "20"),
-            "bengali": ("https://ptpimg.me/jq996n.png", "20"),
-            "bosnian": ("https://ptpimg.me/19t9rv.png", "20"),
-            "brazilian": ("https://ptpimg.me/p8sgla.png", "20"),
-            "bulgarian": ("https://ptpimg.me/un9dc6.png", "20"),
-            "catalan": ("https://ptpimg.me/v4h5bf.png", "20"),
-            "chinese": ("https://ptpimg.me/ea3yv3.png", "20"),
-            "croatian": ("https://ptpimg.me/rxi533.png", "20"),
-            "czech": ("https://ptpimg.me/5m75n3.png", "20"),
-            "danish": ("https://ptpimg.me/m35c41.png", "20"),
-            "dutch": ("https://ptpimg.me/6nmwpx.png", "20"),
-            "dzongkha": ("https://ptpimg.me/56e7y5.png", "20"),
-            "english": ("https://ptpimg.me/ine2fd.png", "25x10"),
-            "english (gb)": ("https://ptpimg.me/a9w539.png", "20"),
-            "estonian": ("https://ptpimg.me/z25pmk.png", "20"),
-            "filipino": ("https://ptpimg.me/9d3z9w.png", "20"),
-            "finnish": ("https://ptpimg.me/p4354c.png", "20"),
-            "french (canada)": ("https://ptpimg.me/ei4s6u.png", "20"),
-            "french canadian": ("https://ptpimg.me/ei4s6u.png", "20"),
-            "french": ("https://ptpimg.me/m7mfoi.png", "20"),
-            "galician": ("https://ptpimg.me/xj51b9.png", "20"),
-            "georgian": ("https://ptpimg.me/pp412q.png", "20"),
-            "german": ("https://ptpimg.me/dw8d04.png", "30x10"),
-            "greek": ("https://ptpimg.me/px1u3e.png", "20"),
-            "gujarati": ("https://ptpimg.me/d0l479.png", "20"),
-            "haitian creole": ("https://ptpimg.me/f64wlp.png", "20"),
-            "hebrew": ("https://ptpimg.me/5jw1jp.png", "20"),
-            "hindi": ("https://ptpimg.me/d0l479.png", "20"),
-            "hungarian": ("https://ptpimg.me/fr4aj7.png", "30x10"),
-            "icelandic": ("https://ptpimg.me/40o553.png", "20"),
-            "indonesian": ("https://ptpimg.me/f00c8u.png", "20"),
-            "irish": ("https://ptpimg.me/71x9mk.png", "20"),
-            "italian": ("https://ptpimg.me/ao762a.png", "20"),
-            "japanese": ("https://ptpimg.me/o1amm3.png", "20"),
-            "kannada": ("https://ptpimg.me/d0l479.png", "20"),
-            "kazakh": ("https://ptpimg.me/tq1h8b.png", "20"),
-            "khmer": ("https://ptpimg.me/0p1tli.png", "20"),
-            "korean": ("https://ptpimg.me/2tvwgn.png", "20"),
-            "kurdish": ("https://ptpimg.me/g290wo.png", "20"),
-            "kyrgyz": ("https://ptpimg.me/336unh.png", "20"),
-            "lao": ("https://ptpimg.me/n3nan1.png", "20"),
-            "latin american": ("https://ptpimg.me/11350x.png", "20"),
-            "latvian": ("https://ptpimg.me/3x2y1b.png", "25x10"),
-            "lithuanian": ("https://ptpimg.me/b444z8.png", "20"),
-            "luxembourgish": ("https://ptpimg.me/52x189.png", "20"),
-            "macedonian": ("https://ptpimg.me/2g5lva.png", "20"),
-            "malagasy": ("https://ptpimg.me/n5120r.png", "20"),
-            "malay": ("https://ptpimg.me/02e17w.png", "30x10"),
-            "malayalam": ("https://ptpimg.me/d0l479.png", "20"),
-            "maltese": ("https://ptpimg.me/ua46c2.png", "20"),
-            "maori": ("https://ptpimg.me/2fw03g.png", "20"),
-            "marathi": ("https://ptpimg.me/d0l479.png", "20"),
-            "mongolian": ("https://ptpimg.me/z2h682.png", "20"),
-            "nepali": ("https://ptpimg.me/5yd3sp.png", "20"),
-            "norwegian": ("https://ptpimg.me/1t11u4.png", "20"),
-            "pashto": ("https://ptpimg.me/i9pt6k.png", "20"),
-            "persian": ("https://ptpimg.me/i0y103.png", "20"),
-            "polish": ("https://ptpimg.me/m73uwa.png", "20"),
-            "portuguese": ("https://ptpimg.me/5j1a7q.png", "20"),
-            "portuguese (brazil)": ("https://ptpimg.me/p8sgla.png", "20"),
-            "punjabi": ("https://ptpimg.me/d0l479.png", "20"),
-            "romanian": ("https://ptpimg.me/ux94x0.png", "20"),
-            "russian": ("https://ptpimg.me/v33j64.png", "20"),
-            "samoan": ("https://ptpimg.me/8nt3zq.png", "20"),
-            "serbian": ("https://ptpimg.me/2139p2.png", "20"),
-            "slovak": ("https://ptpimg.me/70994n.png", "20"),
-            "slovenian": ("https://ptpimg.me/61yp81.png", "25x10"),
-            "somali": ("https://ptpimg.me/320pa6.png", "20"),
-            "spanish": ("https://ptpimg.me/xj51b9.png", "20"),
-            "spanish (latin america)": ("https://ptpimg.me/11350x.png", "20"),
-            "swahili": ("https://ptpimg.me/d0l479.png", "20"),
-            "swedish": ("https://ptpimg.me/082090.png", "20"),
-            "tamil": ("https://ptpimg.me/d0l479.png", "20"),
-            "telugu": ("https://ptpimg.me/d0l479.png", "20"),
-            "thai": ("https://ptpimg.me/38ru43.png", "20"),
-            "turkish": ("https://ptpimg.me/g4jg39.png", "20"),
-            "ukrainian": ("https://ptpimg.me/d8fp6k.png", "20"),
-            "urdu": ("https://ptpimg.me/z23gg5.png", "20"),
-            "uzbek": ("https://ptpimg.me/89854s.png", "20"),
-            "vietnamese": ("https://ptpimg.me/qnuya2.png", "20"),
-            "welsh": ("https://ptpimg.me/a9w539.png", "20"),
-            "xhosa": ("https://ptpimg.me/7teg09.png", "20"),
-            "yiddish": ("https://ptpimg.me/5jw1jp.png", "20"),
-            "yoruba": ("https://ptpimg.me/9l34il.png", "20"),
-            "zulu": ("https://ptpimg.me/7teg09.png", "20"),
-        }
-
         def parse_mediainfo(self, mediainfo_text: str) -> dict[str, Any]:
             # Patterns for matching sections and fields
             section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
@@ -2922,32 +2859,15 @@ class COMMON:
                         # Processing specific properties for text
                         # Process title field
                         if property_name == "title" and "title" not in current_track:
-                            title_lower = property_value.lower()
                             # print(f"\nProcessing Title: '{property_value}'")  # Debugging output
 
                             # Store the title as-is since it should remain descriptive
                             current_track["title"] = property_value
                             # print(f"Stored title: '{property_value}'")
 
-                            # If there's an exact match in LANGUAGE_CODE_MAP, add country code to language field
-                            if title_lower in self.LANGUAGE_CODE_MAP:
-                                country_code, size = self.LANGUAGE_CODE_MAP[title_lower]
-                                current_track["language"] = f"[img={size}]{country_code}[/img]"
-                                # print(f"Exact match found for title '{title_lower}' with country code: {country_code}")
-
                         # Process language field only if it hasn't already been set
                         elif property_name == "language" and "language" not in current_track:
-                            language_lower = property_value.lower()
-                            # print(f"\nProcessing Language: '{property_value}'")  # Debugging output
-
-                            if language_lower in self.LANGUAGE_CODE_MAP:
-                                country_code, size = self.LANGUAGE_CODE_MAP[language_lower]
-                                current_track["language"] = f"[img={size}]{country_code}[/img]"
-                                # print(f"Matched language '{language_lower}' to country code: {country_code}")
-                            else:
-                                # If no match in LANGUAGE_CODE_MAP, store language as-is
-                                current_track["language"] = property_value
-                                # print(f"No match found for language '{property_value}', stored as-is.")
+                            current_track["language"] = property_value
 
             # Append the last track to the parsed data if it exists
             if current_section and current_track:
@@ -2987,17 +2907,8 @@ class COMMON:
                 for index, track in enumerate(parsed_mediainfo["audio"], start=1):  # Start enumeration at 1
                     parts = [f"{index}."]  # Start with track number without a trailing slash
 
-                    # Language flag image
                     language = track.get("language", "").lower()
-                    result = self.LANGUAGE_CODE_MAP.get(language)
-
-                    # Check if the language was found in LANGUAGE_CODE_MAP
-                    if result is not None:
-                        country_code, size = result
-                        parts.append(f"[img={size}]{country_code}[/img]")
-                    else:
-                        # If language is not found, use a fallback or display the language as plain text
-                        parts.append(language.capitalize() if language else "")
+                    parts.append(language.capitalize() if language else "")
 
                     # Other properties to concatenate (language already handled above)
                     properties = ["codec", "format", "channels", "bit_rate", "format_profile", "stream_size"]
@@ -3289,13 +3200,12 @@ class COMMON:
                         console.print(f"[blue]Debug: Original language expanded candidates: {', '.join(sorted(original_language_expanded)) or 'None'}[/blue]")
 
             if original_required and not original_ok:
-                if not meta.get("unattended") or meta.get("debug"):
-                    console.print(
-                        f"[red]Original language requirement not met for [bold]{tracker}[/bold].[/red]\n"
-                        f"[yellow]Required original audio language:[/yellow] {language_display}\n"
-                        f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
-                    )
-                return not meta.get("unattended") and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+                return ask_to_continue(
+                    meta,
+                    f"Original language requirement not met for [bold]{tracker}[/bold].\n"
+                    f"[yellow]Required original audio language:[/yellow] {language_display}\n"
+                    f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}",
+                )
 
             audio_ok = not check_audio or any(lang in audio_languages for lang in languages_to_check)
             subtitle_ok = not check_subtitle or any(lang in subtitle_languages for lang in languages_to_check)

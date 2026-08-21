@@ -22,7 +22,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
-from src.rehostimages import URL_HOST_MAPPING, RehostImagesManager
+from src.imagehosts import host_slug
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -30,9 +30,10 @@ from src.uploadscreens import UploadScreensManager
 
 
 class PTP:
+    post_upload_delay = 5
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
         self.tracker = "PTP"
@@ -88,7 +89,7 @@ class PTP:
             "LAMA",
             "WORLD",
         ]
-        self.approved_image_hosts = ["ptpimg", "pixhost"]
+        self.approved_image_hosts = ["pixhost"]
 
         self.sub_lang_map = {
             ("Arabic", "ara", "ar"): 22,
@@ -487,24 +488,6 @@ class PTP:
 
         return []
 
-    async def ptpimg_url_rehost(self, image_url: str) -> str:
-        payload = {"format": "json", "api_key": self.config["DEFAULT"]["ptpimg_api"], "link-upload": image_url}
-        headers = {"referer": "https://ptpimg.me/index.php"}
-        url = "https://ptpimg.me/upload.php"
-
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.post(url, headers=headers, data=payload)
-        try:
-            response = response.json()
-            ptpimg_code = response[0]["code"]
-            ptpimg_ext = response[0]["ext"]
-            img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
-        except Exception:
-            console.print("[red]PTPIMG image rehost failed")
-            img_url = image_url
-            # img_url = ptpimg_upload(image_url, ptpimg_api)
-        return img_url
-
     def _selected_poster_host(self, meta: dict[str, Any]) -> str:
         default_config = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         return str(meta.get("imghost") or default_config.get("img_host_1") or "").strip()
@@ -513,8 +496,7 @@ class PTP:
         if not selected_host:
             return False
         hostname = (urlparse(image_url).hostname or "").lower()
-        domains = [domain for domain, host in URL_HOST_MAPPING.items() if host == selected_host] or [selected_host]
-        return any(hostname == domain or hostname.endswith(f".{domain}") for domain in domains)
+        return host_slug(hostname) == selected_host or hostname.endswith(f".{selected_host}")
 
     def _poster_extension(self, image_url: str, content_type: str) -> str:
         url_extension = Path(urlparse(image_url).path).suffix.lower()
@@ -810,16 +792,6 @@ class PTP:
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
         desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return desc
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def edit_desc(self, meta: dict[str, Any]) -> None:
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding="utf-8") as base_file:
@@ -1611,7 +1583,11 @@ class PTP:
 
         return url, data
 
-    async def upload(self, meta: dict[str, Any], url: str, data: dict[str, Any], _disctype: str) -> bool:
+    async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
+        url, data = await self.fill_upload_form(meta.get("ptp_groupID"), meta)
+        return await self._submit_upload(meta, url, data)
+
+    async def _submit_upload(self, meta: dict[str, Any], url: str, data: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
         base_piece_mb = int(meta.get("base_torrent_piece_mb", 0) or 0)
         torrent_file_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}].torrent"

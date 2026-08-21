@@ -17,7 +17,7 @@ try:
     import guessit
 
     from src.apply_overrides import ApplyOverrides
-    from src.audio import AudioManager
+    from src.audio import AudioManager, audio_track_facts
     from src.bluray_com import get_bluray_releases
     from src.cleanup import cleanup_manager
     from src.clients import Clients
@@ -613,8 +613,11 @@ class Prep:
             trackers = [t.strip().upper() for t in trackers.split(",")] if "," in trackers else [trackers.strip().upper()]
         else:
             trackers = [t.strip().upper() for t in trackers]
-        meta["trackers"] = trackers
         meta["requested_trackers"] = trackers
+        # Drop trackers whose credentials are empty now, before dupe checks, screenshots and torrent creation
+        from src.trackersetup import TRACKER_SETUP  # local import: trackersetup imports the trackers, which import prep helpers
+
+        meta["trackers"] = TRACKER_SETUP(self.config).with_required_credentials(trackers, debug=bool(meta.get("debug")))
 
         # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
         if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.get("skip_trackers", False) and not meta.get("edit", False):
@@ -779,7 +782,7 @@ class Prep:
         ping_unit3d_config = self.config["DEFAULT"].get("ping_unit3d", False)
         if (
             (not meta.get("region") or not meta.get("distributor"))
-            and meta["is_disc"] == "BDMV"
+            and meta["is_disc"] in ("BDMV", "DVD")
             and ping_unit3d_config
             and not meta.get("edit", False)
             and not meta.get("emby", False)
@@ -1203,17 +1206,10 @@ class Prep:
 
             if releases and meta.get("is_disc") in ("BDMV", "DVD") and meta.get("use_bluray_images", False):
                 # and if we getting bluray/dvd images, we'll rehost them
-                url_host_mapping = {
-                    "ibb.co": "imgbb",
-                    "pixhost.to": "pixhost",
-                    "imgbox.com": "imgbox",
-                }
-
                 approved_image_hosts = ["imgbox", "imgbb", "pixhost"]
                 await self.rehost_images_manager.check_hosts(
                     meta,
                     "covers",
-                    url_host_mapping=url_host_mapping,
                     img_host_index=1,
                     approved_image_hosts=approved_image_hosts,
                 )
@@ -1228,6 +1224,7 @@ class Prep:
             meta["container"] = await video_manager.get_container(meta)
 
             meta["audio"], meta["channels"], meta["has_commentary"], meta["has_audiodesc"] = await self.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
+            meta["audio_track_facts"] = audio_track_facts(meta)
 
             meta["3D"] = await video_manager.is_3d(bdinfo)
 
@@ -1304,6 +1301,13 @@ class Prep:
                     meta["tag"] = f"-{meta['tag']}"
 
             meta = await tag_override(meta)
+
+            # Auto --personalrelease when the detected group is one of ours
+            personal_groups = {str(g).lstrip("-").lower() for g in (self.config["DEFAULT"].get("personal_release_groups") or []) if g}
+            if personal_groups and str(meta.get("tag") or "").lstrip("-").lower() in personal_groups and not meta.get("personalrelease"):
+                meta["personalrelease"] = True
+                if meta.get("debug"):
+                    console.print(f"[green]Release group {meta['tag']} is in personal_release_groups; setting personalrelease.[/green]")
 
             if meta["tag"][1:].startswith(meta["channels"]):
                 meta["tag"] = meta["tag"].replace(f"-{meta['channels']}", "")

@@ -1065,8 +1065,10 @@ class TestApprovedImageHosts:
             seen.update(tracker=tracker_name, hosts=approved_image_hosts)
             return [], False, False
 
-        monkeypatch.setattr(tracker.rehost_images_manager, "check_hosts", fake_check_hosts)
-        asyncio.run(tracker.check_image_hosts({}))
+        from src.rehostimages import RehostImagesManager, check_tracker_image_hosts
+
+        monkeypatch.setattr(RehostImagesManager, "check_hosts", lambda self, *a, **kw: fake_check_hosts(*a, **kw))
+        asyncio.run(check_tracker_image_hosts({}, _config(), tracker))
         assert seen["tracker"] == "V3X"
         assert seen["hosts"] == ["imgbox", "imgbb", "postimg", "pixhost", "ptscreens"]
 

@@ -406,22 +406,26 @@ class QbittorrentClientMixin:
     async def init_qbittorrent_client(self, client: dict[str, Any]) -> Optional[qbittorrentapi.Client]:
         # Creates and logs into a qbittorrent client, with caching to avoid redundant logins
         # If login fails, returns None
-        client_key = (client["qbit_url"], client["qbit_port"], client["qbit_user"])
+        # qbit_api_key (qBittorrent >= 5.2, stateless) takes precedence over user/password
+        api_key = str(client.get("qbit_api_key") or "").strip()
+        client_key = (client["qbit_url"], client["qbit_port"], f"APIKEY:{api_key}" if api_key else client.get("qbit_user", ""))
         async with qbittorrent_locks[client_key]:
             # We lock to further prevent concurrent logins for the same client. If two clients try to init at the same time, if the first one succeeds, the second one can use the cached client.
             potential_cached_client = qbittorrent_cached_clients.get(client_key)
             if potential_cached_client is not None:
                 return potential_cached_client
 
-            qbt_client = qbittorrentapi.Client(
-                host=client["qbit_url"],
-                port=client["qbit_port"],
-                username=client["qbit_user"],
-                password=client["qbit_pass"],
-                VERIFY_WEBUI_CERTIFICATE=client.get("VERIFY_WEBUI_CERTIFICATE", True),
-            )
+            verify_cert = client.get("VERIFY_WEBUI_CERTIFICATE", True)
+            if api_key:
+                qbt_client = qbittorrentapi.Client(host=client["qbit_url"], port=client["qbit_port"], api_key=api_key, VERIFY_WEBUI_CERTIFICATE=verify_cert)
+                login, label = qbt_client.app_version, "qBittorrent API key verification"
+            else:
+                qbt_client = qbittorrentapi.Client(
+                    host=client["qbit_url"], port=client["qbit_port"], username=client.get("qbit_user"), password=client.get("qbit_pass"), VERIFY_WEBUI_CERTIFICATE=verify_cert
+                )
+                login, label = qbt_client.auth_log_in, "qBittorrent login"
             try:
-                await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.auth_log_in), "qBittorrent login")
+                await self.retry_qbt_operation(lambda: asyncio.to_thread(login), label)
             except asyncio.TimeoutError:
                 console.print("[bold red]Connection to qBittorrent timed out after retries")
                 return None
@@ -429,7 +433,7 @@ class QbittorrentClientMixin:
                 console.print("[bold red]Failed to login to qBittorrent - incorrect credentials")
                 return None
             except qbittorrentapi.APIConnectionError:
-                console.print("[bold red]Failed to connect to qBittorrent - check host/port")
+                console.print("[bold red]Failed to connect to qBittorrent - check host/port" + ("/API key" if api_key else ""))
                 return None
             else:
                 qbittorrent_cached_clients[client_key] = qbt_client

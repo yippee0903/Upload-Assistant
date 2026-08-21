@@ -3,6 +3,7 @@ import asyncio
 import os
 import re
 import shutil
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, Optional, Union, cast
@@ -329,6 +330,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: dict[str, Any]) -> Optional[str]:
+        if meta.get("skip_auto_torrent", False):
+            return None
+
         # Determine piece size preferences
         trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
         mtv_config = trackers_config.get("MTV", {})
@@ -492,7 +496,13 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 else:
                     qbt_client = await self.init_qbittorrent_client(client)
 
+                search_start = time.time()
                 found_hash = await self.search_qbit_for_torrent(meta, client, qbt_client, qbt_session, proxy_url)
+                search_duration = time.time() - search_start
+                if meta.get("debug"):
+                    console.print(f"qBittorrent search took {search_duration:.2f}s")
+                if search_duration > 3 and not str(client.get("qui_proxy_url") or "").strip():
+                    console.print(f"[yellow]qBittorrent search took {search_duration:.1f}s; configuring 'qui_proxy_url' for this client makes it much faster.[/yellow]")
 
                 # Clean up session if we created one
                 if qbt_session:
@@ -543,17 +553,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             else:
                                 # Reuse or create qbt_client if needed
                                 if qbt_client is None:
-                                    qbt_client = qbittorrentapi.Client(
-                                        host=client["qbit_url"],
-                                        port=client["qbit_port"],
-                                        username=client["qbit_user"],
-                                        password=client["qbit_pass"],
-                                        VERIFY_WEBUI_CERTIFICATE=client.get("VERIFY_WEBUI_CERTIFICATE", True),
-                                    )
-                                    try:
-                                        await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.auth_log_in), "qBittorrent login")
-                                    except (asyncio.TimeoutError, qbittorrentapi.LoginFailed, qbittorrentapi.APIConnectionError) as e:
-                                        console.print(f"[bold red]Failed to connect to qBittorrent for export: {e}")
+                                    qbt_client = await self.init_qbittorrent_client(client)
+                                    if qbt_client is None:
+                                        console.print("[bold red]Failed to connect to qBittorrent for export.")
                                         found_hash = None
 
                                 if found_hash:  # Only proceed if we still have a hash

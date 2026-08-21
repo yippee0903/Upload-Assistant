@@ -134,7 +134,7 @@ class HDT:
         desc_parts: list[str] = []
 
         # Custom Header
-        desc_parts.append(await builder.get_custom_header())
+        desc_parts.append(await builder.get_custom_header(meta))
 
         # Logo
         logo_resize_url = str(meta.get("tmdb_logo", ""))
@@ -167,7 +167,7 @@ class HDT:
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
         # Screenshot Header
-        desc_parts.append(await builder.screenshot_header())
+        desc_parts.append(await builder.screenshot_header(meta))
 
         # Screenshots
         images_value = meta.get("image_list", [])

@@ -5,7 +5,6 @@ import cli_ui
 
 from src.console import console
 from src.languages import languages_manager
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
@@ -24,8 +23,7 @@ class A4K(UNIT3D):
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.rehost_images_manager = RehostImagesManager(config)
-        self.approved_image_hosts = ["ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
+        self.approved_image_hosts = ["onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
         self.banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
         pass
 
@@ -114,15 +112,6 @@ class A4K(UNIT3D):
         }
 
         return data
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     def _confirm_unknown_bitrate(self, meta: dict[str, Any]) -> bool:
         if not meta.get("unattended", False) or (meta.get("unattended", False) and meta.get("unattended_confirm", False)):

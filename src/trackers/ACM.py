@@ -12,7 +12,6 @@ import pycountry
 
 from src.bbcode import BBCODE
 from src.console import console
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 
@@ -86,8 +85,7 @@ class ACM:
         self.upload_url = f"{self.base_url}/api/torrents/upload"
         self.search_url = f"{self.base_url}/api/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "ptpimg", "imagebam"]
-        self.rehost_images_manager = RehostImagesManager(config)
+        self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "imagebam"]
         self.banned_groups: list[str] = []
 
     async def get_type_id(self, meta: dict[str, Any]) -> str:
@@ -300,14 +298,6 @@ class ACM:
             return subs_tag
         inner = subs_tag.strip().strip("[]").strip()
         return f" [{dub} dub only, {inner}]" if inner else f" [{dub} dub only]"
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     @staticmethod
     def _normalize_countries(meta: dict[str, Any]) -> tuple[list[str], list[str]]:

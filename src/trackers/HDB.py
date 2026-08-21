@@ -916,7 +916,7 @@ class HDB:
 
                     if "data" not in response_json:
                         console.print(f"[red]Error: 'data' key not found or empty in HDB API response. Full response: {response_json}[/red]")
-                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
                     for each in response_json["data"]:
                         hdb_imdb = int(each.get("imdb", {}).get("id") or 0)

@@ -9,6 +9,8 @@ config = {
 
         # will print a notice if an update is available
         "update_notification": True,
+        # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
+        "personal_release_groups": [],
         # will print the changelog if an update is available
         "verbose_notification": False,
 
@@ -29,7 +31,6 @@ config = {
 
         # image host api keys
         "imgbb_api": "",
-        "ptpimg_api": "",
         "lensdump_api": "",
         "ptscreens_api": "",
         "onlyimage_api": "",
@@ -50,9 +51,11 @@ config = {
         "lostimg_api": "",
         # postimages.org API key (https://postimages.org/login/api)
         "postimg_api": "",
+        # img.midnightscene.cc API key (MidnightScene members)
+        "midnightscene_api_key": "",
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, ptpimg, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
         "img_host_1": "imgbb",
         "img_host_2": "imgbox",
 
@@ -252,6 +255,8 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # Optional: stateless API key (qBittorrent 5.2+); when set, qbit_user/qbit_pass are ignored
+            "qbit_api_key": "",
         }
     }
 }

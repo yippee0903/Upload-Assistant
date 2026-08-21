@@ -14,6 +14,8 @@ Config = dict[str, Any]
 
 
 class SN:
+    post_upload_delay = 16  # seconds to wait after an upload before the next tracker
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.tracker = "SN"

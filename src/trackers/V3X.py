@@ -33,7 +33,6 @@ from unidecode import unidecode
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.nfo_generator import decode_nfo, is_multi_episode_nfo
-from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import _FRENCH_AUDIO_THRESHOLD as FRENCH_AUDIO_THRESHOLD
@@ -67,17 +66,6 @@ class V3X(FrenchTrackerMixin):
         self.banned_groups: list[Any] = []
         self._session_cookies: Optional[httpx.Cookies] = None
         self.approved_image_hosts = ["imgbox", "imgbb", "postimg", "pixhost", "ptscreens"]
-        self.rehost_images_manager = RehostImagesManager(config)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        """Rehost screenshots to an approved host when needed; the result
-        lands in meta["V3X_images_key"] and the description prefers it."""
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     async def _login_session_cookies(self) -> Optional[httpx.Cookies]:
         """Log in with the site credentials and cache the session cookie.

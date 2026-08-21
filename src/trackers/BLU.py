@@ -4,11 +4,13 @@ from typing import Any, Optional
 import cli_ui
 
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 from src.trackers.UNIT3D import UNIT3D
 
 
 class BLU(UNIT3D):
+    REGION_IDS = {"CZE": "244", "SVK": "245", "FIN": "246", "SWE": "247", "BGR": "248", "DNK": "249"}
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="BLU")
         self.config = config
@@ -141,15 +143,13 @@ class BLU(UNIT3D):
             if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
                 meta["tracker_status"][self.tracker]["other"] = True
 
-        if meta["type"] not in ["WEBDL"] and not meta["is_disc"] and meta.get("tag", "") in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for raw type content[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if (
+            meta["type"] not in ["WEBDL"]
+            and not meta["is_disc"]
+            and str(meta.get("tag") or "").lstrip("-") in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for raw type content")
+        ):
+            return False
 
         if not meta["valid_mi_settings"]:
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")

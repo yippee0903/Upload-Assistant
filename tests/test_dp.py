@@ -396,3 +396,21 @@ class TestDpKeepFolderStrip:
         stripped = UploadHelper.strip_keep_folder_if_single_file(meta)
         assert stripped is False
         assert meta["keep_folder"] is False
+
+
+class TestDpAdditionalChecks:
+    def _check(self, **overrides: Any) -> bool:
+        dp = _dp()
+        dp.common.check_language_requirements = AsyncMock(return_value=True)
+        return _run(dp.get_additional_checks(_base_meta(unattended=True, **overrides)))
+
+    def test_evo_only_as_webdl_with_hyphenated_tag(self) -> None:
+        assert self._check(tag="-EVO", type="WEBDL") is True
+        assert self._check(tag="-EVO", type="ENCODE") is False
+
+    def test_hdt_only_as_remux(self) -> None:
+        assert self._check(tag="-HDT", type="REMUX") is True
+        assert self._check(tag="-HDT", type="ENCODE") is False
+
+    def test_hardcoded_subs_rejected_even_unattended(self) -> None:
+        assert self._check(hardcoded_subs=True) is False
