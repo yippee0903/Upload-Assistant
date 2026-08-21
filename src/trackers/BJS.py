@@ -1295,13 +1295,14 @@ class BJS:
         return data
 
     def get_year(self, meta: dict[str, Any]) -> str:
-        start_year = meta.get("year", "N/A")
-        imdb_info = dict(meta.get("imdb_info", {}))
-        end_year = imdb_info.get("end_year")
-
-        year_label = f"{start_year}-{end_year}" if end_year else f"{start_year}-"
-
-        return year_label
+        """Movie year, or for TV the year the episode/season aired."""
+        year = str(meta.get("year", "N/A"))
+        if meta.get("category") == "MOVIE":
+            return year
+        for candidate in (meta.get("tvdb_episode_year"), dict(meta.get("imdb_info", {})).get("tv_year")):
+            if candidate and str(candidate).isdigit():
+                return str(candidate)
+        return year
 
     def get_adulto(self, meta: dict[str, Any]) -> str:
         """
