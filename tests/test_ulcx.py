@@ -184,6 +184,8 @@ class TestULCXRules:
         dtshd = _audio("DTS", 6, commercial="DTS-HD Master Audio")
         assert self._passes(ulcx, mediainfo=_mi(dtshd)) is False
         assert self._passes(ulcx, mediainfo=_mi(dtshd), resolution="2160p") is True
+        assert self._passes(ulcx, mediainfo=_mi(dtshd), resolution="4320p") is True
+        assert self._passes(ulcx, mediainfo=_mi(dtshd), resolution="8640p") is True
         assert self._passes(ulcx, mediainfo=_mi(_audio("DTS", 6, commercial="DTS"))) is True
 
     def test_remux_lossless_audio_conversions(self, ulcx):

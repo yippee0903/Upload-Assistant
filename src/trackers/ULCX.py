@@ -195,7 +195,7 @@ class ULCX(UNIT3D):
                 return False
             if not self._is_lossless(track):
                 continue
-            if meta["type"] == "ENCODE" and channels >= 3 and meta["resolution"] != "2160p":
+            if meta["type"] == "ENCODE" and channels >= 3 and meta["resolution"] not in ("2160p", "4320p", "8640p"):
                 console.print(f"[bold red]Lossless multi-channel audio is not accepted on 1080p or lower encodes, skipping {self.tracker} upload.[/bold red]")
                 return False
             if meta["type"] == "REMUX":
