@@ -6,7 +6,7 @@ from typing import Any, Optional, cast
 import cli_ui
 
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -118,15 +118,10 @@ class SP(UNIT3D):
         disallowed_genres = {"adult", "erotica"}
         keywords = [str(k) for k in cast(list[Any], meta.get("keywords", []))]
         combined_genres = [str(g) for g in cast(list[Any], meta.get("combined_genres", []))]
-        if any(keyword.lower() in disallowed_keywords for keyword in keywords) or any(genre.lower() in disallowed_genres for genre in combined_genres):
-            if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if (
+            any(keyword.lower() in disallowed_keywords for keyword in keywords) or any(genre.lower() in disallowed_genres for genre in combined_genres)
+        ) and not ask_to_continue(meta, f"Porn/xxx is not allowed at {self.tracker}."):
+            return False
 
         return should_continue
 

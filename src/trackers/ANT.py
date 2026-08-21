@@ -3,7 +3,6 @@ import asyncio
 import json
 import os
 import platform
-import re
 from pathlib import Path
 from typing import Any, Union
 
@@ -15,7 +14,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -305,9 +304,7 @@ class ANT:
         else:
             data.update({"noreleasegroup": 1})
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
                 console.print("[bold red]Adult content detected[/bold red]")
                 if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):

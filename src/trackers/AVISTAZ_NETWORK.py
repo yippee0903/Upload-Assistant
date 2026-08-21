@@ -21,7 +21,7 @@ from src.console import console
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -225,15 +225,14 @@ class AZTrackerBase:
                     meta["skipping"] = f"{self.tracker}"
                     return duplicates
 
-        if meta["type"] not in ["WEBDL"] and self.tracker == "PHD" and meta.get("tag", "") in ["FGT", "EVO"]:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for web-dl[/bold red]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    meta["skipping"] = f"{self.tracker}"
-                    return duplicates
-            else:
-                meta["skipping"] = f"{self.tracker}"
-                return duplicates
+        if (
+            meta["type"] not in ["WEBDL"]
+            and self.tracker == "PHD"
+            and meta.get("tag", "") in ["FGT", "EVO"]
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for web-dl")
+        ):
+            meta["skipping"] = f"{self.tracker}"
+            return duplicates
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:

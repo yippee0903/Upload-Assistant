@@ -16,7 +16,7 @@ from defusedxml import ElementTree as ET
 from src.console import console
 from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -678,17 +678,14 @@ class MTV:
         return False
 
     async def search_existing(self, meta: Meta, _disctype: str) -> list[dict[str, Any]]:
-        if meta["type"] not in ["WEBDL"] and meta.get("tag", "") and any(x in meta["tag"] for x in ["EVO"]):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Group {meta['tag']} is only allowed for raw type content at {self.tracker}[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "MTV"
-                    return []
-            else:
-                meta["skipping"] = "MTV"
-                return []
+        if (
+            meta["type"] not in ["WEBDL"]
+            and meta.get("tag", "")
+            and any(x in meta["tag"] for x in ["EVO"])
+            and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for raw type content at {self.tracker}")
+        ):
+            meta["skipping"] = "MTV"
+            return []
 
         allowed_anime = [
             "Thighs",
@@ -764,17 +761,11 @@ class MTV:
             genres_list.append(str(genres_value))
         keywords_lower = {k.lower() for k in keywords_list if k}
         genres_lower = {g.lower() for g in genres_list if g}
-        if any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    meta["skipping"] = "MTV"
-                    return []
-            else:
-                meta["skipping"] = "MTV"
-                return []
+        if (any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres)) and not ask_to_continue(
+            meta, f"Porn/xxx is not allowed at {self.tracker}."
+        ):
+            meta["skipping"] = "MTV"
+            return []
 
         dupes: list[dict[str, Any]] = []
 

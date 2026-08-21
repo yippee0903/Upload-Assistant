@@ -3,10 +3,10 @@ import re
 from typing import Any
 
 import aiofiles
-import cli_ui
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.trackers.COMMON import ask_to_continue, is_adult, is_lossless, is_lossless_dts, mi_tracks
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -80,12 +80,19 @@ class ULCX(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
         is_animated = "animation" in meta["keywords"] or meta.get("anime", False) is True
-        if "concert" in meta["keywords"] and not self._ask(meta, "Concerts are not allowed."):
+        if "concert" in meta["keywords"] and not ask_to_continue(meta, f"Concerts are not allowed. ({self.tracker})"):
             return False
-        if meta["video_codec"] == "HEVC" and meta["resolution"] != "2160p" and not is_animated and not self._ask(meta, "This content might not fit the HEVC rules."):
+        if (
+            meta["video_codec"] == "HEVC"
+            and meta["resolution"] != "2160p"
+            and not is_animated
+            and not ask_to_continue(meta, f"This content might not fit the HEVC rules. ({self.tracker})")
+        ):
             return False
         if meta["type"] in ["ENCODE", "HDTV"] and meta["resolution"] not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
-            if meta["type"] == "HDTV" and not self._ask(meta, "SD broadcasts are only accepted when the content was never released in HD or on disc/WEB."):
+            if meta["type"] == "HDTV" and not ask_to_continue(
+                meta, f"SD broadcasts are only accepted when the content was never released in HD or on disc/WEB. ({self.tracker})"
+            ):
                 return False
             if meta["type"] == "ENCODE":
                 if not meta["unattended"]:
@@ -119,8 +126,8 @@ class ULCX(UNIT3D):
             console.print(f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        if meta.get("has_disallowed_compat_track", False) and not self._ask(
-            meta, "This release contains a compatibility audio track which is not allowed. Only TrueHD audio tracks may include a compatibility track."
+        if meta.get("has_disallowed_compat_track", False) and not ask_to_continue(
+            meta, f"This release contains a compatibility audio track which is not allowed. Only TrueHD audio tracks may include a compatibility track. ({self.tracker})"
         ):
             return False
 
@@ -137,7 +144,7 @@ class ULCX(UNIT3D):
             console.print(f"[bold red]No TMDB match, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        if meta["video_codec"] == "AV1" and not is_animated and not self._ask(meta, "AV1 is only accepted for animated content."):
+        if meta["video_codec"] == "AV1" and not is_animated and not ask_to_continue(meta, f"AV1 is only accepted for animated content. ({self.tracker})"):
             return False
 
         if not meta["is_disc"]:
@@ -163,28 +170,8 @@ class ULCX(UNIT3D):
 
         return should_continue
 
-    def _ask(self, meta: Meta, msg: str) -> bool:
-        """Warn and let an interactive user override; unattended runs skip the tracker."""
-        if meta["unattended"] and not meta.get("unattended_confirm", False):
-            return False
-        console.print(f"[bold red]{msg} ({self.tracker})[/bold red]")
-        return bool(cli_ui.ask_yes_no("Do you want to upload anyway?", default=False))
-
-    @staticmethod
-    def _tracks(meta: Meta, track_type: str) -> list[dict[str, Any]]:
-        tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
-        return [t for t in tracks if t.get("@type") == track_type]
-
-    @staticmethod
-    def _is_lossless_dts(track: dict[str, Any]) -> bool:
-        commercial = str(track.get("Format_Commercial_IfAny") or "")
-        return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
-
-    def _is_lossless(self, track: dict[str, Any]) -> bool:
-        return track.get("Compression_Mode") == "Lossless" or track.get("Format") in ("FLAC", "PCM", "MLP FBA") or self._is_lossless_dts(track)
-
     def _check_audio_tracks(self, meta: Meta) -> bool:
-        for track in self._tracks(meta, "Audio"):
+        for track in mi_tracks(meta, "Audio"):
             fmt = str(track.get("Format") or "")
             try:
                 channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
@@ -193,13 +180,13 @@ class ULCX(UNIT3D):
             if fmt == "FLAC" and channels > 2:
                 console.print(f"[bold red]FLAC is only accepted for mono or stereo audio, skipping {self.tracker} upload.[/bold red]")
                 return False
-            if not self._is_lossless(track):
+            if not is_lossless(track):
                 continue
             if meta["type"] == "ENCODE" and channels >= 3 and meta["resolution"] not in ("2160p", "4320p", "8640p"):
                 console.print(f"[bold red]Lossless multi-channel audio is not accepted on 1080p or lower encodes, skipping {self.tracker} upload.[/bold red]")
                 return False
             if meta["type"] == "REMUX":
-                is_dtshd_ma = self._is_lossless_dts(track)
+                is_dtshd_ma = is_lossless_dts(track)
                 if channels == 1 and fmt != "FLAC" and not is_dtshd_ma:
                     console.print(f"[bold red]Lossless mono audio must be FLAC or DTS-HD MA on remuxes, skipping {self.tracker} upload.[/bold red]")
                     return False
@@ -214,11 +201,11 @@ class ULCX(UNIT3D):
         return True
 
     def _personal_release_checks(self, meta: Meta) -> list[tuple[bool, str]]:
-        general = self._tracks(meta, "General")
+        general = mi_tracks(meta, "General")
         encoder = " ".join(f"{t.get('Encoded_Application') or ''} {t.get('Encoded_Library') or ''} {(t.get('extra') or {}).get('Writing_frontend') or ''}" for t in general)
         original_language = str(meta.get("original_language") or "").lower()
         foreign = bool(original_language) and not original_language.startswith("en")
-        default_subs = [str(t.get("Language") or "").lower() for t in self._tracks(meta, "Text") if t.get("Default") == "Yes"]
+        default_subs = [str(t.get("Language") or "").lower() for t in mi_tracks(meta, "Text") if t.get("Default") == "Yes"]
         return [
             (meta["type"] == "ENCODE" and "handbrake" in encoder.lower(), "HandBrake encodes are discouraged."),
             ("Dubbed" in meta.get("audio", ""), "Foreign content should keep the original audio track alongside the dub."),
@@ -236,9 +223,7 @@ class ULCX(UNIT3D):
     async def get_description(self, meta: Meta) -> dict[str, str]:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             pattern = r"(\[center\](?:(?!\[/center\]).)*\[/center\])"
 
             def wrap_in_spoiler(match: re.Match[str]) -> str:

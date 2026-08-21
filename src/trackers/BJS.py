@@ -24,7 +24,7 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.tmdb import TmdbManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 
 
 class BJS:
@@ -1315,12 +1315,11 @@ class BJS:
         adult_no = "2"
 
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
 
         if meta.get("anime", False) and "hentai" in genres.lower():
             return adult_yes
 
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             return adult_yes
 
         return adult_no

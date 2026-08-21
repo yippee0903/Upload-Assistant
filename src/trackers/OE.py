@@ -9,7 +9,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.languages import languages_manager
 from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -168,9 +168,7 @@ class OE(UNIT3D):
         pass
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        if is_adult(meta):
             if not meta["unattended"]:
                 console.print("[bold red]Erotic not allowed at OE.")
             return False

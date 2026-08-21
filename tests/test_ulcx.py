@@ -164,7 +164,7 @@ class TestULCXRules:
         assert self._passes(ulcx, video_codec="AV1", keywords="animation") is True
 
     def test_sd_hdtv_is_asked_not_rejected(self, ulcx):
-        with patch("src.trackers.ULCX.cli_ui.ask_yes_no", return_value=True):
+        with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=True):
             assert self._passes(ulcx, type="HDTV", resolution="576p", unattended=False) is True
         assert self._passes(ulcx, type="ENCODE", resolution="576p", unattended=False) is False
 

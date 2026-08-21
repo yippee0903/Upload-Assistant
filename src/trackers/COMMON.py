@@ -24,6 +24,38 @@ from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
 
+ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "adult", "orgy")
+
+
+def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?") -> bool:
+    """Warn and let an interactive user override; unattended runs (without unattended_confirm) skip."""
+    if meta.get("unattended") and not meta.get("unattended_confirm", False):
+        return False
+    console.print(f"[bold red]{msg}[/bold red]")
+    return bool(cli_ui.ask_yes_no(question, default=False))
+
+
+def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
+    """True when TMDb keywords/genres contain an adult-content marker."""
+    genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+    return any(re.search(rf"(^|,\s*){re.escape(k)}(\s*,|$)", genres, re.IGNORECASE) for k in (*ADULT_KEYWORDS, *extra_keywords))
+
+
+def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:
+    """MediaInfo tracks of one @type ("General", "Video", "Audio", "Text") from meta["mediainfo"]."""
+    tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+    return [t for t in tracks if t.get("@type") == track_type]
+
+
+def is_lossless_dts(track: dict[str, Any]) -> bool:
+    commercial = str(track.get("Format_Commercial_IfAny") or "")
+    return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
+
+
+def is_lossless(track: dict[str, Any]) -> bool:
+    return track.get("Compression_Mode") == "Lossless" or track.get("Format") in ("FLAC", "PCM", "MLP FBA") or is_lossless_dts(track)
+
+
 # Module-level lock to serialize concurrent writes to pack_image_links.json
 _pack_image_links_lock: asyncio.Lock = asyncio.Lock()
 
@@ -3289,13 +3321,12 @@ class COMMON:
                         console.print(f"[blue]Debug: Original language expanded candidates: {', '.join(sorted(original_language_expanded)) or 'None'}[/blue]")
 
             if original_required and not original_ok:
-                if not meta.get("unattended") or meta.get("debug"):
-                    console.print(
-                        f"[red]Original language requirement not met for [bold]{tracker}[/bold].[/red]\n"
-                        f"[yellow]Required original audio language:[/yellow] {language_display}\n"
-                        f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
-                    )
-                return not meta.get("unattended") and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+                return ask_to_continue(
+                    meta,
+                    f"Original language requirement not met for [bold]{tracker}[/bold].\n"
+                    f"[yellow]Required original audio language:[/yellow] {language_display}\n"
+                    f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}",
+                )
 
             audio_ok = not check_audio or any(lang in audio_languages for lang in languages_to_check)
             subtitle_ok = not check_subtitle or any(lang in subtitle_languages for lang in languages_to_check)

@@ -1,13 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any, Optional, cast
-
-import cli_ui
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -58,17 +55,8 @@ class STC(UNIT3D):
                 console.print(f"[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]")
             return False
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Porn is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if is_adult(meta, ("hentai", "adult animation", "softcore")) and not ask_to_continue(meta, f"Porn is not allowed at {self.tracker}."):
+            return False
 
         if meta.get("is_disc") not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True

@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any, Optional, cast
 
 import langcodes
@@ -7,7 +6,7 @@ from langcodes.tag_parser import LanguageTagError
 
 from src.console import console
 from src.languages import languages_manager
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -31,7 +30,6 @@ class LDU(UNIT3D):
     async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
         sound_mixes_value = meta.get("imdb_info", {}).get("sound_mixes", [])
         sound_mixes = cast(list[Any], sound_mixes_value) if isinstance(sound_mixes_value, list) else []
 
@@ -45,7 +43,7 @@ class LDU(UNIT3D):
 
         if "hentai" in genres.lower():
             category_id = "10"
-        elif any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
+        elif is_adult(meta):
             category_id = "45" if not await languages_manager.has_english_language(meta.get("subtitle_languages", [])) else "6"
         if meta.get("category") == "MOVIE":
             if meta.get("3d") or "3D" in meta.get("edition", ""):

@@ -1,11 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import re
 from typing import Any, Optional
 
-import cli_ui
-
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -76,17 +73,8 @@ class YUS(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print("[bold red]Porn/xxx is not allowed at YUS.")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if is_adult(meta, ("hentai", "adult animation", "softcore")) and not ask_to_continue(meta, "Porn/xxx is not allowed at YUS."):
+            return False
 
         tag_group = str(meta.get("tag", "")).strip("-").strip().lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "unk"]

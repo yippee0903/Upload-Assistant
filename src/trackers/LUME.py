@@ -2,10 +2,8 @@
 import re
 from typing import Any
 
-import cli_ui
-
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -45,15 +43,12 @@ class LUME(UNIT3D):
         ):
             return False
 
-        if meta["is_disc"] not in ["BDMV", "DVD"] and meta["resolution"] not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]{self.tracker} only allows SD releases when the content does not have a higher resolution release.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if (
+            meta["is_disc"] not in ["BDMV", "DVD"]
+            and meta["resolution"] not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]
+            and not ask_to_continue(meta, f"{self.tracker} only allows SD releases when the content does not have a higher resolution release.")
+        ):
+            return False
 
         if meta["is_disc"] not in ["BDMV", "DVD"] and meta.get("container", "") != "mkv":
             console.print(f"[bold red]{self.tracker} only allows MKV containers for non-disc uploads.[/bold red]")
@@ -63,17 +58,8 @@ class LUME(UNIT3D):
             console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
-        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Pornography is not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
+        if is_adult(meta) and not ask_to_continue(meta, f"Pornography is not allowed at {self.tracker}."):
+            return False
 
         return should_continue
 
