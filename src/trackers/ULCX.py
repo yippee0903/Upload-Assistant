@@ -156,7 +156,9 @@ class ULCX(UNIT3D):
             if not self._check_audio_tracks(meta):
                 return False
 
-        if len(meta.get("image_list", [])) < 3:
+        # Runs before screenshot generation: reused images may be absent while
+        # the configured screenshot count will still be produced afterwards.
+        if max(len(meta.get("image_list", [])), int(meta.get("screens", 0) or 0)) < 3:
             console.print(f"[bold red]At least 3 screenshots are required, skipping {self.tracker} upload.[/bold red]")
             return False
 

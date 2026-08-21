@@ -219,3 +219,9 @@ class TestULCXRules:
         assert self._passes(ulcx, original_language="en", mediainfo=_mi(_text("en", True)), personalrelease=True) is False
         assert self._passes(ulcx, original_language="en", mediainfo=_mi(_text("en", False)), personalrelease=True) is True
         assert self._passes(ulcx, original_language="", mediainfo=_mi(_text("en", True)), personalrelease=True) is True
+
+    def test_empty_image_list_passes_when_screenshots_will_be_generated(self, ulcx):
+        # Pre-upload checks run before screenshot generation: an empty list only
+        # means nothing was reused from a description, not that none will exist.
+        assert self._passes(ulcx, image_list=[], screens=6) is True
+        assert self._passes(ulcx, image_list=[], screens=2) is False
