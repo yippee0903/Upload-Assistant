@@ -254,6 +254,8 @@ config = {
             "qbit_port": "8080",
             "qbit_user": "",
             "qbit_pass": "",
+            # Optional: stateless API key (qBittorrent 5.2+); when set, qbit_user/qbit_pass are ignored
+            "qbit_api_key": "",
         }
     }
 }
