@@ -22,7 +22,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
-from src.rehostimages import URL_HOST_MAPPING
+from src.imagehosts import host_slug
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -512,8 +512,7 @@ class PTP:
         if not selected_host:
             return False
         hostname = (urlparse(image_url).hostname or "").lower()
-        domains = [domain for domain, host in URL_HOST_MAPPING.items() if host == selected_host] or [selected_host]
-        return any(hostname == domain or hostname.endswith(f".{domain}") for domain in domains)
+        return host_slug(hostname) == selected_host or hostname.endswith(f".{selected_host}")
 
     def _poster_extension(self, image_url: str, content_type: str) -> str:
         url_extension = Path(urlparse(image_url).path).suffix.lower()

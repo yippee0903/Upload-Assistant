@@ -5,7 +5,8 @@ import asyncio
 import glob
 import re
 
-from src.rehostimages import URL_HOST_MAPPING, validate_reused_image_hosts
+from src.imagehosts import URL_HOST_MAPPING
+from src.rehostimages import validate_reused_image_hosts
 
 
 def _approved_lists() -> dict[str, list[str]]:

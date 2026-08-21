@@ -4,7 +4,7 @@ import glob
 import json
 import os
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from typing import Any, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -12,7 +12,7 @@ import aiofiles
 from aiofiles import os as aio_os
 
 from src.console import console
-from src.imagehosts import URL_HOST_MAPPING
+from src.imagehosts import host_slug
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
@@ -71,13 +71,6 @@ def _safe_remove(path: str) -> bool:
     except Exception as e:
         console.print(f"[yellow]Failed to delete file {path}: {str(e)}[/yellow]")
     return False
-
-
-async def match_host(hostname: str, approved_hosts: Iterable[str]) -> str:
-    for approved_host in approved_hosts:
-        if hostname == approved_host or hostname.endswith(f".{approved_host}"):
-            return approved_host
-    return hostname
 
 
 async def sanitize_filename(filename: str) -> str:
@@ -176,10 +169,9 @@ async def _check_hosts(
 
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = await match_host(hostname, URL_HOST_MAPPING.keys())
+            mapped_host = host_slug(hostname)
 
             if mapped_host:
-                mapped_host = URL_HOST_MAPPING.get(mapped_host, mapped_host)
                 if mapped_host in approved_image_hosts:
                     approved_images.append(image)
                     if meta["debug"]:
@@ -233,10 +225,9 @@ async def _check_hosts(
 
         parsed_url = urlparse(raw_url)
         hostname = parsed_url.netloc
-        mapped_host = await match_host(hostname, URL_HOST_MAPPING.keys())
+        mapped_host = host_slug(hostname)
 
         if mapped_host:
-            mapped_host = URL_HOST_MAPPING.get(mapped_host, mapped_host)
             if mapped_host in approved_image_hosts:
                 reuploaded_by_host.setdefault(mapped_host, []).append(image)
             elif meta["debug"]:
@@ -260,8 +251,7 @@ async def _check_hosts(
         for image in tracker_images:
             raw_url = _as_str(image.get("raw_url")) or ""
             netloc = urlparse(raw_url).netloc
-            matched_host = await match_host(netloc, URL_HOST_MAPPING.keys())
-            mapped_host = URL_HOST_MAPPING.get(matched_host, matched_host)
+            mapped_host = host_slug(netloc)
             valid_hosts.append(mapped_host in approved_image_hosts)
 
         # Then check if all are valid
@@ -635,8 +625,7 @@ async def _handle_image_upload(
             raw_url = image["raw_url"]
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
-            mapped_host = await match_host(hostname, URL_HOST_MAPPING.keys())
-            mapped_host = URL_HOST_MAPPING.get(mapped_host, mapped_host)
+            mapped_host = host_slug(hostname)
 
             if mapped_host not in approved_image_hosts:
                 console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
@@ -648,8 +637,7 @@ async def _handle_image_upload(
         valid_hosts: list[bool] = []
         for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
             netloc = urlparse(image["raw_url"]).netloc
-            matched_host = await match_host(netloc, URL_HOST_MAPPING.keys())
-            mapped_host = URL_HOST_MAPPING.get(matched_host, matched_host)
+            mapped_host = host_slug(netloc)
             valid_hosts.append(mapped_host in approved_image_hosts)
         if all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
             output_file = os.path.join(meta["base_dir"], "tmp", meta["uuid"], "covers.json") if tracker == "covers" else os.path.join(screenshots_dir, "reuploaded_images.json")

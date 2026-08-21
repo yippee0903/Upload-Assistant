@@ -54,3 +54,12 @@ def image_size_ok(img_host: Optional[str], size: int) -> bool:
     if host is None or not host.uploadable or size <= MIN_IMAGE_BYTES:
         return False
     return host.max_bytes is None or size <= host.max_bytes
+
+
+def host_slug(hostname: str) -> str:
+    """Slug of the image host serving `hostname` (suffix match on known domains); the hostname itself when unknown."""
+    hostname = hostname.lower()
+    for domain, slug in URL_HOST_MAPPING.items():
+        if hostname == domain or hostname.endswith(f".{domain}"):
+            return slug
+    return hostname

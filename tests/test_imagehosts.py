@@ -1,4 +1,4 @@
-from src.imagehosts import IMAGE_HOSTS, UPLOAD_HOSTS, URL_HOST_MAPPING, image_size_ok
+from src.imagehosts import IMAGE_HOSTS, UPLOAD_HOSTS, URL_HOST_MAPPING, host_slug, image_size_ok
 
 
 def test_image_size_ok():
@@ -16,3 +16,10 @@ def test_registry_is_consistent():
     assert all(IMAGE_HOSTS[slug].uploadable for slug in UPLOAD_HOSTS)
     assert set(URL_HOST_MAPPING.values()) <= set(IMAGE_HOSTS)
     assert "zipline" in UPLOAD_HOSTS and "ziplinestudio" not in UPLOAD_HOSTS
+
+
+def test_host_slug_suffix_match():
+    assert host_slug("i.ibb.co") == "imgbb"
+    assert host_slug("IMGBOX.COM") == "imgbox"
+    assert host_slug("notimgbox.com") == "notimgbox.com"
+    assert host_slug("img.passtheima.ge") == "passtheimage"
