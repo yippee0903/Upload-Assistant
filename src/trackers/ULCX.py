@@ -79,28 +79,18 @@ class ULCX(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
-        if "concert" in meta["keywords"]:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]Concerts not allowed at {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
-        if meta["video_codec"] == "HEVC" and meta["resolution"] != "2160p" and "animation" not in meta["keywords"] and meta.get("anime", False) is not True:
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]")
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                return False
-        if meta["type"] in ["ENCODE", "HDTV"] and meta["resolution"] not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
-            if not meta["unattended"]:
-                console.print(f"[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]")
+        is_animated = "animation" in meta["keywords"] or meta.get("anime", False) is True
+        if "concert" in meta["keywords"] and not self._ask(meta, "Concerts are not allowed."):
             return False
+        if meta["video_codec"] == "HEVC" and meta["resolution"] != "2160p" and not is_animated and not self._ask(meta, "This content might not fit the HEVC rules."):
+            return False
+        if meta["type"] in ["ENCODE", "HDTV"] and meta["resolution"] not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
+            if meta["type"] == "HDTV" and not self._ask(meta, "SD broadcasts are only accepted when the content was never released in HD or on disc/WEB."):
+                return False
+            if meta["type"] == "ENCODE":
+                if not meta["unattended"]:
+                    console.print(f"[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]")
+                return False
 
         if meta["type"] in ["DVDRIP"]:
             if not meta["unattended"]:
@@ -129,20 +119,10 @@ class ULCX(UNIT3D):
             console.print(f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
             return False
 
-        if meta.get("has_disallowed_compat_track", False):
-            if not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)):
-                console.print(
-                    f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}.\n"
-                    "[yellow]Only TrueHD audio tracks may include a compatibility track.[/yellow][/bold red]"
-                )
-                if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    pass
-                else:
-                    return False
-            else:
-                if not meta.get("unattended", False):
-                    console.print(f"[bold red]This release contains a compatibility audio track which is not allowed at {self.tracker}. Skipping.[/bold red]")
-                return False
+        if meta.get("has_disallowed_compat_track", False) and not self._ask(
+            meta, "This release contains a compatibility audio track which is not allowed. Only TrueHD audio tracks may include a compatibility track."
+        ):
+            return False
 
         if meta.get("discs_missing_certificate", []):
             console.print(f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
@@ -153,7 +133,98 @@ class ULCX(UNIT3D):
                 console.print(f"[bold red]Streaming service is missing, skipping {self.tracker} upload.[/bold red]")
             return False
 
+        if not int(meta.get("tmdb_id") or 0):
+            console.print(f"[bold red]No TMDB match, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        if meta["video_codec"] == "AV1" and not is_animated and not self._ask(meta, "AV1 is only accepted for animated content."):
+            return False
+
+        if not meta["is_disc"]:
+            bad_ext = [f for f in meta.get("filelist", []) if not f.lower().endswith(".mkv") and not (meta["type"] == "HDTV" and f.lower().endswith(".ts"))]
+            if bad_ext:
+                console.print(f"[bold red]Only .mkv files are accepted (.ts for HDTV), skipping {self.tracker} upload.[/bold red]")
+                return False
+            if not self._check_audio_tracks(meta):
+                return False
+
+        if len(meta.get("image_list", [])) < 3:
+            console.print(f"[bold red]At least 3 screenshots are required, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        # Strong recommendations: mandatory for personal releases, a warning otherwise.
+        for failed, msg in self._personal_release_checks(meta):
+            if not failed:
+                continue
+            if meta.get("personalrelease", False):
+                console.print(f"[bold red]{msg} Skipping {self.tracker} upload.[/bold red]")
+                return False
+            console.print(f"[yellow]{self.tracker}: {msg} A release that complies may trump this one.[/yellow]")
+
         return should_continue
+
+    def _ask(self, meta: Meta, msg: str) -> bool:
+        """Warn and let an interactive user override; unattended runs skip the tracker."""
+        if meta["unattended"] and not meta.get("unattended_confirm", False):
+            return False
+        console.print(f"[bold red]{msg} ({self.tracker})[/bold red]")
+        return bool(cli_ui.ask_yes_no("Do you want to upload anyway?", default=False))
+
+    @staticmethod
+    def _tracks(meta: Meta, track_type: str) -> list[dict[str, Any]]:
+        tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+        return [t for t in tracks if t.get("@type") == track_type]
+
+    @staticmethod
+    def _is_lossless_dts(track: dict[str, Any]) -> bool:
+        commercial = str(track.get("Format_Commercial_IfAny") or "")
+        return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
+
+    def _is_lossless(self, track: dict[str, Any]) -> bool:
+        return track.get("Compression_Mode") == "Lossless" or track.get("Format") in ("FLAC", "PCM", "MLP FBA") or self._is_lossless_dts(track)
+
+    def _check_audio_tracks(self, meta: Meta) -> bool:
+        for track in self._tracks(meta, "Audio"):
+            fmt = str(track.get("Format") or "")
+            try:
+                channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
+            except (TypeError, ValueError):
+                channels = 0
+            if fmt == "FLAC" and channels > 2:
+                console.print(f"[bold red]FLAC is only accepted for mono or stereo audio, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if not self._is_lossless(track):
+                continue
+            if meta["type"] == "ENCODE" and channels >= 3 and meta["resolution"] != "2160p":
+                console.print(f"[bold red]Lossless multi-channel audio is not accepted on 1080p or lower encodes, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if meta["type"] == "REMUX":
+                is_dtshd_ma = self._is_lossless_dts(track)
+                if channels == 1 and fmt != "FLAC" and not is_dtshd_ma:
+                    console.print(f"[bold red]Lossless mono audio must be FLAC or DTS-HD MA on remuxes, skipping {self.tracker} upload.[/bold red]")
+                    return False
+                if channels == 2 and fmt != "FLAC":
+                    console.print(f"[bold red]Lossless stereo audio must be FLAC on remuxes, skipping {self.tracker} upload.[/bold red]")
+                    return False
+                if channels >= 3 and fmt != "MLP FBA" and not is_dtshd_ma:
+                    console.print(f"[bold red]Lossless multi-channel audio must be DTS-HD MA or TrueHD on remuxes, skipping {self.tracker} upload.[/bold red]")
+                    return False
+            if meta["type"] == "WEBDL" and channels >= 3 and not meta["unattended"]:
+                console.print(f"[yellow]{self.tracker}: a WEB-DL with lossless multi-channel audio needs video comparisons against the remux in its description.[/yellow]")
+        return True
+
+    def _personal_release_checks(self, meta: Meta) -> list[tuple[bool, str]]:
+        general = self._tracks(meta, "General")
+        encoder = " ".join(f"{t.get('Encoded_Application') or ''} {t.get('Encoded_Library') or ''} {(t.get('extra') or {}).get('Writing_frontend') or ''}" for t in general)
+        original_language = str(meta.get("original_language") or "").lower()
+        foreign = bool(original_language) and not original_language.startswith("en")
+        default_subs = [str(t.get("Language") or "").lower() for t in self._tracks(meta, "Text") if t.get("Default") == "Yes"]
+        return [
+            (meta["type"] == "ENCODE" and "handbrake" in encoder.lower(), "HandBrake encodes are discouraged."),
+            ("Dubbed" in meta.get("audio", ""), "Foreign content should keep the original audio track alongside the dub."),
+            (foreign and bool(default_subs) and not any(lang.startswith("en") for lang in default_subs), "English subtitles should be the default track on foreign content."),
+            (original_language.startswith("en") and bool(default_subs), "No subtitle track should be marked default on English content."),
+        ]
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {
