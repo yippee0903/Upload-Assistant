@@ -524,7 +524,7 @@ class TestSizeTolerance:
     def _dupes(self, tolerance, dupe_size):
         checker = DupeChecker(config={"DEFAULT": {"dupe_size_difference_tolerance": tolerance}})
         meta = _base_meta(source_size=10_000_000_000)
-        entry = {"name": "Interstellar 2014 IMAX 1080p BluRay DTS-HD MA 5.1 x264-LEGi0N", "size": dupe_size, "files": [], "link": "x"}
+        entry = {"name": "Example Movie 2020 1080p BluRay DTS-HD MA 5.1 x264-GRP", "size": dupe_size, "files": [], "link": "x"}
         return _run(checker.filter_dupes([entry], meta, "BLU"))
 
     def test_both_directions_excluded_beyond_tolerance(self):
