@@ -236,6 +236,13 @@ class TestUpload:
         assert sent["files"]["file"][1] == b"fake-torrent"
         assert meta["tracker_status"]["V3X"]["torrent_id"] == "new-uuid"
 
+    def test_upload_saves_the_description(self, monkeypatch: Any, tmp_path: Any):
+        tracker = V3X(_config())
+        self._patch(monkeypatch, tracker, _FakeResponse(201, {"id": "new-uuid"}))
+        meta = self._meta(tmp_path)
+        asyncio.run(tracker.upload(meta, ""))
+        assert (tmp_path / "tmp" / meta["uuid"] / "[V3X]DESCRIPTION.txt").read_text(encoding="utf-8") == "desc"
+
     def test_upload_api_error_is_reported(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
         self._patch(monkeypatch, tracker, _FakeResponse(400, {"error": "invalid_category"}))
