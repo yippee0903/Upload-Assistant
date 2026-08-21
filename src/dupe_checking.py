@@ -826,32 +826,3 @@ class DupeChecker:
                 target_hdr_simple = {"HDR"}
 
         return file_hdr_simple == target_hdr_simple
-
-
-async def filter_dupes(dupes: Sequence[DupeInput], meta: Meta, tracker_name: str, config: dict[str, Any]) -> list[DupeEntry]:
-    return await DupeChecker(config).filter_dupes(dupes, meta, tracker_name)
-
-
-async def normalize_filename(filename: Union[str, MutableMapping[str, Any]]) -> str:
-    return await DupeChecker.normalize_filename(filename)
-
-
-async def is_season_episode_match(
-    filename: str,
-    target_season: Optional[Union[str, int]],
-    target_episode: Optional[Union[str, int]],
-) -> tuple[bool, bool]:
-    return await DupeChecker.is_season_episode_match(filename, target_season, target_episode)
-
-
-async def refine_hdr_terms(hdr: Optional[str]) -> set[str]:
-    return await DupeChecker.refine_hdr_terms(hdr)
-
-
-async def has_matching_hdr(
-    file_hdr: set[str],
-    target_hdr: set[str],
-    meta: Meta,
-    tracker: Optional[str] = None,
-) -> bool:
-    return await DupeChecker.has_matching_hdr(file_hdr, target_hdr, meta, tracker=tracker)
