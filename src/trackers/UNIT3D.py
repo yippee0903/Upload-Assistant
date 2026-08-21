@@ -320,7 +320,21 @@ class UNIT3D:
         return {"sd": f"{meta['sd']}"}
 
     async def get_keywords(self, meta: dict[str, Any]) -> dict[str, str]:
-        return {"keywords": meta.get("keywords", "")}
+        """Keywords joined with ", ", cut at whole words to fit UNIT3D's 255-char column."""
+        kept: list[str] = []
+        length = 0
+        for keyword in str(meta.get("keywords", "")).split(","):
+            keyword = keyword.strip()
+            if not keyword:
+                continue
+            needed = len(keyword) + (2 if kept else 0)
+            if length + needed > 255:
+                if not kept:
+                    kept.append(keyword[:255])
+                break
+            kept.append(keyword)
+            length += needed
+        return {"keywords": ", ".join(kept)}
 
     async def get_personal_release(self, meta: dict[str, Any]) -> dict[str, str]:
         personal_release = "1" if meta.get("personalrelease", False) else "0"
