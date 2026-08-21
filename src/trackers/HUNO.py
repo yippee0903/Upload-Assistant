@@ -134,7 +134,7 @@ class HUNO(UNIT3D):
         }
 
     async def get_mediainfo(self, meta: dict[str, Any]) -> dict[str, str]:
-        if meta["bdinfo"] is not None:
+        if meta.get("is_disc") == "BDMV":
             mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
         else:
             async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
