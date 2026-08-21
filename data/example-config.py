@@ -267,6 +267,11 @@ config = {
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_signature": "",
 
+        # Per release-group overrides of the text fields above (custom_description_header, screenshot_header, custom_signature).
+        # Matched against the detected group tag, case-insensitive; also accepted inside a tracker section.
+        # "tag_overrides": {"GRP": {"custom_signature": "[center]Encoded by GRP[/center]"}},
+        "tag_overrides": {},
+
         # Add bluray.com link to description
         # Requires "get_bluray_info" to be set to True
         "add_bluray_link": False,

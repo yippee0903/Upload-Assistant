@@ -25,6 +25,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "update_notification_cache_hours": (int, float),
     "dupe_size_difference_tolerance": (int, float, type(None)),
     "personal_release_groups": (list,),
+    "tag_overrides": (dict,),
     "verbose_notification": (bool,),
     "webhook_url": (str,),
     "tmdb_api": (str,),

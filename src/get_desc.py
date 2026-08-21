@@ -5,7 +5,7 @@ import json
 import os
 import re
 import urllib.parse
-from typing import Any, Union, cast
+from typing import Any, Optional, Union, cast
 from urllib.parse import ParseResult
 
 import aiofiles
@@ -204,12 +204,21 @@ class DescriptionBuilder:
         self.tracker_config: dict[str, Any] = cast(dict[str, Any], tracker_cfg) if isinstance(tracker_cfg, dict) else {}
         self.parser = self.common.parser
 
-    async def get_custom_header(self) -> str:
+    def _text_setting(self, key: str, meta: Optional[dict[str, Any]] = None) -> str:
+        """Tracker config beats DEFAULT; a tag_overrides[<group>][key] entry (per tracker, then DEFAULT) beats both."""
+        tag = str((meta or {}).get("tag") or "").strip().lstrip("-").casefold()
+        for source in (self.tracker_config, self.config.get("DEFAULT", {})):
+            overrides = source.get("tag_overrides") if isinstance(source, dict) else None
+            if tag and isinstance(overrides, dict):
+                for group, values in cast(dict[str, Any], overrides).items():
+                    if str(group).strip().lstrip("-").casefold() == tag and isinstance(values, dict) and values.get(key) is not None:
+                        return str(cast(dict[str, Any], values)[key])
+        return str(self.tracker_config.get(key, self.config["DEFAULT"].get(key, "")) or "")
+
+    async def get_custom_header(self, meta: Optional[dict[str, Any]] = None) -> str:
         """Returns a custom header if configured."""
         try:
-            custom_description_header = str(self.tracker_config.get("custom_description_header", self.config["DEFAULT"].get("custom_description_header", "")))
-            if custom_description_header:
-                return custom_description_header
+            return self._text_setting("custom_description_header", meta)
         except Exception as e:
             console.print(f"[yellow]Warning: Error setting custom description header: {str(e)}[/yellow]")
 
@@ -372,12 +381,10 @@ class DescriptionBuilder:
 
         return ""
 
-    async def screenshot_header(self) -> str:
+    async def screenshot_header(self, meta: Optional[dict[str, Any]] = None) -> str:
         """Returns the screenshot header if applicable."""
         try:
-            screenheader = self.tracker_config.get("screenshot_header", self.config["DEFAULT"].get("screenshot_header", None))
-            if screenheader:
-                return str(screenheader)
+            return self._text_setting("screenshot_header", meta)
         except Exception as e:
             console.print(f"[yellow]Warning: Error getting screenshot header: {str(e)}[/yellow]")
 
@@ -411,11 +418,10 @@ class DescriptionBuilder:
 
         return ""
 
-    async def get_custom_signature(self) -> str:
+    async def get_custom_signature(self, meta: Optional[dict[str, Any]] = None) -> str:
         custom_signature: str = ""
         try:
-            raw_signature = self.tracker_config.get("custom_signature", self.config["DEFAULT"].get("custom_signature", ""))
-            custom_signature = raw_signature or ""
+            custom_signature = self._text_setting("custom_signature", meta)
         except Exception as e:
             console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
 
@@ -503,7 +509,7 @@ class DescriptionBuilder:
 
         # Custom Header
         if not desc_header:
-            desc_header = await self.get_custom_header()
+            desc_header = await self.get_custom_header(meta)
         if desc_header:
             desc_parts.append(desc_header + "\n")
 
@@ -599,7 +605,7 @@ class DescriptionBuilder:
         desc_parts.append(discs_and_screenshots)
 
         # Custom Signature
-        desc_parts.append(await self.get_custom_signature())
+        desc_parts.append(await self.get_custom_signature(meta))
 
         # UA Signature
         if not signature:
@@ -700,7 +706,7 @@ class DescriptionBuilder:
 
     async def _handle_discs_and_screenshots(self, meta: dict[str, Any], approved_image_hosts: list[str], images: list[dict[str, str]], multi_screens: int) -> str:
         try:
-            screenheader = await self.screenshot_header()
+            screenheader = await self.screenshot_header(meta)
         except Exception:
             screenheader = None
 
