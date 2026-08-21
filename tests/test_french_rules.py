@@ -1,6 +1,7 @@
 """Contract: French trackers declare their rules as data and only report declared keys."""
 
 import ast
+import asyncio
 import pathlib
 from unittest.mock import patch
 
@@ -54,3 +55,26 @@ def test_dispositions_drive_the_outcome():
         assert ask.call_args.kwargs["default"] is True
     with pytest.raises(KeyError):
         fake._rule_failed({}, "nope", "m")
+
+
+def _config() -> dict:
+    cfg = {"api_key": "k", "announce_url": "https://example.invalid/announce/k"}
+    return {"TRACKERS": {n: dict(cfg) for n in ("C411", "TOS", "V3X", "G3MINI")}, "DEFAULT": {"tmdb_api": "k"}}
+
+
+def _lang_meta(audio: list[str], subs: list[str], original: str = "it") -> dict:
+    return {"audio_languages": audio, "subtitle_languages": subs, "original_language": original, "language_checked": True, "unattended": True, "debug": False}
+
+
+@pytest.mark.parametrize("cls", [C411, TOS, V3X, G3MINI])
+def test_french_subtitles_only_count_with_original_audio(cls):
+    # A dub in a third language with French subtitles is neither VF nor VOSTFR.
+    tracker = cls(config=_config())
+    run = lambda meta: asyncio.run(tracker._check_french_language(meta))  # noqa: E731
+    assert run(_lang_meta(["French"], [])) is True
+    assert run(_lang_meta(["Italian"], ["French"])) is True
+    assert run(_lang_meta(["English"], ["French"])) is False
+    assert run(_lang_meta(["English"], ["French"], original="en")) is True
+    # Unknown original language or audio tracks cannot be judged: not blocked.
+    assert run(_lang_meta(["English"], ["French"], original="")) is True
+    assert run({**_lang_meta([], ["French"]), "audio_languages": None}) is True
