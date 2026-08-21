@@ -104,7 +104,7 @@ class Args:
             default=None,
         )
         parser.add_argument("--unit3d", action="store_true", required=False, help="[parse a txt output file from UNIT3D-Upload-Checker]")
-        parser.add_argument("-s", "--screens", nargs=1, required=False, help="Number of screenshots", default=int(self.config["DEFAULT"]["screens"]))
+        parser.add_argument("-s", "--screens", nargs=1, type=int, required=False, help="Number of screenshots", default=int(self.config["DEFAULT"]["screens"]))
         parser.add_argument(
             "-comps",
             "--comparison",
@@ -392,6 +392,7 @@ class Args:
             "-fl",
             "--freeleech",
             nargs=1,
+            type=int,
             required=False,
             help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values",
             default=0,
