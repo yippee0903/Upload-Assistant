@@ -9,6 +9,8 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class BLU(UNIT3D):
+    REGION_IDS = {"CZE": "244", "SVK": "245", "FIN": "246", "SWE": "247", "BGR": "248", "DNK": "249"}
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="BLU")
         self.config = config

@@ -11,6 +11,8 @@ Config = dict[str, Any]
 
 
 class LST(UNIT3D):
+    REGION_IDS = {"CZE": "244", "FIN": "245", "SWE": "246"}
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="LST")
         self.config: Config = config

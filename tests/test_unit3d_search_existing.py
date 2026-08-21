@@ -31,3 +31,15 @@ def test_without_tmdb_falls_back_to_category():
     params = _search({})
     assert "tmdbId" not in params
     assert "categories[]" in params
+
+
+def test_site_local_region_ids_override_the_shared_table():
+    import asyncio as _asyncio
+
+    from src.trackers.AITHER import AITHER
+    from src.trackers.LST import LST
+
+    cfg = {"TRACKERS": {"AITHER": {"api_key": "k", "announce_url": "a"}, "LST": {"api_key": "k", "announce_url": "a"}}, "DEFAULT": {}}
+    assert _asyncio.run(AITHER(cfg).get_region_id({"region": "FIN"})) == {"region_id": "244"}
+    assert _asyncio.run(LST(cfg).get_region_id({"region": "FIN"})) == {"region_id": "245"}
+    assert _asyncio.run(LST(cfg).get_region_id({"region": "FRA"})) == {"region_id": "73"}  # shared table still applies

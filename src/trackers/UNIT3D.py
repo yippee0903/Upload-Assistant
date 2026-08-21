@@ -293,8 +293,12 @@ class UNIT3D:
 
         return {}
 
+    # Site-local region ids that are not in the shared UNIT3D table (or differ from it); subclasses override.
+    REGION_IDS: dict[str, str] = {}
+
     async def get_region_id(self, meta: dict[str, Any]) -> dict[str, str]:
-        region_id = await self.common.unit3d_region_ids(meta.get("region", ""))
+        region = str(meta.get("region") or "").upper()
+        region_id = self.REGION_IDS.get(region) or await self.common.unit3d_region_ids(region)
         if region_id:
             return {"region_id": region_id}
 
