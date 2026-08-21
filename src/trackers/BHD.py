@@ -9,7 +9,6 @@ import aiofiles
 import httpx
 
 from src.console import console
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 
 
@@ -24,7 +23,6 @@ class BHD:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "BHD"
         self.source_flag = "BHD"
         self.upload_url = "https://beyond-hd.me/api/upload/"
@@ -67,16 +65,6 @@ class BHD:
         ]
         self.approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "imagebam"]
         pass
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return None
 
     async def upload(self, meta: dict[str, Any], _disctype: str) -> bool:
         common = COMMON(config=self.config)

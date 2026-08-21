@@ -14,7 +14,6 @@ import pyotp
 from defusedxml import ElementTree as ET
 
 from src.console import console
-from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON, ask_to_continue
 
@@ -33,7 +32,6 @@ class MTV:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "MTV"
         self.source_flag = "MTV"
         self.upload_url = "https://www.morethantv.me/upload.php"
@@ -102,16 +100,6 @@ class MTV:
     async def async_json_dumps(self, obj: Any) -> str:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, json.dumps, obj)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         common = COMMON(config=self.config)

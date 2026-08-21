@@ -16,7 +16,6 @@ import tmdbsimple as tmdb
 
 from src.bbcode import BBCODE
 from src.console import console
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
@@ -32,7 +31,6 @@ class TVC:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "TVC"
         self.source_flag = "TVCHAOS"
         self.upload_url = "https://tvchaosuk.com/api/torrents/upload"
@@ -424,11 +422,6 @@ class TVC:
                 return f.read()
 
         return await asyncio.to_thread(_read)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-
-        await self.rehost_images_manager.check_hosts(meta, self.tracker, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
-        return
 
     async def upload(self, meta: Meta, _disctype: str) -> Optional[bool]:
         common = COMMON(config=self.config)

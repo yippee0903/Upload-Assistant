@@ -9,7 +9,6 @@ import httpx
 from cogs.redaction import Redaction
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 Meta = dict[str, Any]
@@ -20,7 +19,6 @@ class DC:
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "DC"
         self.base_url = "https://digitalcore.club"
         self.api_base_url = f"{self.base_url}/api/v1/torrents"
@@ -241,15 +239,6 @@ class DC:
             dc_name += " [UNRAR]"
 
         return dc_name
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         anon = "1" if meta["anon"] or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"

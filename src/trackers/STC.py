@@ -3,7 +3,6 @@ from typing import Any, Optional, cast
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
@@ -16,7 +15,6 @@ class STC(UNIT3D):
         super().__init__(config, tracker_name="STC")
         self.config: Config = config
         self.common = COMMON(config)
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "STC"
         self.base_url = "https://skipthecommercials.xyz"
         self.id_url = f"{self.base_url}/api/torrents/"
@@ -64,14 +62,6 @@ class STC(UNIT3D):
             return False
 
         return should_continue
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         image_list = meta["STC_images_key"] if "STC_images_key" in meta else meta.get("image_list", [])

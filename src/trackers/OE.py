@@ -8,7 +8,6 @@ import aiofiles
 from src.bbcode import BBCODE
 from src.console import console
 from src.languages import languages_manager
-from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
@@ -21,7 +20,6 @@ class OE(UNIT3D):
         super().__init__(config, tracker_name="OE")
         self.config: Config = config
         self.common = COMMON(config)
-        self.rehost_images_manager = RehostImagesManager(config)
         self.tracker = "OE"
         self.base_url = "https://onlyencodes.cc"
         self.id_url = f"{self.base_url}/api/torrents/"
@@ -177,16 +175,6 @@ class OE(UNIT3D):
             meta["is_disc"] != "BDMV"
             and not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True)
         )
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding="utf8") as f:

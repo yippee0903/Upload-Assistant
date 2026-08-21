@@ -235,16 +235,6 @@ class GPW:
 
         return title if title and title != meta.get("title") else ""
 
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
-
     async def get_release_desc(self, meta: dict[str, Any]) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []

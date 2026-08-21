@@ -46,7 +46,7 @@ from src.nfo_link import NfoLinkManager
 from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
-from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, validate_reused_image_hosts
+from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, check_tracker_image_hosts, validate_reused_image_hosts
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
@@ -1286,7 +1286,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                                 console.print(
                                     f"[cyan]Image host debug: post-upload before {tracker_name}.check_image_hosts() image_list={len(meta.get('image_list', []) or [])} {key}={len(meta.get(key, []) or [])}[/cyan]"  # noqa: E501
                                 )
-                            await tracker_instance.check_image_hosts(meta)
+                            await check_tracker_image_hosts(meta, config, tracker_instance)
                             if meta.get("debug"):
                                 key = f"{tracker_name}_images_key"
                                 console.print(

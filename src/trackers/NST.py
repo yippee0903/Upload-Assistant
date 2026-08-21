@@ -8,7 +8,6 @@ import cli_ui
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
-from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
@@ -43,7 +42,6 @@ class NST(FrenchTrackerMixin, UNIT3D):
         self.upload_url = f"{self.base_url}/api/upload-assistant/torrents/upload"
         self.search_url = f"{self.base_url}/api/upload-assistant/torrents/filter"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.rehost_images_manager = RehostImagesManager(config)
         self.approved_image_hosts = ["imgbox", "ptscreens", "onlyimage", "pixhost"]
         self.tmdb_manager = TmdbManager(config)
         _reserved_note = "Internal NST group: reserved for the team's own uploads"
@@ -201,16 +199,6 @@ class NST(FrenchTrackerMixin, UNIT3D):
             french_missing_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=True)
             return french_missing_confirm
         return True
-
-    # ── Image host gating ─────────────────────────────────────────────
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     # ── Description fixup (strip unsupported BBCode extensions) ────
 

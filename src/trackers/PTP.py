@@ -22,7 +22,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
-from src.rehostimages import URL_HOST_MAPPING, RehostImagesManager
+from src.rehostimages import URL_HOST_MAPPING
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -32,7 +32,6 @@ from src.uploadscreens import UploadScreensManager
 class PTP:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
         self.tracker = "PTP"
@@ -810,16 +809,6 @@ class PTP:
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
         desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
         return desc
-
-    async def check_image_hosts(self, meta: dict[str, Any]) -> None:
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def edit_desc(self, meta: dict[str, Any]) -> None:
         async with aiofiles.open(f"{meta['base_dir']}/tmp/{meta['uuid']}/DESCRIPTION.txt", encoding="utf-8") as base_file:

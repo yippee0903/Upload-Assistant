@@ -35,14 +35,23 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
     if relevant:
         console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(relevant)}[/yellow]")
     for tracker_name in relevant:
-        tracker_instance = tracker_class_map[tracker_name](config=config)
-        await tracker_instance.check_image_hosts(meta)
+        await check_tracker_image_hosts(meta, config, tracker_class_map[tracker_name](config=config))
         images_key = f"{tracker_name}_images_key"
         if meta.get(images_key):
             console.print(f"[green]{tracker_name}: {len(meta[images_key])} image(s) ready on approved hosts.[/green]")
         else:
             console.print(f"[yellow]{tracker_name}: existing images could not be validated/rehosted; the description will fall back to the original links.[/yellow]")
     return relevant
+
+
+async def check_tracker_image_hosts(meta: dict[str, Any], config: dict[str, Any], tracker_instance: Any) -> None:
+    """Rehost meta["image_list"] onto a host the tracker accepts; the result lands in meta[f"{tracker}_images_key"]."""
+    await RehostImagesManager(config).check_hosts(
+        meta,
+        tracker_instance.tracker,
+        img_host_index=1,
+        approved_image_hosts=tracker_instance.approved_image_hosts,
+    )
 
 
 def _as_str(value: Any) -> Union[str, None]:
