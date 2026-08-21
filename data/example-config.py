@@ -59,7 +59,7 @@ config = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -88,6 +88,8 @@ config = {
         "lostimg_api": "",
         # postimages.org API key (https://postimages.org/login/api)
         "postimg_api": "",
+        # img.midnightscene.cc API key (MidnightScene members)
+        "midnightscene_api_key": "",
 
         # GETTING METADATA
 

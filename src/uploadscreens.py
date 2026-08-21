@@ -314,13 +314,18 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Request failed with error: {e}")
                 return {"status": "failed", "reason": str(e)}
 
-        elif img_host == "zipline":
-            url = config["DEFAULT"].get("zipline_url")
-            api_key = config["DEFAULT"].get("zipline_api_key")
+        elif img_host in ("zipline", "midnightscene"):
+            # MidnightScene runs a Zipline instance with a fixed URL
+            if img_host == "midnightscene":
+                url = "https://img.midnightscene.cc/api/upload"
+                api_key = config["DEFAULT"].get("midnightscene_api_key")
+            else:
+                url = config["DEFAULT"].get("zipline_url")
+                api_key = config["DEFAULT"].get("zipline_api_key")
 
             if not url or not api_key:
-                console.print("[red]Error: Missing Zipline URL or API key in config.")
-                return {"status": "failed", "reason": "Missing Zipline URL or API key"}
+                console.print(f"[red]Error: Missing {img_host} URL or API key in config.")
+                return {"status": "failed", "reason": f"Missing {img_host} URL or API key"}
 
             try:
                 async with aiofiles.open(image, "rb") as img_file:

@@ -51,6 +51,8 @@ config = {
         "lostimg_api": "",
         # postimages.org API key (https://postimages.org/login/api)
         "postimg_api": "",
+        # img.midnightscene.cc API key (MidnightScene members)
+        "midnightscene_api_key": "",
 
         # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg

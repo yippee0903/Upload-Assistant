@@ -39,6 +39,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "onlyimage_api": (str,),
     "lostimg_api": (str,),
     "postimg_api": (str,),
+    "midnightscene_api_key": (str,),
     "add_logo": (bool,),
     "logo_size": (str, int),
     "episode_overview": (bool,),

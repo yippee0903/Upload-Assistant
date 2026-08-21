@@ -29,6 +29,7 @@ IMAGE_HOSTS: dict[str, ImageHost] = {
     "utppm": ImageHost(("utp.pm",), ("utppm_api",)),
     "lostimg": ImageHost(("lostimg.cc",), ("lostimg_api",)),
     "postimg": ImageHost(("postimg.cc",), ("postimg_api",)),
+    "midnightscene": ImageHost(("img.midnightscene.cc",), ("midnightscene_api_key",)),
     # recognised when rehosting, never uploaded to
     "bhd": ImageHost(("beyondhd.co",), uploadable=False),
     "imagebam": ImageHost(("imagebam.com",), uploadable=False),
