@@ -1111,15 +1111,16 @@ class C411(FrenchTrackerMixin):
             parts.append(f"        [color={C}]Captures d'écran[/color]")
             parts.append("")
             img_lines: list[str] = []
-            # postimg thumbnails are 180px, too small to judge a capture: embed
-            # the stored image instead, one per row so it does not overflow.
-            per_row = 1 if any(host_slug(urlparse(img.get("img_url") or "").hostname or "") == "postimg" for img in image_list) else 2
             for img in image_list:
                 # Embed the thumbnail, linked to the full-size image: the site
                 # does not scale [img] tags, so a raw screenshot renders full width.
+                # postimg thumbnails are 180px, too small to judge a capture:
+                # embed its stored (already downscaled) image instead.
                 raw = img.get("raw_url", "")
                 web = img.get("web_url", "")
-                thumb = (img.get("img_url", "") if per_row == 2 else "") or raw
+                thumb = img.get("img_url", "") or raw
+                if host_slug(urlparse(thumb).hostname or "") == "postimg":
+                    thumb = raw
                 link = web or (raw if thumb != raw else "")
                 if thumb:
                     if link:
@@ -1129,7 +1130,7 @@ class C411(FrenchTrackerMixin):
             if img_lines:
                 parts.append("[center]")
                 # Two thumbnails per row, as on V3X.
-                parts.extend(" ".join(img_lines[i : i + per_row]) for i in range(0, len(img_lines), per_row))
+                parts.extend(" ".join(img_lines[i : i + 2]) for i in range(0, len(img_lines), 2))
                 parts.append("[/center]")
 
         # ── UA Signature ──

@@ -1412,9 +1412,9 @@ class TestDescription:
         assert '[url=https://img.host/view/1][img]https://img.host/1.png[/img][/url]' in desc
         assert '[img]https://img.host/2.png[/img]' in desc
 
-    def test_postimg_screenshots_use_full_size_one_per_row(self):
+    def test_postimg_screenshots_embed_the_stored_image(self):
         # postimg thumbnails are 180px and the site does not scale [img]:
-        # embed the stored image instead, one per row so none overflows.
+        # embed the stored image instead, still two per row.
         meta = _meta_base(image_list=[
             {'img_url': f'https://i.postimg.cc/t{i}/x.png', 'raw_url': f'https://i.postimg.cc/r{i}/x.png', 'web_url': f'https://postimg.cc/p{i}'}
             for i in (1, 2)
@@ -1422,7 +1422,7 @@ class TestDescription:
         c = C411(_config({'include_screenshots': True}))
         desc = asyncio.run(c._build_description(meta))
         assert (
-            '[url=https://postimg.cc/p1][img]https://i.postimg.cc/r1/x.png[/img][/url]\n'
+            '[url=https://postimg.cc/p1][img]https://i.postimg.cc/r1/x.png[/img][/url] '
             '[url=https://postimg.cc/p2][img]https://i.postimg.cc/r2/x.png[/img][/url]\n'
         ) in desc
         assert 'https://i.postimg.cc/t1/x.png' not in desc
