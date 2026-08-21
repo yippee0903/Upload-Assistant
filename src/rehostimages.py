@@ -4,7 +4,7 @@ import glob
 import json
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -52,6 +52,47 @@ async def check_tracker_image_hosts(meta: dict[str, Any], config: dict[str, Any]
         img_host_index=1,
         approved_image_hosts=tracker_instance.approved_image_hosts,
     )
+
+
+def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
+    """img_host_1..img_host_9 from config, in priority order, deduplicated."""
+    default_cfg = config.get("DEFAULT", {}) if isinstance(config.get("DEFAULT", {}), dict) else {}
+    hosts: list[str] = []
+    for index in range(1, 10):
+        host = default_cfg.get(f"img_host_{index}")
+        if host and str(host) not in hosts:
+            hosts.append(str(host))
+    return hosts
+
+
+def choose_common_host(
+    approved_by_tracker: Mapping[str, Any],
+    configured_hosts: Sequence[str],
+    current_host: str,
+) -> tuple[Optional[list[str]], Optional[str]]:
+    """Pick image hosts every tracker accepts.
+
+    Returns (allowed_hosts, preferred_host): allowed_hosts is the list upload_screens
+    may use (None = no constraint could be computed); preferred_host is the host to
+    switch to when current_host is not acceptable to all trackers (None = keep it).
+    Configured hosts win, in config priority; otherwise the common set, sorted.
+    """
+    approved_sets: list[set[str]] = []
+    for approved in approved_by_tracker.values():
+        if not approved or not isinstance(approved, (list, set, tuple)):
+            return None, None
+        approved_sets.append({str(h) for h in cast(Iterable[Any], approved)})
+    if not approved_sets or not configured_hosts:
+        return None, None
+
+    common = set.intersection(*approved_sets)
+    common_configured = [h for h in configured_hosts if h in common]
+    if common_configured:
+        return common_configured, (None if current_host in common_configured else common_configured[0])
+    if common:
+        ordered = sorted(common)
+        return ordered, (None if current_host in common else ordered[0])
+    return None, None
 
 
 def _as_str(value: Any) -> Union[str, None]:

@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 import traceback
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Optional, cast
 
@@ -46,7 +46,7 @@ from src.nfo_link import NfoLinkManager
 from src.proxy_env import apply_proxy_env
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
-from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, check_tracker_image_hosts, validate_reused_image_hosts
+from src.rehostimages import TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS, check_tracker_image_hosts, choose_common_host, configured_image_hosts, validate_reused_image_hosts
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
@@ -1146,85 +1146,20 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                     allowed_hosts: Optional[list[str]] = None
                     if relevant_trackers:
                         try:
-                            tracker_instances = {tracker_name: tracker_class_map[tracker_name](config=config) for tracker_name in relevant_trackers}
-
+                            approved_by_tracker = {name: getattr(tracker_class_map[name](config=config), "approved_image_hosts", None) for name in relevant_trackers}
+                            configured_hosts = configured_image_hosts(config)
+                            current_img_host = str(meta.get("imghost") or config["DEFAULT"].get("img_host_1") or "")
+                            allowed_hosts, preferred_host = choose_common_host(approved_by_tracker, configured_hosts, current_img_host)
                             if meta.get("debug"):
-                                console.print(f"[cyan]Image host debug: meta['imghost']={meta.get('imghost')} img_host_1={config['DEFAULT'].get('img_host_1')}[/cyan]")
-                                console.print(f"[cyan]Image host debug: relevant_trackers={relevant_trackers}[/cyan]")
-
-                            default_cfg_obj = config.get("DEFAULT", {})
-                            default_cfg: dict[str, Any] = cast(dict[str, Any], default_cfg_obj) if isinstance(default_cfg_obj, dict) else {}
-                            configured_hosts: list[str] = []
-                            for host_index in range(1, 10):
-                                host_key = f"img_host_{host_index}"
-                                if host_key in default_cfg:
-                                    host = default_cfg.get(host_key)
-                                    if host and host not in configured_hosts:
-                                        configured_hosts.append(str(host))
-
-                            if meta.get("debug"):
-                                console.print(f"[cyan]Image host debug: configured_hosts={configured_hosts}[/cyan]")
-
-                            approved_sets: list[set[str]] = []
-                            all_known = True
-                            for tracker_name in relevant_trackers:
-                                tracker_instance = tracker_instances[tracker_name]
-                                approved_hosts = getattr(tracker_instance, "approved_image_hosts", None)
-                                if not approved_hosts:
-                                    all_known = False
-                                    break
-                                if isinstance(approved_hosts, (list, set, tuple)):
-                                    approved_hosts_list = [str(host) for host in cast(Iterable[Any], approved_hosts)]
-                                    approved_sets.append(set(approved_hosts_list))
-                                else:
-                                    all_known = False
-                                    break
-
+                                console.print(f"[cyan]Image host debug: relevant_trackers={relevant_trackers} configured_hosts={configured_hosts}[/cyan]")
+                                console.print(f"[cyan]Image host debug: approved={approved_by_tracker} allowed_hosts={allowed_hosts} preferred_host={preferred_host}[/cyan]")
+                            if preferred_host and preferred_host != meta.get("imghost"):
                                 if meta.get("debug"):
-                                    console.print(f"[cyan]Image host debug: {tracker_name}.approved_image_hosts={approved_hosts_list}[/cyan]")
-
-                            if all_known and approved_sets and configured_hosts:
-                                common_hosts: set[str] = set()
-                                for host_set in approved_sets:
-                                    if not common_hosts:
-                                        common_hosts = set(host_set)
-                                    else:
-                                        common_hosts &= host_set
-                                common_configured_hosts = [h for h in configured_hosts if h in common_hosts]
-
-                                if meta.get("debug"):
-                                    console.print(f"[cyan]Image host debug: common_hosts={sorted(common_hosts)}[/cyan]")
-                                    console.print(f"[cyan]Image host debug: common_configured_hosts={common_configured_hosts}[/cyan]")
-
-                                # If we have any common hosts, use them as allowed_hosts for upload_screens
-                                if common_configured_hosts:
-                                    allowed_hosts = common_configured_hosts
-                                elif common_hosts:
-                                    allowed_hosts = sorted(common_hosts)
-
-                                # Prefer the user-selected host if it's valid for all relevant trackers; otherwise
-                                # fall back to the first common configured host by config priority (img_host_1..img_host_9).
-                                current_img_host = str(meta.get("imghost") or config["DEFAULT"].get("img_host_1") or "")
-                                preferred_host: Optional[str] = None
-
-                                if common_configured_hosts and current_img_host not in common_configured_hosts:
-                                    preferred_host = common_configured_hosts[0]
-                                elif common_hosts and current_img_host not in common_hosts:
-                                    preferred_host = sorted(common_hosts)[0]
-
-                                if preferred_host and preferred_host != meta.get("imghost"):
-                                    if meta.get("debug"):
-                                        console.print(
-                                            f"[cyan]Image host debug: current host '{current_img_host}' is not common to all trackers; "
-                                            f"switching meta['imghost'] from '{meta.get('imghost')}' to '{preferred_host}'.[/cyan]"
-                                        )
-                                    meta["imghost"] = preferred_host
-
-                            elif meta.get("debug"):
-                                console.print(
-                                    f"[cyan]Image host debug: cannot compute common host (all_known={all_known}, approved_sets={len(approved_sets)}, configured_hosts={len(configured_hosts)}).[/cyan]"
-                                )
-
+                                    console.print(
+                                        f"[cyan]Image host debug: current host '{current_img_host}' is not common to all trackers; "
+                                        f"switching meta['imghost'] from '{meta.get('imghost')}' to '{preferred_host}'.[/cyan]"
+                                    )
+                                meta["imghost"] = preferred_host
                         except Exception as e:
                             if meta.get("debug"):
                                 console.print(f"[yellow]Could not determine a common approved image host: {e}[/yellow]")
@@ -1240,14 +1175,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                         default_cfg_obj = config.get("DEFAULT", {})
                         default_cfg = cast(dict[str, Any], default_cfg_obj) if isinstance(default_cfg_obj, dict) else {}
                         min_successful_uploads = int(default_cfg.get("min_successful_image_uploads", 3))
-                        host_order: list[str] = []
-                        for host_index in range(1, 10):
-                            host_key = f"img_host_{host_index}"
-                            host = default_cfg.get(host_key)
-                            if host and host not in host_order:
-                                host_str = str(host)
-                                if allowed_hosts is None or host_str in allowed_hosts:
-                                    host_order.append(host_str)
+                        host_order = [h for h in configured_image_hosts(config) if allowed_hosts is None or h in allowed_hosts]
 
                         current_img_host = str(meta.get("imghost") or default_cfg.get("img_host_1") or "")
                         if current_img_host and current_img_host not in host_order and (allowed_hosts is None or current_img_host in allowed_hosts):
