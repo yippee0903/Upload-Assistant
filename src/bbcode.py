@@ -423,7 +423,7 @@ class BBCODE:
 
         # Bare mentions only: a host that is part of a URL or a subdomain
         # (cdn.<site>, i.<site>) must keep its TLD or the link breaks.
-        desc = re.sub(rf"(?<![\w./-]){re.escape(site_netloc)}", site_domain, desc)
+        desc = re.sub(rf"(?<![\w./-]){re.escape(site_netloc)}(?![\w-]|\.\w)", site_domain, desc)
 
         # Temporarily hide spoiler tags
         spoilers = re.findall(r"\[spoiler[\s\S]*?\[\/spoiler\]", desc)

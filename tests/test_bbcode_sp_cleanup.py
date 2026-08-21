@@ -372,5 +372,13 @@ def test_upbrr_signature_is_removed() -> None:
 def test_site_anonymisation_keeps_image_and_link_hosts_intact() -> None:
     desc = "[url=https://seedpool.org/torrents/1][img]https://cdn.seedpool.org/sp.png[/img][/url] [img]https://i.seedpool.org/abc[/img] Mirrored from seedpool.org."
     cleaned, images = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
-    assert {i["img_url"] for i in images} == {"https://cdn.seedpool.org/sp.png", "https://i.seedpool.org/abc"}
+    assert sorted((i["img_url"], i["web_url"]) for i in images) == [
+        ("https://cdn.seedpool.org/sp.png", "https://seedpool.org/torrents/1"),
+        ("https://i.seedpool.org/abc", "https://i.seedpool.org/abc"),
+    ]
     assert "seedpool.org" not in cleaned and "from seedpool." in cleaned
+
+
+def test_site_anonymisation_leaves_longer_hosts_alone() -> None:
+    cleaned, _ = BBCODE().clean_unit3d_description("See seedpool.org.uk or seedpool.org-mirror, not seedpool.org!", "https://seedpool.org")
+    assert cleaned == "See seedpool.org.uk or seedpool.org-mirror, not seedpool!"
