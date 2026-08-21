@@ -67,13 +67,16 @@ class UNIT3D:
             "accept": "application/json",
         }
 
-        category_id = str((await self.get_category_id(meta))["category_id"])
         params_dict: dict[str, str] = {
-            "tmdbId": str(meta["tmdb"]),
-            "categories[]": category_id,
             "name": "",
             "perPage": "100",
         }
+        if meta.get("tmdb"):
+            # TMDb identifies the work across the tracker's subcategories (TV vs Anime),
+            # so don't also filter by category or sibling-category dupes are missed.
+            params_dict["tmdbId"] = str(meta["tmdb"])
+        else:
+            params_dict["categories[]"] = str((await self.get_category_id(meta))["category_id"])
         params_list: Optional[ParamsList] = None
         if self.tracker not in ["OTW"]:
             resolutions = await self.get_resolution_id(meta)
