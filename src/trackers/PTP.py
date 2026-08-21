@@ -22,7 +22,7 @@ from src.bbcode import BBCODE
 from src.console import console
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import URL_HOST_MAPPING, RehostImagesManager
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -513,22 +513,8 @@ class PTP:
         if not selected_host:
             return False
         hostname = (urlparse(image_url).hostname or "").lower()
-        host_aliases = {
-            "imgbb": ("ibb.co", "imgbb.com"),
-            "imgbox": ("imgbox.com",),
-            "pixhost": ("pixhost.to",),
-            "lensdump": ("lensdump.com",),
-            "onlyimage": ("onlyimage.org",),
-            "ptpimg": ("ptpimg.me",),
-            "ptscreens": ("ptscreens.com",),
-            "passtheimage": ("passtheima.ge",),
-            "seedpool_cdn": ("cdn.seedpool.org",),
-            "utppm": ("utp.pm",),
-            "lostimg": ("lostimg.cc",),
-            "postimg": ("postimg.cc",),
-        }
-        aliases = host_aliases.get(selected_host, (selected_host,))
-        return any(hostname == alias or hostname.endswith(f".{alias}") for alias in aliases)
+        domains = [domain for domain, host in URL_HOST_MAPPING.items() if host == selected_host] or [selected_host]
+        return any(hostname == domain or hostname.endswith(f".{domain}") for domain in domains)
 
     def _poster_extension(self, image_url: str, content_type: str) -> str:
         url_extension = Path(urlparse(image_url).path).suffix.lower()
