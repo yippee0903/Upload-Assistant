@@ -30,6 +30,7 @@ ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "adult", "orgy")
 def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?", default: bool = False) -> bool:
     """Warn and let an interactive user override; unattended runs (without unattended_confirm) skip."""
     if meta.get("unattended") and not meta.get("unattended_confirm", False):
+        console.print(f"[yellow]{msg} (unattended: skipping)[/yellow]")
         return False
     console.print(f"[bold red]{msg}[/bold red]")
     return bool(cli_ui.ask_yes_no(question, default=default))

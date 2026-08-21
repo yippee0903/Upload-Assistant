@@ -106,7 +106,7 @@ class OTW(UNIT3D):
         keywords_value = meta.get("keywords", "")
         keywords = ", ".join(cast(list[str], keywords_value)) if isinstance(keywords_value, list) else str(keywords_value)
         combined_genres_text = ", ".join(combined_genres)
-        genres = f"{keywords} {combined_genres_text}"
+        genres = f"{keywords}, {combined_genres_text}"
         if is_adult(meta, ("hentai", "adult animation", "softcore")) and not ask_to_continue(meta, "Adult animation not allowed at OTW."):
             return False
 
