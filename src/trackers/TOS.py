@@ -62,7 +62,7 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         ]
         # Hosts verified to actually render on the site; other common hosts
         # (pixhost, lostimg) come out as dead images there.
-        self.approved_image_hosts = ["ptscreens", "imgbb", "imgbox"]
+        self.approved_image_hosts = ["ptscreens", "imgbb", "imgbox", "postimg"]
         pass
 
     async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:

@@ -415,3 +415,7 @@ class TestTosTypeId:
         for release_type in ("DISC", "REMUX", "ENCODE", "WEBDL", "WEBRIP", "HDTV", "UNKNOWN"):
             result = _run(t.get_type_id(self._type_meta(release_type)))
             assert result["type_id"] != "5", f"{release_type} produced invalid type_id 5"
+
+
+def test_postimg_is_an_approved_host() -> None:
+    assert "postimg" in TOS(_config()).approved_image_hosts
