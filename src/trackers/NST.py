@@ -4,18 +4,20 @@ import re
 from typing import Any
 
 import aiofiles
-import cli_ui
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 from src.trackers.FRENCH import FrenchTrackerMixin
+from src.trackers.french.rules import Rule
 from src.trackers.UNIT3D import UNIT3D
 
 
 class NST(FrenchTrackerMixin, UNIT3D):
     """Nostradamus (nostradamus.foo) — French private tracker with UNIT3D-compatible API."""
+
+    RULES = (Rule("french_language", "waivable", "A French audio track (any VF variant) unless no dub was ever released", default_answer=True),)
 
     # The upload-assistant wrapper uses two different category formats:
     #   - Upload (POST .../upload): sequential numeric IDs 1–5
@@ -186,19 +188,11 @@ class NST(FrenchTrackerMixin, UNIT3D):
             self.get_category_id = original  # type: ignore[assignment]
 
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
-        # NST requires at least one VF audio track (any variant: VFF, VFQ, VFB, …)
-        french_languages = ["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"]
-        if not await self.common.check_language_requirements(
+        return await self._check_french_language(
             meta,
-            self.tracker,
-            languages_to_check=french_languages,
-            check_audio=True,
+            languages_to_check=["french", "fre", "fra", "fr", "français", "francais", "fr-fr", "fr-ca", "fr-be", "fr-ch", "fr-qc"],
             check_subtitle=False,
-        ):
-            console.print(f"[bold red]{self.tracker} requires French language unless there has never been a dubbed version.[/bold red]")
-            french_missing_confirm = cli_ui.ask_yes_no("Do you want to proceed anyway?", default=True)
-            return french_missing_confirm
-        return True
+        )
 
     # ── Description fixup (strip unsupported BBCode extensions) ────
 

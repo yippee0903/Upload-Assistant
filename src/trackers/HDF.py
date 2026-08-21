@@ -25,7 +25,9 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.nfo_generator import SceneNfoGenerator
 from src.tmdb import TmdbManager
+from src.trackers.COMMON import mi_tracks
 from src.trackers.FRENCH import LANG_MAP, LANG_NAMES_FR, FrenchTrackerMixin
+from src.trackers.french.rules import Rule
 
 Meta = dict[str, Any]
 Config = dict[str, Any]
@@ -62,6 +64,11 @@ _BANNED_GROUPS: list[str] = [
 
 class HDF(FrenchTrackerMixin):
     """HD-Forever (hdf.world) — French private tracker with cookie-based auth."""
+
+    RULES = (
+        Rule("no_aac_audio", "strict", "No AAC audio, except commentary and audio-description tracks"),
+        Rule("french_audio", "advisory", "A French audio track (exceptions: no VF ever released, concerts, silent films, some WEB-DL)"),
+    )
 
     secret_token: str = ""
 
@@ -666,31 +673,22 @@ class HDF(FrenchTrackerMixin):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         """Check HDF rules: forbidden codecs, French audio, superfluous tracks, NFO."""
-        # AAC audio is forbidden on HDF, except for commentary and audio description tracks
-        mediainfo = meta.get("mediainfo") or {}
-        media = mediainfo.get("media") if isinstance(mediainfo, dict) else {}
-        all_tracks = (media.get("track") if isinstance(media, dict) else None) or []
-        for track in all_tracks:
-            if not isinstance(track, dict) or track.get("@type") != "Audio":
+        audio_tracks = mi_tracks(meta, "Audio")
+        for track in audio_tracks:
+            if str(track.get("Format", "")).strip().upper() != "AAC":
                 continue
-            fmt = str(track.get("Format", "")).strip().upper()
-            if fmt == "AAC":
-                title = str(track.get("Title", "")).lower()
-                if any(kw in title for kw in ("comment", "audiodesc", "audio desc", "description")):
-                    continue
-                console.print(f"[bold red]{self.tracker}: Le codec AAC est interdit sur HD-Forever (sauf commentaires audio et audiodescription). Upload annulé.[/bold red]")
+            title = str(track.get("Title", "")).lower()
+            if any(kw in title for kw in ("comment", "audiodesc", "audio desc", "description")):
+                continue
+            if not self._rule_failed(meta, "no_aac_audio", "Le codec AAC est interdit sur HD-Forever (sauf commentaires audio et audiodescription). Upload annulé."):
                 meta["skipping"] = self.tracker
                 return False
 
-        # French audio (VF) is mandatory — warn if not detected
-        has_french = self._has_french_audio(meta)
-        audio_tracks = [t for t in all_tracks if isinstance(t, dict) and t.get("@type") == "Audio"]
-        is_muet = len(audio_tracks) == 0
-        if not has_french and not is_muet:
-            console.print(
-                f"[bold yellow]{self.tracker}: Aucune piste audio française détectée. "
-                f"La VF est obligatoire sur HDF (sauf exceptions : film sans VF dispo, "
-                f"concerts, films muets, certains WEB-DL).[/bold yellow]"
+        if not self._has_french_audio(meta) and audio_tracks:
+            self._rule_failed(
+                meta,
+                "french_audio",
+                "Aucune piste audio française détectée. La VF est obligatoire sur HDF (sauf exceptions : film sans VF dispo, concerts, films muets, certains WEB-DL).",
             )
 
         # Bloat detection (warning only — does not block upload)

@@ -27,12 +27,12 @@ from src.languages import languages_manager
 ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "adult", "orgy")
 
 
-def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?") -> bool:
+def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?", default: bool = False) -> bool:
     """Warn and let an interactive user override; unattended runs (without unattended_confirm) skip."""
     if meta.get("unattended") and not meta.get("unattended_confirm", False):
         return False
     console.print(f"[bold red]{msg}[/bold red]")
-    return bool(cli_ui.ask_yes_no(question, default=False))
+    return bool(cli_ui.ask_yes_no(question, default=default))
 
 
 def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
