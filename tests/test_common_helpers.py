@@ -15,6 +15,8 @@ def test_ask_to_continue_unattended_gate():
 
 def test_is_adult_matches_whole_keywords_only():
     assert is_adult({"keywords": "xxx, drama", "combined_genres": "Drama"}) is True
+    assert is_adult({"keywords": "drama", "combined_genres": "Erotic, Thriller"}) is True  # first genre
+    assert is_adult({"keywords": "xxx", "combined_genres": ""}) is True  # lone keyword
     assert is_adult({"keywords": "adulthood", "combined_genres": "Drama"}) is False
     assert is_adult({"keywords": "", "combined_genres": "Drama, Hentai"}) is False
     assert is_adult({"keywords": "", "combined_genres": "Drama, Hentai"}, ("hentai",)) is True

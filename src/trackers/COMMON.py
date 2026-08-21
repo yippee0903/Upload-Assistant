@@ -37,7 +37,7 @@ def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want
 
 def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
     """True when TMDb keywords/genres contain an adult-content marker."""
-    genres = f"{meta.get('keywords', '')} {meta.get('combined_genres', '')}"
+    genres = f"{meta.get('keywords', '')}, {meta.get('combined_genres', '')}"
     return any(re.search(rf"(^|,\s*){re.escape(k)}(\s*,|$)", genres, re.IGNORECASE) for k in (*ADULT_KEYWORDS, *extra_keywords))
 
 
