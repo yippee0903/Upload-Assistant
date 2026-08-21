@@ -421,7 +421,9 @@ class BBCODE:
                 url_tag_removed = url_tag_removed.replace("[/url]", "")
                 desc = desc.replace(site_url_tag, url_tag_removed)
 
-        desc = desc.replace(site_netloc, site_domain)
+        # Bare mentions only: a host that is part of a URL or a subdomain
+        # (cdn.<site>, i.<site>) must keep its TLD or the link breaks.
+        desc = re.sub(rf"(?<![\w./-]){re.escape(site_netloc)}(?![\w-]|\.\w)", site_domain, desc)
 
         # Temporarily hide spoiler tags
         spoilers = re.findall(r"\[spoiler[\s\S]*?\[\/spoiler\]", desc)

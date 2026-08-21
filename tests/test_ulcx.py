@@ -219,3 +219,34 @@ class TestULCXRules:
         assert self._passes(ulcx, original_language="en", mediainfo=_mi(_text("en", True)), personalrelease=True) is False
         assert self._passes(ulcx, original_language="en", mediainfo=_mi(_text("en", False)), personalrelease=True) is True
         assert self._passes(ulcx, original_language="", mediainfo=_mi(_text("en", True)), personalrelease=True) is True
+
+    def test_empty_image_list_passes_when_screenshots_will_be_generated(self, ulcx):
+        # Pre-upload checks run before screenshot generation: an empty list only
+        # means nothing was reused from a description, not that none will exist.
+        assert self._passes(ulcx, image_list=[], screens=6) is True
+        assert self._passes(ulcx, image_list=[], screens=2) is False
+
+
+class TestULCXDescription:
+    @pytest.fixture
+    def ulcx(self):
+        return ULCX(config=_config())
+
+    def _desc(self, ulcx, raw: str) -> str:
+        with patch("src.trackers.ULCX.DescriptionBuilder.unit3d_edit_desc", return_value=raw):
+            return _run(ulcx.get_description({"tmdb_id": 1, "keywords": [], "combined_genres": ""}))["description"]
+
+    def test_trailer_links_are_removed(self, ulcx):
+        raw = (
+            "Plot.\n"
+            "[center][b][url=https://www.youtube.com/watch?v=abc123][Trailer on YouTube][/url][/b][/center]\n"
+            "[center][url=https://youtu.be/abc123][b]Trailer[/b][/url][/center]\n"
+            "[url]https://youtu.be/abc123[/url] [b]Tagline kept.[/b]\n"
+            "https://www.youtube.com/watch?v=abc123\n"
+            "[center][url=https://example.com/review]Review[/url][/center]"
+        )
+        cleaned = self._desc(ulcx, raw)
+        assert cleaned == "Plot.\n [b]Tagline kept.[/b]\n\n[center][url=https://example.com/review]Review[/url][/center]"
+
+    def test_nested_empty_wrappers_collapse(self, ulcx):
+        assert self._desc(ulcx, "[center][b][center][b][/b][/center][/b][/center]") == ""

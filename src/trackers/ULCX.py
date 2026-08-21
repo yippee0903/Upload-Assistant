@@ -156,7 +156,9 @@ class ULCX(UNIT3D):
             if not self._check_audio_tracks(meta):
                 return False
 
-        if len(meta.get("image_list", [])) < 3:
+        # Runs before screenshot generation: reused images may be absent while
+        # the configured screenshot count will still be produced afterwards.
+        if max(len(meta.get("image_list", [])), int(meta.get("screens", 0) or 0)) < 3:
             console.print(f"[bold red]At least 3 screenshots are required, skipping {self.tracker} upload.[/bold red]")
             return False
 
@@ -223,6 +225,14 @@ class ULCX(UNIT3D):
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, comparison=True)
+
+        # Trailers are not allowed in descriptions: drop YouTube links, then
+        # any [b]/[center] wrapper they leave empty.
+        _yt = r"https?://(?:www\.)?(?:youtube\.com|youtu\.be)/[^\s\[\]]*"
+        desc = re.sub(rf"\[url={_yt}\](?:(?!\[/url\]).)*\[/url\]|\[url\]{_yt}\[/url\]|{_yt}", "", desc, flags=re.IGNORECASE | re.DOTALL)
+        empty_wrapper = re.compile(r"\[(b|center)\]\s*\[/\1\]\n?", flags=re.IGNORECASE)
+        while (stripped := empty_wrapper.sub("", desc)) != desc:
+            desc = stripped
 
         if is_adult(meta):
             pattern = r"(\[center\](?:(?!\[/center\]).)*\[/center\])"
