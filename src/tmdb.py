@@ -1487,12 +1487,13 @@ async def get_anime(response: dict[str, Any], meta: dict[str, Any]) -> tuple[int
     tmdb_name = meta["title"]
     alt_name = "" if meta.get("aka", "") == "" else meta["aka"]
     anime = False
-    animation = False
     demographic = ""
-    for each in response["genres"]:
-        if each["id"] == 16:
-            animation = True
-    if response["original_language"] == "ja" and animation is True:
+    genres = typing_cast(list[dict[str, Any]], response.get("genres") or [])
+    is_animation = any(each.get("id") == 16 or str(each.get("name", "")).lower() == "animation" for each in genres)
+    origin_countries = {str(c).upper() for c in typing_cast(list[Any], response.get("origin_country") or [])}
+    origin_countries |= {str(c.get("iso_3166_1", "")).upper() for c in typing_cast(list[dict[str, Any]], response.get("production_countries") or []) if isinstance(c, dict)}
+    is_japanese = str(response.get("original_language", "")).lower() == "ja" or "JP" in origin_countries
+    if is_animation and is_japanese:
         romaji, mal_id, _eng_title, _season_year, _episodes, demographic, anilist_id = await get_romaji(
             tmdb_name,
             meta.get("mal_id"),
@@ -1508,6 +1509,7 @@ async def get_anime(response: dict[str, Any], meta: dict[str, Any]) -> tuple[int
         anilist_id = 0
     if meta.get("mal_id", 0) != 0:
         mal_id = int(meta.get("mal_id", 0) or 0)
+        anime = True
     return mal_id, alt_name, anime, demographic, anilist_id
 
 
