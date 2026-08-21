@@ -25,8 +25,16 @@ class _Screens:
         return None
 
 
-def test_rehost_reaches_an_approved_host_beyond_the_approved_list_size(tmp_path: pathlib.Path):
-    # 4 configured slots, 2 approved hosts: the approved one sits in slot 4.
+@pytest.mark.parametrize(
+    "default_config",
+    [
+        # 4 slots, 2 approved hosts: the approved one sits in slot 4.
+        {"img_host_1": "lostimg", "img_host_2": "pixhost", "img_host_3": "postimg", "img_host_4": "ptscreens", "screens": "1"},
+        # Sparse and duplicated slots: the approved host sits beyond the distinct-host count.
+        {"img_host_1": "lostimg", "img_host_3": "lostimg", "img_host_5": "ptscreens", "screens": "1"},
+    ],
+)
+def test_rehost_reaches_an_approved_host_beyond_the_approved_list_size(tmp_path: pathlib.Path, default_config: dict[str, str]):
     uuid = "Movie.2024.1080p.WEB-GRP"
     shots = tmp_path / "tmp" / uuid
     shots.mkdir(parents=True)
@@ -42,7 +50,6 @@ def test_rehost_reaches_an_approved_host_beyond_the_approved_list_size(tmp_path:
         "title": "Movie",
         "video": "/x/movie.mkv",
     }
-    default_config = {"img_host_1": "lostimg", "img_host_2": "pixhost", "img_host_3": "postimg", "img_host_4": "ptscreens", "screens": "1"}
     uploader = _Uploader()
 
     result, retry_mode, _ = asyncio.run(

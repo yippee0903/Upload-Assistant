@@ -65,6 +65,11 @@ def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
     return hosts
 
 
+def last_image_host_slot(default_cfg: Mapping[str, Any]) -> int:
+    """Highest populated img_host_N index (slots may be sparse or repeat a host)."""
+    return max((i for i in range(1, 10) if default_cfg.get(f"img_host_{i}")), default=0)
+
+
 def trackers_lacking_images(meta: Mapping[str, Any], trackers: Sequence[str], minimum: int) -> list[str]:
     """Trackers whose per-tracker image list ended up with fewer than `minimum` entries."""
     return [t for t in trackers if len(meta.get(f"{t}_images_key") or []) < minimum]
@@ -312,8 +317,8 @@ async def _check_hosts(
         console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
-    # The index walks the configured img_host_N slots, so bound it by those.
-    max_retries = len(configured_image_hosts({"DEFAULT": default_config}))
+    # The index walks the img_host_N slots, so bound it by the last populated one.
+    max_retries = last_image_host_slot(default_config)
 
     while img_host_index <= max_retries:
         image_list, retry_mode, images_reuploaded = await _handle_image_upload(
@@ -616,14 +621,14 @@ async def _handle_image_upload(
         failed_hosts = meta["failed_image_hosts"]
 
         # Add a max retry limit to prevent infinite loop
-        max_retries = len(configured_image_hosts({"DEFAULT": default_config}))
+        max_retries = last_image_host_slot(default_config)
         while img_host_index <= max_retries:
             current_img_host_key = f"img_host_{img_host_index}"
             current_img_host = _as_str(default_config.get(current_img_host_key))
 
             if not current_img_host:
-                console.print("[red]No more image hosts left to try.")
-                return [], True, images_reuploaded
+                img_host_index += 1
+                continue  # sparse slot
 
             if current_img_host not in approved_image_hosts:
                 if meta["debug"]:
@@ -644,6 +649,9 @@ async def _handle_image_upload(
             if meta["debug"]:
                 console.print(f"[green]Uploading to approved host '{current_img_host}'.")
             break
+        else:
+            console.print("[red]No more image hosts left to try.")
+            return [], True, images_reuploaded
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
             meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
