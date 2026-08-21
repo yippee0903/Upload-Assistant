@@ -661,6 +661,9 @@ class V3X(FrenchTrackerMixin):
             return False
 
         description = await self._build_description(meta)
+        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
+            await f.write(description)
         # The site rules keep the ORIGINAL release NFO (shipped untouched);
         # otherwise fall back to MediaInfo / a generated scene NFO, with the
         # "Complete name" line patched to the tracker release name.
@@ -711,9 +714,6 @@ class V3X(FrenchTrackerMixin):
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
 
         if meta.get("debug"):
-            desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-            async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
-                await f.write(description)
             console.print(f"[cyan]{self.tracker} Debug — request data (description saved to {desc_path}):[/cyan]")
             console.print(f"  Name:        {name}")
             console.print(f"  Category:    {data['categoryId']}")

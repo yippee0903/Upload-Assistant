@@ -16,6 +16,7 @@ import json
 import os
 import re
 from typing import Any, Union
+from urllib.parse import urlparse
 
 import aiofiles
 import defusedxml.ElementTree as ET
@@ -24,6 +25,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.imagehosts import host_slug
 from src.nfo_generator import decode_nfo, is_multi_episode_nfo
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -51,7 +53,7 @@ class C411(FrenchTrackerMixin):
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
         # Hosts verified to actually render on the site; other common hosts
         # (ptscreens, lostimg) come out as dead images there.
-        self.approved_image_hosts = ["pixhost", "imgbb", "onlyimage", "imgbox"]
+        self.approved_image_hosts = ["pixhost", "imgbb", "onlyimage", "imgbox", "postimg"]
         self.tmdb_manager = TmdbManager(config)
         _reserved_note = "Internal C411 group: reserved for the team's own uploads"
         self.banned_groups: list[Any] = ["k0RE"] + [
@@ -1112,9 +1114,13 @@ class C411(FrenchTrackerMixin):
             for img in image_list:
                 # Embed the thumbnail, linked to the full-size image: the site
                 # does not scale [img] tags, so a raw screenshot renders full width.
+                # postimg thumbnails are 180px, too small to judge a capture:
+                # embed its stored (already downscaled) image instead.
                 raw = img.get("raw_url", "")
                 web = img.get("web_url", "")
                 thumb = img.get("img_url", "") or raw
+                if host_slug(urlparse(thumb).hostname or "") == "postimg":
+                    thumb = raw
                 link = web or (raw if thumb != raw else "")
                 if thumb:
                     if link:
@@ -1355,6 +1361,9 @@ class C411(FrenchTrackerMixin):
             console.print("[yellow]C411: No NFO available — upload may be rejected[/yellow]")
         # ── Description ──
         description = await self._build_description(meta)
+        desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
+            await f.write(description)
 
         # ── Category / Subcategory ──
         cat_id, subcat_id = self._get_category_subcategory(meta)
@@ -1556,11 +1565,8 @@ class C411(FrenchTrackerMixin):
 
                 return False  # exhausted retries without explicit return
             else:
-                # ── Debug mode — save description & show summary ──
-                desc_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{self.tracker}]DESCRIPTION.txt"
-                async with aiofiles.open(desc_path, "w", encoding="utf-8") as f:
-                    await f.write(description)
-                console.print(f"DEBUG: Saving final description to {desc_path}")
+                # ── Debug mode — show summary ──
+                console.print(f"DEBUG: description saved to {desc_path}")
                 console.print("[cyan]C411 Debug — Request data:[/cyan]")
                 console.print(f"  Title:       {title}")
                 console.print(f"  Category:    {cat_id} / Sub: {subcat_id}")
