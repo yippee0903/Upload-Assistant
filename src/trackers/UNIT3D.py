@@ -76,6 +76,8 @@ class UNIT3D:
             # so don't also filter by category or sibling-category dupes are missed.
             params_dict["tmdbId"] = str(meta["tmdb"])
         else:
+            # No TMDb id: keep the category filter and tmdbId=0 rather than an unconstrained query
+            params_dict["tmdbId"] = "0"
             params_dict["categories[]"] = str((await self.get_category_id(meta))["category_id"])
         params_list: Optional[ParamsList] = None
         if self.tracker not in ["OTW"]:

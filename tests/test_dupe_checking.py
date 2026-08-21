@@ -530,6 +530,7 @@ class TestSizeTolerance:
     def test_both_directions_excluded_beyond_tolerance(self):
         assert self._dupes(10, 12_000_000_000) == []  # 20% larger
         assert self._dupes(10, 8_000_000_000) == []  # 20% smaller
+        assert len(self._dupes(0, 12_000_000_000)) == 1  # 0 = disabled
         assert self._dupes(10, "12.5 GB") == []  # string sizes parsed
 
     def test_within_tolerance_or_disabled_is_kept(self):

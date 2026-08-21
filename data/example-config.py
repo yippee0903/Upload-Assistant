@@ -8,6 +8,8 @@ config = {
         "update_notification": True,
         # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
         "personal_release_groups": [],
+        # Drop dupe-search results whose size differs from yours by at least this many percent (either direction). 0/None = off
+        "dupe_size_difference_tolerance": None,
         # will print the changelog if an update is available
         "verbose_notification": False,
 
@@ -69,7 +71,7 @@ config = {
 
         # image host api keys
         "imgbb_api": "",
-                "lensdump_api": "",
+        "lensdump_api": "",
         "ptscreens_api": "",
         "onlyimage_api": "",
         "dalexni_api": "",

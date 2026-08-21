@@ -249,7 +249,7 @@ class DupeChecker:
             tolerance = self.config.get("DEFAULT", {}).get("dupe_size_difference_tolerance")
             upload_size = coerce_int(meta.get("source_size"))
             dupe_size = parse_size_to_bytes(sized)
-            if tolerance is not None and upload_size and dupe_size:
+            if tolerance and upload_size and dupe_size:  # None/0 = disabled
                 try:
                     diff_pct = abs(dupe_size - upload_size) / upload_size * 100
                     if diff_pct >= float(tolerance):

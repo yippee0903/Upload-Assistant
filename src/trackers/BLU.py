@@ -146,7 +146,7 @@ class BLU(UNIT3D):
         if (
             meta["type"] not in ["WEBDL"]
             and not meta["is_disc"]
-            and meta.get("tag", "") in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]
+            and str(meta.get("tag") or "").lstrip("-") in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]
             and not ask_to_continue(meta, f"Group {meta['tag']} is only allowed for raw type content")
         ):
             return False

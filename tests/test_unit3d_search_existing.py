@@ -27,9 +27,9 @@ def test_tmdb_id_search_does_not_filter_by_category():
     assert "categories[]" not in params
 
 
-def test_without_tmdb_falls_back_to_category():
+def test_without_tmdb_keeps_category_filter_and_zero_id():
     params = _search({})
-    assert "tmdbId" not in params
+    assert params["tmdbId"] == "0"  # never an unconstrained name="" query
     assert "categories[]" in params
 
 
