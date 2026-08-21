@@ -584,22 +584,12 @@ async def dvd_screenshots(meta: dict[str, Any], disc_num: int, num_screens: int 
         capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
         if capture_results and len(capture_results) > num_screens:
-            smallest = None
-            smallest_size = float("inf")
-            for screens in [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}/", f"{meta['discs'][disc_num]['name']}-*"))]:
-                screen_path = os.path.join(f"{meta['base_dir']}/tmp/{meta['uuid']}/", screens)
-                try:
-                    screen_size = os.path.getsize(screen_path)
-                    if screen_size < smallest_size:
-                        smallest_size = screen_size
-                        smallest = screen_path
-                except FileNotFoundError:
-                    console.print(f"[red]File not found: {screen_path}[/red]")  # Handle potential edge cases
-                    continue
-
-            if smallest:
+            # only consider this batch's files: the tmp dir also holds menu captures and other discs' screenshots
+            sizes = {image: os.path.getsize(image) for image in capture_results if os.path.exists(image)}
+            if sizes:
+                smallest = min(sizes, key=sizes.get)
                 if meta["debug"]:
-                    console.print(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
+                    console.print(f"[yellow]Removing smallest image: {smallest} ({sizes[smallest]} bytes)[/yellow]")
                 os.remove(smallest)
                 capture_results.remove(smallest)
 
