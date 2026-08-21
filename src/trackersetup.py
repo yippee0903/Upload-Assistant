@@ -1,5 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import functools
+import importlib.util
 import json
 import os
 import re
@@ -91,6 +93,21 @@ JsonDict = dict[str, Any]
 Meta = dict[str, Any]
 
 
+@functools.lru_cache(maxsize=1)
+def _example_config() -> dict[str, Any]:
+    """data/example-config.py, loaded once (the hyphen keeps it out of a plain import)."""
+    path = Path(__file__).resolve().parent.parent / "data" / "example-config.py"
+    spec = importlib.util.spec_from_file_location("example_config", path)
+    if spec is None or spec.loader is None:
+        return {}
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        return {}
+    return cast(dict[str, Any], getattr(module, "config", {}))
+
+
 class TRACKER_SETUP:
     def __init__(self, config: dict[str, Any]):
         self.config: dict[str, Any] = config
@@ -122,7 +139,18 @@ class TRACKER_SETUP:
         for tracker in removed_trackers:
             console.print(f"Warning: Tracker '{tracker}' is not recognized and will be ignored.", markup=False)
 
-        return valid_trackers
+        return [t for t in valid_trackers if self._has_required_credentials(t, debug=bool(meta.get("debug")))]
+
+    def _has_required_credentials(self, tracker: str, debug: bool = False) -> bool:
+        """False when the example config declares api_key/announce_url for this tracker and the user left it empty (fail fast, before screenshots)."""
+        example_tracker = _example_config().get("TRACKERS", {}).get(tracker, {})
+        tracker_config = cast(dict[str, Any], self.config.get("TRACKERS", {}).get(tracker, {}) or {})
+        for key, label in (("api_key", "an API key"), ("announce_url", "an announce URL")):
+            if key in example_tracker and not str(tracker_config.get(key) or "").strip():
+                console.print(f"{tracker}: [bold red]tracker is missing {label} and will be {'kept (debug)' if debug else 'ignored'}.[/bold red]")
+                if not debug:
+                    return False
+        return True
 
     async def get_banned_groups(self, meta: Meta, tracker: str) -> Optional[str]:
         file_path = os.path.join(meta["base_dir"], "data", "banned", f"{tracker}_banned_groups.json")

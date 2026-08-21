@@ -14,7 +14,7 @@ def _run(meta_extra: dict[str, Any], tracker_cls: type) -> tuple[dict[str, Any],
         "name": "Anonymous.Release.2020",
         **meta_extra,
     }
-    config = {"DEFAULT": {"multiScreens": 2}, "TRACKERS": {"default_trackers": "BLU"}}
+    config = {"DEFAULT": {"multiScreens": 2}, "TRACKERS": {"default_trackers": "BLU", "BLU": {"api_key": "k", "announce_url": "a"}}}
     client = AsyncMock()
     with patch("src.trackerhandle.asyncio.sleep", new_callable=AsyncMock) as sleep:
         asyncio.run(process_trackers(meta, config, client, MagicMock(), [], {"BLU": tracker_cls}))
