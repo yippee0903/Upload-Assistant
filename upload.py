@@ -468,6 +468,16 @@ async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = No
         await asyncio.gather(*[validate_single_tracker(tracker) for tracker in valid_trackers])
 
 
+def _skip_trackers_without_approved_images(meta: Meta, config: dict[str, Any], trackers: list[str], minimum: int) -> None:
+    """Disable trackers whose approved-host image list is too short: better skipped than uploaded with broken links."""
+    for tracker_name in trackers_lacking_images(meta, trackers, minimum):
+        approved = getattr(tracker_class_map[tracker_name](config=config), "approved_image_hosts", None) or []
+        console.print(f"[bold red]{tracker_name}: no working approved image host ({', '.join(approved)}); skipping this tracker.[/bold red]")
+        entry = cast(dict[str, Any], meta.setdefault("tracker_status", {})).setdefault(tracker_name, {})
+        entry["upload"] = False
+        entry["status_message"] = "skipped: no working approved image host"
+
+
 async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[bool]:
     """Process the metadata for each queued path."""
     if use_discord and bot:
@@ -1243,12 +1253,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                                 console.print(
                                     f"[cyan]Image host debug: post-upload after  {tracker_name}.check_image_hosts() image_list={len(meta.get('image_list', []) or [])} {key}={len(meta.get(key, []) or [])}[/cyan]"  # noqa: E501
                                 )
-                        for tracker_name in trackers_lacking_images(meta, relevant_trackers, min_successful_uploads):
-                            approved = getattr(tracker_class_map[tracker_name](config=config), "approved_image_hosts", None) or []
-                            console.print(f"[bold red]{tracker_name}: no working approved image host ({', '.join(approved)}); skipping this tracker.[/bold red]")
-                            tracker_status_entry = cast(dict[str, Any], meta.setdefault("tracker_status", {})).setdefault(tracker_name, {})
-                            tracker_status_entry["upload"] = False
-                            tracker_status_entry["status_message"] = "skipped: no working approved image host"
+                        _skip_trackers_without_approved_images(meta, config, relevant_trackers, min_successful_uploads)
                     except asyncio.CancelledError:
                         console.print("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
                         return
@@ -1265,7 +1270,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
                     # description) — the screenshot-upload block above was skipped,
                     # but trackers with approved-host requirements still need the
                     # existing images validated and rehosted when necessary.
-                    await validate_reused_image_hosts(meta, config, tracker_class_map)
+                    validated = await validate_reused_image_hosts(meta, config, tracker_class_map)
+                    _skip_trackers_without_approved_images(meta, config, validated, int(config.get("DEFAULT", {}).get("min_successful_image_uploads", 3)))
 
                 elif meta.get("skip_imghost_upload", False) is True and meta.get("image_list", False) is False:
                     meta["image_list"] = []
