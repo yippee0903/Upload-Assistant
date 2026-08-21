@@ -345,6 +345,9 @@ class Args:
             dest="force_recheck",
         )
         parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BHD, LST)")
+        parser.add_argument("-feat", "--featured", action="store_true", required=False, help="Featured torrent (UNIT3D, staff only)")
+        parser.add_argument("-dup", "--double-upload", dest="doubleup", action="store_true", required=False, help="Double upload (UNIT3D, internal/staff only)")
+        parser.add_argument("-stk", "--sticky", action="store_true", required=False, help="Sticky/pinned torrent (UNIT3D, staff only)")
         parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")

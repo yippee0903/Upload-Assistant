@@ -434,7 +434,7 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                 errors.append(f"[TRACKERS][{tracker_name}] announce_url contains placeholder (e.g., <PASSKEY>) - replace with actual value")
 
         # Check boolean fields are actually booleans (must be real bool, not string)
-        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost"]
+        bool_fields = ["anon", "useAPI", "modq", "draft", "draft_default", "img_rehost", "featured", "doubleup", "double_upload", "double_up", "sticky"]
         for field in bool_fields:
             if field in tracker_config_dict:
                 value = tracker_config_dict[field]

@@ -368,8 +368,8 @@ class UNIT3D:
 
         return data
 
-    async def get_featured(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"featured": "0"}
+    async def get_featured(self, meta: dict[str, Any]) -> dict[str, str]:
+        return {"featured": await self.get_flag(meta, "featured")}
 
     async def get_free(self, meta: dict[str, Any]) -> dict[str, str]:
         free = "0"
@@ -378,11 +378,16 @@ class UNIT3D:
 
         return {"free": free}
 
-    async def get_doubleup(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"doubleup": "0"}
+    async def get_doubleup(self, meta: dict[str, Any]) -> dict[str, str]:
+        doubleup = "0"
+        for flag in ("doubleup", "double_upload", "double_up"):  # config spellings in the wild
+            doubleup = await self.get_flag(meta, flag)
+            if doubleup == "1":
+                break
+        return {"doubleup": doubleup}
 
-    async def get_sticky(self, _meta: dict[str, Any]) -> dict[str, str]:
-        return {"sticky": "0"}
+    async def get_sticky(self, meta: dict[str, Any]) -> dict[str, str]:
+        return {"sticky": await self.get_flag(meta, "sticky")}
 
     async def get_data(self, meta: dict[str, Any]) -> dict[str, str]:
         _REQUIRED_GETTERS = {"get_name", "get_category_id", "get_type_id", "get_resolution_id"}
