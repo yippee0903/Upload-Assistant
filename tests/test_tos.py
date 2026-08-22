@@ -327,6 +327,11 @@ class TestNogroupWebDL:
             f"Audio token 'AAC' duplicated in name: {name!r}."
         )
 
+    def test_accents_are_transliterated(self):
+        """Accented letters map to ASCII instead of being dropped (Appétit → Appetit)."""
+        name = self._get_name(_meta_nogroup(title='Bon Appétit, Votre Majesté', tag='-GRP'))
+        assert name.startswith('Bon.Appetit.Votre.Majeste.'), name
+
     def test_real_group_preserved(self):
         """A real group tag must not be replaced by the notag label."""
         name = self._get_name(_meta_nogroup(tag='-FRiENDS'))
