@@ -201,7 +201,8 @@ class V3X(FrenchTrackerMixin):
             items: list[dict[str, Any]] = []
             offset = 0
             incomplete = False
-            while offset < 5000:  # hard cap so a misbehaving feed can't loop forever
+            max_offset = 5000  # hard cap so a misbehaving feed can't loop forever
+            while True:
                 try:
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.get(self.torznab_url, params={"t": "search", "q": search_term, "limit": 100, "offset": offset, "apikey": self.api_key})
@@ -217,6 +218,10 @@ class V3X(FrenchTrackerMixin):
                     # No total in the feed: a short page means we reached the end.
                     break
                 offset += 100
+                if offset >= max_offset:
+                    # Still full at the cap: results beyond it were never read.
+                    incomplete = True
+                    break
 
             # A failed page leaves a partial result set — a dupe could sit on
             # a page we never read. Fail closed: skip the tracker rather than
@@ -278,7 +283,8 @@ class V3X(FrenchTrackerMixin):
         items: list[dict[str, Any]] = []
         for item in ET.fromstring(xml_text).iter("item"):
             guid = (item.findtext("guid") or "").strip()
-            size_text = (item.findtext("size") or "0").strip()
+            size_attr = next((a.get("value") for a in item.iter("{http://torznab.com/schemas/2015/feed}attr") if a.get("name") == "size"), None)
+            size_text = (item.findtext("size") or size_attr or "0").strip()
             items.append(
                 {
                     "title": (item.findtext("title") or "").strip(),

@@ -32,12 +32,20 @@ class _FakeResponse:
         return self._payload if isinstance(self._payload, str) else ""
 
 
-def _rss(*torrents: dict[str, Any]) -> str:
-    """Torznab feed with one <item> per torrent ({id, name, size})."""
-    items = "".join(
-        f"<item><title>{t['name']}</title><guid isPermaLink=\"true\">https://v3x.club/torrents/{t['id']}</guid><size>{t.get('size', 0)}</size></item>" for t in torrents
-    )
-    return f'<?xml version="1.0"?><rss version="2.0"><channel><title>V3X</title>{items}</channel></rss>'
+def _rss(*torrents: dict[str, Any], size_as_attr: bool = False) -> str:
+    """Torznab feed with one <item> per torrent ({id, name, size}).
+
+    V3X emits both a plain <size> and the standard torznab:attr; the flag
+    picks which one the fake feed carries.
+    """
+
+    def _size(t: dict[str, Any]) -> str:
+        if size_as_attr:
+            return f'<torznab:attr name="size" value="{t.get("size", 0)}" />'
+        return f"<size>{t.get('size', 0)}</size>"
+
+    items = "".join(f"<item><title>{t['name']}</title><guid isPermaLink=\"true\">https://v3x.club/torrents/{t['id']}</guid>{_size(t)}</item>" for t in torrents)
+    return f'<?xml version="1.0"?><rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel><title>V3X</title>{items}</channel></rss>'
 
 
 class _FakeClient:
@@ -108,6 +116,24 @@ class TestSearchExisting:
         # torznab only reads the key from the query string (Bearer is rejected there)
         assert _FakeClient.captured["params"]["apikey"] == "test-key"
         assert _FakeClient.captured["url"].endswith("/torznab/api")
+
+    def test_size_read_from_torznab_attr(self):
+        items = V3X._parse_torznab(_rss({"id": "u1", "name": "X", "size": 456}, size_as_attr=True))
+        assert items == [{"title": "X", "size": 456, "link": "https://v3x.club/torrents/u1", "id": "u1"}]
+
+    def test_search_still_full_at_the_offset_cap_fails_closed(self, monkeypatch: Any):
+        full_page = _rss(*({"id": f"u{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": 1} for i in range(100)))
+
+        class _EndlessClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                return _FakeResponse(200, full_page)
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _EndlessClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        meta: dict[str, Any] = {"title": "Some Movie"}
+        assert asyncio.run(tracker.search_existing(meta)) == []
+        assert meta["skipping"] == "V3X"
 
     def test_search_filters_irrelevant_results(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
@@ -194,6 +220,22 @@ class TestSearchExisting:
         assert dupes[0]["files"] == ["a.mkv", "b.srt"]
         assert dupes[0]["file_count"] == 2
         assert "files" not in dupes[1]
+
+    def test_login_without_cookie_is_treated_as_no_session(self, monkeypatch: Any):
+        """2FA accounts get {twoFactorRequired, challenge} with no cookie: unusable unattended."""
+
+        class _NoCookieResponse(_FakeResponse):
+            cookies = v3x_module.httpx.Cookies()
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.response = _NoCookieResponse(200, {"twoFactorRequired": True, "challenge": "x"})
+        cfg = _config()
+        cfg["TRACKERS"]["V3X"].update({"username": "user", "password": "pass"})
+        tracker = V3X(cfg)
+        assert asyncio.run(tracker._login_session_cookies()) is None
+        dupes = [{"name": "X", "id": "uuid-1"}]
+        asyncio.run(tracker._enrich_with_files(dupes))
+        assert "files" not in dupes[0]
 
     def test_enrichment_is_skipped_without_site_credentials(self, monkeypatch: Any):
         """The API key cannot read /torrents/{uuid}; without username/password the dupes stay name-only."""
