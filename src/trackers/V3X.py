@@ -12,7 +12,8 @@
 #   GET  /categories                    public category tree (id/name/children)
 #   GET  /api/categories                key-authenticated tree with subcategory ids
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
-#                                       (?apikey= also accepted; X-Api-Key is NOT)
+#                                       (?apikey= rejected on write scopes since 2026-08; X-Api-Key too)
+#     409 {error: duplicate|duplicate_content, id} — the release already exists
 #     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
 #               movies/series also require nfo and tmdbUrl (or tmdbId)
 #     accepted: name, description, descriptionFormat, language,
@@ -762,9 +763,14 @@ class V3X(FrenchTrackerMixin):
                 return False
             if response.status_code in (200, 201):
                 break
-            if response.status_code in (400, 401, 403, 404, 422):
-                # Client error — a retry cannot succeed, fail fast with the server's own message
+            if response.status_code in (400, 401, 403, 404, 409, 422):
+                # Client error — a retry cannot succeed, fail fast with the server's own message.
+                # 409 {error: duplicate|duplicate_content, id} means the release already exists.
                 detail = _error_detail(response)
+                if response.status_code == 409 and isinstance(detail, dict) and detail.get("id"):
+                    meta["tracker_status"][self.tracker]["status_message"] = f"data error: already on {self.tracker} ({detail.get('error')}): id {detail['id']}"
+                    console.print(f"[yellow]{self.tracker}: release already exists ({detail.get('error')}), id {detail['id']}[/yellow]")
+                    return False
                 meta["tracker_status"][self.tracker]["status_message"] = {"error": f"HTTP {response.status_code}", "detail": detail}
                 console.print(f"[red]{self.tracker} upload failed: HTTP {response.status_code}[/red]")
                 if detail:
