@@ -3,13 +3,17 @@
 # V3X (v3x.club) — French private tracker with a custom (non-UNIT3D) API.
 #
 # API surface (api.v3x.club):
-#   GET  /torrents?q=…&page=…           public listing (torrents/total/page/perPage);
-#     the filter param is q — "search" and the like are silently ignored
+#   GET  /torznab/api?t=search&q=…&apikey=…   key-authenticated listing (RSS/torznab):
+#     title, size, guid (site URL with the uuid), infohash, tmdbid; limit max 100,
+#     offset pagination, no total. The key goes in the query string only — the
+#     Bearer header is rejected on this read scope. season/ep params are ignored.
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
+#     (web session cookie only)
 #   GET  /categories                    public category tree (id/name/children)
 #   GET  /api/categories                key-authenticated tree with subcategory ids
 #   POST /api/torrents                  upload — multipart, Authorization: Bearer <api key>
-#                                       (?apikey= also accepted; X-Api-Key is NOT)
+#                                       (?apikey= rejected on write scopes since 2026-08; X-Api-Key too)
+#     409 {error: duplicate|duplicate_content, id} — the release already exists
 #     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
 #               movies/series also require nfo and tmdbUrl (or tmdbId)
 #     accepted: name, description, descriptionFormat, language,
@@ -17,7 +21,8 @@
 #     (title exists but must be left empty — the IMDb tmdbUrl auto-fills
 #      the fiche title site-side)
 #   Browse routes (/torrents listing & detail) require a web session cookie —
-#   API keys are rejected there since the 2026-08 site update.
+#   API keys are rejected there since the 2026-08 site update; the dupe search
+#   uses torznab instead and the cookie only enriches dupes with file lists.
 
 import asyncio
 import contextlib
@@ -26,6 +31,7 @@ import re
 from typing import Any, Optional
 
 import aiofiles
+import defusedxml.ElementTree as ET
 import httpx
 from torf import Torrent
 from unidecode import unidecode
@@ -60,6 +66,7 @@ class V3X(FrenchTrackerMixin):
         self.api_base = "https://api.v3x.club"
         self.upload_url = f"{self.api_base}/api/torrents"
         self.search_url = f"{self.api_base}/torrents"
+        self.torznab_url = f"{self.api_base}/torznab/api"
         self.torrent_url = f"{self.base_url}/torrents/"
         self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
         self.tmdb_manager = TmdbManager(config)
@@ -88,6 +95,10 @@ class V3X(FrenchTrackerMixin):
             return None
         if response.status_code != 200:
             console.print(f"[yellow]{self.tracker}: login failed (HTTP {response.status_code}) — check the username/password in your config.[/yellow]")
+            return None
+        if not response.cookies:
+            # Accounts with 2FA get {twoFactorRequired, challenge} and no cookie: nothing usable unattended.
+            console.print(f"[yellow]{self.tracker}: login returned no session cookie (2FA?) — dupes are compared by name only.[/yellow]")
             return None
         self._session_cookies = response.cookies
         return self._session_cookies
@@ -147,12 +158,6 @@ class V3X(FrenchTrackerMixin):
             meta["skipping"] = self.tracker
             return dupes
 
-        cookies = await self._login_session_cookies()
-        if cookies is None:
-            console.print(f"[yellow]{self.tracker}: the dupe search needs the site username/password in your config — skipping tracker to avoid a false negative.[/yellow]")
-            meta["skipping"] = self.tracker
-            return dupes
-
         title = str(meta.get("title") or "")
         fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
         year_str = str(meta.get("year") or "").strip()
@@ -193,37 +198,30 @@ class V3X(FrenchTrackerMixin):
         upload_lacks_french_audio = upload_level < FRENCH_AUDIO_THRESHOLD
 
         for search_term in queries:
-            items: list[Any] = []
-            page = 1
+            items: list[dict[str, Any]] = []
+            offset = 0
             incomplete = False
-            total = None
-            while page <= 50:  # hard cap so a misreported total can't loop forever
+            max_offset = 5000  # hard cap so a misbehaving feed can't loop forever
+            while True:
                 try:
-                    async with httpx.AsyncClient(timeout=30.0, cookies=cookies) as client:
-                        response = await client.get(self.search_url, params={"q": search_term, "perPage": 100, "page": page})
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.get(self.torznab_url, params={"t": "search", "q": search_term, "limit": 100, "offset": offset, "apikey": self.api_key})
                     if response.status_code != 200:
                         incomplete = True
                         break
-                    payload = response.json()
-                except (httpx.RequestError, httpx.TimeoutException, ValueError):
-                    incomplete = True
-                    break
-                page_items = payload.get("torrents") if isinstance(payload, dict) else None
-                if not isinstance(page_items, list):
+                    page_items = self._parse_torznab(response.text)
+                except (httpx.RequestError, httpx.TimeoutException, ET.ParseError):
                     incomplete = True
                     break
                 items.extend(page_items)
-                if not page_items:
+                if len(page_items) < 100:
+                    # No total in the feed: a short page means we reached the end.
                     break
-                total = payload.get("total") if isinstance(payload.get("total"), int) else None
-                if total is not None:
-                    if len(items) >= total:
-                        break
-                elif len(page_items) < 100:
-                    # No usable total: a short page means we reached the end;
-                    # a full page means there may be more — keep going.
+                offset += 100
+                if offset >= max_offset:
+                    # Still full at the cap: results beyond it were never read.
+                    incomplete = True
                     break
-                page += 1
 
             # A failed page leaves a partial result set — a dupe could sit on
             # a page we never read. Fail closed: skip the tracker rather than
@@ -236,7 +234,7 @@ class V3X(FrenchTrackerMixin):
             for torrent in items:
                 if not isinstance(torrent, dict):
                     continue
-                name = str(torrent.get("name") or "")
+                name = str(torrent.get("title") or "")
                 if not name:
                     continue
                 name_norm = _normalize(name)
@@ -268,7 +266,7 @@ class V3X(FrenchTrackerMixin):
                     {
                         "name": name,
                         "size": torrent.get("size", 0),
-                        "link": f"{self.torrent_url}{torrent.get('slug') or torrent.get('id', '')}",
+                        "link": torrent.get("link") or f"{self.torrent_url}{torrent.get('id', '')}",
                         "id": torrent.get("id"),
                     }
                 )
@@ -279,17 +277,42 @@ class V3X(FrenchTrackerMixin):
             await self._enrich_with_files(dupes, debug=debug)
         return await self._check_french_lang_dupes(dupes, meta)
 
+    @staticmethod
+    def _parse_torznab(xml_text: str) -> list[dict[str, Any]]:
+        """Torznab RSS items → {title, size, link, id (uuid from the guid URL)}."""
+        items: list[dict[str, Any]] = []
+        for item in ET.fromstring(xml_text).iter("item"):
+            guid = (item.findtext("guid") or "").strip()
+            size_attr = next((a.get("value") for a in item.iter("{http://torznab.com/schemas/2015/feed}attr") if a.get("name") == "size"), None)
+            size_text = (item.findtext("size") or size_attr or "0").strip()
+            items.append(
+                {
+                    "title": (item.findtext("title") or "").strip(),
+                    "size": int(size_text) if size_text.isdigit() else 0,
+                    "link": guid,
+                    "id": guid.rstrip("/").rsplit("/", 1)[-1] if guid else None,
+                }
+            )
+        return items
+
     async def _enrich_with_files(self, dupes: list[dict[str, Any]], *, debug: bool = False) -> None:
         """Fetch each dupe's file list via GET /torrents/{uuid}.
 
         Enriches entries in-place with ``files``/``file_count`` so
         DupeChecker can compare filenames instead of falling back to name
-        similarity. Failures leave the entry unchanged.
+        similarity. Needs the site username/password (browse routes reject
+        API keys); without them the dupes keep name-similarity matching.
+        Failures leave the entry unchanged.
         """
+        cookies = await self._login_session_cookies()
+        if cookies is None:
+            if debug:
+                console.print(f"[dim]{self.tracker}: no site credentials — dupes compared by name only[/dim]")
+            return
         enrich_limit = 25  # one request per dupe — bound the sequential cost
         if len(dupes) > enrich_limit:
             console.print(f"[yellow]{self.tracker}: enriching only the first {enrich_limit} of {len(dupes)} dupes; the rest fall back to name similarity.[/yellow]")
-        async with httpx.AsyncClient(timeout=20.0, cookies=self._session_cookies) as client:
+        async with httpx.AsyncClient(timeout=20.0, cookies=cookies) as client:
             for entry in dupes[:enrich_limit]:
                 torrent_id = entry.get("id")
                 if not torrent_id:
@@ -746,9 +769,14 @@ class V3X(FrenchTrackerMixin):
                 return False
             if response.status_code in (200, 201):
                 break
-            if response.status_code in (400, 401, 403, 404, 422):
-                # Client error — a retry cannot succeed, fail fast with the server's own message
+            if response.status_code in (400, 401, 403, 404, 409, 422):
+                # Client error — a retry cannot succeed, fail fast with the server's own message.
+                # 409 {error: duplicate|duplicate_content, id} means the release already exists.
                 detail = _error_detail(response)
+                if response.status_code == 409 and isinstance(detail, dict) and detail.get("id"):
+                    meta["tracker_status"][self.tracker]["status_message"] = f"data error: already on {self.tracker} ({detail.get('error')}): id {detail['id']}"
+                    console.print(f"[yellow]{self.tracker}: release already exists ({detail.get('error')}), id {detail['id']}[/yellow]")
+                    return False
                 meta["tracker_status"][self.tracker]["status_message"] = {"error": f"HTTP {response.status_code}", "detail": detail}
                 console.print(f"[red]{self.tracker} upload failed: HTTP {response.status_code}[/red]")
                 if detail:

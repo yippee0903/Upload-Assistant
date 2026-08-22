@@ -27,6 +27,26 @@ class _FakeResponse:
     def json(self) -> Any:
         return self._payload
 
+    @property
+    def text(self) -> str:
+        return self._payload if isinstance(self._payload, str) else ""
+
+
+def _rss(*torrents: dict[str, Any], size_as_attr: bool = False) -> str:
+    """Torznab feed with one <item> per torrent ({id, name, size}).
+
+    V3X emits both a plain <size> and the standard torznab:attr; the flag
+    picks which one the fake feed carries.
+    """
+
+    def _size(t: dict[str, Any]) -> str:
+        if size_as_attr:
+            return f'<torznab:attr name="size" value="{t.get("size", 0)}" />'
+        return f"<size>{t.get('size', 0)}</size>"
+
+    items = "".join(f"<item><title>{t['name']}</title><guid isPermaLink=\"true\">https://v3x.club/torrents/{t['id']}</guid>{_size(t)}</item>" for t in torrents)
+    return f'<?xml version="1.0"?><rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel><title>V3X</title>{items}</channel></rss>'
+
 
 class _FakeClient:
     response: _FakeResponse = _FakeResponse(200, {})
@@ -86,29 +106,44 @@ class TestSearchExisting:
 
     def test_search_maps_listing_to_dupes(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
-        _FakeClient.response = _FakeResponse(
-            200,
-            {"torrents": [{"id": "uuid-1", "slug": "some-slug", "name": "Some Movie (2024)", "size": 123}], "total": 1},
-        )
+        _FakeClient.response = _FakeResponse(200, _rss({"id": "uuid-1", "name": "Some Movie (2024)", "size": 123}))
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/some-slug", "id": "uuid-1"}]
+        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/uuid-1", "id": "uuid-1"}]
         # Full cleaned title (the API matches ordered words, separator-agnostic)
         assert _FakeClient.captured["params"]["q"] == "Some Movie"
+        # torznab only reads the key from the query string (Bearer is rejected there)
+        assert _FakeClient.captured["params"]["apikey"] == "test-key"
+        assert _FakeClient.captured["url"].endswith("/torznab/api")
+
+    def test_size_read_from_torznab_attr(self):
+        items = V3X._parse_torznab(_rss({"id": "u1", "name": "X", "size": 456}, size_as_attr=True))
+        assert items == [{"title": "X", "size": 456, "link": "https://v3x.club/torrents/u1", "id": "u1"}]
+
+    def test_search_still_full_at_the_offset_cap_fails_closed(self, monkeypatch: Any):
+        full_page = _rss(*({"id": f"u{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": 1} for i in range(100)))
+
+        class _EndlessClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                return _FakeResponse(200, full_page)
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _EndlessClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker)
+        meta: dict[str, Any] = {"title": "Some Movie"}
+        assert asyncio.run(tracker.search_existing(meta)) == []
+        assert meta["skipping"] == "V3X"
 
     def test_search_filters_irrelevant_results(self, monkeypatch: Any):
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
         _FakeClient.response = _FakeResponse(
             200,
-            {
-                "torrents": [
-                    {"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1},
-                    {"id": "u2", "slug": "s2", "name": "Other.Movie.2024.1080p.WEB-GRP", "size": 2},
-                    {"id": "u3", "slug": "s3", "name": "Some.Movie.2024.2160p.WEB-GRP", "size": 3},
-                ],
-                "total": 3,
-            },
+            _rss(
+                {"id": "u1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1},
+                {"id": "u2", "name": "Other.Movie.2024.1080p.WEB-GRP", "size": 2},
+                {"id": "u3", "name": "Some.Movie.2024.2160p.WEB-GRP", "size": 3},
+            ),
         )
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker)
@@ -137,22 +172,22 @@ class TestSearchExisting:
         assert asyncio.run(tracker.search_existing(meta)) == []
         assert meta["skipping"] == "V3X"
 
-    def test_search_paginates_until_total(self, monkeypatch: Any):
-        pages = {
-            1: {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-AAA", "size": 1}], "total": 2},
-            2: {"torrents": [{"id": "u2", "slug": "s2", "name": "Some.Movie.2024.1080p.WEB-BBB", "size": 2}], "total": 2},
-        }
+    def test_search_paginates_until_short_page(self, monkeypatch: Any):
+        # No total in the feed: a full page (100) means "maybe more", a short one ends the walk.
+        full_page = [{"id": f"u{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": i} for i in range(100)]
+        pages = {0: _rss(*full_page), 100: _rss({"id": "u100", "name": "Some.Movie.2024.1080p.WEB-BBB", "size": 2})}
 
         class _PagingClient(_FakeClient):
             async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
-                page = kwargs.get("params", {}).get("page", 1)
-                return _FakeResponse(200, pages[page])
+                offset = kwargs.get("params", {}).get("offset", 0)
+                return _FakeResponse(200, pages[offset])
 
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _PagingClient)
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-        assert [d["name"] for d in dupes] == ["Some.Movie.2024.1080p.WEB-AAA", "Some.Movie.2024.1080p.WEB-BBB"]
+        assert len(dupes) == 101
+        assert dupes[-1]["name"] == "Some.Movie.2024.1080p.WEB-BBB"
 
     def test_french_title_adds_second_query(self, monkeypatch: Any):
         seen_queries: list[str] = []
@@ -160,7 +195,7 @@ class TestSearchExisting:
         class _RecordingClient(_FakeClient):
             async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
                 seen_queries.append(kwargs.get("params", {}).get("q", ""))
-                return _FakeResponse(200, {"torrents": [], "total": 0})
+                return _FakeResponse(200, _rss())
 
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RecordingClient)
         tracker = V3X(_config())
@@ -175,11 +210,42 @@ class TestSearchExisting:
 
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _DetailClient)
         tracker = V3X(_config())
+
+        async def fake_login() -> Any:
+            return v3x_module.httpx.Cookies()
+
+        monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
         dupes = [{"name": "X", "id": "uuid-1"}, {"name": "Y"}]
         asyncio.run(tracker._enrich_with_files(dupes))
         assert dupes[0]["files"] == ["a.mkv", "b.srt"]
         assert dupes[0]["file_count"] == 2
         assert "files" not in dupes[1]
+
+    def test_login_without_cookie_is_treated_as_no_session(self, monkeypatch: Any):
+        """2FA accounts get {twoFactorRequired, challenge} with no cookie: unusable unattended."""
+
+        class _NoCookieResponse(_FakeResponse):
+            cookies = v3x_module.httpx.Cookies()
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.response = _NoCookieResponse(200, {"twoFactorRequired": True, "challenge": "x"})
+        cfg = _config()
+        cfg["TRACKERS"]["V3X"].update({"username": "user", "password": "pass"})
+        tracker = V3X(cfg)
+        assert asyncio.run(tracker._login_session_cookies()) is None
+        dupes = [{"name": "X", "id": "uuid-1"}]
+        asyncio.run(tracker._enrich_with_files(dupes))
+        assert "files" not in dupes[0]
+
+    def test_enrichment_is_skipped_without_site_credentials(self, monkeypatch: Any):
+        """The API key cannot read /torrents/{uuid}; without username/password the dupes stay name-only."""
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
+        _FakeClient.captured = {}
+        tracker = V3X(_config())  # no username/password in the config
+        dupes = [{"name": "X", "id": "uuid-1"}]
+        asyncio.run(tracker._enrich_with_files(dupes))
+        assert "files" not in dupes[0]
+        assert _FakeClient.captured == {}
 
 
 class TestUpload:
@@ -249,6 +315,14 @@ class TestUpload:
         meta = self._meta(tmp_path)
         assert asyncio.run(tracker.upload(meta, "")) is False
         assert "invalid_category" in str(meta["tracker_status"]["V3X"]["status_message"])
+
+    def test_upload_409_duplicate_fails_fast_with_existing_id(self, monkeypatch: Any, tmp_path: Any):
+        tracker = V3X(_config())
+        self._patch(monkeypatch, tracker, _FakeResponse(409, {"error": "duplicate_content", "id": "abc-123", "name": "Example.Release.2026.1080p-GRP"}))
+        meta = self._meta(tmp_path)
+        assert asyncio.run(tracker.upload(meta, "")) is False
+        assert "already on V3X" in str(meta["tracker_status"]["V3X"]["status_message"])
+        assert "abc-123" in str(meta["tracker_status"]["V3X"]["status_message"])
 
     def test_debug_mode_does_not_post(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
@@ -526,7 +600,7 @@ def test_upload_omits_language_when_undetected(monkeypatch: Any, tmp_path: Any):
 
 def test_search_existing_routes_dupes_through_french_lang_filter(monkeypatch: Any):
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
-    _FakeClient.response = _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "size": 1}]})
+    _FakeClient.response = _FakeResponse(200, _rss({"id": "u1", "name": "Some.Movie.2024.VOSTFR.1080p.WEB-GRP", "size": 1}))
     tracker = V3X(_config())
 
     async def fake_checks(meta: Any) -> bool:
@@ -701,45 +775,6 @@ def test_description_informations_section(monkeypatch: Any, tmp_path: Any):
     assert "Débit vidéo :[/color][/b] 12.5 Mb/s" in desc
     # Informations comes after the poster and before the Synopsis
     assert desc.index("━━━ Informations ━━━") < desc.index("━━━ Synopsis ━━━")
-
-
-def test_search_paginates_without_total_until_short_page(monkeypatch: Any):
-    calls: list[int] = []
-
-    class _NoTotalClient(_FakeClient):
-        async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
-            page = kwargs.get("params", {}).get("page", 1)
-            calls.append(page)
-            if page == 1:
-                torrents = [{"id": f"u{i}", "slug": f"s{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": i} for i in range(100)]
-            else:
-                torrents = [{"id": "last", "slug": "last", "name": "Some.Movie.2024.1080p.WEB-LAST", "size": 1}]
-            return _FakeResponse(200, {"torrents": torrents})
-
-    monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _NoTotalClient)
-    tracker = V3X(_config())
-
-    async def fake_checks(meta: Any) -> bool:
-        return True
-
-    async def fake_fr(meta: Any) -> str:
-        return ""
-
-    async def fake_enrich(dupes: Any, *, debug: bool = False) -> None:
-        return None
-
-    async def fake_login() -> Any:
-        return v3x_module.httpx.Cookies()
-
-    monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
-    monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
-    monkeypatch.setattr(tracker, "_enrich_with_files", fake_enrich)
-    monkeypatch.setattr(tracker, "_login_session_cookies", fake_login)
-    dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-    # Full first page without a total → a second page is fetched; the short
-    # second page ends the walk. No skipping, all 101 results kept.
-    assert calls == [1, 2]
-    assert len(dupes) == 101
 
 
 def test_description_survives_non_numeric_ids(monkeypatch: Any, tmp_path: Any):
@@ -959,7 +994,7 @@ def test_prefers_original_title_in_names(monkeypatch: Any):
     assert asyncio.run(tracker.get_name(dict(meta, original_language="fr")))["name"] == "Les.Infiltres.2006.1080p.BluRay.x264-GRP"
 
 
-def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
+def test_session_cookie_reaches_enrichment_only(monkeypatch: Any):
     constructed: list[Any] = []
 
     class _CookieClient(_FakeClient):
@@ -967,8 +1002,8 @@ def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
             constructed.append(kwargs.get("cookies"))
 
         async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
-            if url.endswith("/torrents"):
-                return _FakeResponse(200, {"torrents": [{"id": "u1", "slug": "s1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1}], "total": 1})
+            if url.endswith("/torznab/api"):
+                return _FakeResponse(200, _rss({"id": "u1", "name": "Some.Movie.2024.1080p.WEB-GRP", "size": 1}))
             return _FakeResponse(200, {"files": [{"path": "a.mkv", "size": 1}]})
 
     monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _CookieClient)
@@ -986,9 +1021,8 @@ def test_session_cookie_reaches_search_and_enrichment(monkeypatch: Any):
     monkeypatch.setattr(tracker, "_get_french_title", fake_fr)
     dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
     assert dupes and dupes[0]["file_count"] == 1
-    # Both the paginated search client and the enrichment client carry the jar
-    assert len(constructed) >= 2
-    assert all(c is not None and c.get("v3x_sid") == "abc" for c in constructed)
+    # The torznab search is key-only; only the enrichment client carries the jar
+    assert [c is not None and c.get("v3x_sid") == "abc" for c in constructed] == [False, True]
 
 
 class TestFrenchLanguageSupersede:
@@ -997,10 +1031,7 @@ class TestFrenchLanguageSupersede:
 
     def _search(self, monkeypatch: Any, upload_audio: str, listing_names: list[str]) -> list[dict[str, Any]]:
         monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _FakeClient)
-        _FakeClient.response = _FakeResponse(
-            200,
-            {"torrents": [{"id": f"u{i}", "slug": f"s{i}", "name": n, "size": i + 1} for i, n in enumerate(listing_names)], "total": len(listing_names)},
-        )
+        _FakeClient.response = _FakeResponse(200, _rss(*({"id": f"u{i}", "name": n, "size": i + 1} for i, n in enumerate(listing_names))))
         tracker = V3X(_config())
 
         async def fake_checks(meta: Any) -> bool:
