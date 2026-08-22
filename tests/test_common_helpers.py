@@ -20,8 +20,8 @@ def test_is_adult_matches_whole_keywords_only():
     assert is_adult({"keywords": "adulthood", "combined_genres": "Drama"}) is False
     assert is_adult({"keywords": "gay porn, drama", "combined_genres": ""}) is True  # marker inside a compound keyword
     assert is_adult({"keywords": "adult animation, adult humor", "combined_genres": "Animation"}) is False
-    assert is_adult({"keywords": "", "combined_genres": "Drama, Hentai"}) is False
-    assert is_adult({"keywords": "", "combined_genres": "Drama, Hentai"}, ("hentai",)) is True
+    assert is_adult({"keywords": "", "combined_genres": "Drama, Hentai"}) is True  # base list covers hentai/JAV
+    assert is_adult({"keywords": "", "combined_genres": "Drama"}, ("drama",)) is True  # tracker extras
 
 
 def test_mi_tracks_and_lossless():

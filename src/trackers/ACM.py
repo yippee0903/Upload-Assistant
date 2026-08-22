@@ -382,9 +382,7 @@ class ACM:
             if not cli_ui.ask_yes_no("Is this show currently airing?", default=False):
                 return False
 
-        if is_adult(meta, ("hentai", "softcore", "jav", "japanese adult video")) and not ask_to_continue(
-            meta, f"{self.tracker}: Adult, hentai, and JAV content is not permitted."
-        ):
+        if is_adult(meta) and not ask_to_continue(meta, f"{self.tracker}: Adult, hentai, and JAV content is not permitted."):
             return False
 
         # BDMV full-disc structures are allowed (that's the primary Blu-ray format).

@@ -53,7 +53,7 @@ class STC(UNIT3D):
                 console.print(f"[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]")
             return False
 
-        if is_adult(meta, ("hentai", "softcore")) and not ask_to_continue(meta, f"Porn is not allowed at {self.tracker}."):
+        if is_adult(meta) and not ask_to_continue(meta, f"Porn is not allowed at {self.tracker}."):
             return False
 
         if meta.get("is_disc") not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(

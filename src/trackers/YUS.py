@@ -73,7 +73,7 @@ class YUS(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
 
-        if is_adult(meta, ("hentai", "softcore")) and not ask_to_continue(meta, "Porn/xxx is not allowed at YUS."):
+        if is_adult(meta) and not ask_to_continue(meta, "Porn/xxx is not allowed at YUS."):
             return False
 
         tag_group = str(meta.get("tag", "")).strip("-").strip().lower()
