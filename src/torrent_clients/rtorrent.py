@@ -483,7 +483,6 @@ class RtorrentClientMixin:
                 "lst",
                 "oe",
                 "hdb",
-                "a4k",
                 "hhd",
                 "ihd",
                 "lume",

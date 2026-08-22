@@ -14,7 +14,6 @@ from src.clients import Clients
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 NEW_TRACKERS = {
-    "a4k": "aura4k.net",
     "hhd": "homiehelpdesk.net",
     "ihd": "infinityhd.net",
     "lume": "luminarr.me",
@@ -87,7 +86,7 @@ def test_metadata_reuse_consultation_order() -> None:
     order = list(ast.literal_eval(tracker_keys_maps[0]))
     preferred = [
         "aither", "blu", "lst", "ulcx", "oe", "huno", "ant", "btn", "bhd", "hdb", "rf",
-        "otw", "yus", "dp", "lume", "hhd", "ihd", "a4k", "stc", "acm", "sp", "ptp", "tos", "g3mini",
+        "otw", "yus", "dp", "lume", "hhd", "ihd", "stc", "acm", "sp", "ptp", "tos", "g3mini",
     ]
     extra = sorted(k for k in NEW_TRACKERS if k not in preferred)
     assert order == preferred + extra

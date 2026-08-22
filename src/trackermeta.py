@@ -608,7 +608,6 @@ async def update_metadata_from_tracker(
         "YUS",
         "DP",
         "SP",
-        "A4K",
         "HHD",
         "IHD",
         "LUME",
