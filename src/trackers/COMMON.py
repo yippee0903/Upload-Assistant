@@ -24,7 +24,7 @@ from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
 
-ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "adult", "orgy")
+ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "erotica", "porn", "orgy", "hentai", "softcore", "jav", "japanese adult video")
 
 
 def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?", default: bool = False) -> bool:
@@ -37,9 +37,9 @@ def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want
 
 
 def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
-    """True when TMDb keywords/genres contain an adult-content marker."""
+    """True when a TMDb keyword/genre contains an adult-content marker as a whole word ("gay porn" counts, "adulthood" does not)."""
     genres = f"{meta.get('keywords', '')}, {meta.get('combined_genres', '')}"
-    return any(re.search(rf"(^|,\s*){re.escape(k)}(\s*,|$)", genres, re.IGNORECASE) for k in (*ADULT_KEYWORDS, *extra_keywords))
+    return any(re.search(rf"\b{re.escape(k)}\b", genres, re.IGNORECASE) for k in (*ADULT_KEYWORDS, *extra_keywords))
 
 
 def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:

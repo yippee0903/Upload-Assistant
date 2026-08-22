@@ -12,7 +12,7 @@ import pycountry
 
 from src.bbcode import BBCODE
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 
 
 class ACM:
@@ -382,19 +382,8 @@ class ACM:
             if not cli_ui.ask_yes_no("Is this show currently airing?", default=False):
                 return False
 
-        # ── Adult content (hentai, porn, JAV) ────────────────────────────────────
-        # TMDB keywords are not always reliable, so this is a soft block: the user
-        # can override if the detection is a false positive.
-        genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
-        adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav", "japanese adult video"]
-        if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
-            if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
-                console.print(f"[bold red]{self.tracker}: Adult, hentai, and JAV content is not permitted.[/bold red]")
-                console.print("[yellow]Note: TMDB keywords may not be reliable — override if this is a false positive.[/yellow]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                    return False
-            else:
-                return False
+        if is_adult(meta) and not ask_to_continue(meta, f"{self.tracker}: Adult, hentai, and JAV content is not permitted."):
+            return False
 
         # BDMV full-disc structures are allowed (that's the primary Blu-ray format).
         # Only raw ISOs are restricted to 3D/MGVC, but UA never uploads ISOs — it

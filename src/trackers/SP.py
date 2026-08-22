@@ -114,7 +114,7 @@ class SP(UNIT3D):
             else:
                 return False
 
-        if is_adult(meta, ("erotica",)) and not ask_to_continue(meta, f"Porn/xxx is not allowed at {self.tracker}."):
+        if is_adult(meta) and not ask_to_continue(meta, f"Porn/xxx is not allowed at {self.tracker}."):
             return False
 
         return should_continue

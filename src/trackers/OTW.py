@@ -107,7 +107,7 @@ class OTW(UNIT3D):
         keywords = ", ".join(cast(list[str], keywords_value)) if isinstance(keywords_value, list) else str(keywords_value)
         combined_genres_text = ", ".join(combined_genres)
         genres = f"{keywords}, {combined_genres_text}"
-        if is_adult(meta, ("hentai", "adult animation", "softcore")) and not ask_to_continue(meta, "Adult animation not allowed at OTW."):
+        if is_adult(meta, ("adult animation",)) and not ask_to_continue(meta, "Adult animation not allowed at OTW."):
             return False
 
         game_show_keywords = ["reality", "game show", "game-show", "reality tv", "reality television"]
