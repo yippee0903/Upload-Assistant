@@ -1023,10 +1023,16 @@ config = {
             # it therefore needs a qBittorrent or rTorrent client with linking
             # enabled (the link folder takes the new name); without one, the
             # rename is skipped and the fiche shows the on-disk name.
-            "api_key": "V3X api key (upload scope)",
-            # Site credentials — the dupe search browses the catalog through a
-            # web session (API keys are upload-only since the 2026-08 update).
-            # Without them V3X is skipped before upload (no blind uploads).
+            # API key (Settings > Integrations > scoped API keys): needs the
+            # "upload" scope for uploads and "torznab" for the dupe search,
+            # which reads the torznab feed. This key alone is enough.
+            "api_key": "V3X api key (upload + torznab scopes)",
+            # Optional site credentials — only used to fetch each dupe's file
+            # list (the browse routes accept a web session, not API keys) so
+            # the dupe check can compare filenames instead of release names.
+            # Accounts with 2FA enabled get a challenge instead of a session
+            # cookie, so the login cannot complete unattended: leave these
+            # empty in that case — dupes are then compared by name only.
             "username": "",
             "password": "",
             "announce_url": "get from V3X",
