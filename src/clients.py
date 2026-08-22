@@ -192,23 +192,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return tracker_ids
 
-    async def add_to_client(self, meta: dict[str, Any], tracker: str, cross: bool = False) -> None:
-        if cross:
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent"
-        elif meta["debug"]:
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_DEBUG].torrent"
-        else:
-            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
-        if meta.get("no_seed", False) is True:
-            console.print("[bold red]--no-seed was passed, so the torrent will not be added to the client")
-            console.print("[bold yellow]Add torrent manually to the client")
-            return
-        if os.path.exists(torrent_path):
-            torrent = Torrent.read(torrent_path)
-        else:
-            console.print(f"[bold red]Torrent file {torrent_path} does not exist, cannot add to client")
-            return
+    def _inject_client_names(self, meta: dict[str, Any]) -> Optional[list[str]]:
+        """Client names a torrent gets injected into (meta client → injecting_client_list → default).
 
+        None means "meta client is 'none'": nothing to inject anywhere.
+        """
         inject_clients: list[str] = []
         client_value = meta.get("client")
         if isinstance(client_value, str) and client_value != "none":
@@ -218,7 +206,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         elif client_value == "none":
             if meta["debug"]:
                 console.print("[cyan]DEBUG: meta client is 'none', skipping adding to client[/cyan]")
-            return
+            return None
         else:
             try:
                 inject_clients_config = self.config["DEFAULT"].get("injecting_client_list")
@@ -253,6 +241,45 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         if meta["debug"]:
             console.print(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
+        return inject_clients
+
+    async def injection_clients_online(self, meta: dict[str, Any]) -> bool:
+        """Fresh (uncached) reachability probe of every qBittorrent client the upload will inject into.
+
+        The per-process health cache is filled at the start of the run; a client that
+        dies during screenshots would otherwise pass that cache and leave a live
+        tracker upload with nothing seeding it.
+        """
+        if meta.get("no_seed", False):
+            return True
+        for client_name in self._inject_client_names(meta) or []:
+            client = self.config["TORRENT_CLIENTS"].get(client_name)
+            if not client or client.get("torrent_client") != "qbit":
+                continue
+            if not await self._check_qbit_reachable(client):
+                return False
+        return True
+
+    async def add_to_client(self, meta: dict[str, Any], tracker: str, cross: bool = False) -> None:
+        if cross:
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent"
+        elif meta["debug"]:
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_DEBUG].torrent"
+        else:
+            torrent_path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
+        if meta.get("no_seed", False) is True:
+            console.print("[bold red]--no-seed was passed, so the torrent will not be added to the client")
+            console.print("[bold yellow]Add torrent manually to the client")
+            return
+        if os.path.exists(torrent_path):
+            torrent = Torrent.read(torrent_path)
+        else:
+            console.print(f"[bold red]Torrent file {torrent_path} does not exist, cannot add to client")
+            return
+
+        inject_clients = self._inject_client_names(meta)
+        if inject_clients is None:
+            return
         for client_name in inject_clients:
             if client_name == "none" or not client_name:
                 continue
