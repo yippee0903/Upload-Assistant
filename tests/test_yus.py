@@ -51,6 +51,18 @@ def _meta(**overrides: Any) -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════
 
 
+class TestYUSAdultCheck:
+    """TMDB tags mainstream adult cartoons 'adult animation'; only hentai/porn markers block."""
+
+    def test_adult_animation_keyword_passes(self):
+        meta = _meta(keywords="adult animation, satire", combined_genres="Animation, Comedy")
+        assert _run(YUS(_config()).get_additional_checks(meta)) is True
+
+    def test_hentai_keyword_is_rejected(self):
+        meta = _meta(keywords="hentai, adult animation", combined_genres="Animation")
+        assert _run(YUS(_config()).get_additional_checks(meta)) is False
+
+
 class TestYUSNogroupRejection:
     """YUS has no policy for untagged releases — they must be rejected.
 

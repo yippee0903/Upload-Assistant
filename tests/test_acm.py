@@ -863,6 +863,12 @@ class TestAdditionalChecksAdultContent:
         meta = _checks_meta(combined_genres="Drama", keywords="jav")
         assert _run(acm.get_additional_checks(meta)) is False
 
+    def test_adult_animation_keyword_is_not_rejected(self):
+        """TMDB tags mainstream adult cartoons 'adult animation'; only hentai/porn markers block."""
+        acm = ACM(_config())
+        meta = _checks_meta(combined_genres="Animation, Comedy", keywords="adult animation, satire")
+        assert _run(acm.get_additional_checks(meta)) is True
+
     def test_normal_animation_is_not_rejected(self):
         """The word 'animation' alone must not trigger the adult-content check."""
         acm = ACM(_config())

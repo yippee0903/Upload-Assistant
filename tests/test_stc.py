@@ -100,6 +100,37 @@ class TestSTCEnglishLanguageCheck:
         }
         assert _run(stc.get_additional_checks(meta)) is False
 
+    def test_adult_animation_keyword_passes(self, stc):
+        """TMDB tags mainstream adult cartoons 'adult animation'; only hentai/porn markers block."""
+        meta = {
+            "category": "TV",
+            "audio_languages": ["English"],
+            "subtitle_languages": [],
+            "is_disc": None,
+            "type": "WEBDL",
+            "debug": False,
+            "unattended": True,
+            "keywords": "adult animation, satire",
+            "combined_genres": "Animation, Comedy",
+        }
+        with patch("src.trackers.COMMON.languages_manager") as mock_lm:
+            mock_lm.process_desc_language = AsyncMock()
+            assert _run(stc.get_additional_checks(meta)) is True
+
+    def test_hentai_keyword_fails(self, stc):
+        meta = {
+            "category": "TV",
+            "audio_languages": ["English"],
+            "subtitle_languages": [],
+            "is_disc": None,
+            "type": "WEBDL",
+            "debug": False,
+            "unattended": True,
+            "keywords": "hentai, adult animation",
+            "combined_genres": "Animation",
+        }
+        assert _run(stc.get_additional_checks(meta)) is False
+
 
 def test_approved_image_hosts() -> None:
     # Rules only ask for lossless thumbnails linking to full-size images;

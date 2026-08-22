@@ -386,7 +386,7 @@ class ACM:
         # TMDB keywords are not always reliable, so this is a soft block: the user
         # can override if the detection is a false positive.
         genres_combined = f"{meta.get('keywords', '') or ''} {meta.get('combined_genres', '') or ''}".lower()
-        adult_keywords = ["hentai", "xxx", "porn", "erotic", "adult animation", "softcore", "orgy", "jav", "japanese adult video"]
+        adult_keywords = ["hentai", "xxx", "porn", "erotic", "softcore", "orgy", "jav", "japanese adult video"]
         if any(re.search(rf"(^|[,\s]){re.escape(kw)}([,\s]|$)", genres_combined) for kw in adult_keywords):
             if not bool(meta.get("unattended")) or (bool(meta.get("unattended")) and meta.get("unattended_confirm", False)):
                 console.print(f"[bold red]{self.tracker}: Adult, hentai, and JAV content is not permitted.[/bold red]")
