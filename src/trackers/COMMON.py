@@ -24,7 +24,7 @@ from src.console import console
 from src.exportmi import exportInfo
 from src.languages import languages_manager
 
-ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "porn", "orgy", "hentai", "softcore", "jav", "japanese adult video")
+ADULT_KEYWORDS: tuple[str, ...] = ("xxx", "erotic", "erotica", "porn", "orgy", "hentai", "softcore", "jav", "japanese adult video")
 
 
 def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want to upload anyway?", default: bool = False) -> bool:
