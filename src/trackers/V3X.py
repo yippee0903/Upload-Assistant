@@ -28,10 +28,10 @@ import asyncio
 import contextlib
 import os
 import re
-import xml.etree.ElementTree as ET
 from typing import Any, Optional
 
 import aiofiles
+import defusedxml.ElementTree as ET
 import httpx
 from torf import Torrent
 from unidecode import unidecode
