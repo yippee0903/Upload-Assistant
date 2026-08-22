@@ -250,6 +250,14 @@ class TestUpload:
         assert asyncio.run(tracker.upload(meta, "")) is False
         assert "invalid_category" in str(meta["tracker_status"]["V3X"]["status_message"])
 
+    def test_upload_409_duplicate_fails_fast_with_existing_id(self, monkeypatch: Any, tmp_path: Any):
+        tracker = V3X(_config())
+        self._patch(monkeypatch, tracker, _FakeResponse(409, {"error": "duplicate_content", "id": "abc-123", "name": "Example.Release.2026.1080p-GRP"}))
+        meta = self._meta(tmp_path)
+        assert asyncio.run(tracker.upload(meta, "")) is False
+        assert "already on V3X" in str(meta["tracker_status"]["V3X"]["status_message"])
+        assert "abc-123" in str(meta["tracker_status"]["V3X"]["status_message"])
+
     def test_debug_mode_does_not_post(self, monkeypatch: Any, tmp_path: Any):
         tracker = V3X(_config())
         self._patch(monkeypatch, tracker, _FakeResponse(500, {}))
