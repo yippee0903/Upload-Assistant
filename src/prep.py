@@ -160,7 +160,6 @@ class Prep:
             "dp",
             "sp",
             "ptp",
-            "a4k",
             "hhd",
             "ihd",
             "lume",

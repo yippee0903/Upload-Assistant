@@ -16,7 +16,6 @@ import httpx
 
 from src.cleanup import cleanup_manager
 from src.console import console
-from src.trackers.A4K import A4K
 from src.trackers.ACM import ACM
 from src.trackers.AITHER import AITHER
 from src.trackers.ANT import ANT
@@ -1353,7 +1352,6 @@ class TRACKER_SETUP:
 
 
 tracker_class_map: dict[str, type[Any]] = {
-    "A4K": A4K,
     "ACM": ACM,
     "AITHER": AITHER,
     "ANT": ANT,
@@ -1429,7 +1427,6 @@ tracker_class_map: dict[str, type[Any]] = {
 # Trackers running the UNIT3D platform.
 # Upload flow: JSON API with mod-queue / draft support; descriptions built via unit3d_edit_desc().
 api_trackers = {
-    "A4K",
     "ACM",
     "AITHER",
     "BHD",

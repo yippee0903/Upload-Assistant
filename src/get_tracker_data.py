@@ -130,7 +130,6 @@ class TrackerDataManager:
                     "lume": "LUME",
                     "hhd": "HHD",
                     "ihd": "IHD",
-                    "a4k": "A4K",
                     "stc": "STC",
                     "acm": "ACM",
                     # SP descriptions often carry noise, consult it late
@@ -181,7 +180,6 @@ class TrackerDataManager:
                     "utp": "UTP",
                     "sp": "SP",
                     "otw": "OTW",
-                    "a4k": "A4K",
                     "hhd": "HHD",
                     "ihd": "IHD",
                     "lume": "LUME",

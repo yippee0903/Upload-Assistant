@@ -395,21 +395,10 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: A4K, ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
+        # Available tracker: ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
-        "A4K": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            "api_key": "",
-            "anon": False,
-            # Send uploads to Aura4K modq for staff approval
-            "modq": False,
-            # Tracker-specific options like skip_dupe_asking and inject_delay can be set here to override global defaults
-            # "skip_dupe_asking": True,
-            # "inject_delay": 5,
-        },
 
         "ACM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

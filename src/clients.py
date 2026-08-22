@@ -89,10 +89,6 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 tracker_id = _last_path_id(path)
                 if tracker_id:
                     tracker_ids["huno"] = tracker_id
-            elif _is_host(host, "aura4k.net"):
-                tracker_id = _last_path_id(path)
-                if tracker_id:
-                    tracker_ids["a4k"] = tracker_id
             elif _is_host(host, "homiehelpdesk.net"):
                 tracker_id = _last_path_id(path)
                 if tracker_id:
