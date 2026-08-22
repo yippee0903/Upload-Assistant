@@ -1971,6 +1971,13 @@ async def do_the_thing(base_dir: str) -> None:
             else:
                 meta = cast(Meta, meta)
                 console.print()
+                # A client that died since the start-of-run health check would leave
+                # live tracker uploads with nothing seeding them: re-probe right before uploading.
+                if not meta.get("debug") and not await client.injection_clients_online(meta):
+                    console.print("[bold red]qBittorrent went offline before the uploads started.")
+                    if meta.get("unattended") or not await asyncio.to_thread(cli_ui.ask_yes_no, "Upload anyway (torrents will not be seeded)?", default=False):
+                        console.print("[bold red]Upload process aborted: qBittorrent is offline.")
+                        return
                 console.print("[yellow]Processing uploads to trackers.....")
                 if meta.get("were_trumping", False):
                     trump_trackers = [t for t in cast(list[Any], meta.get("trackers", [])) if isinstance(t, str)]
