@@ -36,6 +36,29 @@ from src.console import console
 # INDENT - Probably not an issue, but maybe just remove tags
 
 
+_PIXHOST_FULL = re.compile(r"^https?://img(\d+)\.pixhost\.to/images/")
+_PIXHOST_THUMB = re.compile(r"^https?://t(\d+)\.pixhost\.to/thumbs/")
+
+
+def image_entry(img_url: str, web_url: str = "") -> dict[str, str]:
+    """Image dict for a URL found in a description, with the host's thumbnail/full-size pair derived.
+
+    Descriptions often embed the full-size image; sites that do not scale [img]
+    (C411, V3X) then render it full width — or not at all. Only imgbox and pixhost
+    expose both forms through a predictable URL rewrite.
+    """
+    img_url = img_url.strip()
+    raw_url = img_url
+    host = urllib.parse.urlparse(img_url).hostname or ""
+    if host == "thumbs2.imgbox.com":
+        raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com").replace("_t.png", "_o.png")
+    elif _PIXHOST_FULL.match(img_url):
+        img_url = _PIXHOST_FULL.sub(r"https://t\1.pixhost.to/thumbs/", img_url)
+    elif _PIXHOST_THUMB.match(img_url):
+        raw_url = _PIXHOST_THUMB.sub(r"https://img\1.pixhost.to/images/", img_url)
+    return {"img_url": img_url, "raw_url": raw_url, "web_url": web_url.strip() or raw_url}
+
+
 class BBCODE:
     def __init__(self) -> None:
         pass
@@ -116,13 +139,7 @@ class BBCODE:
                 desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", "")
                 continue
 
-            raw_url = img_url
-            if img_host == "thumbs2.imgbox.com":
-                raw_url = img_url.replace("thumbs2.imgbox.com", "images2.imgbox.com")
-                raw_url = raw_url.replace("_t.png", "_o.png")
-
-            image_dict = {"img_url": img_url, "raw_url": raw_url, "web_url": web_url}
-            imagelist.append(image_dict)
+            imagelist.append(image_entry(img_url, web_url))
             desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", "")
 
         description = desc.strip()
@@ -163,8 +180,7 @@ class BBCODE:
         # Extract loose images and add to imagelist as dictionaries
         loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", desc, flags=re.IGNORECASE)
         for img_url in loose_images:
-            image_dict = {"img_url": img_url, "raw_url": img_url, "web_url": img_url}
-            imagelist.append(image_dict)
+            imagelist.append(image_entry(img_url))
             desc = desc.replace(img_url, "")
 
         # Now, remove matching URLs from [URL] tags
@@ -376,8 +392,7 @@ class BBCODE:
         loose_images = re.findall(r"(https?:\/\/[^\s\[\]]+\.(?:png|jpg))", nocomp, flags=re.IGNORECASE)
         for img_url in loose_images:
             if img_url not in excluded_urls:  # Only include URLs not part of excluded sections
-                image_dict = {"img_url": img_url, "raw_url": img_url, "web_url": img_url}
-                imagelist.append(image_dict)
+                imagelist.append(image_entry(img_url))
                 desc = desc.replace(img_url, "")
 
         # Re-place comparisons
@@ -441,12 +456,7 @@ class BBCODE:
         url_img_pattern = r"\[url=(https?://[^\]]+)\]\[img[^\]]*\](.*?)\[/img\]\[/url\]"
         url_img_matches = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
         for web_url, img_url in url_img_matches:
-            image_dict = {
-                "img_url": img_url.strip(),
-                "raw_url": img_url.strip(),
-                "web_url": web_url.strip(),
-            }
-            imagelist.append(image_dict)
+            imagelist.append(image_entry(img_url, web_url))
             # Remove the entire [url=...][img]...[/img][/url] structure
             desc = re.sub(rf"\[url={re.escape(web_url)}\]\[img[^\]]*\]{re.escape(img_url)}\[/img\]\[/url\]", "", desc, flags=re.IGNORECASE)
 
@@ -456,13 +466,8 @@ class BBCODE:
             for img_url in img_tags:
                 img_url = img_url.strip()
                 # Check if this image was already added (wrapped in URL)
-                if not any(img["img_url"] == img_url for img in imagelist):
-                    image_dict = {
-                        "img_url": img_url,
-                        "raw_url": img_url,
-                        "web_url": img_url,
-                    }
-                    imagelist.append(image_dict)
+                if not any(img_url in (img["img_url"], img["raw_url"]) for img in imagelist):
+                    imagelist.append(image_entry(img_url))
                 # Remove the [img] tag
                 desc = re.sub(rf"\[img[^\]]*\]{re.escape(img_url)}\[/img\]", "", desc, flags=re.IGNORECASE)
 
@@ -474,7 +479,8 @@ class BBCODE:
             "https://ptpimg.me/606tk4.png",
             # Add any other known bot image URLs here
         ]
-        imagelist = [img for img in imagelist if img["img_url"] not in bot_image_urls and not re.search(r"thumbs", img["img_url"], re.IGNORECASE)]
+        # A thumbnail with no full-size counterpart cannot be reused as a screenshot.
+        imagelist = [img for img in imagelist if img["img_url"] not in bot_image_urls and not re.search(r"thumbs", img["raw_url"], re.IGNORECASE)]
         # ptpimg.me is dead: its images (flags, icons, screenshots) must not
         # be reused as if they were live screenshots
         imagelist = [img for img in imagelist if "ptpimg.me" not in str(img.get("raw_url", ""))]
