@@ -456,7 +456,7 @@ class V3X(FrenchTrackerMixin):
 
         # ── Synopsis ──
         parts.append(f"[b][color={C}][size=130]━━━ Synopsis ━━━[/size][/color][/b]")
-        synopsis = str(fr_data.get("overview", "")).strip() or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
+        synopsis = await self.french_synopsis(meta, fr_data) or "Aucun synopsis disponible."
         parts.append(synopsis)
         parts.append("")
 

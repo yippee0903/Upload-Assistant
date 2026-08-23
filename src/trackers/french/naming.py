@@ -232,6 +232,15 @@ class FrenchNamingMixin:
 
         return meta.get("title", "")
 
+    async def french_synopsis(self, meta: Meta, fr_data: dict[str, Any]) -> str:
+        """Synopsis for a French fiche: TMDB French, else the IMDb French plot, else TMDB English."""
+        synopsis = str(fr_data.get("overview") or "").strip()
+        if not synopsis and meta.get("imdb_id"):
+            from src.imdb import imdb_manager
+
+            synopsis = await imdb_manager.get_imdb_plot(meta["imdb_id"], "fr-FR")
+        return synopsis or str(meta.get("overview", "")).strip()
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """Build the dot-separated release name (French-tracker conventions)."""
 

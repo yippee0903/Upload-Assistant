@@ -314,9 +314,43 @@ def test_bot_generated_fiche_is_emptied() -> None:
     assert cleaned == ""
 
 
+_BOT_FICHE_QUOTED = (
+    "[center][b][color=#ff00ff][size=18]This release is sourced from Netflix and is not transcoded, just remuxed from the direct Netflix stream[/size][/color][/b][/center]\n"
+    "[center][center][b][size=18][color=#2E86C1]Example Movie (2026)[/color][/size][/b][/center]\n\n"
+    "[center][b][size=16][color=#117A65]By:[/color][/size][/b] [i]Some Director[/i][/center]\n\n"
+    "[b][size=15][color=#6C3483]Synopsis:[/color][/size][/b]\n[quote]A paragraph about the plot.[/quote]\n\n"
+    "[center][tr]\n[td][/td]\n[td][/td]\n[/tr][/center]\n\n"
+    "[b][size=15][color=#2E86C1]cast:[/color][/size][/b]\n[quote]Actor One, Actor Two[/quote]\n[/center]\n[center]\n"
+)
+
+
+def test_quoted_bot_fiche_variant_is_emptied() -> None:
+    cleaned, _ = BBCODE().clean_unit3d_description(_BOT_FICHE_QUOTED, "https://example-tracker.org")
+    assert cleaned == ""
+    cleaned, _ = BBCODE().clean_unit3d_description("Encoded from UHD.\n\n" + _BOT_FICHE_QUOTED + "\nSeed please.", "https://example-tracker.org")
+    assert cleaned.split() == ["Encoded", "from", "UHD.", "Seed", "please."]
+
+
+def test_find_our_uploads_link_is_removed_but_source_notes_stay() -> None:
+    desc = (
+        "[h3][center][color=#F4AACA]Source 1[/color]: CR Video and Subtitles.\n"
+        "[color=#F4AACA]Source 2[/color]: AMZN Audio.\n"
+        "[center]Find our uploads [url=https://example-tracker.org/torrents?name=GRP]🐾 here 🐾[/url][/center][/h3]\n[center]\n"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://other-tracker.org")
+    assert "Find our uploads" not in cleaned and "[url=" not in cleaned
+    assert "Source 1" in cleaned and "AMZN Audio" in cleaned
+
+
 def test_uploader_notes_survive_the_fiche_cleanup() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description("Encoded from the UHD source.\n\n" + _BOT_FICHE + "\nSeed please.", "https://example-tracker.org")
     assert cleaned == "Encoded from the UHD source.\nSeed please."
+
+
+def test_styled_word_starting_with_a_label_is_kept() -> None:
+    desc = "[b]Byzantine[/b] architecture notes.\n[b]Plotting[/b] the course."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert cleaned == desc
 
 
 def test_hand_written_table_and_text_are_kept() -> None:
@@ -333,22 +367,22 @@ def test_only_uploader_signature_is_removed() -> None:
 
 
 def test_onlyencodes_signature_is_removed() -> None:
-    desc = "Kept.\n[center]OnlyEncodes Upload Assistant[/center]\nAlso kept."
-    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
-    assert "OnlyEncodes" not in cleaned
-    assert "Kept." in cleaned and "Also kept." in cleaned
+    for sig in ("[center]OnlyEncodes Upload Assistant[/center]", "[center]OnlyEncodes Uploader - Powered by L4G's Upload Assistant[/center]"):
+        cleaned, _ = BBCODE().clean_unit3d_description(f"Kept.\n{sig}\nAlso kept.", "https://example-tracker.org")
+        assert "OnlyEncodes" not in cleaned and "Powered by" not in cleaned
+        assert "Kept." in cleaned and "Also kept." in cleaned
 
 
 def test_h3_wrapped_ornament_header_and_leftover_close_are_removed() -> None:
     desc = (
         "[h3][center]•❅───✧❅✦ [color=#F69047]Screenshots[/color]"
         " ✦❅✧───❅•[/center]\n\n"
-        "[center]Find our uploads [url=https://example.com/torrents?name=Group]here[/url][/center][/h3]"
+        "[center]Encoded from the UHD source.[/center][/h3]"
     )
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Screenshots" not in cleaned
     assert "[/h3]" not in cleaned
-    assert "Find our uploads" in cleaned
+    assert "Encoded from the UHD source." in cleaned
     matched = "[h3]intro[/h3]\nBody."
     cleaned2, _ = BBCODE().clean_unit3d_description(matched, "https://lst.gg")
     assert "[h3]intro[/h3]" in cleaned2

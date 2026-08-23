@@ -29,6 +29,31 @@ def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str
 
 
 class ImdbManager:
+    async def get_imdb_plot(self, imdb_id: Union[str, int], language: str) -> str:
+        """Plot text in the given locale ("fr-FR"…), "" when IMDb has none or the call fails.
+
+        IMDb GraphQL localises `plot` from the x-imdb-user-language header; the
+        English text comes back when no translation exists, so the answer is only
+        kept when its language matches the request.
+        """
+        imdb_id_str = str(imdb_id)
+        if imdb_id_str.isdigit():
+            imdb_id_str = f"tt{int(imdb_id_str):07d}"
+        if not imdb_id_str.startswith("tt"):
+            return ""
+        query = {"query": f'query {{ title(id: "{imdb_id_str}") {{ plot {{ plotText {{ plainText }} language {{ id }} }} }} }}'}
+        headers = {**IMDB_GRAPHQL_HEADERS, "x-imdb-user-language": language}
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(IMDB_GRAPHQL_URL, json=query, headers=headers, timeout=10)
+                response.raise_for_status()
+                plot = ((response.json().get("data") or {}).get("title") or {}).get("plot") or {}
+        except Exception:
+            return ""
+        if str((plot.get("language") or {}).get("id", "")).lower()[:2] != language.lower()[:2]:
+            return ""
+        return str((plot.get("plotText") or {}).get("plainText") or "").strip()
+
     def safe_get(self, data: Any, path: list[str], default: Any = None) -> Any:
         for key in path:
             if isinstance(data, dict):
