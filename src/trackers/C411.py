@@ -824,7 +824,6 @@ class C411(FrenchTrackerMixin):
         # TMDB has no real French translation (fr_data would otherwise return
         # the original-language title for movies — e.g. Chinese characters).
         fr_title = (await self._get_french_title(meta)).strip() or str(meta.get("title", "")).strip()
-        fr_overview = str(fr_data.get("overview", "")).strip()
         year = meta.get("year", "")
 
         # ── Header: Title + Year + Poster (centered) ──
@@ -975,7 +974,7 @@ class C411(FrenchTrackerMixin):
         #  Synopsis
         # ══════════════════════════════════════════════════════
         parts.append(f"        [color={C}]Synopsis[/color]")
-        synopsis = fr_overview or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
+        synopsis = await self.french_synopsis(meta, fr_data) or "Aucun synopsis disponible."
         parts.append(f"    [font=Verdana][size=14]{synopsis}[/size][/font]")
         parts.append("")
 
