@@ -280,6 +280,22 @@ def test_pm_uploader_reseed_line_is_removed() -> None:
     assert "Kept." in cleaned and "Also kept." in cleaned
 
 
+_MI_SPOILER = "[center][spoiler=Example.S01E0{n}.1080p.WEB-GRP]\n[b]General[/b]\n[b]Format:[/b] Matroska\n[/spoiler][/center]"
+
+
+def test_generated_pack_mediainfo_spoilers_are_dropped() -> None:
+    desc = "Intro.\n" + _MI_SPOILER.format(n=2) + "\n[center][spoiler=Other files]\n" + _MI_SPOILER.format(n=3) + "\n[/spoiler][/center]\n[center]Example.S01E01.1080p.WEB-GRP[/center]\nOutro."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "General" not in cleaned and "Other files" not in cleaned and "S01E01" not in cleaned
+    assert "Intro." in cleaned and "Outro." in cleaned
+
+
+def test_non_mediainfo_spoilers_are_kept() -> None:
+    desc = "[center][spoiler=NFO][code]nfo[/code][/spoiler][/center]\n[spoiler=Notes]Source notes[/spoiler]"
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "[spoiler=NFO]" in cleaned and "[spoiler=Notes]" in cleaned
+
+
 def test_only_uploader_signature_is_removed() -> None:
     desc = "Kept.\n[center][b]Brought to you by Only-Uploader [/b][/center]\nAlso kept."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
