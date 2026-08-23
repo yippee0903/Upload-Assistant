@@ -913,6 +913,7 @@ class Prep:
                 mode=meta.get("mode", "discord"),
                 category_preference=meta.get("category"),
                 imdb_info=meta.get("imdb_info", None),
+                unattended=unattended,
             )
 
             meta["category"] = category
@@ -996,6 +997,7 @@ class Prep:
                 mode=meta.get("mode", "discord"),
                 category_preference=meta.get("category"),
                 imdb_info=meta.get("imdb_info", None),
+                unattended=unattended,
             )
 
             meta["category"] = category
