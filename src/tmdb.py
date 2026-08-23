@@ -379,11 +379,12 @@ async def get_tmdb_from_imdb(
     mode: str = "discord",
     category_preference: Optional[str] = None,
     imdb_info: Optional[dict[str, Any]] = None,
+    unattended: bool = False,
 ) -> tuple[str, Union[int, str], str, bool]:
     """Fetches TMDb ID using IMDb or TVDb ID.
 
     - Returns `(category, tmdb_id, original_language)`
-    - If TMDb fails, prompts the user (if in CLI mode).
+    - If TMDb fails, prompts the user (if in CLI mode and not unattended).
     """
     if not str(imdb_id).startswith("tt"):
         if isinstance(imdb_id, str) and imdb_id.isdigit():
@@ -474,7 +475,7 @@ async def get_tmdb_from_imdb(
     category = category or "MOVIE"
 
     # **User Prompt for Manual TMDb ID Entry**
-    if tmdb_id in ("None", "", None, 0, "0") and mode == "cli":
+    if tmdb_id in ("None", "", None, 0, "0") and mode == "cli" and not unattended:
         console.print("[yellow]Unable to find a matching TMDb entry[/yellow]")
         tmdb_input = console.input("Please enter TMDb ID (format: tv/12345 or movie/12345): ") or ""
         category, tmdb_id = _get_parser().parse_tmdb_id(tmdb_input, category)
@@ -1035,6 +1036,8 @@ async def get_tmdb_id(
 
     # No match found, prompt user if in CLI mode
     console.print("[bold red]Unable to find TMDb match using any search[/bold red]")
+    if unattended:
+        return 0, category
     try:
         tmdb_input = cli_ui.ask_string("Please enter TMDb ID in this format: tv/12345 or movie/12345")
     except EOFError:
