@@ -425,18 +425,29 @@ class BBCODE:
         only unrecognised free text — encode notes, source info — is worth keeping.
         Each section is matched by its shape, never by its content.
         """
-        color = r"\[color=[^\]]*\]"
+        # Decoration around a label: any mix of [b]/[i]/[size]/[color]/[center] tags
+        tag = r"\[/?(?:b|i|center|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]"
+        deco = rf"(?:{tag}|[ \t])*"
+        # At least one tag before the text: plain "Synopsis: …" typed by an uploader is not a bot label.
+        styled = rf"{deco}{tag}{deco}"
         # "[b][color=…]Title (2024)[/color][/b]" alone on its line
-        desc = re.sub(rf"^[ \t]*\[b\]{color}[^\[\n]*\(\d{{4}}\)\[/color\]\[/b\][ \t]*\n?", "", desc, flags=re.MULTILINE)
-        # "Synopsis:" / "cast:" headers with the paragraph that follows them
-        desc = re.sub(rf"^[ \t]*\[b\]{color}(?:synopsis|plot|overview|cast|casting)\s*:?\[/color\]\[/b\][ \t]*\n(?:[^\n]*\n?)?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        desc = re.sub(rf"^{styled}[^\[\n]*\(\d{{4}}\){deco}$\n?", "", desc, flags=re.MULTILINE)
+        # "Synopsis:" / "cast:" / "By:" labels with their value: the rest of the line
+        # and, when the paragraph follows on the next line, that line or [quote] block
+        label = r"(?:synopsis|plot|overview|cast|casting|by|director|directed by)\s*:?"
+        desc = re.sub(
+            rf"^{styled}{label}{deco}[^\n]*\n?(?:[ \t]*(?:\[quote\][\s\S]*?\[/quote\]|[^\[\n][^\n]*)[^\n]*\n?)?",
+            "",
+            desc,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
         # [table] made of metadata rows only (Genre / Rating / Release Date / Language / …)
         info_row = r"\s*\[tr\]\s*\[td\](?:genre|rating|release date|language|runtime|director|year|country|imdb|tmdb)s?\[/td\]\s*\[td\][^\[]*\[/td\]\s*\[/tr\]"
         desc = re.sub(rf"\[table\](?:{info_row})+\s*\[/table\]\s*", "", desc, flags=re.IGNORECASE)
         # Trailer link line
         desc = re.sub(r"^[ \t]*(?:\[b\])?\[url=https?://(?:www\.)?youtu[^\]]*\]\[?Trailer[^\[]*\]?\[/url\](?:\[/b\])?[ \t]*\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
-        # Empty table skeletons ([tr][td][/td]…[/tr] with nothing inside)
-        desc = re.sub(r"(?:\s*\[tr\](?:\s*\[td\]\s*\[/td\])+\s*\[/tr\])+\s*", "\n", desc, flags=re.IGNORECASE)
+        # Empty table skeletons ([tr][td][/td]…[/tr] with nothing inside), possibly centered
+        desc = re.sub(r"(?:\[center\])?(?:\s*\[tr\](?:\s*\[td\]\s*\[/td\])+\s*\[/tr\])+\s*(?:\[/center\])?\s*", "\n", desc, flags=re.IGNORECASE)
         return desc
 
     @staticmethod
@@ -608,6 +619,7 @@ class BBCODE:
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
             r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created with mkbrr, ffmpeg,? and mediainfo",
+            r"This release is sourced from [\w+ ]{1,30} and is not transcoded, just remuxed from the direct [\w+ ]{1,30} stream",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
             desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
@@ -666,6 +678,8 @@ class BBCODE:
         # A dropped header line may have carried the opening [hN] of a block
         # that continues below it: sweep the now-unmatched heading tags.
         desc = _drop_unmatched(desc, r"\[/?h[1-6]\]")
+        # Bot fiches are often unbalanced ([/center] without its opener): sweep those too.
+        desc = _drop_unmatched(desc, r"\[/?center\]")
 
         # Strip trailing whitespace and newlines:
         desc = desc.rstrip()

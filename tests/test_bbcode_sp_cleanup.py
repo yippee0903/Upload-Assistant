@@ -314,6 +314,23 @@ def test_bot_generated_fiche_is_emptied() -> None:
     assert cleaned == ""
 
 
+_BOT_FICHE_QUOTED = (
+    "[center][b][color=#ff00ff][size=18]This release is sourced from Netflix and is not transcoded, just remuxed from the direct Netflix stream[/size][/color][/b][/center]\n"
+    "[center][center][b][size=18][color=#2E86C1]Example Movie (2026)[/color][/size][/b][/center]\n\n"
+    "[center][b][size=16][color=#117A65]By:[/color][/size][/b] [i]Some Director[/i][/center]\n\n"
+    "[b][size=15][color=#6C3483]Synopsis:[/color][/size][/b]\n[quote]A paragraph about the plot.[/quote]\n\n"
+    "[center][tr]\n[td][/td]\n[td][/td]\n[/tr][/center]\n\n"
+    "[b][size=15][color=#2E86C1]cast:[/color][/size][/b]\n[quote]Actor One, Actor Two[/quote]\n[/center]\n[center]\n"
+)
+
+
+def test_quoted_bot_fiche_variant_is_emptied() -> None:
+    cleaned, _ = BBCODE().clean_unit3d_description(_BOT_FICHE_QUOTED, "https://example-tracker.org")
+    assert cleaned == ""
+    cleaned, _ = BBCODE().clean_unit3d_description("Encoded from UHD.\n\n" + _BOT_FICHE_QUOTED + "\nSeed please.", "https://example-tracker.org")
+    assert cleaned.split() == ["Encoded", "from", "UHD.", "Seed", "please."]
+
+
 def test_uploader_notes_survive_the_fiche_cleanup() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description("Encoded from the UHD source.\n\n" + _BOT_FICHE + "\nSeed please.", "https://example-tracker.org")
     assert cleaned == "Encoded from the UHD source.\nSeed please."
