@@ -561,6 +561,7 @@ class BBCODE:
             r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
             r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
+            r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
             desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)

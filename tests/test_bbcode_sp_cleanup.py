@@ -287,6 +287,13 @@ def test_only_uploader_signature_is_removed() -> None:
     assert "Kept." in cleaned and "Also kept." in cleaned
 
 
+def test_onlyencodes_signature_is_removed() -> None:
+    desc = "Kept.\n[center]OnlyEncodes Upload Assistant[/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "OnlyEncodes" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
+
+
 def test_h3_wrapped_ornament_header_and_leftover_close_are_removed() -> None:
     desc = (
         "[h3][center]•❅───✧❅✦ [color=#F69047]Screenshots[/color]"
