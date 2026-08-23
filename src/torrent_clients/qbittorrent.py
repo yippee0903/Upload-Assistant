@@ -281,7 +281,7 @@ class QbittorrentClientMixin:
             ssl_context.verify_mode = ssl.CERT_NONE
         return ssl_context
 
-    async def _check_qbit_reachable(self, client: dict[str, Any], attempts: int = 3, timeout: float = 10.0, retry_delay: float = 5.0) -> bool:
+    async def _check_qbit_reachable(self, client: dict[str, Any], attempts: int = 3, timeout: float = 30.0, retry_delay: float = 5.0) -> bool:
         """Return True when the qBittorrent API (direct or via proxy) responds.
 
         The result is cached per process by the caller, so a false negative
@@ -1093,14 +1093,19 @@ class QbittorrentClientMixin:
                     async with qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add", data=fd) as r:
                         return r.status
 
-                try:
-                    status = await _proxy_add()
-                    if status in (502, 503, 504):
-                        await asyncio.sleep(3)
+                # qui answers 502 as soon as its own upstream timeout hits a slow
+                # qBittorrent; the client was measured stalling for ~15 s at a time,
+                # so spread the attempts wider than one stall.
+                status = 0
+                for attempt in range(4):
+                    if attempt:
+                        await asyncio.sleep(10)
+                    try:
                         status = await _proxy_add()
-                except (asyncio.TimeoutError, aiohttp.ClientError):
-                    await asyncio.sleep(3)
-                    status = await _proxy_add()
+                    except (asyncio.TimeoutError, aiohttp.ClientError):
+                        status = 0
+                    if status not in (0, 502, 503, 504):
+                        break
                 if status != 200:
                     console.print(f"[bold red]Failed to add torrent via proxy: {status}")
                     await qbt_session.close()

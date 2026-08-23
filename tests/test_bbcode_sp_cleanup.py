@@ -76,7 +76,8 @@ def test_seedpool_sentence_with_other_tool_name_is_removed():
     desc = "[b][size=12][color=#757575]Created with mkbrr, ffmpeg, and mediainfo. Posted to this fine tracker with seed-tools.[/color][/size][/b]"
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://seedpool.org")
     assert "Posted to this fine tracker" not in cleaned
-    assert "Created with mkbrr, ffmpeg, and mediainfo." in cleaned
+    # The tool-credit sentence is a bot signature too, dropped on its own.
+    assert cleaned == ""
 
 
 def test_seedpool_sentence_does_not_eat_following_text():
@@ -280,10 +281,61 @@ def test_pm_uploader_reseed_line_is_removed() -> None:
     assert "Kept." in cleaned and "Also kept." in cleaned
 
 
+_MI_SPOILER = "[center][spoiler=Example.S01E0{n}.1080p.WEB-GRP]\n[b]General[/b]\n[b]Format:[/b] Matroska\n[/spoiler][/center]"
+
+
+def test_generated_pack_mediainfo_spoilers_are_dropped() -> None:
+    desc = "Intro.\n" + _MI_SPOILER.format(n=2) + "\n[center][spoiler=Other files]\n" + _MI_SPOILER.format(n=3) + "\n[/spoiler][/center]\n[center]Example.S01E01.1080p.WEB-GRP[/center]\nOutro."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "General" not in cleaned and "Other files" not in cleaned and "S01E01" not in cleaned
+    assert "Intro." in cleaned and "Outro." in cleaned
+
+
+def test_non_mediainfo_spoilers_are_kept() -> None:
+    desc = "[center][spoiler=NFO][code]nfo[/code][/spoiler][/center]\n[spoiler=Notes]Source notes[/spoiler]"
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "[spoiler=NFO]" in cleaned and "[spoiler=Notes]" in cleaned
+
+
+_BOT_FICHE = (
+    "[b][color=#2E86C1]Example Show (2024)[/color][/b]\n\n"
+    "[b][color=#6C3483]Synopsis:[/color][/b]\nA paragraph about the plot.\n\n"
+    "[tr]\n[td][/td]\n[td][/td]\n[/tr]\n\n"
+    "[table]\n[tr]\n[td]Genre[/td]\n[td]Drama[/td]\n[/tr]\n[tr]\n[td]Rating[/td]\n[td]7.5/10[/td]\n[/tr]\n"
+    "[tr]\n[td]Release Date[/td]\n[td]2024-07-10[/td]\n[/tr]\n[tr]\n[td]Language[/td]\n[td]EN[/td]\n[/tr]\n[/table]\n\n"
+    "[b][color=#2E86C1]cast:[/color][/b]\nActor One, Actor Two\n\n"
+    "[b][url=https://www.youtube.com/watch?v=abc][Trailer on YouTube][/url][/b]\n\n"
+    "[b][color=#757575]Created with mkbrr, ffmpeg, and mediainfo.[/color][/b]"
+)
+
+
+def test_bot_generated_fiche_is_emptied() -> None:
+    cleaned, _ = BBCODE().clean_unit3d_description(_BOT_FICHE, "https://example-tracker.org")
+    assert cleaned == ""
+
+
+def test_uploader_notes_survive_the_fiche_cleanup() -> None:
+    cleaned, _ = BBCODE().clean_unit3d_description("Encoded from the UHD source.\n\n" + _BOT_FICHE + "\nSeed please.", "https://example-tracker.org")
+    assert cleaned == "Encoded from the UHD source.\nSeed please."
+
+
+def test_hand_written_table_and_text_are_kept() -> None:
+    desc = "[table][tr][td]Source[/td][td]UHD BluRay[/td][/tr][/table]\nSynopsis: a hand-written one-liner."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert cleaned == desc
+
+
 def test_only_uploader_signature_is_removed() -> None:
     desc = "Kept.\n[center][b]Brought to you by Only-Uploader [/b][/center]\nAlso kept."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Only-Uploader" not in cleaned
+    assert "Kept." in cleaned and "Also kept." in cleaned
+
+
+def test_onlyencodes_signature_is_removed() -> None:
+    desc = "Kept.\n[center]OnlyEncodes Upload Assistant[/center]\nAlso kept."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert "OnlyEncodes" not in cleaned
     assert "Kept." in cleaned and "Also kept." in cleaned
 
 

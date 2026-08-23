@@ -107,6 +107,10 @@ class NameManager:
             year = ""
         if meta.get("no_aka", False) is True:
             alt_title = ""
+        # The AKA was chosen against an earlier (filename-derived) title; drop it
+        # when it merely repeats the final one ("Ranma ½ AKA Ranma ½").
+        if re.sub(r"^AKA\s+", "", alt_title, flags=re.IGNORECASE).strip().casefold() == title.strip().casefold():
+            alt_title = ""
         if meta["debug"]:
             console.log("[cyan]get_name cat/type")
             console.log(f"CATEGORY: {meta['category']}")

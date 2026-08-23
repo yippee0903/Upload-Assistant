@@ -417,6 +417,44 @@ class BBCODE:
 
         return desc, imagelist
 
+    @staticmethod
+    def _strip_generated_metadata(desc: str) -> str:
+        """Remove the title/synopsis/info-table/cast/trailer sections a bot-built fiche carries.
+
+        The tool regenerates all of them (and UNIT3D shows them on the fiche anyway);
+        only unrecognised free text — encode notes, source info — is worth keeping.
+        Each section is matched by its shape, never by its content.
+        """
+        color = r"\[color=[^\]]*\]"
+        # "[b][color=…]Title (2024)[/color][/b]" alone on its line
+        desc = re.sub(rf"^[ \t]*\[b\]{color}[^\[\n]*\(\d{{4}}\)\[/color\]\[/b\][ \t]*\n?", "", desc, flags=re.MULTILINE)
+        # "Synopsis:" / "cast:" headers with the paragraph that follows them
+        desc = re.sub(rf"^[ \t]*\[b\]{color}(?:synopsis|plot|overview|cast|casting)\s*:?\[/color\]\[/b\][ \t]*\n(?:[^\n]*\n?)?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # [table] made of metadata rows only (Genre / Rating / Release Date / Language / …)
+        info_row = r"\s*\[tr\]\s*\[td\](?:genre|rating|release date|language|runtime|director|year|country|imdb|tmdb)s?\[/td\]\s*\[td\][^\[]*\[/td\]\s*\[/tr\]"
+        desc = re.sub(rf"\[table\](?:{info_row})+\s*\[/table\]\s*", "", desc, flags=re.IGNORECASE)
+        # Trailer link line
+        desc = re.sub(r"^[ \t]*(?:\[b\])?\[url=https?://(?:www\.)?youtu[^\]]*\]\[?Trailer[^\[]*\]?\[/url\](?:\[/b\])?[ \t]*\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # Empty table skeletons ([tr][td][/td]…[/tr] with nothing inside)
+        desc = re.sub(r"(?:\s*\[tr\](?:\s*\[td\]\s*\[/td\])+\s*\[/tr\])+\s*", "\n", desc, flags=re.IGNORECASE)
+        return desc
+
+    @staticmethod
+    def _strip_generated_pack_blocks(desc: str) -> str:
+        """Remove the per-file MediaInfo spoilers and filename headers of a generated pack description."""
+        mediainfo_spoiler = re.compile(r"\[spoiler=[^\]]*\]\s*\[b\]General\[/b\](?:(?!\[spoiler)[\s\S])*?\[/spoiler\]", re.IGNORECASE)
+        if not mediainfo_spoiler.search(desc):
+            return desc
+        # Innermost first, until none is left
+        while True:
+            desc, n = mediainfo_spoiler.subn("", desc)
+            if not n:
+                break
+        # Now-empty "Other files" wrapper and the filename-only headers
+        desc = re.sub(r"\[spoiler=Other files\](?:\s|\[/?center\])*\[/spoiler\]", "", desc, flags=re.IGNORECASE)
+        desc = re.sub(r"\[center\]\s*[^\s\[\]]+\.[^\s\[\]]+-[\w.]+\s*\[/center\]", "", desc)
+        return desc
+
     def clean_unit3d_description(self, desc: str, site: str) -> tuple[str, list[dict[str, Any]]]:
         # Unescape HTML
         desc = html.unescape(desc)
@@ -439,6 +477,13 @@ class BBCODE:
         # Bare mentions only: a host that is part of a URL or a subdomain
         # (cdn.<site>, i.<site>) must keep its TLD or the link breaks.
         desc = re.sub(rf"(?<![\w./-]){re.escape(site_netloc)}(?![\w-]|\.\w)", site_domain, desc)
+
+        # A description reused from another tracker may itself be a generated
+        # pack description: per-file MediaInfo spoilers (nested under "Other
+        # files") and a bare filename header. Those get regenerated for this
+        # upload, so keeping them would print every file's MediaInfo twice.
+        desc = self._strip_generated_pack_blocks(desc)
+        desc = self._strip_generated_metadata(desc)
 
         # Temporarily hide spoiler tags
         spoilers = re.findall(r"\[spoiler[\s\S]*?\[\/spoiler\]", desc)
@@ -561,6 +606,8 @@ class BBCODE:
             r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
             r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
+            r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
+            r"Created with mkbrr, ffmpeg,? and mediainfo",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
             desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
