@@ -618,6 +618,7 @@ class BBCODE:
             r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
             r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
             r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
+            r"OnlyEncodes Uploader(?:\s*[-–]\s*Powered by L4G'?s Upload Assistant)?",
             r"Created with mkbrr, ffmpeg,? and mediainfo",
             r"This release is sourced from [\w+ ]{1,30} and is not transcoded, just remuxed from the direct [\w+ ]{1,30} stream",
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
