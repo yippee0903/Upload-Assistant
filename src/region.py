@@ -2068,7 +2068,7 @@ async def get_service(
         'DLWP': 'DLWP', 'DailyWire+': 'DLWP', 'DRTV': 'DRTV', 'FBW': 'FBW',
         'FLMN': 'FLMN', 'Filmin': 'FLMN', 'FNDG': 'FNDG', 'Fandango at Home': 'FNDG', 'FSTV': 'FSTV', 'Fawsome TV': 'FSTV',
         'FUBO': 'FUBO', 'FuboTV': 'FUBO', 'GAGA': 'GAGA', 'HPLAY': 'HPLAY', 'Hungama Play': 'HPLAY',
-        'INFP': 'INFP', 'Infinity+': 'INFP', 'IVI': 'IVI', 'Ivi.ru': 'IVI', 'JHS': 'JHS', 'JioHotstar': 'JHS',
+        'INFP': 'INFP', 'Infinity+': 'INFP', 'IVI': 'IVI', 'Ivi.ru': 'IVI', 'JHS': 'JHS', 'JIOHS': 'JHS', 'JioHotstar': 'JHS',
         'KF': 'KF', 'KlikFilm': 'KF', 'KPN': 'KPN', 'LGP': 'LGP', 'Lionsgate Play': 'LGP', 'LeTV': 'LeTV', 'Le.com': 'LeTV',
         'MELI': 'MELI', 'Mercado Play': 'MELI', 'MMAX': 'MMAX', 'ManoramaMAX': 'MMAX', 'MS': 'MS', 'Microsoft Store': 'MS',
         'MX': 'MX', 'MONOMAX': 'MX', 'MY5': 'MY5', 'Channel 5': 'MY5', 'NPO': 'NPO', 'NPO Start': 'NPO',
