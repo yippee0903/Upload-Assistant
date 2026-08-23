@@ -234,7 +234,7 @@ class FrenchNamingMixin:
 
     async def french_synopsis(self, meta: Meta, fr_data: dict[str, Any]) -> str:
         """Synopsis for a French fiche: TMDB French, else the IMDb French plot, else TMDB English."""
-        synopsis = str(fr_data.get("overview", "")).strip()
+        synopsis = str(fr_data.get("overview") or "").strip()
         if not synopsis and meta.get("imdb_id"):
             from src.imdb import imdb_manager
 

@@ -347,6 +347,12 @@ def test_uploader_notes_survive_the_fiche_cleanup() -> None:
     assert cleaned == "Encoded from the UHD source.\nSeed please."
 
 
+def test_styled_word_starting_with_a_label_is_kept() -> None:
+    desc = "[b]Byzantine[/b] architecture notes.\n[b]Plotting[/b] the course."
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")
+    assert cleaned == desc
+
+
 def test_hand_written_table_and_text_are_kept() -> None:
     desc = "[table][tr][td]Source[/td][td]UHD BluRay[/td][/tr][/table]\nSynopsis: a hand-written one-liner."
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://example-tracker.org")

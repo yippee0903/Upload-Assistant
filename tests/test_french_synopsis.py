@@ -29,6 +29,15 @@ def test_english_overview_is_the_last_resort(monkeypatch: Any) -> None:
     assert _synopsis(monkeypatch, "", "") == "English overview."
 
 
+def test_null_tmdb_overview_falls_through(monkeypatch: Any) -> None:
+    async def fake_plot(imdb_id_arg: Any, language: str) -> str:
+        return "Résumé IMDb."
+
+    monkeypatch.setattr(imdb_module.imdb_manager, "get_imdb_plot", fake_plot)
+    meta: dict[str, Any] = {"imdb_id": 1, "overview": "English overview."}
+    assert asyncio.run(FrenchNamingMixin().french_synopsis(meta, {"overview": None})) == "Résumé IMDb."
+
+
 def test_no_imdb_id_skips_the_lookup(monkeypatch: Any) -> None:
     async def boom(*args: Any, **kwargs: Any) -> str:
         raise AssertionError("must not be called")

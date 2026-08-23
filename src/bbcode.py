@@ -434,7 +434,7 @@ class BBCODE:
         desc = re.sub(rf"^{styled}[^\[\n]*\(\d{{4}}\){deco}$\n?", "", desc, flags=re.MULTILINE)
         # "Synopsis:" / "cast:" / "By:" labels with their value: the rest of the line
         # and, when the paragraph follows on the next line, that line or [quote] block
-        label = r"(?:synopsis|plot|overview|cast|casting|by|director|directed by)\s*:?"
+        label = r"(?:synopsis|plot|overview|cast|casting|by|director|directed by)\b\s*:?"
         desc = re.sub(
             rf"^{styled}{label}{deco}[^\n]*\n?(?:[ \t]*(?:\[quote\][\s\S]*?\[/quote\]|[^\[\n][^\n]*)[^\n]*\n?)?",
             "",
