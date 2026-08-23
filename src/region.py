@@ -2066,7 +2066,7 @@ async def get_service(
         'BEAM': 'BEAM', 'Beamafilm': 'BEAM', 'BK': 'BK', 'Bentkey': 'BK', 'CLBI': 'CLBI', 'Club illico': 'CLBI',
         'CM': 'CM', 'CineMember': 'CM', 'CNB': 'CNB', 'Cinobo': 'CNB', 'CRZN': 'CRZN', 'Curzon': 'CRZN',
         'DLWP': 'DLWP', 'DailyWire+': 'DLWP', 'DRTV': 'DRTV', 'FBW': 'FBW',
-        'FLMN': 'FLMN', 'Filmin': 'FLMN', 'FNDG': 'FNDG', 'Fandango at Home': 'FNDG', 'FSTV': 'FSTV', 'Fawsome TV': 'FSTV',
+        'FLMN': 'FLMN', 'Filmin': 'FLMN', 'FNDG': 'FNDG', 'Fandango at Home': 'FNDG', 'FSTV': 'FSTV', 'Fawesome TV': 'FSTV',
         'FUBO': 'FUBO', 'FuboTV': 'FUBO', 'GAGA': 'GAGA', 'HPLAY': 'HPLAY', 'Hungama Play': 'HPLAY',
         'INFP': 'INFP', 'Infinity+': 'INFP', 'IVI': 'IVI', 'Ivi.ru': 'IVI', 'JHS': 'JHS', 'JIOHS': 'JHS', 'JioHotstar': 'JHS',
         'KF': 'KF', 'KlikFilm': 'KF', 'KPN': 'KPN', 'LGP': 'LGP', 'Lionsgate Play': 'LGP', 'LeTV': 'LeTV', 'Le.com': 'LeTV',

@@ -23,4 +23,4 @@ def test_aka_identical_to_title_is_dropped() -> None:
 
 
 def test_different_aka_is_kept() -> None:
-    assert _name("AKA Something Else").startswith("Ranma ½ AKA Something Else ")
+    assert _name("AKA Something Else") == "Ranma ½ AKA Something Else S01 1080p NF WEB-DL AAC 2.0 H.264"

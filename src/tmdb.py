@@ -75,6 +75,7 @@ class TmdbManager:
         mode: str = "discord",
         category_preference: Optional[str] = None,
         imdb_info: Optional[dict[str, Any]] = None,
+        unattended: bool = False,
     ) -> tuple[str, Union[int, str], str, bool]:
         return await get_tmdb_from_imdb(
             imdb_id=imdb_id,
@@ -85,6 +86,7 @@ class TmdbManager:
             mode=mode,
             category_preference=category_preference,
             imdb_info=imdb_info,
+            unattended=unattended,
         )
 
     async def get_tmdb_id(
@@ -464,11 +466,11 @@ async def get_tmdb_from_imdb(
 
     # Try as movie first
     fallback_movie_title = str(imdb_info.get("original title") or imdb_info.get("localized title") or "")
-    tmdb_id, category = await get_tmdb_id(title, year, "MOVIE", secondary_title=fallback_movie_title, debug=debug)
+    tmdb_id, category = await get_tmdb_id(title, year, "MOVIE", secondary_title=fallback_movie_title, debug=debug, unattended=unattended)
 
     # If no results, try as TV
     if tmdb_id == 0:
-        tmdb_id, category = await get_tmdb_id(title, year, "TV", secondary_title=fallback_movie_title, debug=debug)
+        tmdb_id, category = await get_tmdb_id(title, year, "TV", secondary_title=fallback_movie_title, debug=debug, unattended=unattended)
 
     # Extract necessary values from the result
     tmdb_id = tmdb_id or 0

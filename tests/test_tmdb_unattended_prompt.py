@@ -32,8 +32,9 @@ class _NoResultClient:
         return _EmptyResponse()
 
 
-def _stub_lookups(monkeypatch: Any) -> None:
+def _stub_lookups(monkeypatch: Any, expect_unattended: bool) -> None:
     async def no_search(*args: Any, **kwargs: Any) -> tuple[int, str]:
+        assert kwargs.get("unattended", False) is expect_unattended
         return 0, "MOVIE"
 
     def closed_stdin(*args: Any, **kwargs: Any) -> str:
@@ -45,12 +46,19 @@ def _stub_lookups(monkeypatch: Any) -> None:
 
 
 def test_unattended_returns_no_id_instead_of_prompting(monkeypatch: Any) -> None:
-    _stub_lookups(monkeypatch)
+    _stub_lookups(monkeypatch, expect_unattended=True)
     category, tmdb_id, _, _ = asyncio.run(tmdb.get_tmdb_from_imdb("tt1234567", None, 2026, "Example.Release.2026.1080p-GRP", mode="cli", imdb_info={"title": "Example"}, unattended=True))
     assert (category, tmdb_id) == ("MOVIE", 0)
 
 
+def test_manager_wrapper_forwards_unattended(monkeypatch: Any) -> None:
+    _stub_lookups(monkeypatch, expect_unattended=True)
+    manager = tmdb.TmdbManager({"DEFAULT": {"tmdb_api": "fake-key"}})
+    _, tmdb_id, _, _ = asyncio.run(manager.get_tmdb_from_imdb("tt1234567", None, 2026, "Example.Release.2026.1080p-GRP", mode="cli", imdb_info={"title": "Example"}, unattended=True))
+    assert tmdb_id == 0
+
+
 def test_interactive_still_prompts(monkeypatch: Any) -> None:
-    _stub_lookups(monkeypatch)
+    _stub_lookups(monkeypatch, expect_unattended=False)
     with pytest.raises(EOFError):
         asyncio.run(tmdb.get_tmdb_from_imdb("tt1234567", None, 2026, "Example.Release.2026.1080p-GRP", mode="cli", imdb_info={"title": "Example"}))
