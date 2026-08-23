@@ -623,6 +623,9 @@ class BBCODE:
             r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
         ):
             desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # Group signatures pointing at another tracker's search page
+        # ("Find our uploads [url=…]here[/url]"), wherever they sit on the line.
+        desc = re.sub(r"(?:\[center\])?\s*Find (?:our|my) uploads\s*\[url=[^\]]*\][^\[]*\[/url\]\.?\s*(?:\[/center\])?", "", desc, flags=re.IGNORECASE)
         # UNIT3D-internal [note] tags: drop empty blocks, unwrap the rest
         desc = re.sub(r"\[note\]\s*\[/note\]\s*", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[/?note\]", "", desc, flags=re.IGNORECASE)

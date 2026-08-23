@@ -331,6 +331,17 @@ def test_quoted_bot_fiche_variant_is_emptied() -> None:
     assert cleaned.split() == ["Encoded", "from", "UHD.", "Seed", "please."]
 
 
+def test_find_our_uploads_link_is_removed_but_source_notes_stay() -> None:
+    desc = (
+        "[h3][center][color=#F4AACA]Source 1[/color]: CR Video and Subtitles.\n"
+        "[color=#F4AACA]Source 2[/color]: AMZN Audio.\n"
+        "[center]Find our uploads [url=https://example-tracker.org/torrents?name=GRP]🐾 here 🐾[/url][/center][/h3]\n[center]\n"
+    )
+    cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://other-tracker.org")
+    assert "Find our uploads" not in cleaned and "[url=" not in cleaned
+    assert "Source 1" in cleaned and "AMZN Audio" in cleaned
+
+
 def test_uploader_notes_survive_the_fiche_cleanup() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description("Encoded from the UHD source.\n\n" + _BOT_FICHE + "\nSeed please.", "https://example-tracker.org")
     assert cleaned == "Encoded from the UHD source.\nSeed please."
@@ -360,12 +371,12 @@ def test_h3_wrapped_ornament_header_and_leftover_close_are_removed() -> None:
     desc = (
         "[h3][center]•❅───✧❅✦ [color=#F69047]Screenshots[/color]"
         " ✦❅✧───❅•[/center]\n\n"
-        "[center]Find our uploads [url=https://example.com/torrents?name=Group]here[/url][/center][/h3]"
+        "[center]Encoded from the UHD source.[/center][/h3]"
     )
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
     assert "Screenshots" not in cleaned
     assert "[/h3]" not in cleaned
-    assert "Find our uploads" in cleaned
+    assert "Encoded from the UHD source." in cleaned
     matched = "[h3]intro[/h3]\nBody."
     cleaned2, _ = BBCODE().clean_unit3d_description(matched, "https://lst.gg")
     assert "[h3]intro[/h3]" in cleaned2
