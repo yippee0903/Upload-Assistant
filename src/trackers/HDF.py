@@ -405,7 +405,6 @@ class HDF(FrenchTrackerMixin):
             fr_data = await self.tmdb_manager.get_tmdb_localized_data(meta, data_type="main", language="fr", append_to_response="credits") or {}
 
         fr_title = str(fr_data.get("title", "") or meta.get("title", "")).strip()
-        fr_overview = str(fr_data.get("overview", "")).strip()
         year = meta.get("year", "")
         tagline = str(fr_data.get("tagline", "")).strip()
 
@@ -515,7 +514,7 @@ class HDF(FrenchTrackerMixin):
         #  Synopsis
         # ══════════════════════════════════════════════════════
         parts.append(f"[b][color={C}][size=18]━━━ Synopsis ━━━[/size][/color][/b]")
-        synopsis = fr_overview or str(meta.get("overview", "")).strip() or "Aucun synopsis disponible."
+        synopsis = await self.french_synopsis(meta, fr_data) or "Aucun synopsis disponible."
         parts.append(synopsis)
         parts.append("")
 
