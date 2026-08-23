@@ -222,15 +222,27 @@ class COMMON:
         path = f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}_cross].torrent" if cross else f"{meta['base_dir']}/tmp/{meta['uuid']}/[{tracker}].torrent"
         if downurl:
             try:
-                async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0, follow_redirects=True) as session, session.stream("GET", downurl) as r:
-                    r.raise_for_status()
-                    content_type = r.headers.get("content-type", "")
-                    if "text/html" in content_type:
-                        console.print("[yellow]Warning: Torrent download returned HTML instead of a torrent file (possible auth/redirect issue).[/yellow]")
-                        return None
-                    async with aiofiles.open(path, "wb") as f:
-                        async for chunk in r.aiter_bytes():
-                            await f.write(chunk)
+                # The upload already went through: a transient network failure here
+                # would leave a live torrent with nothing seeding it, so retry a few
+                # times with enough spacing to outlast a short connectivity blip.
+                for attempt in range(4):
+                    if attempt:
+                        console.print(f"[yellow]Torrent download failed, retrying in 10s… (attempt {attempt + 1}/4)[/yellow]")
+                        await asyncio.sleep(10)
+                    try:
+                        async with httpx.AsyncClient(headers=headers, params=params, timeout=30.0, follow_redirects=True) as session, session.stream("GET", downurl) as r:
+                            r.raise_for_status()
+                            content_type = r.headers.get("content-type", "")
+                            if "text/html" in content_type:
+                                console.print("[yellow]Warning: Torrent download returned HTML instead of a torrent file (possible auth/redirect issue).[/yellow]")
+                                return None
+                            async with aiofiles.open(path, "wb") as f:
+                                async for chunk in r.aiter_bytes():
+                                    await f.write(chunk)
+                        break
+                    except (httpx.TransportError, httpx.HTTPStatusError):
+                        if attempt == 3:
+                            raise
 
                 if cross:
                     return None
