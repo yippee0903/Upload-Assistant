@@ -9,7 +9,7 @@ bencode.py==4.1.0
 cli-ui==0.19.0
 click==8.4.2
 cloudscraper==1.2.71
-cryptography==50.0.0
+cryptography==50.0.1
 defusedxml==0.7.1
 deluge-client==1.10.2
 discord.py==2.7.1
