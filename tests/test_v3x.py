@@ -389,6 +389,21 @@ class TestDescription:
         assert desc.index("━━━ Release ━━━") < desc.index("━━━ Captures d'écran ━━━")
         assert "[url=https://github.com/yippee0903/Upload-Assistant]" in desc  # linked signature
 
+    def test_postimg_screenshots_embed_full_size(self, monkeypatch: Any, tmp_path: Any):
+        # postimg thumbnails are 180px: the stored full-size image is embedded instead
+        tracker = self._tracker(monkeypatch, localized=None)
+        meta = {
+            "base_dir": str(tmp_path),
+            "uuid": "Some.Movie.2024.2160p.WEB-GRP",
+            "overview": "Fallback.",
+            "image_list": [
+                {"img_url": "https://i.postimg.cc/t1/x.png", "raw_url": "https://i.postimg.cc/r1/x.png", "web_url": "https://postimg.cc/p1"},
+            ],
+        }
+        desc = asyncio.run(tracker._build_description(meta))
+        assert "[url=https://postimg.cc/p1][img]https://i.postimg.cc/r1/x.png[/img][/url]" in desc
+        assert "https://i.postimg.cc/t1/x.png" not in desc
+
     def test_description_survives_missing_data(self, monkeypatch: Any, tmp_path: Any):
         tracker = self._tracker(monkeypatch, localized=None)
         desc = asyncio.run(tracker._build_description({"base_dir": str(tmp_path), "uuid": "x", "overview": "Fallback only."}))
