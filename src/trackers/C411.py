@@ -51,9 +51,13 @@ class C411(FrenchTrackerMixin):
         self.upload_url: str = "https://c411.org/api/torrents"
         self.torrent_url: str = "https://c411.org/torrents/"
         self.api_key: str = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "")).strip()
-        # Hosts verified to actually render on the site; other common hosts
-        # (ptscreens, lostimg) come out as dead images there.
-        self.approved_image_hosts = ["pixhost", "imgbb", "onlyimage", "imgbox", "postimg"]
+        # The site's front-end only renders images from a fixed hostname
+        # whitelist. pixhost is whitelisted for servers 0-3 only while pixhost
+        # picks the storage server per upload, and imgbox thumbnail hostnames
+        # are not whitelisted at all, so both randomly come out as dead
+        # images; keep only hosts whose hostnames are always whitelisted
+        # (i.ibb.co, img.onlyimage.org, i.postimg.cc).
+        self.approved_image_hosts = ["imgbb", "onlyimage", "postimg"]
         self.tmdb_manager = TmdbManager(config)
         _reserved_note = "Internal C411 group: reserved for the team's own uploads"
         self.banned_groups: list[Any] = ["k0RE"] + [

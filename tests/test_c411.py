@@ -1430,6 +1430,12 @@ class TestDescription:
     def test_postimg_is_an_approved_host(self):
         assert 'postimg' in C411(_config()).approved_image_hosts
 
+    def test_approved_hosts_match_site_hostname_whitelist(self):
+        # The site whitelists exact hostnames: pixhost only on servers 0-3
+        # and imgbox thumbnails not at all, so neither may be approved.
+        approved = C411(_config()).approved_image_hosts
+        assert approved == ['imgbb', 'onlyimage', 'postimg']
+
     def test_screenshots_excluded_by_default(self):
         meta = _meta_base(image_list=[
             {'raw_url': 'https://img.host/1.png', 'web_url': 'https://img.host/view/1'},
