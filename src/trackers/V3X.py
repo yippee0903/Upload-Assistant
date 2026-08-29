@@ -29,6 +29,7 @@ import contextlib
 import os
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import aiofiles
 import defusedxml.ElementTree as ET
@@ -38,6 +39,7 @@ from unidecode import unidecode
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.imagehosts import host_slug
 from src.nfo_generator import decode_nfo, is_multi_episode_nfo
 from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
@@ -542,11 +544,16 @@ class V3X(FrenchTrackerMixin):
         image_list = meta.get(f"{self.tracker}_images_key") or meta.get("image_list") or []
         if image_list and self.config["TRACKERS"].get(self.tracker, {}).get("include_screenshots", True):
             parts.append(f"[b][color={C}][size=130]━━━ Captures d'écran ━━━[/size][/color][/b]")
-            thumbs = [
-                f"[url={img.get('web_url') or img.get('raw_url', '')}][img]{img.get('img_url') or img.get('raw_url', '')}[/img][/url]"
-                for img in image_list
-                if img.get("img_url") or img.get("raw_url")
-            ]
+            thumbs: list[str] = []
+            for img in image_list:
+                thumb = img.get("img_url") or img.get("raw_url", "")
+                if not thumb:
+                    continue
+                # postimg thumbnails are 180px, too small to judge a capture:
+                # embed its stored (already downscaled) image instead.
+                if host_slug(urlparse(thumb).hostname or "") == "postimg":
+                    thumb = img.get("raw_url", "") or thumb
+                thumbs.append(f"[url={img.get('web_url') or img.get('raw_url', '')}][img]{thumb}[/img][/url]")
             parts.extend(" ".join(thumbs[i : i + 2]) for i in range(0, len(thumbs), 2))
 
         parts.append("[/center]")
