@@ -73,7 +73,7 @@ Many thanks to all who have contributed.
 |-|:-:|-|:-:|
 |Aither|AITHER|Alpharatio|AR|
 |Amigos-Share|ASC|Anthelion|ANT|
-|AsianCinema|ACM|||
+|AsianCinema|ACM|C411|C411|
 |AvistaZ|AZ|Beyond-HD|BHD|
 |BitHDTV|BHDTV|Blutopia|BLU|
 |BrasilJapão-Share|BJS|BrasilTracker|BT|
