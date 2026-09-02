@@ -46,14 +46,18 @@ class _FakeClient:
         pass
 
     async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
-        _FakeClient.captured = {"url": url, **kwargs}
+        _FakeClient.captured = {"method": "GET", "url": url, **kwargs}
         _FakeClient.calls.append(_FakeClient.captured)
         return _FakeClient.response
 
     async def post(self, url: str, **kwargs: Any) -> _FakeResponse:
-        _FakeClient.captured = {"url": url, **kwargs}
+        _FakeClient.captured = {"method": "POST", "url": url, **kwargs}
         _FakeClient.calls.append(_FakeClient.captured)
         return _FakeClient.response
+
+
+def _posts() -> list[dict[str, Any]]:
+    return [c for c in _FakeClient.calls if c.get("method") == "POST"]
 
 
 def _entry(name: str, size: int = 1000, torrent_id: str = "Xk3Qm9") -> dict[str, Any]:
@@ -203,10 +207,14 @@ class TestUpload:
         async def fake_fr_title(meta: Any) -> str:
             return "Un Film"
 
+        class _FakeTorrent:
+            infohash = "ab" * 20
+
         monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
         monkeypatch.setattr(tracker, "get_name", fake_get_name)
         monkeypatch.setattr(tracker, "_build_description", fake_desc)
         monkeypatch.setattr(tracker, "_get_french_title", fake_fr_title)
+        monkeypatch.setattr(drau_module.Torrent, "read", staticmethod(lambda _path: _FakeTorrent()))
 
     def test_upload_sends_required_contract(self, monkeypatch: Any, tmp_path: Any):
         tracker = DRAU(_config())
@@ -274,7 +282,7 @@ class TestUpload:
         meta = self._meta(tmp_path)
         assert asyncio.run(tracker.upload(meta, "")) is False
         assert "doublon" in str(meta["tracker_status"]["DRAU"]["status_message"])
-        assert len(_FakeClient.calls) == 1
+        assert len(_posts()) == 1
 
     def test_upload_server_error_is_retried(self, monkeypatch: Any, tmp_path: Any):
         tracker = DRAU(_config())
@@ -282,8 +290,43 @@ class TestUpload:
         monkeypatch.setattr(drau_module, "RETRY_DELAY", 0.0)
         meta = self._meta(tmp_path)
         assert asyncio.run(tracker.upload(meta, "")) is False
-        assert len(_FakeClient.calls) == 3
+        assert len(_posts()) == 3
         assert "HTTP 503" in str(meta["tracker_status"]["DRAU"]["status_message"])
+
+    def test_422_duplicate_of_our_own_torrent_is_reconciled_as_success(self, monkeypatch: Any, tmp_path: Any):
+        tracker = DRAU(_config())
+        self._patch(monkeypatch, tracker, _FakeResponse(422, {"error": "doublon"}))
+
+        class _Reconciling(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                _FakeClient.calls.append({"method": "GET", "url": url, **kwargs})
+                return _FakeResponse(200, {"id": "Xk3Qm9", "infohash": "ab" * 20, "status": "approved"})
+
+        monkeypatch.setattr(drau_module.httpx, "AsyncClient", _Reconciling)
+        meta = self._meta(tmp_path)
+        assert asyncio.run(tracker.upload(meta, "")) is True
+        assert meta["tracker_status"]["DRAU"]["torrent_id"] == "Xk3Qm9"
+        assert [c["url"] for c in _FakeClient.calls if c["method"] == "GET"] == ["https://draupnirr.xyz/api/torrents/" + "ab" * 20]
+
+    def test_timed_out_post_that_went_through_is_reconciled_without_a_second_post(self, monkeypatch: Any, tmp_path: Any):
+        tracker = DRAU(_config())
+        self._patch(monkeypatch, tracker, _FakeResponse(500, {}))
+        monkeypatch.setattr(drau_module, "RETRY_DELAY", 0.0)
+
+        class _Flaky(_FakeClient):
+            async def post(self, url: str, **kwargs: Any) -> _FakeResponse:
+                _FakeClient.calls.append({"method": "POST", "url": url, **kwargs})
+                raise drau_module.httpx.ReadTimeout("slow")
+
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                _FakeClient.calls.append({"method": "GET", "url": url, **kwargs})
+                return _FakeResponse(200, {"id": "Xk3Qm9", "infohash": "ab" * 20, "status": "approved", "awaiting_validation": True})
+
+        monkeypatch.setattr(drau_module.httpx, "AsyncClient", _Flaky)
+        meta = self._meta(tmp_path)
+        assert asyncio.run(tracker.upload(meta, "")) is True
+        assert len(_posts()) == 1
+        assert meta["tracker_status"]["DRAU"]["torrent_id"] == "Xk3Qm9"
 
     def test_debug_mode_does_not_post(self, monkeypatch: Any, tmp_path: Any):
         tracker = DRAU(_config())

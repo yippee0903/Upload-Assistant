@@ -26,10 +26,11 @@
 
 import asyncio
 import re
-from typing import Any
+from typing import Any, Optional
 
 import aiofiles
 import httpx
+from torf import Torrent
 from unidecode import unidecode
 
 from src.console import console
@@ -194,7 +195,7 @@ class DRAU(FrenchTrackerMixin):
             console.print(f"[cyan]{self.tracker} dupe search found {len(dupes)} result(s)[/cyan]")
         return await self._check_french_lang_dupes(dupes, meta)
 
-    async def _search_catalogue(self, query: str) -> list[dict[str, Any]] | None:
+    async def _search_catalogue(self, query: str) -> Optional[list[dict[str, Any]]]:
         """All catalogue entries matching ``query``, or None when a page
         could not be read (HTTP error, bad JSON, or still full at the cap)."""
         items: list[dict[str, Any]] = []
@@ -500,20 +501,19 @@ class DRAU(FrenchTrackerMixin):
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode, not uploaded."
             return True
 
-        response = await self._post_upload(meta, data, files)
-        if response is None:
+        infohash = await asyncio.to_thread(lambda: str(Torrent.read(torrent_path).infohash))
+        payload = await self._post_upload(meta, data, files, infohash)
+        if payload is None:
             return False
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = {}
-        if not isinstance(payload, dict) or payload.get("error"):
+        if payload.get("error"):
             meta["tracker_status"][self.tracker]["status_message"] = f"data error: {payload}"
             return False
 
         torrent_id = str(payload.get("id") or "")
         if torrent_id:
             meta["tracker_status"][self.tracker]["torrent_id"] = torrent_id
+        if payload.get("reconciled"):
+            console.print(f"[yellow]{self.tracker}: this exact torrent is already on the site (id {torrent_id}) — treating the upload as done.[/yellow]")
         if payload.get("status") == "pending":
             console.print(f"[yellow]{self.tracker}: upload sent to human moderation (status pending).[/yellow]")
         if payload.get("awaiting_validation"):
@@ -563,16 +563,43 @@ class DRAU(FrenchTrackerMixin):
                 data["meta[episode]"] = episode
         return data
 
-    async def _post_upload(self, meta: Meta, data: dict[str, str], files: dict[str, Any]) -> httpx.Response | None:
-        """POST the multipart upload; None when it failed (status recorded)."""
+    async def _find_by_infohash(self, infohash: str) -> Optional[dict[str, Any]]:
+        """The catalogue entry for ``infohash`` (our own quarantined uploads
+        included), or None when unknown or unreadable."""
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(f"{self.search_url}/{infohash}", headers=self._headers())
+            detail = response.json() if response.status_code == 200 else None
+        except (httpx.RequestError, httpx.TimeoutException, ValueError):
+            return None
+        return detail if isinstance(detail, dict) and detail.get("id") else None
+
+    async def _post_upload(self, meta: Meta, data: dict[str, str], files: dict[str, Any], infohash: str) -> Optional[dict[str, Any]]:
+        """POST the multipart upload; the response payload, or None when it
+        failed (status recorded).
+
+        The API has no idempotency key, so a request whose outcome is unknown
+        (timeout, dropped connection, 5xx after the site stored it) is
+        reconciled by looking the torrent up by infohash before any retry
+        and on a 422: when the site already has it, the upload is done.
+        """
         status = meta["tracker_status"][self.tracker]
         timeout = 60.0
         max_retries = 3
+
+        async def _already_there() -> Optional[dict[str, Any]]:
+            existing = await self._find_by_infohash(infohash)
+            return {**existing, "reconciled": True} if existing else None
+
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                # No redirect following: a cross-origin redirect would carry
+                # the X-Api-Key header along.
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(self.upload_url, files=files, data=data, headers=self._headers())
             except (httpx.RequestError, httpx.TimeoutException) as e:
+                if existing := await _already_there():
+                    return existing
                 if attempt < max_retries - 1:
                     timeout *= 1.5
                     console.print(f"[yellow]{self.tracker}: upload attempt failed ({type(e).__name__}), retrying in {RETRY_DELAY:.0f}s…[/yellow]")
@@ -580,22 +607,26 @@ class DRAU(FrenchTrackerMixin):
                     continue
                 status["status_message"] = f"data error: upload failed: {type(e).__name__}"
                 return None
-            if response.status_code in (200, 201):
-                return response
             try:
                 detail: Any = response.json()
             except ValueError:
                 detail = response.text[:500]
+            if response.status_code in (200, 201):
+                return detail if isinstance(detail, dict) else {"error": f"unexpected response: {detail}"}
             if response.status_code in (400, 401, 403, 404, 422):
                 # Client error — a retry cannot succeed: fail fast with the
-                # site's own reason (a 422 duplicate means the release is
-                # already there).
+                # site's own reason, unless the 422 is a duplicate of the
+                # torrent we just sent (an earlier attempt went through).
+                if response.status_code == 422 and (existing := await _already_there()):
+                    return existing
                 reason = detail.get("error", "") if isinstance(detail, dict) else str(detail)
                 status["status_message"] = f"data error: HTTP {response.status_code}: {reason or detail}"
                 console.print(f"[red]{self.tracker} upload failed: HTTP {response.status_code}[/red]")
                 if reason:
                     console.print(f"[dim]{reason}[/dim]")
                 return None
+            if existing := await _already_there():
+                return existing
             if attempt < max_retries - 1:
                 console.print(f"[yellow]{self.tracker}: HTTP {response.status_code}, retrying in {RETRY_DELAY:.0f}s… (attempt {attempt + 1}/{max_retries})[/yellow]")
                 await asyncio.sleep(RETRY_DELAY)
