@@ -395,7 +395,7 @@ config = {
 
     "TRACKERS": {
         # Which trackers do you want to upload to?
-        # Available tracker: ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
+        # Available tracker: ACM, AITHER, ANT, AR, ASC, AZ, BHD, BHDTV, BJS, BLU, BT, C411, CBR, CZ, DC, DP, DRAU, DT, EMUW, FF, FL, GPW, HDB, HDF, HDS, HDT, HHD, HUNO, IHD, IS, ITT, LCD, LDU, LST, LT, LUME, MTV, NBL, OE, OTW, PHD, PT, PTER, PTP, PTS, PTT, R4E, RAS, RF, RTF, SAM, SHRI, SN, SP, SPD, STC, THR, TIK, TL, TLZ, TOS, TTG, TTR, TVC, ULCX, UTP, V3X, YUS
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
@@ -557,6 +557,20 @@ config = {
             "anon": False,
             # Send uploads to DP modq for staff approval
             "modq": False,
+        },
+        "DRAU": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # draupnirr.xyz — French private tracker (custom API, not UNIT3D)
+            # Your passkey doubles as the API key (profile page). It is also
+            # used to build the announce URL, so nothing else is needed here.
+            "api_key": "",
+            # Include screenshots in the upload description (default: False)
+            "include_screenshots": False,
+            # Append the reused/base description (cleaned text grabbed from
+            # another tracker, or your custom description) as a
+            # "Notes de la release d'origine" section in the fiche
+            "include_source_description": False,
         },
         "DT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name

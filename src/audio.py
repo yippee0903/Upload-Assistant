@@ -787,6 +787,7 @@ def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng
         "CBR",
         "DC",
         "DP",
+        "DRAU",
         "FF",
         "G3MINI",
         "GF",

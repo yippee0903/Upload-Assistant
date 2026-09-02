@@ -1,12 +1,12 @@
 > **⚠️ This is a fork of [Upload Assistant](https://github.com/Audionut/Upload-Assistant), originally created by [Audionut](https://github.com/Audionut) and [L4G](https://github.com/L4GSP1KE).**
 >
-> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, G3MINI, NST, TOS, V3X. HDF and GF are also included but not recommended since there are known issues with their implementation.
+> This fork contains **experimental features** and is primarily focused on adding **compatibility with French trackers**: C411, DRAU, G3MINI, NST, TOS, V3X. HDF and GF are also included but not recommended since there are known issues with their implementation.
 >
 > For the original project, please refer to the [upstream repository](https://github.com/Audionut/Upload-Assistant).
 
 ## What's different from upstream
 
-- **French trackers**: added support for C411, G3MINI, NST, V3X and reworked TOS (plus GF and HDF, see the warning above), built on a shared `FRENCH.py` mixin handling French naming conventions (VF/VFF/VFQ/VOQ/VOSTFR/MULTI tags, audio codec placement, HDLight/4KLight), French-content checks before upload, French-localized TMDB titles and posters, and language-aware dupe checking (VF vs VOSTFR).
+- **French trackers**: added support for C411, DRAU, G3MINI, NST, V3X and reworked TOS (plus GF and HDF, see the warning above), built on a shared `FRENCH.py` mixin handling French naming conventions (VF/VFF/VFQ/VOQ/VOSTFR/MULTI tags, audio codec placement, HDLight/4KLight), French-content checks before upload, French-localized TMDB titles and posters, and language-aware dupe checking (VF vs VOSTFR).
 - **Description reuse and cleanup**: descriptions and images from existing UNIT3D uploads can be reused, with automatic cleanup of foreign tool signatures (GG-BOT, seedpool, upbrr, …), dead image blocks, orphaned screenshot headers and other leftovers; per-tracker opt-out available.
 - **Image hosts**: added lostimg.cc; per-tracker approved image host lists with automatic rehosting when the target site refuses the current host (C411, TOS, V3X, …); rotation to the next host when uploads fail.
 - **NFO handling**: per-tracker NFO inclusion/exclusion, generated mediainfo NFOs, and torrent patching that avoids full rehashes when NFO requirements differ between trackers.
@@ -73,14 +73,14 @@ Many thanks to all who have contributed.
 |-|:-:|-|:-:|
 |Aither|AITHER|Alpharatio|AR|
 |Amigos-Share|ASC|Anthelion|ANT|
-|AsianCinema|ACM|||
+|AsianCinema|ACM|C411|C411|
 |AvistaZ|AZ|Beyond-HD|BHD|
 |BitHDTV|BHDTV|Blutopia|BLU|
 |BrasilJapão-Share|BJS|BrasilTracker|BT|
 |CapybaraBR|CBR|CinemaZ|CZ|
 |Cinematik|TIK|DarkPeers|DP|
 |DigitalCore|DC|DesiTorrents|DT|
-|Emuwarez|EMUW|
+|Draupnirr|DRAU|Emuwarez|EMUW|
 |FileList|FL|FunFile|FF|
 |GreatPosterWall|GPW|hawke-uno|HUNO|
 |HDBits|HDB|HD-Space|HDS|
