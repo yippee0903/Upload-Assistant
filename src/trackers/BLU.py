@@ -4,7 +4,7 @@ from typing import Any, Optional
 import cli_ui
 
 from src.console import console
-from src.trackers.COMMON import COMMON, ask_to_continue
+from src.trackers.COMMON import COMMON, ask_to_continue, is_lossless, mi_tracks
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -32,15 +32,18 @@ class BLU(UNIT3D):
             "AnimeRG",
             "AniURL",
             "AROMA",
+            "ATM05",
             "aXXo",
             "B3LLUM",
             "BHDStudio",
+            "BitHD",
             "Brrip",
             "CHD",
             "CM8",
             "CrEwSaDe",
             "d3g",
             "DeadFish",
+            "D3US",
             "DNL",
             "DTLegacy",
             "ELiTE",
@@ -68,6 +71,7 @@ class BLU(UNIT3D):
             "Leffe",
             "LEGi0N",
             "LOAD",
+            "mAck",
             "MeGusta",
             "mHD",
             "mSD",
@@ -77,10 +81,14 @@ class BLU(UNIT3D):
             "NOIVTC",
             "nSD",
             "OFT",
+            "PAAI",
+            "PHOCiS",
             "PiRaTeS",
             "playBD",
             "PlaySD",
             "playXD",
+            "PMi",
+            "PrimeFix",
             "PRODJi",
             "RAPiDCOWS",
             "RARBG",
@@ -104,6 +112,7 @@ class BLU(UNIT3D):
             "WAF",
             "WKS",
             "x0r",
+            "XDMovies",
             "xRed",
             "XS",
             "YIFY",
@@ -113,8 +122,16 @@ class BLU(UNIT3D):
         ]
         pass
 
+    DERIVED_DV_ALERT = (
+        "[alert]This release contains a Derived Dolby Vision layer. The WEB Dolby Vision layer was injected using dovi_tool. "
+        "Mismatches between Blu-ray and WEB stream masters may occur.[/alert]\n\n"
+    )
+
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         should_continue = True
+        hdr = meta.get("hdr") or ""
+        is_encode = meta["type"] in ["ENCODE", "WEBRIP"]
+        is_animated = "animation" in meta.get("keywords", "") or meta.get("anime", False) is True
 
         if not meta.get("is_disc"):
             container = meta.get("container", "").lower()
@@ -122,7 +139,6 @@ class BLU(UNIT3D):
             allowed = ["mkv"]
             if type_name == "HDTV":
                 allowed.append("ts")
-            hdr = meta.get("hdr") or ""
             if type_name in ["WEBDL", "HDTV"] and "DV" in hdr and "HDR" not in hdr:
                 allowed.append("mp4")
 
@@ -130,17 +146,57 @@ class BLU(UNIT3D):
                 console.print(f"[bold red]For this release, {self.tracker} requires one of the following containers: {', '.join([a.upper() for a in allowed])}[/bold red]")
                 return False
 
-        if (
-            meta["type"] in ["ENCODE", "REMUX"]
-            and "HDR" in meta.get("hdr", "")
-            and "DV" in meta.get("hdr", "")
-            and (not meta["unattended"] or (meta["unattended"] and meta.get("unattended_confirm", False)))
-        ):
-            console.print("[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]")
-            console.print("[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]")
-            if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if is_encode and meta["resolution"] not in ["720p", "1080p", "2160p"]:
+                console.print(f"[bold red]Encodes must be 720p, 1080p or 2160p, skipping {self.tracker} upload.[/bold red]")
                 return False
-            if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
+
+            if is_encode and meta["video_codec"] == "AV1":
+                console.print(f"[bold red]Encodes must use x264 or x265, skipping {self.tracker} upload.[/bold red]")
+                return False
+
+            if (
+                is_encode
+                and meta["video_codec"] == "HEVC"
+                and not hdr
+                and not is_animated
+                and not ask_to_continue(meta, f"SDR live-action encodes must use x264. ({self.tracker})")
+            ):
+                return False
+
+            if "Hi10P" in meta.get("video_encode", "") and not is_animated and not ask_to_continue(meta, f"Hi10P is only allowed for anime. ({self.tracker})"):
+                return False
+
+            if not await self.common.check_language_requirements(
+                meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True, original_language=True, original_required=True
+            ):
+                return False
+
+            if meta.get("non_disc_has_pcm_audio_tracks", False):
+                console.print(f"[bold red]PCM audio is not allowed outside discs, skipping {self.tracker} upload.[/bold red]")
+                return False
+
+            if meta.get("has_disallowed_compat_track", False) and not ask_to_continue(
+                meta, f"This release contains a compatibility audio track which is not allowed. Only TrueHD audio tracks may include a compatibility track. ({self.tracker})"
+            ):
+                return False
+
+            if not self._check_audio_tracks(meta):
+                return False
+
+        if max(len(meta.get("image_list", [])), int(meta.get("screens", 0) or 0)) < 3:
+            console.print(f"[bold red]At least 3 screenshots are required, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        if meta["type"] in ["ENCODE", "REMUX"] and "HDR" in hdr and "DV" in hdr:
+            derived = bool(meta.get("webdv"))
+            if not derived and (not meta["unattended"] or meta.get("unattended_confirm", False)):
+                derived = bool(cli_ui.ask_yes_no("Is the Dolby Vision layer derived from a different source (WEB)?", default=False))
+            if derived:
+                if not ask_to_continue(
+                    meta,
+                    f"Derived Dolby Vision releases go to FANRES and the description must include the HDR grade check, DV plots, DV source, metafier log and dovi_tool summary. ({self.tracker})",
+                ):
+                    return False
                 meta["tracker_status"][self.tracker]["other"] = True
 
         if (
@@ -157,6 +213,38 @@ class BLU(UNIT3D):
 
         return should_continue
 
+    def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
+        tracks = mi_tracks(meta, "Audio")
+        ac3_langs = {str(t.get("Language") or "").lower() for t in tracks if t.get("Format") == "AC-3"}
+        for i, track in enumerate(tracks):
+            fmt = str(track.get("Format") or "")
+            try:
+                channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
+            except (TypeError, ValueError):
+                channels = 0
+            if fmt in ("Opus", "Vorbis"):
+                console.print(f"[bold red]{fmt} audio is not allowed, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if fmt == "FLAC" and channels > 2 and not (meta.get("anime", False) is True and channels <= 6):
+                console.print(f"[bold red]FLAC is only accepted for mono or stereo audio, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if fmt == "AAC" and channels > 2 and meta["type"] not in ("WEBDL", "HDTV"):
+                console.print(f"[bold red]AAC is only accepted for mono or stereo audio unless untouched, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if fmt == "MLP FBA" and str(track.get("Language") or "").lower() not in ac3_langs:
+                console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if i == 0 and meta["type"] == "ENCODE" and meta["resolution"] == "2160p" and not is_lossless(track):
+                console.print(f"[bold red]2160p encodes must have lossless main audio, skipping {self.tracker} upload.[/bold red]")
+                return False
+        return True
+
+    async def get_description(self, meta: dict[str, Any]) -> dict[str, str]:
+        desc = (await super().get_description(meta))["description"]
+        if meta["tracker_status"][self.tracker].get("other", False):
+            desc = self.DERIVED_DV_ALERT + desc
+        return {"description": desc}
+
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         blu_name = meta["name"]
         if meta["category"] == "TV" and meta.get("episode_title", "") != "":
@@ -166,7 +254,6 @@ class BLU(UNIT3D):
         imdb_aka = meta.get("imdb_info", {}).get("aka", "")
         year = str(meta.get("year", ""))
         aka = meta.get("aka", "")
-        webdv = meta.get("webdv", "")
         if imdb_name and imdb_name.strip():
             if aka:
                 blu_name = blu_name.replace(f"{aka} ", "", 1)
@@ -178,11 +265,8 @@ class BLU(UNIT3D):
         if meta.get("category") != "TV" and imdb_year and imdb_year.strip() and year and year.strip() and imdb_year != year:
             blu_name = blu_name.replace(f"{year}", imdb_year, 1)
 
-        if webdv:
-            blu_name = blu_name.replace("HYBRID ", "", 1)
-
-        if meta["tracker_status"][self.tracker].get("other", False):
-            blu_name = blu_name.replace(f"{meta['resolution']}", f"{meta['resolution']} DVP5/DVP8", 1)
+        if meta["type"] == "WEBDL":
+            blu_name = blu_name.replace("Hybrid ", "", 1)
 
         return {"name": blu_name}
 
