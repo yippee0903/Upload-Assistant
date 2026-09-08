@@ -36,6 +36,20 @@ def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want
     return bool(cli_ui.ask_yes_no(question, default=default))
 
 
+_REUPLOAD_NOTICE = re.compile(r"\b(?:do not|don'?t|no|not to be|must not be|may not be|should not be)\s+(?:re-?upload|cross-?seed)", re.IGNORECASE)
+
+
+def check_reupload_notice(meta: dict[str, Any], text: Optional[str], tracker: str) -> None:
+    """Abort when a source description forbids reuploads; interactive runs may override."""
+    text = text or ""
+    match = _REUPLOAD_NOTICE.search(text)
+    if match is None:
+        return
+    excerpt = " ".join(text[max(match.start() - 40, 0) : match.end() + 40].split())
+    if not ask_to_continue(meta, f'{tracker} description forbids reuploads: "...{excerpt}..."', question="Continue anyway?"):
+        raise Exception(f"Reupload forbidden by the {tracker} uploader")
+
+
 def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
     """True when a TMDb keyword/genre contains an adult-content marker as a whole word ("gay porn" counts, "adulthood" does not)."""
     genres = f"{meta.get('keywords', '')}, {meta.get('combined_genres', '')}"
@@ -2605,6 +2619,7 @@ class COMMON:
                 # Extract data from the attributes
                 category = attributes.get("category")
                 description = attributes.get("description")
+                check_reupload_notice(meta, description, tracker)
                 tmdb = int(attributes.get("tmdb_id") or 0)
                 tvdb = int(attributes.get("tvdb_id") or 0)
                 mal = int(attributes.get("mal_id") or 0)
@@ -2632,6 +2647,7 @@ class COMMON:
                     # Extract data from the attributes
                     category = attributes.get("category")
                     description = attributes.get("description")
+                    check_reupload_notice(meta, description, tracker)
                     tmdb = int(attributes.get("tmdb_id") or 0)
                     tvdb = int(attributes.get("tvdb_id") or 0)
                     mal = int(attributes.get("mal_id") or 0)

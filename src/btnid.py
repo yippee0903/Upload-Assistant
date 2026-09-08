@@ -8,6 +8,7 @@ from typing_extensions import TypeAlias
 
 from src.bbcode import BBCODE
 from src.console import console
+from src.trackers.COMMON import check_reupload_notice
 
 Meta: TypeAlias = MutableMapping[str, Any]
 
@@ -190,6 +191,7 @@ class BtnIdManager:
             meta["framestor"] = True
         elif "flux" in name:
             meta["flux"] = True
+        check_reupload_notice(cast(dict[str, Any], meta), description, "BHD")
         description, imagelist = bbcode.clean_bhd_description(description, cast(dict[str, Any], meta))
         if not only_id:
             meta["description"] = description
