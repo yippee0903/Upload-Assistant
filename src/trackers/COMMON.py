@@ -36,7 +36,11 @@ def ask_to_continue(meta: dict[str, Any], msg: str, question: str = "Do you want
     return bool(cli_ui.ask_yes_no(question, default=default))
 
 
-_REUPLOAD_NOTICE = re.compile(r"\b(?:do not|don'?t|no|not to be|must not be|may not be|should not be)\s+(?:re-?upload|cross-?seed)", re.IGNORECASE)
+_REUPLOAD_NOTICE = re.compile(r"\b(?:do not|don'?t|no|not to be|must not be|may not be|should not be)\s+(?:re[- ]?upload|cross[- ]?seed)", re.IGNORECASE)
+
+
+class ReuploadForbidden(Exception):
+    """The source uploader forbids reuploads and the run was not overridden."""
 
 
 def check_reupload_notice(meta: dict[str, Any], text: Optional[str], tracker: str) -> None:
@@ -47,7 +51,7 @@ def check_reupload_notice(meta: dict[str, Any], text: Optional[str], tracker: st
         return
     excerpt = " ".join(text[max(match.start() - 40, 0) : match.end() + 40].split())
     if not ask_to_continue(meta, f'{tracker} description forbids reuploads: "...{excerpt}..."', question="Continue anyway?"):
-        raise Exception(f"Reupload forbidden by the {tracker} uploader")
+        raise ReuploadForbidden(f"Reupload forbidden by the {tracker} uploader")
 
 
 def is_adult(meta: dict[str, Any], extra_keywords: tuple[str, ...] = ()) -> bool:
@@ -2720,6 +2724,8 @@ class COMMON:
 
             return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
 
+        except ReuploadForbidden:
+            raise
         except Exception as e:
             console.print_exception()
             console.print(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
