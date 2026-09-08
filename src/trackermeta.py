@@ -19,7 +19,7 @@ from src.btnid import BtnIdManager
 from src.console import console
 from src.proxy_env import proxy_for
 from src.tmdb import resolve_tmdb_namespace
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, check_reupload_notice
 from src.type_utils import to_int
 
 config: dict[str, Any] = {}
@@ -678,6 +678,7 @@ async def update_metadata_from_tracker(
                 tuple[Optional[int], Optional[int], Optional[str], Optional[str], Optional[str]],
                 hdb_info,
             )
+            check_reupload_notice(meta, meta["hdb_description"], tracker_name)
 
             if imdb or tvdb_id or meta["hdb_description"]:
                 meta["imdb_id"] = imdb if imdb else meta.get("imdb_id", 0)
@@ -717,6 +718,7 @@ async def update_metadata_from_tracker(
                 tuple[Optional[int], Optional[int], Optional[str], Optional[str], Optional[str], Optional[int]],
                 hdb_search,
             )
+            check_reupload_notice(meta, meta["hdb_description"], tracker_name)
             meta["hdb_name"] = hdb_name
             if tracker_id:
                 meta[tracker_key] = tracker_id

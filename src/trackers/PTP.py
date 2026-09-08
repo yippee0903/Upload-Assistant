@@ -25,7 +25,7 @@ from src.exceptions import *  # noqa F403
 from src.imagehosts import host_slug
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, check_reupload_notice
 from src.uploadscreens import UploadScreensManager
 
 
@@ -239,6 +239,7 @@ class PTP:
         await asyncio.sleep(1)
 
         ptp_desc = response.text
+        check_reupload_notice(meta, ptp_desc, "PTP")
         # console.print(f"[yellow]Raw description received:\n{ptp_desc}...")  # Show first 500 characters for brevity
         desc = None
         imagelist: list[Any] = []
