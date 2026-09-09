@@ -561,6 +561,39 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Unexpected error with Postimages: {e}")
                 return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
 
+        elif img_host == "freeimage":
+            url = "https://freeimage.host/api/1/upload"
+            try:
+                data = {"key": config["DEFAULT"]["freeimage_api"], "action": "upload"}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"source": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, data=data, files=files, timeout=timeout)
+                    response_data = response.json()
+
+                    if response.status_code != 200 or "image" not in response_data:
+                        console.print(f"[yellow]freeimage upload failed: {response_data.get('error', {}).get('message', 'Unknown error')} {response.status_code}")
+                        return {"status": "failed", "reason": "freeimage upload failed"}
+
+                    raw_url = response_data["image"]["url"]
+                    # Chevereto omits "medium" when the source is smaller than the medium size.
+                    img_url = response_data["image"].get("medium", {}).get("url") or raw_url
+                    web_url = response_data["image"]["url_viewer"]
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to freeimage timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]freeimage request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                console.print(f"[red]Invalid JSON response from freeimage: {e}")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
             url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
