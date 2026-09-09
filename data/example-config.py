@@ -61,7 +61,7 @@ config = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene, freeimage
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene, freeimage, imgchest
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -94,6 +94,8 @@ config = {
         "midnightscene_api_key": "",
         # freeimage.host API key (https://freeimage.host/page/api)
         "freeimage_api": "",
+        # imgchest.com API token (https://imgchest.com/profile/api)
+        "imgchest_api": "",
 
         # GETTING METADATA
 

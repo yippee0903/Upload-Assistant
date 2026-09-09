@@ -594,6 +594,41 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Invalid JSON response from freeimage: {e}")
                 return {"status": "failed", "reason": "Invalid JSON response"}
 
+        elif img_host == "imgchest":
+            url = "https://api.imgchest.com/v1/post"
+            try:
+                headers = {"Authorization": f"Bearer {config['DEFAULT']['imgchest_api']}"}
+                # One hidden post per screenshot: imgchest has no single-image endpoint.
+                data = {"privacy": "hidden"}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"images[]": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, headers=headers, data=data, files=files, timeout=timeout)
+                    response_data = response.json()
+                    images = response_data.get("data", {}).get("images") or []
+
+                    if response.status_code != 200 or not images:
+                        console.print(f"[yellow]imgchest upload failed: {response_data.get('message', 'Unknown error')} {response.status_code}")
+                        return {"status": "failed", "reason": "imgchest upload failed"}
+
+                    raw_url = images[0]["link"]
+                    img_url = raw_url.replace("/files/", "/files/thumb/", 1)
+                    web_url = f"https://imgchest.com/p/{response_data['data']['id']}"
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to imgchest timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]imgchest request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                console.print(f"[red]Invalid JSON response from imgchest: {e}")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
             url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
