@@ -12,7 +12,7 @@ import aiofiles
 from aiofiles import os as aio_os
 
 from src.console import console
-from src.imagehosts import host_slug
+from src.imagehosts import MAX_IMAGE_HOST_SLOTS, host_slug
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
@@ -55,10 +55,10 @@ async def check_tracker_image_hosts(meta: dict[str, Any], config: dict[str, Any]
 
 
 def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
-    """img_host_1..img_host_9 from config, in priority order, deduplicated."""
+    """img_host_1..img_host_99 from config, in priority order, deduplicated."""
     default_cfg = config.get("DEFAULT", {}) if isinstance(config.get("DEFAULT", {}), dict) else {}
     hosts: list[str] = []
-    for index in range(1, 10):
+    for index in range(1, MAX_IMAGE_HOST_SLOTS + 1):
         host = default_cfg.get(f"img_host_{index}")
         if host and str(host) not in hosts:
             hosts.append(str(host))
@@ -67,7 +67,7 @@ def configured_image_hosts(config: Mapping[str, Any]) -> list[str]:
 
 def last_image_host_slot(default_cfg: Mapping[str, Any]) -> int:
     """Highest populated img_host_N index (slots may be sparse or repeat a host)."""
-    return max((i for i in range(1, 10) if default_cfg.get(f"img_host_{i}")), default=0)
+    return max((i for i in range(1, MAX_IMAGE_HOST_SLOTS + 1) if default_cfg.get(f"img_host_{i}")), default=0)
 
 
 def trackers_lacking_images(meta: Mapping[str, Any], trackers: Sequence[str], minimum: int) -> list[str]:

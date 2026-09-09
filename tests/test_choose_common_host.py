@@ -1,4 +1,4 @@
-from src.rehostimages import choose_common_host, configured_image_hosts
+from src.rehostimages import choose_common_host, configured_image_hosts, last_image_host_slot
 
 
 def test_configured_hosts_in_priority_order_deduped():
@@ -27,3 +27,9 @@ def test_no_constraint_when_a_tracker_is_unknown_or_nothing_in_common():
     assert choose_common_host({"A": ["imgbox"], "B": None}, ["imgbox"], "imgbox") == (None, None)
     assert choose_common_host({"A": ["imgbox"], "B": ["ptpimg"]}, ["imgbox"], "imgbox") == (None, None)
     assert choose_common_host({}, ["imgbox"], "imgbox") == (None, None)
+
+
+def test_configured_hosts_read_past_the_ninth_slot():
+    config = {"DEFAULT": {"img_host_1": "imgbox", "img_host_10": "pixhost", "img_host_99": "imgbb"}}
+    assert configured_image_hosts(config) == ["imgbox", "pixhost", "imgbb"]
+    assert last_image_host_slot(config["DEFAULT"]) == 99

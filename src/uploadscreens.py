@@ -16,6 +16,7 @@ import pyimgbox
 from typing_extensions import TypeAlias
 
 from src.console import console
+from src.imagehosts import MAX_IMAGE_HOST_SLOTS
 
 Meta: TypeAlias = dict[str, Any]
 ImageDict: TypeAlias = dict[str, Any]
@@ -767,7 +768,7 @@ async def _upload_screens(
 
         # Find the first approved host from config
         approved_host = None
-        for i in range(1, 10):  # Check img_host_1 through img_host_9
+        for i in range(1, MAX_IMAGE_HOST_SLOTS + 1):
             host_key = f"img_host_{i}"
             if host_key in default_config:
                 host = default_config[host_key]
@@ -953,7 +954,7 @@ async def _upload_screens(
                 console.print(f"[yellow]Marked '{img_host}' as failed for this session.[/yellow]")
 
             # Keep walking img_host_N after a fallback also fails (the chain used to stop at img_host_2)
-            for next_host_num in range(img_host_num + 1, 10):
+            for next_host_num in range(img_host_num + 1, MAX_IMAGE_HOST_SLOTS + 1):
                 next_host = str(default_config.get(f"img_host_{next_host_num}") or "").strip()
                 if not next_host or next_host in failed_hosts or (allowed_hosts is not None and next_host not in allowed_hosts):
                     continue

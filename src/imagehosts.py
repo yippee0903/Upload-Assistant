@@ -13,6 +13,7 @@ class ImageHost:
 
 
 MIN_IMAGE_BYTES = 75_000
+MAX_IMAGE_HOST_SLOTS = 99  # img_host_1 .. img_host_99 in config
 
 IMAGE_HOSTS: dict[str, ImageHost] = {
     "imgbb": ImageHost(("ibb.co", "imgbb.com"), ("imgbb_api",), 31_000_000),
