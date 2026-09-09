@@ -612,8 +612,9 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         console.print(f"[yellow]imgchest upload failed: {response_data.get('message', 'Unknown error')} {response.status_code}")
                         return {"status": "failed", "reason": "imgchest upload failed"}
 
-                    raw_url = images[0]["link"]
-                    img_url = raw_url.replace("/files/", "/files/thumb/", 1)
+                    # The CDN thumbnail (/files/thumb/) is a 400x400 centre crop, useless for a
+                    # 16:9 capture: the full image is used everywhere, as for lostimg.
+                    img_url = raw_url = images[0]["link"]
                     web_url = f"https://imgchest.com/p/{response_data['data']['id']}"
 
                     if meta["debug"]:

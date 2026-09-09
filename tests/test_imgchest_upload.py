@@ -1,4 +1,4 @@
-"""imgchest upload: one hidden post per screenshot, thumbnail derived from the CDN link."""
+"""imgchest upload: one hidden post per screenshot, no thumbnail (the CDN one is a square crop)."""
 
 import asyncio
 from typing import Any
@@ -28,7 +28,7 @@ def test_imgchest_success(tmp_path: Any) -> None:
     result, client = _upload(tmp_path, POST)
     assert result["status"] == "success"
     assert result["raw_url"] == "https://cdn.imgchest.com/files/f1le1d.png"
-    assert result["img_url"] == "https://cdn.imgchest.com/files/thumb/f1le1d.png"
+    assert result["img_url"] == result["raw_url"]
     assert result["web_url"] == "https://imgchest.com/p/p0st1d"
     args, kwargs = client.post.call_args
     assert args[0] == "https://api.imgchest.com/v1/post"
