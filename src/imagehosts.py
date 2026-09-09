@@ -32,6 +32,7 @@ IMAGE_HOSTS: dict[str, ImageHost] = {
     "midnightscene": ImageHost(("img.midnightscene.cc",), ("midnightscene_api_key",)),
     "freeimage": ImageHost(("freeimage.host", "iili.io"), ("freeimage_api",)),
     "imgchest": ImageHost(("imgchest.com", "cdn.imgchest.com"), ("imgchest_api",)),
+    "catbox": ImageHost(("catbox.moe", "files.catbox.moe"), ("catbox_userhash",)),
     # recognised when rehosting, never uploaded to
     "bhd": ImageHost(("beyondhd.co",), uploadable=False),
     "imagebam": ImageHost(("imagebam.com",), uploadable=False),

@@ -61,7 +61,7 @@ config = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene, freeimage, imgchest
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, midnightscene, freeimage, imgchest, catbox
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -96,6 +96,9 @@ config = {
         "freeimage_api": "",
         # imgchest.com API token (https://imgchest.com/profile/api)
         "imgchest_api": "",
+        # catbox.moe userhash (https://catbox.moe/user/manage.php), required: no anonymous uploads
+        # Catbox is often blocked or slow from some countries and ISPs, and some trackers refuse it: keep it late in the host order
+        "catbox_userhash": "",
 
         # GETTING METADATA
 

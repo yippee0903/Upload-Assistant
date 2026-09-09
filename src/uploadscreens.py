@@ -629,6 +629,41 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Invalid JSON response from imgchest: {e}")
                 return {"status": "failed", "reason": "Invalid JSON response"}
 
+        elif img_host == "catbox":
+            url = "https://catbox.moe/user/api.php"
+            userhash = config["DEFAULT"].get("catbox_userhash")
+
+            if not userhash:
+                console.print("[red]Catbox userhash not found in config, anonymous uploads are not allowed.")
+                return {"status": "failed", "reason": "Missing Catbox userhash"}
+
+            try:
+                data = {"reqtype": "fileupload", "userhash": userhash}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"fileToUpload": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, data=data, files=files, timeout=timeout)
+                    # The API answers with the bare file URL as plain text, or an error sentence.
+                    body = response.text.strip()
+
+                    if response.status_code != 200 or not body.startswith("https://files.catbox.moe/"):
+                        console.print(f"[yellow]Catbox upload failed: {body[:100]} {response.status_code}")
+                        return {"status": "failed", "reason": "Catbox upload failed"}
+
+                    # Catbox has no thumbnails: the full image is used everywhere.
+                    img_url = raw_url = web_url = body
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to Catbox timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]Catbox request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
             url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
