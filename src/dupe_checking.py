@@ -168,6 +168,16 @@ class DupeChecker:
 
                 processed_dupes.append(entry)
 
+        # Names the similarity fallback measures against: the generic release name
+        # and the one this tracker would give it (French sites title in French, …).
+        similarity_targets = [await DupeChecker.normalize_filename(str(meta.get("name", "")))]
+        try:
+            tracker_formatted = await self._tracker_name(tracker_name, meta)
+        except Exception:
+            tracker_formatted = ""
+        if tracker_formatted and tracker_formatted != meta.get("name"):
+            similarity_targets.append(await DupeChecker.normalize_filename(tracker_formatted))
+
         def coerce_int(value: Any) -> Optional[int]:
             try:
                 return int(value) if value is not None else None
@@ -372,8 +382,7 @@ class DupeChecker:
                     # french_lang_supersede because the upload's French audio wasn't detected,
                     # yet the dupe is clearly the same release (identical group, ~same name).
                     if not files and tag.strip() and tag.strip() in normalized:
-                        target_normalized = await DupeChecker.normalize_filename(str(meta.get("name", "")))
-                        similarity = SequenceMatcher(None, normalized, target_normalized).ratio()
+                        similarity = max(SequenceMatcher(None, normalized, target).ratio() for target in similarity_targets)
                         if meta.get("debug"):
                             console.log(f"[debug] french_lang_supersede name-similarity: {similarity:.3f} for {each}")
                         if similarity >= 0.75:
@@ -716,8 +725,7 @@ class DupeChecker:
                     if meta.get("debug"):
                         console.log(f"[debug] Skipping name-similarity: season-pack vs episode for {each}")
                 else:
-                    target_normalized = await DupeChecker.normalize_filename(str(meta.get("name", "")))
-                    similarity = SequenceMatcher(None, normalized, target_normalized).ratio()
+                    similarity = max(SequenceMatcher(None, normalized, target).ratio() for target in similarity_targets)
                     if meta.get("debug"):
                         console.log(f"[debug] Name similarity fallback: {similarity:.3f} (threshold 0.75) for {each}")
                     if similarity >= 0.75:
