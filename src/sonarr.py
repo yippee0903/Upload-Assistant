@@ -3,6 +3,7 @@ import os
 import re
 from collections.abc import Mapping
 from typing import Any, Optional, cast
+from urllib.parse import quote
 
 import httpx
 
@@ -60,14 +61,14 @@ class SonarrManager:
             if tvdb_id:
                 urls = [f"{base_url}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"]
             elif filename and title:
-                urls = [f"{base_url}/api/v3/parse?title={title}&path={filename}"]
+                urls = [f"{base_url}/api/v3/parse?title={quote(title, safe='')}&path={quote(filename, safe='')}"]
                 # Sonarr parses the path in priority; a non-Latin prefix (native
                 # title) yields a series title it cannot match. Retry title-only
                 # with that prefix stripped.
                 release = os.path.basename(filename.rstrip("/\\"))
                 stripped = re.sub(r"^(?:[^\x00-\x7F]+[\s._-]+)+", "", release)
                 if stripped and stripped != release:
-                    urls.append(f"{base_url}/api/v3/parse?title={stripped}")
+                    urls.append(f"{base_url}/api/v3/parse?title={quote(stripped, safe='')}")
             else:
                 instance_index += 1
                 continue

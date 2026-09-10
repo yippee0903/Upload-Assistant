@@ -4,6 +4,7 @@
 
 import asyncio
 from typing import Any
+from urllib.parse import unquote
 
 import src.sonarr as sonarr_module
 from src.sonarr import SonarrManager
@@ -35,7 +36,7 @@ def _client(answers: dict[str, Any], calls: list[str]) -> type:
 
         async def get(self, url: str, **k: Any) -> _Resp:
             calls.append(url)
-            series = None if "子夜归" in url else answers.get("series", SERIES)
+            series = None if "子夜归" in unquote(url) else answers.get("series", SERIES)
             return _Resp({"series": series, "parsedEpisodeInfo": {}})
 
     return _Client
@@ -57,3 +58,11 @@ def test_no_retry_when_folder_has_no_prefix(monkeypatch: Any) -> None:
     result = asyncio.run(SonarrManager(CONFIG).get_sonarr_data(filename="/data/tv/Example.Release.S01.2026.2160p.WEB-DL.H265-GRP", title="Example Release"))
     assert result is None
     assert len(calls) == 1
+
+
+def test_fallback_title_is_url_encoded(monkeypatch: Any) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(sonarr_module.httpx, "AsyncClient", _client({}, calls))
+    result = asyncio.run(SonarrManager(CONFIG).get_sonarr_data(filename="/data/tv/子夜归.Rock.&.Roll.#1.S01.2026.1080p.WEB-GRP", title="子夜归 Rock & Roll #1"))
+    assert result is not None
+    assert calls[1].endswith("/api/v3/parse?title=Rock.%26.Roll.%231.S01.2026.1080p.WEB-GRP")
