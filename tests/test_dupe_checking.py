@@ -577,3 +577,15 @@ class TestSimilarityAgainstTrackerName:
         entry = _no_files_entry(name="Titre.Exemple.2002.MULTi.1080p.WEB.DDP.5.1.H264-GRP")
         _run(checker.filter_dupes([entry], meta, "V3X"))
         assert not meta.get("filename_match")
+
+    def test_tracker_name_failure_falls_back_to_the_generic_name(self, monkeypatch: Any):
+        checker = _checker()
+
+        async def tracker_name(_tracker: str, _meta: dict[str, Any]) -> str:
+            raise RuntimeError("tracker naming unavailable")
+
+        monkeypatch.setattr(checker, "_tracker_name", tracker_name)
+        meta = self._meta()
+        entry = _no_files_entry(name="Titre.Exemple.2002.MULTi.1080p.WEB.DDP.5.1.H264-GRP")
+        dupes = _run(checker.filter_dupes([entry], meta, "V3X"))
+        assert dupes and not meta.get("filename_match")

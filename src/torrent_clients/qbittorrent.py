@@ -1667,7 +1667,7 @@ class QbittorrentClientMixin:
 
             # First collect exact path matches
             linked_folders = self._coerce_str_list(client_config.get("linked_folder", []))
-            local_sizes = local_content_sizes(meta)
+            local_sizes = await asyncio.to_thread(local_content_sizes, meta)
             for torrent in torrents:
                 try:
                     torrent_name = torrent.name
