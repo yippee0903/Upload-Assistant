@@ -606,9 +606,10 @@ class BBCODE:
         # ...and bare (unwrapped) signature lines: only complete lines made of
         # the marker plus known BBCode wrappers — ordinary note text that
         # merely mentions a tool name must survive.
-        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
+        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|\[img(?:=\d+)?\][^\[\]\n]*\[/img\]|[^\w\n\[\]])*"
         for _sig_marker in (
             r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
+            r"Uploaded (?:with|using) (?:\[url=[^\]]*\])?UNIT3D(?:\[/url\])? Auto Uploader(?:\s+v?[\w.]+)?",
             r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Uploaded with (?:\[/?color(?:=[^\]]*)?\]|[^\w\n\[\]])*using GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
             r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
