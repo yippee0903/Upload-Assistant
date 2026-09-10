@@ -349,3 +349,12 @@ def test_drau_is_registered() -> None:
     assert tracker_class_map["DRAU"] is DRAU
     assert "DRAU" in other_api_trackers
     assert "DRAU" in nfo_auto_trackers
+
+
+class TestCrossSeedHeaders:
+    def test_key_only_for_the_https_site_origin(self):
+        tracker = DRAU(_config())
+        assert tracker.cross_seed_headers("https://draupnirr.xyz/api/torrents/abc/download") == {"X-Api-Key": _config()["TRACKERS"]["DRAU"]["api_key"]}
+        assert tracker.cross_seed_headers("http://draupnirr.xyz/api/torrents/abc/download") is None
+        assert tracker.cross_seed_headers("https://evil.example/api/torrents/abc/download") is None
+        assert tracker.cross_seed_headers("https://draupnirr.xyz.evil.example/x") is None

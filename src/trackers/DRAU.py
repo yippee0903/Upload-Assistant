@@ -29,6 +29,7 @@
 import asyncio
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import aiofiles
 import httpx
@@ -102,6 +103,17 @@ class DRAU(FrenchTrackerMixin):
         return "films-film"
 
     # ── Dupes ──
+
+    def cross_seed_headers(self, download_url: str) -> Optional[dict[str, str]]:
+        """X-Api-Key for a .torrent download, only when the URL is the site's own HTTPS origin.
+
+        The URL comes from the catalogue response and httpx forwards custom
+        headers across cross-origin redirects, so the key never goes elsewhere.
+        """
+        target, site = urlparse(download_url), urlparse(self.base_url)
+        if target.scheme == "https" and target.hostname == site.hostname:
+            return {"X-Api-Key": self.api_key}
+        return None
 
     async def search_existing(self, meta: Meta, _disctype: Any = None) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
