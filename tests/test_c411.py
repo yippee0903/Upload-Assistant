@@ -1579,6 +1579,7 @@ class TestTorznabParser:
       <title>Le.Prenom.2012.FRENCH.1080p.WEB.x264.AC3-Troxy</title>
       <guid>https://c411.org/torrents/12345</guid>
       <link>https://c411.org/torrents/12345/download</link>
+      <enclosure url="https://c411.org/api?t=get&amp;id=12345&amp;apikey=k" length="4831838208" type="application/x-bittorrent" />
       <size>4831838208</size>
       <torznab:attr name="files" value="1" />
       <torznab:attr name="resolution" value="1080p" />
@@ -1605,11 +1606,14 @@ class TestTorznabParser:
         assert first['link'] == 'https://c411.org/torrents/12345/download'
         assert first['file_count'] == 1
         assert first['res'] == '1080p'
+        # The enclosure is the .torrent (api?t=get), what cross-seeding downloads
+        assert first['download'] == 'https://c411.org/api?t=get&id=12345&apikey=k'
 
     def test_second_item_no_link_fallback_comments(self):
         results = C411._parse_torznab_response(self.SAMPLE_XML)
         second = results[1]
         assert second['name'] == 'Le.Prenom.2012.MULTI.1080p.BluRay.x264-VENUE'
+        assert second['download'] is None
         assert second['size'] == 9663676416
 
     def test_empty_xml(self):
