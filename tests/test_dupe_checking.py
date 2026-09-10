@@ -536,3 +536,44 @@ class TestSizeTolerance:
     def test_within_tolerance_or_disabled_is_kept(self):
         assert len(self._dupes(10, 10_500_000_000)) == 1
         assert len(self._dupes(None, 12_000_000_000)) == 1
+
+
+class TestSimilarityAgainstTrackerName:
+    """The name-similarity fallback also compares against the name the tracker itself would use."""
+
+    def _meta(self) -> dict[str, Any]:
+        return _base_meta(
+            name="Example Title 2002 1080p WEB-DL Dual-Audio DD+ 5.1 H.264-GRP",
+            uuid="Example.Title.2002.MULTi.1080p.WEB.x264-GRP",
+            tag="-GRP",
+            resolution="1080p",
+            type="WEBDL",
+            source="WEB",
+            category="MOVIE",
+            season=None,
+            episode=None,
+        )
+
+    def test_french_titled_entry_matches_through_the_tracker_name(self, monkeypatch: Any):
+        checker = _checker()
+
+        async def tracker_name(_tracker: str, _meta: dict[str, Any]) -> str:
+            return "Example.Title.2002.MULTI.VFF.1080p.WEB.DDP.5.1.H264-GRP"
+
+        monkeypatch.setattr(checker, "_tracker_name", tracker_name)
+        meta = self._meta()
+        entry = _no_files_entry(name="Titre.Exemple.2002.MULTi.1080p.WEB.DDP.5.1.H264-GRP")
+        dupes = _run(checker.filter_dupes([entry], meta, "V3X"))
+        assert dupes and meta.get("filename_match")
+
+    def test_generic_name_alone_stays_below_the_threshold(self, monkeypatch: Any):
+        checker = _checker()
+
+        async def tracker_name(_tracker: str, meta: dict[str, Any]) -> str:
+            return str(meta["name"])
+
+        monkeypatch.setattr(checker, "_tracker_name", tracker_name)
+        meta = self._meta()
+        entry = _no_files_entry(name="Titre.Exemple.2002.MULTi.1080p.WEB.DDP.5.1.H264-GRP")
+        _run(checker.filter_dupes([entry], meta, "V3X"))
+        assert not meta.get("filename_match")
