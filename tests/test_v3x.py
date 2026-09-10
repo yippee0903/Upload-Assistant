@@ -44,7 +44,11 @@ def _rss(*torrents: dict[str, Any], size_as_attr: bool = False) -> str:
             return f'<torznab:attr name="size" value="{t.get("size", 0)}" />'
         return f"<size>{t.get('size', 0)}</size>"
 
-    items = "".join(f"<item><title>{t['name']}</title><guid isPermaLink=\"true\">https://v3x.club/torrents/{t['id']}</guid>{_size(t)}</item>" for t in torrents)
+    items = "".join(
+        f"<item><title>{t['name']}</title><guid isPermaLink=\"true\">https://v3x.club/torrents/{t['id']}</guid>"
+        f"<link>https://api.v3x.club/torznab/download?id={t['id']}&amp;apikey=k</link>{_size(t)}</item>"
+        for t in torrents
+    )
     return f'<?xml version="1.0"?><rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel><title>V3X</title>{items}</channel></rss>'
 
 
@@ -110,7 +114,7 @@ class TestSearchExisting:
         tracker = V3X(_config())
         self._prep(monkeypatch, tracker)
         dupes = asyncio.run(tracker.search_existing({"title": "Some Movie"}))
-        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/uuid-1", "id": "uuid-1"}]
+        assert dupes == [{"name": "Some Movie (2024)", "size": 123, "link": "https://v3x.club/torrents/uuid-1", "id": "uuid-1", "download": "https://api.v3x.club/torznab/download?id=uuid-1&apikey=k"}]
         # Full cleaned title (the API matches ordered words, separator-agnostic)
         assert _FakeClient.captured["params"]["q"] == "Some Movie"
         # torznab only reads the key from the query string (Bearer is rejected there)
@@ -119,7 +123,7 @@ class TestSearchExisting:
 
     def test_size_read_from_torznab_attr(self):
         items = V3X._parse_torznab(_rss({"id": "u1", "name": "X", "size": 456}, size_as_attr=True))
-        assert items == [{"title": "X", "size": 456, "link": "https://v3x.club/torrents/u1", "id": "u1"}]
+        assert items == [{"title": "X", "size": 456, "link": "https://v3x.club/torrents/u1", "id": "u1", "download": "https://api.v3x.club/torznab/download?id=u1&apikey=k"}]
 
     def test_search_still_full_at_the_offset_cap_fails_closed(self, monkeypatch: Any):
         full_page = _rss(*({"id": f"u{i}", "name": f"Some.Movie.2024.1080p.WEB-G{i}", "size": 1} for i in range(100)))

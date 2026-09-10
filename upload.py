@@ -59,6 +59,7 @@ from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.AR import AR
 from src.trackers.COMMON import COMMON
+from src.trackers.DRAU import DRAU
 from src.trackers.PTP import PTP
 from src.trackersetup import (
     TRACKER_SETUP,
@@ -2359,6 +2360,9 @@ async def process_cross_seeds(meta: Meta) -> None:
                 "accept": "application/json",
                 "Authorization": config["TRACKERS"][tracker]["api_key"].strip(),
             }
+        elif tracker == "DRAU":
+            # /api/torrents/{id}/download answers 401 without the key header.
+            headers = DRAU(config=config).cross_seed_headers(download_url)
 
         if tracker == "AR" and download_url:
             try:
