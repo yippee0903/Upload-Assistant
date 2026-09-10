@@ -281,7 +281,8 @@ class V3X(FrenchTrackerMixin):
             # Only same-group entries can turn into a file-level match; the others
             # fall back to name similarity anyway, so skip their detail calls.
             tag = str(meta.get("tag") or "").strip("- ").lower()
-            same_group = [d for d in dupes if tag in str(d.get("name", "")).lower()] if tag else dupes
+            group_re = re.compile(rf"-{re.escape(tag)}(?![a-z0-9])") if tag else None
+            same_group = [d for d in dupes if group_re.search(str(d.get("name", "")).lower())] if group_re else dupes
             if same_group:
                 await self._enrich_with_files(same_group, debug=debug)
         return await self._check_french_lang_dupes(dupes, meta)

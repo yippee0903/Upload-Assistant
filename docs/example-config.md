@@ -60,7 +60,7 @@ Important gotchas:
 ### Image host selection (priority list)
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
-- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `freeimage`, `imgchest`, `catbox`.
+- `img_host_1`..`img_host_99` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `freeimage`, `imgchest`, `catbox`.
 
 ### Image host credentials
 - `imgbb_api` (str): API key for imgbb.
