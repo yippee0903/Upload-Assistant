@@ -1682,6 +1682,8 @@ class C411(FrenchTrackerMixin):
 
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
+        if dupes:
+            await self._enrich_with_files(dupes, debug=bool(meta.get("debug")))
 
         # ── Same infohash: definite dupe, bypass every filter ──
         # The upload torrent is a deterministic BASE clone, so an identical
@@ -1874,6 +1876,40 @@ class C411(FrenchTrackerMixin):
             return str(torrent.infohash).lower()
         except Exception:
             return ""
+
+    async def _enrich_with_files(self, dupes: list[dict[str, Any]], *, debug: bool = False) -> None:
+        """Fetch each dupe's file list via GET /api/torrents/{infohash} (Bearer).
+
+        Torznab only carries a file count; the detail endpoint lists
+        {path: [...], length}, so DupeChecker can compare filenames instead
+        of falling back to name similarity. Failures leave the entry unchanged.
+        """
+        enrich_limit = 25  # one request per dupe — bound the sequential cost
+        if len(dupes) > enrich_limit:
+            console.print(f"[yellow]C411: enriching only the first {enrich_limit} of {len(dupes)} dupes; the rest fall back to name similarity.[/yellow]")
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
+            for entry in dupes[:enrich_limit]:
+                # The endpoint takes an infohash; the parser's "id" is the RSS guid, which
+                # the live feed fills with the infohash but a fallback may fill with a URL.
+                torrent_id = str(entry.get("infohash") or entry.get("id") or "").lower()
+                if not re.fullmatch(r"[0-9a-f]{40}", torrent_id):
+                    continue
+                try:
+                    response = await client.get(f"https://c411.org/api/torrents/{torrent_id}")
+                    if response.status_code != 200:
+                        continue
+                    detail = response.json()
+                except (httpx.RequestError, httpx.TimeoutException, ValueError):
+                    continue
+                files = detail.get("files") if isinstance(detail, dict) else None
+                if isinstance(files, list):
+                    paths = ["/".join(str(p) for p in f["path"]) for f in files if isinstance(f, dict) and isinstance(f.get("path"), list) and f["path"]]
+                    if paths:
+                        entry["files"] = paths
+                        entry["file_count"] = len(paths)
+                        if debug:
+                            console.print(f"[cyan]C411 enriched {entry.get('name')!r} with {len(paths)} file(s)[/cyan]")
 
     @staticmethod
     def _parse_torznab_response(xml_text: str) -> list[dict[str, Any]]:

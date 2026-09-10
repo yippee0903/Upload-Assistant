@@ -19,6 +19,28 @@ Meta = dict[str, Any]
 DupeEntry = dict[str, Any]
 
 
+def size_backed_cross_seed(dupes: list[Any], tracker_name: str, meta: Mapping[str, Any]) -> bool:
+    """True when the matched dupe is byte-identical in size to the local release.
+
+    For trackers without file lists (DRAU, V3X without a session cookie) a name
+    match alone is not enough to cross-seed: the site torrent must weigh exactly
+    the local video (source_size) or the whole local folder (video + nfo).
+    """
+    matched_name = meta.get(f"{tracker_name}_matched_name")
+    entry = next((d for d in dupes if isinstance(d, dict) and d.get("name") == matched_name), None) if matched_name else None
+    try:
+        entry_size = int(entry.get("size") or 0) if entry else 0
+    except (TypeError, ValueError):
+        return False
+    if entry_size <= 0:
+        return False
+    local_sizes = {int(meta.get("source_size") or 0)}
+    path = str(meta.get("path") or "")
+    if os.path.isdir(path):
+        local_sizes.add(sum(os.path.getsize(os.path.join(root, f)) for root, _, files in os.walk(path) for f in files))
+    return entry_size in local_sizes
+
+
 class UploadHelper:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -174,7 +196,9 @@ class UploadHelper:
 
                 if not meta.get("were_trumping", False):
                     if meta.get("filename_match", False):
-                        console.print(f"[bold red]Exact match found! - {meta['filename_match']}[/bold red]")
+                        # exact_filename_match comes from a file-list or exact-name comparison; the rest is name similarity
+                        label = "Exact match found!" if meta.get("exact_filename_match") else "Name match found!"
+                        console.print(f"[bold red]{label} - {meta['filename_match']}[/bold red]")
                         try:
                             if tracker_name in ["AITHER", "LST"]:
                                 console.print(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
@@ -288,6 +312,15 @@ class UploadHelper:
                             if meta["debug"]:
                                 console.print(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                             break
+
+            elif meta.get("filename_match", False) and size_backed_cross_seed(dupes_list, tracker_name, meta):
+                if meta["debug"]:
+                    console.print(f"[yellow]{tracker_name} name and size cross seeding check[/yellow]")
+                tracker_download_link = meta.get(f"{tracker_name}_matched_download")
+                if tracker_download_link:
+                    meta[f"{tracker_name}_cross_seed"] = tracker_download_link
+                    if meta["debug"]:
+                        console.print(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
 
             if upload is False:
                 return True, meta
