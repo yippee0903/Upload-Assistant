@@ -31,7 +31,14 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
     """
     if meta.get("skip_imghost_upload", False) or not meta.get("image_list"):
         return []
-    relevant = [t for t in meta.get("trackers", []) if isinstance(t, str) and t in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS and t in tracker_class_map]
+    # Only trackers still slated for upload: a declined dupe or a skipped tracker
+    # must not trigger a rehost (same filter as the host arbitration in upload.py).
+    status_map = meta.get("tracker_status") or {}
+    relevant = [
+        t
+        for t in meta.get("trackers", [])
+        if isinstance(t, str) and t in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS and t in tracker_class_map and (not status_map or status_map.get(t, {}).get("upload", False))
+    ]
     if relevant:
         console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(relevant)}[/yellow]")
     for tracker_name in relevant:

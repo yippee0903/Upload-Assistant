@@ -89,6 +89,12 @@ class TestValidateReusedImageHosts:
         assert asyncio.run(validate_reused_image_hosts(meta, {}, self._map())) == []
         assert self._FakeTracker.instances == []
 
+    def test_tracker_not_slated_for_upload_is_skipped(self):
+        # A declined dupe stays in meta["trackers"] but its status says no upload: no validation, no rehost
+        meta = {"trackers": ["V3X"], "image_list": [{"img_url": "x"}], "tracker_status": {"V3X": {"upload": False, "dupe": True}}}
+        assert asyncio.run(validate_reused_image_hosts(meta, {}, self._map())) == []
+        assert self._FakeTracker.instances == []
+
 
 def test_upload_wires_the_reused_images_validation():
     # Wiring guard only — the behavior itself is covered above.
