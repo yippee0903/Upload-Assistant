@@ -2617,6 +2617,16 @@ class COMMON:
                 console.print("[yellow]No data found (404). Returning None.[/yellow]")
                 return None, None, None, None, None, None, None, [], None
 
+            if file_name and isinstance(file_name, str) and data and isinstance(data, list):
+                # A site whose file_name filter is broken answers with its newest
+                # torrents: only trust results that actually list the searched file.
+                wanted = os.path.basename(file_name).lower()
+                listed = [t for t in data if t.get("attributes", {}).get("files")]
+                if listed:
+                    data = [t for t in listed if any(os.path.basename(str(f.get("name", ""))).lower() == wanted for f in t["attributes"]["files"])]
+                    if not data:
+                        console.print(f"[yellow]{tracker}: no search result contains {wanted}, ignoring {len(listed)} unrelated torrents[/yellow]")
+
             if data and isinstance(data, list):  # Ensure data is a list before accessing it
                 attributes = data[0].get("attributes", {})
 

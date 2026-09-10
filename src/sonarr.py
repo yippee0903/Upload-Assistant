@@ -1,6 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import os
+import re
 from collections.abc import Mapping
 from typing import Any, Optional, cast
+from urllib.parse import quote
 
 import httpx
 
@@ -54,11 +57,18 @@ class SonarrManager:
             if debug:
                 console.print(f"[blue]Trying Sonarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
 
-            # Build the appropriate URL
+            # Build the appropriate URL(s)
             if tvdb_id:
-                url = f"{base_url}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"
+                urls = [f"{base_url}/api/v3/series?tvdbId={tvdb_id}&includeSeasonImages=false"]
             elif filename and title:
-                url = f"{base_url}/api/v3/parse?title={title}&path={filename}"
+                urls = [f"{base_url}/api/v3/parse?title={quote(title, safe='')}&path={quote(filename, safe='')}"]
+                # Sonarr parses the path in priority; a non-Latin prefix (native
+                # title) yields a series title it cannot match. Retry title-only
+                # with that prefix stripped.
+                release = os.path.basename(filename.rstrip("/\\"))
+                stripped = re.sub(r"^(?:[^\x00-\x7F]+[\s._-]+)+", "", release)
+                if stripped and stripped != release:
+                    urls.append(f"{base_url}/api/v3/parse?title={quote(stripped, safe='')}")
             else:
                 instance_index += 1
                 continue
@@ -67,29 +77,30 @@ class SonarrManager:
 
             if debug:
                 console.print(f"[green]TVDB ID {tvdb_id}[/green]")
-                console.print(f"[blue]Sonarr URL:[/blue] {url}")
+                console.print(f"[blue]Sonarr URL(s):[/blue] {urls}")
 
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.get(url, headers=headers, timeout=10.0)
+                    for url in urls:
+                        response = await client.get(url, headers=headers, timeout=10.0)
 
-                    if response.status_code == 200:
-                        data = response.json()
+                        if response.status_code == 200:
+                            data = response.json()
 
-                        if debug:
-                            console.print(f"[blue]Sonarr Response Status:[/blue] {response.status_code}")
-                            console.print(f"[blue]Sonarr Response Data:[/blue] {data}")
+                            if debug:
+                                console.print(f"[blue]Sonarr Response Status:[/blue] {response.status_code}")
+                                console.print(f"[blue]Sonarr Response Data:[/blue] {data}")
 
-                        # Check if we got valid data by trying to extract show info
-                        show_data: ShowInfo = await self.extract_show_data(data)
+                            # Check if we got valid data by trying to extract show info
+                            show_data: ShowInfo = await self.extract_show_data(data)
 
-                        if show_data and (show_data.get("tvdb_id") or show_data.get("imdb_id") or show_data.get("tmdb_id")):
-                            console.print(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
-                            return show_data
-                    else:
-                        console.print(
-                            f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]"
-                        )
+                            if show_data and (show_data.get("tvdb_id") or show_data.get("imdb_id") or show_data.get("tmdb_id")):
+                                console.print(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
+                                return show_data
+                        else:
+                            console.print(
+                                f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]"
+                            )
 
             except httpx.TimeoutException:
                 console.print(f"[red]Timeout when fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
