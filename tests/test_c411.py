@@ -1723,20 +1723,26 @@ class TestSearchExisting:
         c = C411(_config())
         meta = _meta_base(tmdb='', imdb_id=0)  # only the text query remains
 
-        pages = [MagicMock(status_code=200, text=self._torznab_page(100, start=i * 100)) for i in range(3)]
+        pages = iter([MagicMock(status_code=200, text=self._torznab_page(100, start=i * 100)) for i in range(3)])
+
+        async def fake_get(url: str, **kwargs: Any) -> MagicMock:
+            # torznab pages in order; the per-dupe enrichment calls get a 404
+            return next(pages) if 'params' in kwargs else MagicMock(status_code=404)
 
         with patch('httpx.AsyncClient') as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.get = AsyncMock(side_effect=pages)
+            mock_client.get = AsyncMock(side_effect=fake_get)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client_cls.return_value = mock_client
 
             asyncio.run(c.search_existing(meta, 'nodisc'))
 
-        offsets = [ca.kwargs['params'].get('offset') for ca in mock_client.get.call_args_list]
+        # Only the torznab calls paginate; the per-dupe /api/torrents/{id} enrichment calls carry no params
+        torznab_calls = [ca for ca in mock_client.get.call_args_list if 'params' in ca.kwargs]
+        offsets = [ca.kwargs['params'].get('offset') for ca in torznab_calls]
         assert offsets == ['0', '100', '200'], f"Expected three paginated calls capped at 300, got offsets {offsets}"
-        assert all(ca.kwargs['params'].get('limit') == '100' for ca in mock_client.get.call_args_list)
+        assert all(ca.kwargs['params'].get('limit') == '100' for ca in torznab_calls)
 
     def test_search_short_page_stops_pagination(self):
         """A page smaller than the page size must not trigger another request."""
@@ -1754,7 +1760,7 @@ class TestSearchExisting:
 
             asyncio.run(c.search_existing(meta, 'nodisc'))
 
-        assert mock_client.get.call_count == 1
+        assert sum('params' in ca.kwargs for ca in mock_client.get.call_args_list) == 1
 
     def test_search_deduplicates(self):
         """When IMDB + text search return the same torrent, it should appear only once."""
@@ -3319,3 +3325,43 @@ class TestSourceDescriptionSection:
     def test_section_absent_by_default(self, tmp_path: Any):
         desc = self._desc(tmp_path, flag=False, content="Encoder notes worth keeping.")
         assert "Notes de la release" not in desc
+
+
+class TestFileEnrichment:
+    """Dupes are enriched with the file list from GET /api/torrents/{infohash}."""
+
+    TORZNAB = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <item>
+      <title>Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy</title>
+      <guid>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</guid>
+      <link>https://c411.org/torrents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</link>
+      <size>4000000000</size>
+    </item>
+  </channel>
+</rss>"""
+
+    def test_search_adds_files_from_detail(self):
+        c = C411(_config())
+        meta = _meta_base()
+        torznab = MagicMock(status_code=200, text=self.TORZNAB)
+        detail = MagicMock(status_code=200)
+        detail.json.return_value = {"files": [{"path": ["Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy.mkv"], "length": 3999990000}, {"path": ["Le.Prenom.nfo"], "length": 10000}]}
+        seen: list[str] = []
+
+        async def fake_get(url: str, **kwargs: Any) -> MagicMock:
+            seen.append(url)
+            return detail if "/api/torrents/" in url else torznab
+
+        with patch('httpx.AsyncClient') as mock_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(side_effect=fake_get)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_cls.return_value = mock_client
+            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+
+        assert dupes[0]["files"] == ["Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy.mkv", "Le.Prenom.nfo"]
+        assert dupes[0]["file_count"] == 2
+        assert seen.count("https://c411.org/api/torrents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") == 1
