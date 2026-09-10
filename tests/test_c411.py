@@ -8,7 +8,7 @@ Covers: language detection, naming, category/quality mapping,
 import asyncio
 import json
 import re
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -3342,12 +3342,9 @@ class TestFileEnrichment:
   </channel>
 </rss>"""
 
-    def test_search_adds_files_from_detail(self):
+    def _search(self, detail: MagicMock, feed: Optional[str] = None) -> tuple[list[dict[str, Any]], list[str]]:
         c = C411(_config())
-        meta = _meta_base()
-        torznab = MagicMock(status_code=200, text=self.TORZNAB)
-        detail = MagicMock(status_code=200)
-        detail.json.return_value = {"files": [{"path": ["Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy.mkv"], "length": 3999990000}, {"path": ["Le.Prenom.nfo"], "length": 10000}]}
+        torznab = MagicMock(status_code=200, text=feed or self.TORZNAB)
         seen: list[str] = []
 
         async def fake_get(url: str, **kwargs: Any) -> MagicMock:
@@ -3360,8 +3357,26 @@ class TestFileEnrichment:
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_cls.return_value = mock_client
-            dupes = asyncio.run(c.search_existing(meta, 'nodisc'))
+            return asyncio.run(c.search_existing(_meta_base(), 'nodisc')), seen
 
+    def test_search_adds_files_from_detail(self):
+        detail = MagicMock(status_code=200)
+        detail.json.return_value = {"files": [{"path": ["Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy.mkv"], "length": 3999990000}, {"path": ["Le.Prenom.nfo"], "length": 10000}]}
+        dupes, seen = self._search(detail)
         assert dupes[0]["files"] == ["Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy.mkv", "Le.Prenom.nfo"]
         assert dupes[0]["file_count"] == 2
         assert seen.count("https://c411.org/api/torrents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") == 1
+
+    def test_failed_detail_leaves_the_dupe_unchanged(self):
+        dupes, _ = self._search(MagicMock(status_code=404))
+        assert dupes[0]["files"] == [] and dupes[0]["file_count"] == 0
+
+        bad_json = MagicMock(status_code=200)
+        bad_json.json.side_effect = ValueError("not json")
+        dupes, _ = self._search(bad_json)
+        assert dupes[0]["files"] == [] and dupes[0]["file_count"] == 0
+
+    def test_guid_that_is_not_an_infohash_is_not_requested(self):
+        feed = self.TORZNAB.replace("<guid>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</guid>", "<guid>https://c411.org/torrents/111</guid>")
+        dupes, seen = self._search(MagicMock(status_code=200), feed)
+        assert dupes and not any("/api/torrents/" in url for url in seen)

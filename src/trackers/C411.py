@@ -1890,8 +1890,10 @@ class C411(FrenchTrackerMixin):
         headers = {"Authorization": f"Bearer {self.api_key}"}
         async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
             for entry in dupes[:enrich_limit]:
-                torrent_id = entry.get("infohash") or entry.get("id")
-                if not torrent_id:
+                # The endpoint takes an infohash; the parser's "id" is the RSS guid, which
+                # the live feed fills with the infohash but a fallback may fill with a URL.
+                torrent_id = str(entry.get("infohash") or entry.get("id") or "").lower()
+                if not re.fullmatch(r"[0-9a-f]{40}", torrent_id):
                     continue
                 try:
                     response = await client.get(f"https://c411.org/api/torrents/{torrent_id}")
