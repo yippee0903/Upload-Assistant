@@ -278,7 +278,12 @@ class V3X(FrenchTrackerMixin):
         if debug:
             console.print(f"[cyan]{self.tracker} dupe search found {len(dupes)} result(s)[/cyan]")
         if dupes:
-            await self._enrich_with_files(dupes, debug=debug)
+            # Only same-group entries can turn into a file-level match; the others
+            # fall back to name similarity anyway, so skip their detail calls.
+            tag = str(meta.get("tag") or "").strip("- ").lower()
+            same_group = [d for d in dupes if tag in str(d.get("name", "")).lower()] if tag else dupes
+            if same_group:
+                await self._enrich_with_files(same_group, debug=debug)
         return await self._check_french_lang_dupes(dupes, meta)
 
     @staticmethod

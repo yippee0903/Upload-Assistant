@@ -1683,7 +1683,12 @@ class C411(FrenchTrackerMixin):
         if meta.get("debug"):
             console.print(f"[cyan]C411 dupe search found {len(dupes)} result(s)[/cyan]")
         if dupes:
-            await self._enrich_with_files(dupes, debug=bool(meta.get("debug")))
+            # Only same-group entries can turn into a file-level match; the others
+            # fall back to name similarity anyway, so skip their detail calls.
+            tag = str(meta.get("tag") or "").strip("- ").lower()
+            same_group = [d for d in dupes if tag in str(d.get("name", "")).lower()] if tag else dupes
+            if same_group:
+                await self._enrich_with_files(same_group, debug=bool(meta.get("debug")))
 
         # ── Same infohash: definite dupe, bypass every filter ──
         # The upload torrent is a deterministic BASE clone, so an identical
