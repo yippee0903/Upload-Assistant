@@ -16,6 +16,7 @@ import pyimgbox
 from typing_extensions import TypeAlias
 
 from src.console import console
+from src.imagehosts import MAX_IMAGE_HOST_SLOTS
 
 Meta: TypeAlias = dict[str, Any]
 ImageDict: TypeAlias = dict[str, Any]
@@ -561,6 +562,110 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 console.print(f"[red]Unexpected error with Postimages: {e}")
                 return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
 
+        elif img_host == "freeimage":
+            url = "https://freeimage.host/api/1/upload"
+            try:
+                data = {"key": config["DEFAULT"]["freeimage_api"], "action": "upload"}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"source": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, data=data, files=files, timeout=timeout)
+                    response_data = response.json()
+
+                    if response.status_code != 200 or "image" not in response_data:
+                        console.print(f"[yellow]freeimage upload failed: {response_data.get('error', {}).get('message', 'Unknown error')} {response.status_code}")
+                        return {"status": "failed", "reason": "freeimage upload failed"}
+
+                    raw_url = response_data["image"]["url"]
+                    # Chevereto omits "medium" when the source is smaller than the medium size.
+                    img_url = response_data["image"].get("medium", {}).get("url") or raw_url
+                    web_url = response_data["image"]["url_viewer"]
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to freeimage timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]freeimage request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                console.print(f"[red]Invalid JSON response from freeimage: {e}")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+
+        elif img_host == "imgchest":
+            url = "https://api.imgchest.com/v1/post"
+            try:
+                headers = {"Authorization": f"Bearer {config['DEFAULT']['imgchest_api']}"}
+                # One hidden post per screenshot: imgchest has no single-image endpoint.
+                data = {"privacy": "hidden"}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"images[]": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, headers=headers, data=data, files=files, timeout=timeout)
+                    response_data = response.json()
+                    images = response_data.get("data", {}).get("images") or []
+
+                    if response.status_code != 200 or not images:
+                        console.print(f"[yellow]imgchest upload failed: {response_data.get('message', 'Unknown error')} {response.status_code}")
+                        return {"status": "failed", "reason": "imgchest upload failed"}
+
+                    # The CDN thumbnail (/files/thumb/) is a 400x400 centre crop, useless for a
+                    # 16:9 capture: the full image is used everywhere, as for lostimg.
+                    img_url = raw_url = images[0]["link"]
+                    web_url = f"https://imgchest.com/p/{response_data['data']['id']}"
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to imgchest timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]imgchest request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+            except ValueError as e:
+                console.print(f"[red]Invalid JSON response from imgchest: {e}")
+                return {"status": "failed", "reason": "Invalid JSON response"}
+
+        elif img_host == "catbox":
+            url = "https://catbox.moe/user/api.php"
+            userhash = config["DEFAULT"].get("catbox_userhash")
+
+            if not userhash:
+                console.print("[red]Catbox userhash not found in config, anonymous uploads are not allowed.")
+                return {"status": "failed", "reason": "Missing Catbox userhash"}
+
+            try:
+                data = {"reqtype": "fileupload", "userhash": userhash}
+
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"fileToUpload": (os.path.basename(image), await file.read())}
+
+                    response = await client.post(url, data=data, files=files, timeout=timeout)
+                    # The API answers with the bare file URL as plain text, or an error sentence.
+                    body = response.text.strip()
+
+                    if response.status_code != 200 or not body.startswith("https://files.catbox.moe/"):
+                        console.print(f"[yellow]Catbox upload failed: {body[:100]} {response.status_code}")
+                        return {"status": "failed", "reason": "Catbox upload failed"}
+
+                    # Catbox has no thumbnails: the full image is used everywhere.
+                    img_url = raw_url = web_url = body
+
+                    if meta["debug"]:
+                        console.print(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+
+            except httpx.TimeoutException:
+                console.print("[red]Request to Catbox timed out.")
+                return {"status": "failed", "reason": "Request timed out"}
+            except httpx.RequestError as e:
+                console.print(f"[red]Catbox request failed: {e}")
+                return {"status": "failed", "reason": str(e)}
+
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
             url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
@@ -663,7 +768,7 @@ async def _upload_screens(
 
         # Find the first approved host from config
         approved_host = None
-        for i in range(1, 10):  # Check img_host_1 through img_host_9
+        for i in range(1, MAX_IMAGE_HOST_SLOTS + 1):
             host_key = f"img_host_{i}"
             if host_key in default_config:
                 host = default_config[host_key]
@@ -849,7 +954,7 @@ async def _upload_screens(
                 console.print(f"[yellow]Marked '{img_host}' as failed for this session.[/yellow]")
 
             # Keep walking img_host_N after a fallback also fails (the chain used to stop at img_host_2)
-            for next_host_num in range(img_host_num + 1, 10):
+            for next_host_num in range(img_host_num + 1, MAX_IMAGE_HOST_SLOTS + 1):
                 next_host = str(default_config.get(f"img_host_{next_host_num}") or "").strip()
                 if not next_host or next_host in failed_hosts or (allowed_hosts is not None and next_host not in allowed_hosts):
                     continue

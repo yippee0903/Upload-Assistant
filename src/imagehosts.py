@@ -13,6 +13,7 @@ class ImageHost:
 
 
 MIN_IMAGE_BYTES = 75_000
+MAX_IMAGE_HOST_SLOTS = 99  # img_host_1 .. img_host_99 in config
 
 IMAGE_HOSTS: dict[str, ImageHost] = {
     "imgbb": ImageHost(("ibb.co", "imgbb.com"), ("imgbb_api",), 31_000_000),
@@ -30,6 +31,9 @@ IMAGE_HOSTS: dict[str, ImageHost] = {
     "lostimg": ImageHost(("lostimg.cc",), ("lostimg_api",)),
     "postimg": ImageHost(("postimg.cc",), ("postimg_api",)),
     "midnightscene": ImageHost(("img.midnightscene.cc",), ("midnightscene_api_key",)),
+    "freeimage": ImageHost(("freeimage.host", "iili.io"), ("freeimage_api",)),
+    "imgchest": ImageHost(("imgchest.com", "cdn.imgchest.com"), ("imgchest_api",)),
+    "catbox": ImageHost(("catbox.moe", "files.catbox.moe"), ("catbox_userhash",)),
     # recognised when rehosting, never uploaded to
     "bhd": ImageHost(("beyondhd.co",), uploadable=False),
     "imagebam": ImageHost(("imagebam.com",), uploadable=False),

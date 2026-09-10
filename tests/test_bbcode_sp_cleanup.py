@@ -468,3 +468,19 @@ def test_site_anonymisation_keeps_image_and_link_hosts_intact() -> None:
 def test_site_anonymisation_leaves_longer_hosts_alone() -> None:
     cleaned, _ = BBCODE().clean_unit3d_description("See seedpool.org.uk or seedpool.org-mirror, not seedpool.org!", "https://seedpool.org")
     assert cleaned == "See seedpool.org.uk or seedpool.org-mirror, not seedpool!"
+
+
+def test_unit3d_auto_uploader_signature_is_removed() -> None:
+    desc = (
+        "Kept.\n"
+        "[center][b]Uploaded with UNIT3D Auto Uploader[/b][/center]\n"
+        "Uploaded with [url=https://github.com/HDInnovations/UNIT3D]UNIT3D[/url] Auto Uploader v1.2.3\n"
+        "[center][img=20]https://example.invalid/favicon.ico[/img] [b]Uploaded Using [url=https://github.com/HDInnovations/UNIT3D]UNIT3D[/url] Auto Uploader[/b] [img=20]https://example.invalid/favicon.ico[/img][/center]\n"
+        "Also kept, even though it was uploaded with UNIT3D Auto Uploader at first."
+    )
+    cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
+    assert "Kept." in cleaned and "Also kept, even though it was uploaded with UNIT3D Auto Uploader at first." in cleaned
+    assert cleaned.count("Auto Uploader") == 1
+    assert "favicon.ico" not in cleaned
+    # the signature's favicons are decoration, not screenshots to reuse
+    assert not any("favicon.ico" in img["img_url"] for img in images)

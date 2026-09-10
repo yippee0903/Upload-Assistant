@@ -51,11 +51,17 @@ config = {
         "lostimg_api": "",
         # postimages.org API key (https://postimages.org/login/api)
         "postimg_api": "",
+        # freeimage.host API key
+        "freeimage_api": "",
+        # imgchest.com API token
+        "imgchest_api": "",
+        # catbox.moe userhash, required. Often blocked or slow from some countries and ISPs, keep it late in the host order
+        "catbox_userhash": "",
         # img.midnightscene.cc API key (MidnightScene members)
         "midnightscene_api_key": "",
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg, postimg, freeimage, imgchest, catbox
         "img_host_1": "imgbb",
         "img_host_2": "imgbox",
 

@@ -6,7 +6,7 @@ Validates the user's config.py against expected structure and types.
 
 from typing import Any, Optional, cast
 
-from src.imagehosts import IMAGE_HOST_CONFIG_KEYS, UPLOAD_HOSTS
+from src.imagehosts import IMAGE_HOST_CONFIG_KEYS, MAX_IMAGE_HOST_SLOTS, UPLOAD_HOSTS
 
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
@@ -39,6 +39,9 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "onlyimage_api": (str,),
     "lostimg_api": (str,),
     "postimg_api": (str,),
+    "freeimage_api": (str,),
+    "imgchest_api": (str,),
+    "catbox_userhash": (str,),
     "midnightscene_api_key": (str,),
     "add_logo": (bool,),
     "logo_size": (str, int),
@@ -316,7 +319,7 @@ def validate_config(config: Any, active_trackers: Optional[list[str]] = None, ac
             active_hosts = [active_imghost.strip()]
         else:
             # Collect all configured img_host_* values
-            for i in range(1, 10):
+            for i in range(1, MAX_IMAGE_HOST_SLOTS + 1):
                 host_key = f"img_host_{i}"
                 host_value = default_section.get(host_key, "")
                 if isinstance(host_value, str) and host_value.strip():
@@ -360,7 +363,7 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                 )
 
     # Validate image hosts
-    for i in range(1, 10):
+    for i in range(1, MAX_IMAGE_HOST_SLOTS + 1):
         host_key = f"img_host_{i}"
         if host_key in default:
             host_value = default[host_key]

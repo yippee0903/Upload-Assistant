@@ -3380,3 +3380,22 @@ class TestFileEnrichment:
         feed = self.TORZNAB.replace("<guid>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</guid>", "<guid>https://c411.org/torrents/111</guid>")
         dupes, seen = self._search(MagicMock(status_code=200), feed)
         assert dupes and not any("/api/torrents/" in url for url in seen)
+
+    def test_only_same_group_dupes_are_enriched(self):
+        other = self.TORZNAB.replace("</channel>", """    <item>
+      <title>Le.Prenom.2012.FRENCH.1080p.WEB.x264-OTHER</title>
+      <guid>bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</guid>
+      <link>https://c411.org/torrents/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</link>
+      <size>4000000000</size>
+    </item>
+  </channel>""")
+        dupes, seen = self._search(MagicMock(status_code=404), other)
+        assert len(dupes) == 2
+        detail_calls = [url for url in seen if "/api/torrents/" in url]
+        assert detail_calls == ["https://c411.org/api/torrents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+
+    def test_tag_inside_the_name_is_not_a_group_match(self):
+        # "Troxy" appears in the title tokens but the trailing group is another one
+        feed = self.TORZNAB.replace("Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy", "Le.Prenom.Troxy.2012.FRENCH.1080p.WEB.x264-OTHER")
+        _, seen = self._search(MagicMock(status_code=404), feed)
+        assert not any("/api/torrents/" in url for url in seen)

@@ -60,7 +60,7 @@ Important gotchas:
 ### Image host selection (priority list)
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
-- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`.
+- `img_host_1`..`img_host_99` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `freeimage`, `imgchest`, `catbox`.
 
 ### Image host credentials
 - `imgbb_api` (str): API key for imgbb.
@@ -68,6 +68,9 @@ Order matters: `img_host_1` is primary, later hosts are fallbacks.
 - `ptscreens_api` (str): API key for ptscreens.
 - `onlyimage_api` (str): API key for onlyimage.
 - `dalexni_api` (str): API key for dalexni.
+- `freeimage_api` (str): API key for freeimage.host.
+- `imgchest_api` (str): API token for imgchest.
+- `catbox_userhash` (str): Userhash for catbox.moe. Required, anonymous uploads are refused. Catbox is often blocked or slow from some countries and ISPs, and some trackers refuse it, so keep it late in the host order.
 - `passtheima_ge_api` (str): API key for passtheimage.
 - `zipline_url` (str): Base URL for a Zipline instance.
 - `zipline_api_key` (str): Zipline API key.

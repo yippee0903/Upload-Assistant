@@ -59,6 +59,35 @@ def image_entry(img_url: str, web_url: str = "") -> dict[str, str]:
     return {"img_url": img_url, "raw_url": raw_url, "web_url": web_url.strip() or raw_url}
 
 
+# Complete lines made of a tool signature plus known BBCode wrappers (and the
+# favicon-style images some tools frame it with). Ordinary note text that merely
+# mentions a tool name must survive, hence the anchored, whole-line match.
+_SIG_DECOR = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|\[img(?:=\d+)?\][^\[\]\n]*\[/img\]|[^\w\n\[\]])*"
+_SIG_MARKERS = (
+    r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
+    r"Uploaded (?:with|using) (?:\[url=[^\]]*\])?UNIT3D(?:\[/url\])? Auto Uploader(?:\s+v?[\w.]+)?",
+    r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
+    r"Uploaded with (?:\[/?color(?:=[^\]]*)?\]|[^\w\n\[\]])*using GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
+    r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
+    r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
+    r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
+    r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
+    r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
+    r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
+    r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
+    r"OnlyEncodes Uploader(?:\s*[-–]\s*Powered by L4G'?s Upload Assistant)?",
+    r"Created with mkbrr, ffmpeg,? and mediainfo",
+    r"This release is sourced from [\w+ ]{1,30} and is not transcoded, just remuxed from the direct [\w+ ]{1,30} stream",
+    r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
+)
+
+
+def _strip_signature_lines(desc: str) -> str:
+    for marker in _SIG_MARKERS:
+        desc = re.sub(rf"^\s*{_SIG_DECOR}{marker}\s*[.!]?\s*{_SIG_DECOR}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+    return desc
+
+
 class BBCODE:
     def __init__(self) -> None:
         pass
@@ -505,6 +534,9 @@ class BBCODE:
             desc = desc.replace(spoilers[i], f"SPOILER_PLACEHOLDER-{i} ")
             spoiler_placeholders.append(spoilers[i])
 
+        # Signature lines first: their framing images must not be harvested as screenshots.
+        desc = _strip_signature_lines(desc)
+
         # Get Images from [img] tags, checking if they're wrapped in [url] tags
         imagelist: list[dict[str, Any]] = []
 
@@ -603,27 +635,8 @@ class BBCODE:
         ).strip()
         desc = re.sub(r"\[center\].*Created by.*Upload Assistant.*\[\/center\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[right\].*Created by.*Upload Assistant.*\[\/right\]", "", desc, flags=re.IGNORECASE)
-        # ...and bare (unwrapped) signature lines: only complete lines made of
-        # the marker plus known BBCode wrappers — ordinary note text that
-        # merely mentions a tool name must survive.
-        _sig_decor = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\w\n\[\]])*"
-        for _sig_marker in (
-            r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
-            r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
-            r"Uploaded with (?:\[/?color(?:=[^\]]*)?\]|[^\w\n\[\]])*using GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
-            r"Created by Hentai Bot(?:\s+v?[\w.]+)?",
-            r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
-            r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
-            r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
-            r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
-            r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
-            r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
-            r"OnlyEncodes Uploader(?:\s*[-–]\s*Powered by L4G'?s Upload Assistant)?",
-            r"Created with mkbrr, ffmpeg,? and mediainfo",
-            r"This release is sourced from [\w+ ]{1,30} and is not transcoded, just remuxed from the direct [\w+ ]{1,30} stream",
-            r"Please PM [\w.\-]{1,40} if you have any issues(?: or need a reseed)?",
-        ):
-            desc = re.sub(rf"^\s*{_sig_decor}{_sig_marker}\s*[.!]?\s*{_sig_decor}\s*$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # ...and bare (unwrapped) signature lines (see _strip_signature_lines)
+        desc = _strip_signature_lines(desc)
         # Group signatures pointing at another tracker's search page
         # ("Find our uploads [url=…]here[/url]"), wherever they sit on the line.
         desc = re.sub(r"(?:\[center\])?\s*Find (?:our|my) uploads\s*\[url=[^\]]*\][^\[]*\[/url\]\.?\s*(?:\[/center\])?", "", desc, flags=re.IGNORECASE)
