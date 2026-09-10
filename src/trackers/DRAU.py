@@ -12,6 +12,8 @@
 #                                           the pagination); q matches ordered
 #                                           words against the stored name
 #   GET  /api/torrents/{sqid|infohash}      detail: file_count only, no file list
+#   GET  /api/torrents/{sqid|infohash}/download  the .torrent (X-Api-Key required);
+#                                           catalogue entries carry it as download_url
 #   POST /api/upload                        multipart upload:
 #     required: torrent (private, info.source = "DRAUPNIRR"), category slug
 #     accepted: nfo, description (bbcode), mediainfo (text), meta[work_title],
@@ -27,6 +29,7 @@
 import asyncio
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import aiofiles
 import httpx
@@ -100,6 +103,17 @@ class DRAU(FrenchTrackerMixin):
         return "films-film"
 
     # ── Dupes ──
+
+    def cross_seed_headers(self, download_url: str) -> Optional[dict[str, str]]:
+        """X-Api-Key for a .torrent download, only when the URL is the site's own HTTPS origin.
+
+        The URL comes from the catalogue response and httpx forwards custom
+        headers across cross-origin redirects, so the key never goes elsewhere.
+        """
+        target, site = urlparse(download_url), urlparse(self.base_url)
+        if target.scheme == "https" and target.hostname == site.hostname:
+            return {"X-Api-Key": self.api_key}
+        return None
 
     async def search_existing(self, meta: Meta, _disctype: Any = None) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -186,6 +200,7 @@ class DRAU(FrenchTrackerMixin):
                     "size": int(size) if isinstance(size, (int, float)) or str(size).isdigit() else 0,
                     "link": f"{self.torrent_url}{torrent.get('id', '')}",
                     "id": torrent.get("id"),
+                    "download": torrent.get("download_url"),
                 }
                 if isinstance(file_count, int):
                     entry["file_count"] = file_count

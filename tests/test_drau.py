@@ -61,7 +61,7 @@ def _posts() -> list[dict[str, Any]]:
 
 
 def _entry(name: str, size: int = 1000, torrent_id: str = "Xk3Qm9") -> dict[str, Any]:
-    return {"id": torrent_id, "infohash": "ab" * 20, "name": name, "category": "films-film", "size_bytes": size, "file_count": 1}
+    return {"id": torrent_id, "infohash": "ab" * 20, "name": name, "category": "films-film", "size_bytes": size, "file_count": 1, "download_url": f"https://draupnirr.xyz/api/torrents/{torrent_id}/download"}
 
 
 class TestCategoryMapping:
@@ -106,7 +106,7 @@ class TestSearchExisting:
         self._prep(monkeypatch, tracker)
         _FakeClient.response = _FakeResponse(200, [_entry("Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", size=4321)])
         dupes = asyncio.run(tracker.search_existing(self._meta()))
-        assert dupes == [{"name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", "size": 4321, "link": "https://draupnirr.xyz/torrents/Xk3Qm9", "id": "Xk3Qm9", "file_count": 1}]
+        assert dupes == [{"name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", "size": 4321, "link": "https://draupnirr.xyz/torrents/Xk3Qm9", "id": "Xk3Qm9", "download": "https://draupnirr.xyz/api/torrents/Xk3Qm9/download", "file_count": 1}]
         sent = _FakeClient.captured
         assert sent["url"] == "https://draupnirr.xyz/api/torrents"
         assert sent["params"] == {"q": "Some Movie", "limit": 100, "offset": 0}
@@ -349,3 +349,12 @@ def test_drau_is_registered() -> None:
     assert tracker_class_map["DRAU"] is DRAU
     assert "DRAU" in other_api_trackers
     assert "DRAU" in nfo_auto_trackers
+
+
+class TestCrossSeedHeaders:
+    def test_key_only_for_the_https_site_origin(self):
+        tracker = DRAU(_config())
+        assert tracker.cross_seed_headers("https://draupnirr.xyz/api/torrents/abc/download") == {"X-Api-Key": _config()["TRACKERS"]["DRAU"]["api_key"]}
+        assert tracker.cross_seed_headers("http://draupnirr.xyz/api/torrents/abc/download") is None
+        assert tracker.cross_seed_headers("https://evil.example/api/torrents/abc/download") is None
+        assert tracker.cross_seed_headers("https://draupnirr.xyz.evil.example/x") is None

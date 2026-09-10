@@ -1922,6 +1922,10 @@ class C411(FrenchTrackerMixin):
             if guid_el is not None and guid_el.text:
                 guid = guid_el.text.strip()
 
+            # The enclosure is the .torrent (api?t=get&id=&apikey=): what cross-seeding downloads.
+            enclosure_el = item.find("enclosure")
+            download = (enclosure_el.get("url") or "").strip() if enclosure_el is not None else ""
+
             # Extract torznab attributes (resolution, category, files, etc.)
             files_count = 0
             resolution = ""
@@ -1954,7 +1958,7 @@ class C411(FrenchTrackerMixin):
                         "type": None,
                         "bd_info": None,
                         "description": None,
-                        "download": None,
+                        "download": download or None,
                     }
                 )
 
