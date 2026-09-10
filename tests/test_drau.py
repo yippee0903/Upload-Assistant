@@ -61,7 +61,7 @@ def _posts() -> list[dict[str, Any]]:
 
 
 def _entry(name: str, size: int = 1000, torrent_id: str = "Xk3Qm9") -> dict[str, Any]:
-    return {"id": torrent_id, "infohash": "ab" * 20, "name": name, "category": "films-film", "size_bytes": size, "file_count": 1}
+    return {"id": torrent_id, "infohash": "ab" * 20, "name": name, "category": "films-film", "size_bytes": size, "file_count": 1, "download_url": f"https://draupnirr.xyz/api/torrents/{torrent_id}/download"}
 
 
 class TestCategoryMapping:
@@ -106,7 +106,7 @@ class TestSearchExisting:
         self._prep(monkeypatch, tracker)
         _FakeClient.response = _FakeResponse(200, [_entry("Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", size=4321)])
         dupes = asyncio.run(tracker.search_existing(self._meta()))
-        assert dupes == [{"name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", "size": 4321, "link": "https://draupnirr.xyz/torrents/Xk3Qm9", "id": "Xk3Qm9", "file_count": 1}]
+        assert dupes == [{"name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", "size": 4321, "link": "https://draupnirr.xyz/torrents/Xk3Qm9", "id": "Xk3Qm9", "download": "https://draupnirr.xyz/api/torrents/Xk3Qm9/download", "file_count": 1}]
         sent = _FakeClient.captured
         assert sent["url"] == "https://draupnirr.xyz/api/torrents"
         assert sent["params"] == {"q": "Some Movie", "limit": 100, "offset": 0}

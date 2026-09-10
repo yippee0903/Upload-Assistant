@@ -4,7 +4,8 @@
 #
 # API surface (api.v3x.club):
 #   GET  /torznab/api?t=search&q=…&apikey=…   key-authenticated listing (RSS/torznab):
-#     title, size, guid (site URL with the uuid), infohash, tmdbid; limit max 100,
+#     title, size, guid (site URL with the uuid), link (torznab/download?id=&apikey=,
+#     the .torrent, used for cross-seeding), infohash, tmdbid; limit max 100,
 #     offset pagination, no total. The key goes in the query string only — the
 #     Bearer header is rejected on this read scope. season/ep params are ignored.
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
@@ -270,6 +271,7 @@ class V3X(FrenchTrackerMixin):
                         "size": torrent.get("size", 0),
                         "link": torrent.get("link") or f"{self.torrent_url}{torrent.get('id', '')}",
                         "id": torrent.get("id"),
+                        "download": torrent.get("download"),
                     }
                 )
 
@@ -281,7 +283,7 @@ class V3X(FrenchTrackerMixin):
 
     @staticmethod
     def _parse_torznab(xml_text: str) -> list[dict[str, Any]]:
-        """Torznab RSS items → {title, size, link, id (uuid from the guid URL)}."""
+        """Torznab RSS items → {title, size, link, id (uuid from the guid URL), download (.torrent URL)}."""
         items: list[dict[str, Any]] = []
         for item in ET.fromstring(xml_text).iter("item"):
             guid = (item.findtext("guid") or "").strip()
@@ -293,6 +295,8 @@ class V3X(FrenchTrackerMixin):
                     "size": int(size_text) if size_text.isdigit() else 0,
                     "link": guid,
                     "id": guid.rstrip("/").rsplit("/", 1)[-1] if guid else None,
+                    # <link> is the torznab/download URL with the key: what cross-seeding fetches.
+                    "download": (item.findtext("link") or "").strip(),
                 }
             )
         return items

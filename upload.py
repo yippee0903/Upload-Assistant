@@ -2359,6 +2359,9 @@ async def process_cross_seeds(meta: Meta) -> None:
                 "accept": "application/json",
                 "Authorization": config["TRACKERS"][tracker]["api_key"].strip(),
             }
+        elif tracker == "DRAU":
+            # /api/torrents/{id}/download answers 401 without the key header.
+            headers = {"X-Api-Key": str(config["TRACKERS"][tracker].get("api_key", "")).strip()}
 
         if tracker == "AR" and download_url:
             try:

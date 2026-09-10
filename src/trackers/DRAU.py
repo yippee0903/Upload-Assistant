@@ -12,6 +12,8 @@
 #                                           the pagination); q matches ordered
 #                                           words against the stored name
 #   GET  /api/torrents/{sqid|infohash}      detail: file_count only, no file list
+#   GET  /api/torrents/{sqid|infohash}/download  the .torrent (X-Api-Key required);
+#                                           catalogue entries carry it as download_url
 #   POST /api/upload                        multipart upload:
 #     required: torrent (private, info.source = "DRAUPNIRR"), category slug
 #     accepted: nfo, description (bbcode), mediainfo (text), meta[work_title],
@@ -186,6 +188,7 @@ class DRAU(FrenchTrackerMixin):
                     "size": int(size) if isinstance(size, (int, float)) or str(size).isdigit() else 0,
                     "link": f"{self.torrent_url}{torrent.get('id', '')}",
                     "id": torrent.get("id"),
+                    "download": torrent.get("download_url"),
                 }
                 if isinstance(file_count, int):
                     entry["file_count"] = file_count
