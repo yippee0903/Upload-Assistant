@@ -1666,6 +1666,8 @@ class QbittorrentClientMixin:
             matching_torrents: list[dict[str, Any]] = []
 
             # First collect exact path matches
+            linked_folders = self._coerce_str_list(client_config.get("linked_folder", []))
+            local_sizes = local_content_sizes(meta)
             for torrent in torrents:
                 try:
                     torrent_name = torrent.name
@@ -1675,6 +1677,10 @@ class QbittorrentClientMixin:
                         continue
 
                     if not self._torrent_name_matches(torrent_name, meta):
+                        if linked_size_match(torrent, linked_folders, local_sizes):
+                            # Its root carries the tracker's name, so it must not become the
+                            # BASE.torrent; it only marks the tracker as already seeding.
+                            await match_tracker_url([str(torrent.tracker or "")], meta)
                         continue
 
                     torrent_properties: dict[str, Any] = {}
@@ -2115,6 +2121,33 @@ class QbittorrentClientMixin:
             return []
 
 
+def local_content_sizes(meta: dict[str, Any]) -> set[int]:
+    """Byte sizes a client torrent of this release may have: the video alone (source_size) or the whole folder (video + nfo)."""
+    sizes = {int(meta.get("source_size") or 0)}
+    path = str(meta.get("path") or "")
+    if os.path.isdir(path):
+        sizes.add(sum(os.path.getsize(os.path.join(root, f)) for root, _, files in os.walk(path) for f in files))
+    sizes.discard(0)
+    return sizes
+
+
+def linked_size_match(torrent: Any, linked_folders: list[str], local_sizes: set[int]) -> bool:
+    """A tool-linked upload whose root the tracker renamed (V3X, SPD, FF, PTS, THR).
+
+    The name check cannot see it, but the tool itself put it under a linked
+    folder, and an identical byte size rules out another release of the title.
+    """
+    content = str(getattr(torrent, "content_path", "") or "")
+    if not content or not local_sizes:
+        return False
+    if not any(content.startswith(os.path.join(folder, "")) for folder in linked_folders if folder):
+        return False
+    try:
+        return int(getattr(torrent, "total_size", 0) or getattr(torrent, "size", 0) or 0) in local_sizes
+    except (TypeError, ValueError):
+        return False
+
+
 async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> None:
     tracker_url_patterns = {
         "acm": ["https://eiga.moi"],
@@ -2128,11 +2161,12 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "blu": ["https://blutopia.cc"],
         "bt": ["t.brasiltracker.org"],
         "btn": ["https://broadcasthe.net"],
-        "c411": ["c411.org"],
+        "c411": ["c411.org", "c411.tw"],
         "cbr": ["capybarabr.com"],
         "cz": ["tracker.cinemaz.to"],
         "dc": ["tracker.digitalcore.club", "trackerprxy.digitalcore.club"],
         "dp": ["https://darkpeers.org"],
+        "drau": ["draupnirr.xyz"],
         "emuw": ["emuwarez.com"],
         "ff": ["tracker.funfile.org"],
         "fl": ["reactor.filelist", "reactor.thefl.org"],
@@ -2180,6 +2214,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: dict[str, Any]) -> No
         "tvc": ["https://tvchaosuk.com"],
         "ulcx": ["https://upload.cx"],
         "utp": ["utp.to"],
+        "v3x": ["v3x.club"],
         "yus": ["https://yu-scene.net"],
     }
     found_ids: set[str] = set()
