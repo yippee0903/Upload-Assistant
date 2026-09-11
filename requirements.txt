@@ -41,7 +41,7 @@ rich==15.0.0
 setuptools==84.0.0
 tmdbsimple==2.9.8
 torf==4.3.1
-tqdm==4.70.0
+tqdm==4.70.1
 transmission_rpc==7.0.12
 tvdb-v4-official==1.1.0
 unidecode==1.4.0
