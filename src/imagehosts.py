@@ -10,6 +10,7 @@ class ImageHost:
     config_keys: tuple[str, ...] = ()  # config["DEFAULT"] keys the host needs (credential, URL)
     max_bytes: Optional[int] = None  # None = no upper limit
     uploadable: bool = True  # False = only recognised when rehosting
+    site_bound: bool = False  # True = a tracker's own host; its images must be rehosted for any other site
 
 
 MIN_IMAGE_BYTES = 75_000
@@ -24,26 +25,28 @@ IMAGE_HOSTS: dict[str, ImageHost] = {
     "onlyimage": ImageHost(("onlyimage.org",), ("onlyimage_api",)),
     "dalexni": ImageHost((), ("dalexni_api",)),
     "zipline": ImageHost((), ("zipline_url", "zipline_api_key")),
-    "passtheimage": ImageHost(("passtheima.ge", "img.passtheima.ge"), ("passtheima_ge_api",)),
-    "seedpool_cdn": ImageHost(("cdn.seedpool.org",), ("seedpool_cdn_api",)),
-    "sharex": ImageHost(("digitalcore.club", "img.digitalcore.club"), ("sharex_url", "sharex_api_key")),
-    "utppm": ImageHost(("utp.pm",), ("utppm_api",)),
+    "passtheimage": ImageHost(("passtheima.ge", "img.passtheima.ge"), ("passtheima_ge_api",), site_bound=True),
+    "seedpool_cdn": ImageHost(("cdn.seedpool.org",), ("seedpool_cdn_api",), site_bound=True),
+    "sharex": ImageHost(("digitalcore.club", "img.digitalcore.club"), ("sharex_url", "sharex_api_key"), site_bound=True),
+    "utppm": ImageHost(("utp.pm",), ("utppm_api",), site_bound=True),
     "lostimg": ImageHost(("lostimg.cc",), ("lostimg_api",)),
     "postimg": ImageHost(("postimg.cc",), ("postimg_api",)),
-    "midnightscene": ImageHost(("img.midnightscene.cc",), ("midnightscene_api_key",)),
+    "midnightscene": ImageHost(("img.midnightscene.cc",), ("midnightscene_api_key",), site_bound=True),
     "freeimage": ImageHost(("freeimage.host", "iili.io"), ("freeimage_api",)),
     "imgchest": ImageHost(("imgchest.com", "cdn.imgchest.com"), ("imgchest_api",)),
     "catbox": ImageHost(("catbox.moe", "files.catbox.moe"), ("catbox_userhash",)),
     # recognised when rehosting, never uploaded to
-    "bhd": ImageHost(("beyondhd.co",), uploadable=False),
+    "bhd": ImageHost(("beyondhd.co",), uploadable=False, site_bound=True),
     "imagebam": ImageHost(("imagebam.com",), uploadable=False),
     "imgur": ImageHost(("imgur.com",), uploadable=False),
-    "kshare": ImageHost(("kshare.club",), uploadable=False),
-    "pterclub": ImageHost(("img.pterclub.com",), uploadable=False),
-    "ilikeshots": ImageHost(("yes.ilikeshots.club",), uploadable=False),
+    "kshare": ImageHost(("kshare.club",), uploadable=False, site_bound=True),
+    "pterclub": ImageHost(("img.pterclub.com",), uploadable=False, site_bound=True),
+    "ilikeshots": ImageHost(("yes.ilikeshots.club",), uploadable=False, site_bound=True),
 }
 
 UPLOAD_HOSTS: tuple[str, ...] = tuple(slug for slug, host in IMAGE_HOSTS.items() if host.uploadable)
+SITE_BOUND_HOSTS: frozenset[str] = frozenset(slug for slug, host in IMAGE_HOSTS.items() if host.site_bound)
+PUBLIC_HOSTS: frozenset[str] = frozenset(slug for slug, host in IMAGE_HOSTS.items() if not host.site_bound)
 
 # domain -> slug, for recognising where an existing image lives
 URL_HOST_MAPPING: dict[str, str] = {domain: slug for slug, host in IMAGE_HOSTS.items() for domain in host.domains}
