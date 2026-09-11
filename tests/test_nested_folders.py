@@ -47,9 +47,9 @@ def test_flat_release_passes_silently(tmp_path: Path, monkeypatch: Any) -> None:
 def test_nested_unattended_aborts(tmp_path: Path) -> None:
     meta = _release(tmp_path, nested=True)
     meta["unattended"] = True
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc_info:
         asyncio.run(check_nested_folders(meta))
-
+    assert exc_info.value.code == 1
 
 def test_nested_interactive_yes_continues(tmp_path: Path, monkeypatch: Any) -> None:
     prompts = _answer(monkeypatch, "y")
@@ -59,9 +59,9 @@ def test_nested_interactive_yes_continues(tmp_path: Path, monkeypatch: Any) -> N
 
 def test_nested_interactive_default_aborts(tmp_path: Path, monkeypatch: Any) -> None:
     _answer(monkeypatch, "")
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc_info:
         asyncio.run(check_nested_folders(_release(tmp_path, nested=True)))
-
+    assert exc_info.value.code == 1
 
 def test_disc_is_ignored(tmp_path: Path) -> None:
     meta = _release(tmp_path, nested=True)

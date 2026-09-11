@@ -14,10 +14,10 @@ FILES = [f"/media/Example.Release.S01E{e:02d}.2026.1080p.WEB-GRP.mkv" for e in (
 def _manager(monkeypatch: Any, complete: bool) -> SeasonEpisodeManager:
     mgr = SeasonEpisodeManager({"DEFAULT": {"tmdb_api": "fake-key"}})
 
-    async def detail(meta: Any) -> dict[str, Any]:
+    async def detail(_meta: Any) -> dict[str, Any]:
         return {"complete": complete, "missing_episodes": [] if complete else [(1, 3)], "consistent_tags": True, "tags_found": {"GRP": FILES}}
 
-    async def homogeneity(meta: Any) -> dict[str, Any]:
+    async def homogeneity(_meta: Any) -> dict[str, Any]:
         return {"homogeneous": True, "issues": {}}
 
     monkeypatch.setattr(mgr, "check_season_pack_detail", detail)
@@ -27,9 +27,9 @@ def _manager(monkeypatch: Any, complete: bool) -> SeasonEpisodeManager:
 
 def test_incomplete_pack_aborts_in_unattended(monkeypatch: Any) -> None:
     mgr = _manager(monkeypatch, complete=False)
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc_info:
         asyncio.run(mgr.check_season_pack_completeness({"filelist": FILES, "tv_pack": 1, "debug": False, "unattended": True}))
-
+    assert exc_info.value.code == 1
 
 def test_complete_pack_passes_in_unattended(monkeypatch: Any) -> None:
     mgr = _manager(monkeypatch, complete=True)
