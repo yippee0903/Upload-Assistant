@@ -163,3 +163,31 @@ class TestBLUNameAndDescription:
     def test_banned_groups_match_site_list(self, blu):
         for group in ("ATM05", "BitHD", "D3US", "mAck", "PAAI", "PHOCiS", "PMi", "PrimeFix", "XDMovies"):
             assert group in blu.banned_groups
+
+
+class TestBLUExtrasInPack:
+    """BLU wants extras uploaded on their own: a pack mixing extras with the main content is refused."""
+
+    EPISODES = [f"/data/Example.Show.S01E{e:02d}.1080p.WEB-DL.AAC.H.264-GRP.mkv" for e in (1, 2)]
+    EXTRA = "/data/Example.Show.S01E02.Extra.1080p.WEB-DL.AAC.H.264-GRP.mkv"
+
+    @pytest.fixture
+    def blu(self):
+        tracker = BLU(config=_config())
+        tracker.common.check_language_requirements = AsyncMock(return_value=True)
+        return tracker
+
+    def test_mixed_pack_is_skipped_unattended(self, blu):
+        assert _run(blu.get_additional_checks(_meta(filelist=[*self.EPISODES, self.EXTRA]))) is False
+
+    def test_mixed_pack_can_be_forced_interactively(self, blu):
+        with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=True):
+            assert _run(blu.get_additional_checks(_meta(filelist=[*self.EPISODES, self.EXTRA], unattended=False))) is True
+
+    def test_extras_only_upload_passes_without_asking(self, blu):
+        with patch("src.trackers.COMMON.cli_ui.ask_yes_no", side_effect=AssertionError("must not prompt")):
+            extras = [self.EXTRA, "/data/Example.Show.S01.Bonus.Making.of.1080p.WEB-DL-GRP.mkv"]
+            assert _run(blu.get_additional_checks(_meta(filelist=extras, unattended=False))) is True
+
+    def test_word_boundary_does_not_match_extraction(self, blu):
+        assert _run(blu.get_additional_checks(_meta(filelist=[*self.EPISODES, "/data/Example.Show.S01E03.Extraction.Day.1080p.WEB-DL-GRP.mkv"]))) is True

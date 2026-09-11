@@ -1,4 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import os
+import re
 from typing import Any, Optional
 
 import cli_ui
@@ -127,6 +129,18 @@ class BLU(UNIT3D):
         "Mismatches between Blu-ray and WEB stream masters may occur.[/alert]\n\n"
     )
 
+    # A file name marking bonus material, as a whole word between name separators.
+    _EXTRA_MARKER = re.compile(r"(?:^|[.\s_-])(?:extras?|bonus|featurettes?|making[.\s_-]?of|deleted[.\s_-]?scenes?)(?=[.\s_-]|$)", re.IGNORECASE)
+
+    @classmethod
+    def _extras_in_pack(cls, meta: dict[str, Any]) -> list[str]:
+        """Extras mixed with the main content of a multi-file upload. An extras-only upload is fine."""
+        names = [os.path.basename(str(f)) for f in meta.get("filelist") or []]
+        if len(names) < 2:
+            return []
+        extras = [n for n in names if cls._EXTRA_MARKER.search(os.path.splitext(n)[0])]
+        return extras if len(extras) < len(names) else []
+
     async def get_additional_checks(self, meta: dict[str, Any]) -> bool:
         should_continue = True
         hdr = meta.get("hdr") or ""
@@ -182,6 +196,10 @@ class BLU(UNIT3D):
 
             if not self._check_audio_tracks(meta):
                 return False
+
+        extras = self._extras_in_pack(meta)
+        if extras and not ask_to_continue(meta, f"Extras must be their own upload, not mixed with the main content: {', '.join(extras)} ({self.tracker})"):
+            return False
 
         if max(len(meta.get("image_list", [])), int(meta.get("screens", 0) or 0)) < 3:
             console.print(f"[bold red]At least 3 screenshots are required, skipping {self.tracker} upload.[/bold red]")
