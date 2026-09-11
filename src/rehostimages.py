@@ -12,7 +12,7 @@ import aiofiles
 from aiofiles import os as aio_os
 
 from src.console import console
-from src.imagehosts import MAX_IMAGE_HOST_SLOTS, host_slug
+from src.imagehosts import MAX_IMAGE_HOST_SLOTS, PUBLIC_HOSTS, SITE_BOUND_HOSTS, host_slug
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
@@ -34,11 +34,9 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
     # Only trackers still slated for upload: a declined dupe or a skipped tracker
     # must not trigger a rehost (same filter as the host arbitration in upload.py).
     status_map = meta.get("tracker_status") or {}
-    relevant = [
-        t
-        for t in meta.get("trackers", [])
-        if isinstance(t, str) and t in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS and t in tracker_class_map and (not status_map or status_map.get(t, {}).get("upload", False))
-    ]
+    slated = [t for t in meta.get("trackers", []) if isinstance(t, str) and t in tracker_class_map and (not status_map or status_map.get(t, {}).get("upload", False))]
+    await rehost_site_bound_images(meta, config, tracker_class_map, slated)
+    relevant = [t for t in slated if t in TRACKERS_WITH_IMAGE_HOST_REQUIREMENTS]
     if relevant:
         console.print(f"[yellow]Validating existing images against approved hosts for: {', '.join(relevant)}[/yellow]")
     for tracker_name in relevant:
@@ -49,6 +47,33 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
         else:
             console.print(f"[yellow]{tracker_name}: existing images could not be validated/rehosted; the description will fall back to the original links.[/yellow]")
     return relevant
+
+
+def _is_site_bound(image: Mapping[str, Any]) -> bool:
+    raw_url = _as_str(image.get("raw_url")) or ""
+    return host_slug(urlparse(raw_url).netloc) in SITE_BOUND_HOSTS
+
+
+async def rehost_site_bound_images(meta: dict[str, Any], config: dict[str, Any], tracker_class_map: Mapping[str, Any], trackers: Sequence[str]) -> None:
+    """Screenshots on a tracker's own image host are unusable on any other site.
+
+    Rehost the whole reused list, in place, onto a host every destination of
+    this upload accepts: the intersection of their approved lists, a tracker
+    without one accepting any public host. A destination that owns the host
+    keeps it approved, so uploading to that site alone changes nothing.
+    """
+    images = cast(list[dict[str, Any]], meta.get("image_list") or [])
+    bound = [image for image in images if _is_site_bound(image)]
+    if not bound or not trackers:
+        return
+    approved_sets = [set(getattr(tracker_class_map[t](config=config), "approved_image_hosts", None) or PUBLIC_HOSTS) for t in trackers]
+    approved = sorted(set.intersection(*approved_sets)) or sorted(PUBLIC_HOSTS)
+    console.print(f"[yellow]{len(bound)} reused screenshot(s) live on a tracker's own image host; rehosting for {', '.join(trackers)}[/yellow]")
+    rehosted, _, _ = await RehostImagesManager(config).check_hosts(meta, "reused", img_host_index=1, approved_image_hosts=approved)
+    if rehosted:
+        meta["image_list"] = list(rehosted)
+    else:
+        console.print("[red]Could not rehost the tracker-hosted screenshots; the original links are kept.[/red]")
 
 
 async def check_tracker_image_hosts(meta: dict[str, Any], config: dict[str, Any], tracker_instance: Any) -> None:
