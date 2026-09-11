@@ -60,3 +60,14 @@ def test_destination_owning_the_host_keeps_it_approved(monkeypatch: Any) -> None
 def test_public_images_are_left_alone(monkeypatch: Any) -> None:
     meta, calls = _run(monkeypatch, [_img("https://i.ibb.co/x.png")], ["AAA", "BBB"])
     assert calls == [] and meta["image_list"][0]["raw_url"] == "https://i.ibb.co/x.png"
+
+
+def test_failed_rehost_keeps_the_original_links(monkeypatch: Any) -> None:
+    async def failing_check_hosts(self: Any, meta: Any, tracker: str, img_host_index: int = 1, approved_image_hosts: Any = None) -> Any:
+        return [], False, True
+
+    monkeypatch.setattr(rh.RehostImagesManager, "check_hosts", failing_check_hosts)
+    images = [_img("https://beyondhd.co/images/a.png")]
+    meta: dict[str, Any] = {"image_list": list(images), "trackers": ["AAA", "BBB"], "debug": False, "imghost": "imgbb"}
+    asyncio.run(rh.rehost_site_bound_images(meta, CFG, {"AAA": _WithList, "BBB": _NoList}, ["AAA", "BBB"]))
+    assert meta["image_list"] == images

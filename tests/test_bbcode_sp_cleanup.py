@@ -494,10 +494,12 @@ def test_dead_comparison_spoiler_is_dropped_with_its_empty_links() -> None:
         "[spoiler=SOURCE vs ENCODE vs OTHER][center]SOURCE | ENCODE | OTHER[/center]\r\n"
         + shot.format("aaa111") + shot.format("bbb222") + shot.format("ccc333") + "\r\n"
         + shot.format("ddd444") + shot.format("eee555") + shot.format("fff666") + "[/spoiler]\r\n"
-        "[spoiler=Notes]Kept text, with a dead banner [img=100]https://ptpimg.me/zzz999.png[/img][/spoiler]"
+        "[spoiler=Notes]Kept text, with a dead banner [img=100]https://ptpimg.me/zzz999.png[/img][/spoiler]\r\n"
+        "[spoiler=Codec notes]AV1 vs HEVC notes: HEVC | AV1 both fine here[/spoiler]"
     )
     cleaned, _ = BBCODE().clean_unit3d_description(desc, "https://blutopia.cc/torrents/")
     assert "[code]SOURCE........: 2160p UHD Hybrid Remux DTS-HD MA 5.1 GRP[/code]" in cleaned
     assert "[url=" not in cleaned and "[/url]" not in cleaned
     assert "spoiler=SOURCE" not in cleaned and "SOURCE | ENCODE" not in cleaned
     assert "[spoiler=Notes]Kept text, with a dead banner [/spoiler]" in cleaned
+    assert "[spoiler=Codec notes]AV1 vs HEVC notes: HEVC | AV1 both fine here[/spoiler]" in cleaned

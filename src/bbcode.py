@@ -660,10 +660,12 @@ class BBCODE:
         desc = re.sub(r"\[img=[^\]]*\]", "", desc, flags=re.IGNORECASE)
         # ...and the [url] wrappers those images leave empty
         desc = re.sub(r"\[url=[^\]]*\]\s*\[/url\]", "", desc, flags=re.IGNORECASE)
-        # A comparison spoiler whose images are all gone keeps only its
-        # "A | B | C" header: nothing left to show, drop the whole block.
+        # A comparison spoiler (convert_comparison_to_collapse's shape:
+        # "[spoiler=A vs B][center]A | B[/center]" + images) whose images are
+        # all gone keeps only its header: nothing left to show, drop the block.
+        # Single-level quantifiers only, so a run of "|" cannot backtrack.
         desc = re.sub(
-            r"\[spoiler=[^\]]*\](?:\s|\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\[\]\n]*(?:\||\bvs\b)[^\[\]\n]*)*\[/spoiler\]\s*",
+            r"\[spoiler=[^\]]*\]\s*\[center\][^\[\]\n]*\|[^\[\]\n]*\[/center\]\s*\[/spoiler\]\s*",
             "",
             desc,
             flags=re.IGNORECASE,
