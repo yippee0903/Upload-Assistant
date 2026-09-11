@@ -376,9 +376,9 @@ class SeasonEpisodeManager:
             else:
                 console.print("[red]Warning: Season pack appears incomplete (missing episodes could not be determined).")
 
-            # In unattended mode with no confirmation prompts, ensure we always log that we're proceeding.
             if unattended and not unattended_confirm:
-                console.print("[yellow]Unattended mode: continuing despite incomplete season pack (no confirmation).")
+                console.print("[red]Unattended mode: aborting torrent creation due to incomplete season pack.")
+                sys.exit(1)
 
             if "Unknown" not in missing_list:
                 # Show first 15 files from filelist

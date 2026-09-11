@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import json
 import os
 import re
@@ -414,3 +415,29 @@ class VideoManager:
 
 
 video_manager = VideoManager()
+
+
+async def check_nested_folders(meta: dict[str, Any]) -> None:
+    """Warn and confirm (or abort when unattended) when video files sit below
+    the release root, e.g. one folder per episode: most trackers reject it."""
+    if meta.get("is_disc") or not meta.get("isdir"):
+        return
+    root = os.path.abspath(str(meta.get("path", "")))
+    nested = sorted({os.path.relpath(os.path.dirname(os.path.abspath(f)), root) for f in meta.get("filelist", []) if os.path.dirname(os.path.abspath(f)) != root})
+    if not nested:
+        return
+
+    console.print("[bold red]Warning: release contains nested folders, most trackers reject this layout!")
+    console.print(f"[cyan]Nested folders ({len(nested)}):")
+    for folder in nested[:15]:
+        console.print(f"[cyan]  {folder}/")
+    if len(nested) > 15:
+        console.print(f"[yellow]  ... and {len(nested) - 15} more")
+
+    if meta.get("unattended") and not meta.get("unattended_confirm"):
+        console.print("[red]Unattended mode: aborting upload due to nested folders")
+        sys.exit(1)
+    response = await asyncio.to_thread(input, "Continue with nested folders? (y/N): ")
+    if response.lower() != "y":
+        console.print("[red]Aborting upload due to nested folders")
+        sys.exit(1)

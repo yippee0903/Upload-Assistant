@@ -42,7 +42,7 @@ try:
     from src.tmdb import TmdbManager, verify_tmdb_imdb_agreement
     from src.tvdb import tvdb_data
     from src.tvmaze import tvmaze_manager
-    from src.video import video_manager
+    from src.video import check_nested_folders, video_manager
 
     guessit_module: Any = cast(Any, guessit)
     GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
@@ -1062,6 +1062,8 @@ class Prep:
         # if it was skipped earlier, make sure we have the season/episode data
         if not meta.get("not_anime", False) and meta.get("category") == "TV":
             meta = await self.season_episode_manager.get_season_episode(video, meta)
+
+        await check_nested_folders(meta)
 
         if meta["category"] == "TV" and meta.get("tv_pack"):
             await self.season_episode_manager.check_season_pack_completeness(meta)
