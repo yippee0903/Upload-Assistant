@@ -65,7 +65,7 @@ def image_entry(img_url: str, web_url: str = "") -> dict[str, str]:
 _SIG_DECOR = r"(?:\[/?(?:center|right|b|i|u|url(?:=[^\]]*)?|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|\[img(?:=\d+)?\][^\[\]\n]*\[/img\]|[^\w\n\[\]])*"
 _SIG_MARKERS = (
     r"Created by Upload Assistant(?:\s+v?[\w.]+)?",
-    r"Uploaded (?:with|using) (?:\[url=[^\]]*\])?UNIT3D(?:\[/url\])? Auto Uploader(?:\s+v?[\w.]+)?",
+    r"Uploaded (?:with|using) (?:\[(?:url|color)=[^\]]*\])?UNIT3D(?:\[/(?:url|color)\])? Auto Uploader(?:\s+v?[\w.]+)?",
     r"Powered by GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
     r"Uploaded with (?:\[/?color(?:=[^\]]*)?\]|[^\w\n\[\]])*using GG-BOT Upload Assistant(?:\s+v?[\w.]+)?",
     r"Created by Hentai Bot(?:\s+v?[\w.]+)?",

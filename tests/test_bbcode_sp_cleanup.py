@@ -476,6 +476,7 @@ def test_unit3d_auto_uploader_signature_is_removed() -> None:
         "[center][b]Uploaded with UNIT3D Auto Uploader[/b][/center]\n"
         "Uploaded with [url=https://github.com/HDInnovations/UNIT3D]UNIT3D[/url] Auto Uploader v1.2.3\n"
         "[center][img=20]https://example.invalid/favicon.ico[/img] [b]Uploaded Using [url=https://github.com/HDInnovations/UNIT3D]UNIT3D[/url] Auto Uploader[/b] [img=20]https://example.invalid/favicon.ico[/img][/center]\n"
+        "[center][b]Uploaded with [color=#58a6ff]UNIT3D[/color] Auto Uploader[/b][/center]\n"
         "Also kept, even though it was uploaded with UNIT3D Auto Uploader at first."
     )
     cleaned, images = BBCODE().clean_unit3d_description(desc, "https://lst.gg")
