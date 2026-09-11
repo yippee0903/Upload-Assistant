@@ -658,7 +658,16 @@ class BBCODE:
         desc = re.sub(r"\[img\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[img=[^\]]*\][\s\S]*?\[\/img\]", "", desc, flags=re.IGNORECASE)
         desc = re.sub(r"\[img=[^\]]*\]", "", desc, flags=re.IGNORECASE)
-        # desc = re.sub(r"\[URL=[\s\S]*?\]\[\/URL\]", "", desc, flags=re.IGNORECASE)
+        # ...and the [url] wrappers those images leave empty
+        desc = re.sub(r"\[url=[^\]]*\]\s*\[/url\]", "", desc, flags=re.IGNORECASE)
+        # A comparison spoiler whose images are all gone keeps only its
+        # "A | B | C" header: nothing left to show, drop the whole block.
+        desc = re.sub(
+            r"\[spoiler=[^\]]*\](?:\s|\[/?(?:center|b|i|u|size(?:=[^\]]*)?|color(?:=[^\]]*)?)\]|[^\[\]\n]*(?:\||\bvs\b)[^\[\]\n]*)*\[/spoiler\]\s*",
+            "",
+            desc,
+            flags=re.IGNORECASE,
+        )
 
         # Drop unmatched [url] tags left behind by the removals above — e.g.
         # a stripped site link whose label itself contained brackets, which
