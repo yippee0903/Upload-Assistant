@@ -589,3 +589,25 @@ class TestSimilarityAgainstTrackerName:
         entry = _no_files_entry(name="Titre.Exemple.2002.MULTi.1080p.WEB.DDP.5.1.H264-GRP")
         dupes = _run(checker.filter_dupes([entry], meta, "V3X"))
         assert dupes and not meta.get("filename_match")
+
+
+class TestWebDvOnlyAgainstDvHdr:
+    """A DV+HDR (profile 8) WEB-DL supersedes a DV-only (profile 5) one."""
+
+    def _match(self, existing: str, target: str, type_: str = "WEBDL", tracker: str = "BLU") -> bool:
+        file_hdr = _run(DupeChecker.refine_hdr_terms(existing))
+        target_hdr = _run(DupeChecker.refine_hdr_terms(target))
+        return _run(DupeChecker.has_matching_hdr(file_hdr, target_hdr, {"type": type_}, tracker=tracker))
+
+    def test_dv_only_upload_is_dupe_of_existing_dv_hdr(self):
+        for tracker in ("ACM", "AITHER", "BLU", "C411", "G3MINI", "HHD", "LST", "LUME", "TOS", "ULCX"):
+            assert self._match(existing="DV HDR", target="DV", tracker=tracker), tracker
+
+    def test_dv_hdr_upload_is_not_dupe_of_existing_dv_only(self):
+        assert not self._match(existing="DV", target="DV HDR")
+
+    def test_dv_only_upload_is_not_dupe_of_existing_hdr_only(self):
+        assert not self._match(existing="HDR", target="DV")
+
+    def test_keep_everything_tracker_still_accepts_dv_only(self):
+        assert not self._match(existing="DV HDR", target="DV", tracker="RF")

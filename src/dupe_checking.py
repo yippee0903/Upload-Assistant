@@ -18,6 +18,9 @@ TRUMPABLE_FLAG_TRACKERS = frozenset({"AITHER", "LST"})  # site marks entries tru
 SEASON_TRUMP_TRACKERS = frozenset({"AITHER", "LST"})  # single episode may trump a season pack
 DVD_TAG_ONLY_TRACKERS = frozenset({"AITHER", "LST"})  # DVD dupes match on release tag alone
 SUBSTRING_FILE_MATCH_TRACKERS = frozenset({"MTV", "AR", "RTF"})  # any dupe file contained in ours counts
+DV_HDR_SUPERSEDES_DV_TRACKERS = frozenset(
+    {"ACM", "AITHER", "BLU", "C411", "G3MINI", "HHD", "LST", "LUME", "TOS", "ULCX"}
+)  # quality-controlled: a DV HDR WEB-DL makes a DV-only one a dupe
 SIZE_MATCH_TRACKERS = frozenset({"BHD"})  # identical size counts as a dupe
 EXACT_NAME_MATCH_TRACKERS = frozenset({"BHD", "HUNO"})  # identical tracker-formatted name counts as a dupe
 FRAMESTOR_4K_SKIP_TRACKERS = frozenset({"BHD", "MTV", "RTF", "AR"})
@@ -868,6 +871,12 @@ class DupeChecker:
 
         file_hdr_simple = simplify_hdr(file_hdr, tracker)
         target_hdr_simple = simplify_hdr(target_hdr, tracker)
+
+        # On quality-controlled sites a DV+HDR (profile 8) WEB-DL supersedes a
+        # DV-only (profile 5) one: uploading DV-only next to it is a dupe. The
+        # reverse is an upgrade. Keep-everything sites accept both.
+        if tracker in DV_HDR_SUPERSEDES_DV_TRACKERS and "web" in str(meta.get("type", "")).lower() and target_hdr_simple == {"DV"} and file_hdr_simple == {"DV", "HDR"}:
+            return True
 
         if file_hdr_simple in [{"DV", "HDR"}, {"HDR", "DV"}]:
             file_hdr_simple = {"HDR"}
