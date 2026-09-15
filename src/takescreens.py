@@ -1423,11 +1423,21 @@ async def valid_ss_time(ss_times: list[str], num_screens: int, length: float, fr
 
     result_times: list[str] = ss_times.copy()
 
-    for i in range(total_screens):
-        frame = start_frame + (i * frame_interval)
-        chosen_frames.append(frame)
-        time = frame / frame_rate
-        result_times.append(str(time))
+    reused_images = [img for img in cast(list[dict[str, Any]], meta.get("image_list") or []) if str(img.get("img_url", "")).startswith("http")]
+    if reused_images and not retake:
+        # Topping up reused images: the source upload was most likely made by
+        # this tool on this very grid for meta["screens"], so sit halfway
+        # between its points, spread over the whole grid, with a little jitter
+        # so two runs never pick the same frame.
+        base_screens = max(int(meta.get("screens") or 0), total_screens)
+        base_interval = usable_frames // base_screens
+        for i in range(total_screens):
+            slot = int((i + 0.5) * base_screens / total_screens)
+            jitter = random.randint(-(base_interval // 10), base_interval // 10)  # nosec B311 - screenshot timing, not cryptographic
+            chosen_frames.append(start_frame + slot * base_interval + base_interval // 2 + jitter)
+    else:
+        chosen_frames.extend(start_frame + (i * frame_interval) for i in range(total_screens))
+    result_times.extend(str(frame / frame_rate) for frame in chosen_frames)
 
     if meta["debug"]:
         console.print(f"[purple]Screenshots information:[/purple] \n[slate_blue3]Screenshots: [gold3]{total_screens}[/gold3] \nTotal Frames: [gold3]{total_frames}[/gold3]")
