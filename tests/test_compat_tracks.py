@@ -180,6 +180,26 @@ class TestDisallowedCases:
         check_disallowed_compat_tracks(meta, tracks)
         assert meta.get("has_disallowed_compat_track") is True
 
+    def test_truehd_plus_eac3_same_lang_is_a_second_compat_track(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("E-AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_truehd_plus_ac3_plus_eac3_same_lang_is_disallowed(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("AC-3", "en"), _track("E-AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_dts_hdma_plus_dts_same_lang_is_a_compat_track(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("DTS-HD MA", "en"), _track("DTS", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_truehd_plus_two_ac3_same_lang_is_disallowed(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("AC-3", "en"), _track("AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
     def test_flag_not_reset_when_already_false(self):
         """Calling on clean tracks must not clobber an existing True flag."""
         meta = _meta(has_disallowed_compat_track=True)
