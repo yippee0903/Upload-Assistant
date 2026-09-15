@@ -731,15 +731,35 @@ def check_disallowed_compat_tracks(meta: Meta, audio_tracks: list[TrackDict]) ->
     TRUEHD_FORMAT = "MLP FBA"
 
     def tier(track: TrackDict) -> int:
+        # Raw MediaInfo reports every DTS flavour as Format "DTS": the lossless
+        # ones are told apart by the commercial name, the compression mode or
+        # the XLL feature.
         fmt = str(track.get("Format") or "").strip()
-        if fmt in ("AC-3", "AAC"):
+        commercial = str(track.get("Format_Commercial_IfAny") or "")
+        lossless = (
+            track.get("Compression_Mode") == "Lossless"
+            or fmt in ("MLP FBA", "FLAC", "PCM", "DTS-HD MA")
+            or "Master Audio" in commercial
+            or "DTS:X" in commercial
+            or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
+        )
+        if lossless:
+            return 3
+        if fmt.startswith("AAC") or fmt in ("AC-3", "MPEG Audio", "Opus", "Vorbis"):
             return 1
-        if fmt in ("E-AC-3", "DTS", "DTS-HD HRA"):
-            return 2
-        return 3  # lossless: TrueHD, DTS-HD MA, DTS:X, FLAC, PCM
+        return 2  # E-AC-3, DTS core, DTS-HD HRA
 
     # A track titled as a distinct mix is its own thing, not a downmix of another track.
     distinct_mix = re.compile(r"\b(?:mix|remix|alternate|isolated|score|theatrical)\b", re.IGNORECASE)
+
+    def channels(track: TrackDict) -> int:
+        try:
+            return int(track.get("Channels_Original") or track.get("Channels") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def is_downmix(ch: int, widest_main: int) -> bool:
+        return ch == 0 or (ch >= 2 and (widest_main == 0 or ch <= widest_main))
 
     lang_groups: dict[str, list[TrackDict]] = {}
     for track in audio_tracks:
@@ -753,7 +773,11 @@ def check_disallowed_compat_tracks(meta: Meta, audio_tracks: list[TrackDict]) ->
             continue
         top = max(tier(t) for t in tracks_in_lang)
         mains = [t for t in tracks_in_lang if tier(t) == top]
-        compats = [t for t in tracks_in_lang if tier(t) < top]
+        # A compatibility track is a downmix: never more channels than the track
+        # it accompanies, and never mono (a mono track is the original mono mix).
+        # Unknown channel counts (0) leave the codec tiers to decide.
+        widest_main = max(channels(t) for t in mains)
+        compats = [t for t in tracks_in_lang if tier(t) < top and is_downmix(channels(t), widest_main)]
         if not compats:
             continue
         if all(str(t.get("Format") or "").strip() == TRUEHD_FORMAT for t in mains) and len(compats) == 1 and str(compats[0].get("Format") or "").strip() == "AC-3":
