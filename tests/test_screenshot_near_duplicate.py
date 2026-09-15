@@ -4,8 +4,10 @@
 
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
+from src import takescreens
 from src.takescreens import near_duplicate, reused_image_hashes
 
 
@@ -32,3 +34,9 @@ def test_different_frame_is_not_a_duplicate(tmp_path: Path) -> None:
 def test_missing_reused_files_are_skipped(tmp_path: Path) -> None:
     assert reused_image_hashes([str(tmp_path / "gone.png")]) == []
     assert not near_duplicate(str(_gradient(tmp_path / "c.png")), [])
+
+
+def test_default_threshold_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    for distance, expected in ((10, True), (11, False)):
+        monkeypatch.setattr(takescreens, "_dhash", lambda _path, d=distance: (1 << d) - 1)
+        assert near_duplicate("capture.png", [0]) is expected, distance
