@@ -148,11 +148,12 @@ class TestBLUAdditionalChecks:
         assert self._passes(blu, type="ENCODE", hdr="DV HDR", description="SOURCE: Example.2026.UHD.BluRay.DV.HYBRID.REMUX-GRP") is False
         blu.disc_has_dv.assert_not_called()
 
-    def test_disc_dv_is_read_from_full_disc_names_only(self, blu):
-        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray DV HDR HEVC TrueHD 7.1-GRP", "Full Disc")]) is True
-        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray HDR HEVC TrueHD 7.1-GRP", "Full Disc"), ("Example 2026 1080p Blu-ray AVC DTS-HD MA 5.1-GRP", "Full Disc")]) is False
-        # The site ignores the type filter: a DV WEB-DL or a hybrid remux proves nothing.
-        assert blu._discs_prove_dv([("Example 2026 2160p DSNP WEB-DL DD+ 5.1 DV HDR H.265-GRP", "WEB-DL"), ("Example 2026 2160p UHD BluRay REMUX DVP8 HDR HEVC-GRP", "Remux")]) is False
+    def test_disc_dv_is_proven_by_a_dv_full_disc_or_a_non_fanres_dv_remux(self, blu):
+        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray DV HDR HEVC TrueHD 7.1-GRP", "Full Disc", "Movie")]) is True
+        assert blu._discs_prove_dv([("Example 2026 2160p UHD BluRay REMUX DVP8 HDR HEVC TrueHD 7.1-GRP", "Remux", "Movie")]) is True
+        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray HDR HEVC TrueHD 7.1-GRP", "Full Disc", "Movie"), ("Example 2026 1080p Blu-ray AVC DTS-HD MA 5.1-GRP", "Full Disc", "Movie")]) is False
+        # The site ignores the type filter: a DV WEB-DL proves nothing, nor does a hybrid remux, which sits in FANRES.
+        assert blu._discs_prove_dv([("Example 2026 2160p DSNP WEB-DL DD+ 5.1 DV HDR H.265-GRP", "WEB-DL", "Movie"), ("Example 2026 2160p UHD BluRay REMUX DVP8 HDR HEVC-GRP", "Remux", "Movie FANRES")]) is False
         assert blu._discs_prove_dv([]) is False
 
     def test_derived_dv_interactive_sets_fanres(self, blu):

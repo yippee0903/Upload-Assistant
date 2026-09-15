@@ -240,12 +240,16 @@ class BLU(UNIT3D):
         return should_continue
 
     @staticmethod
-    def _discs_prove_dv(hits: list[tuple[str, str]]) -> bool:
-        """(name, type) pairs from the site: a full disc listed with Dolby Vision proves the disc carries the DV layer."""
-        return any(kind == "Full Disc" and re.search(r"\b(?:DV|DoVi|Dolby Vision)\b", name, re.IGNORECASE) for name, kind in hits)
+    def _discs_prove_dv(hits: list[tuple[str, str, str]]) -> bool:
+        """(name, type, category) triples from the site: a full disc with Dolby Vision, or a DV remux
+        outside FANRES (where the site puts derived-DV remuxes), proves the disc carries the DV layer."""
+        return any(
+            (kind == "Full Disc" or (kind == "Remux" and "FANRES" not in category.upper())) and re.search(r"\b(?:DVP?\d?|DoVi|Dolby Vision)\b", name, re.IGNORECASE)
+            for name, kind, category in hits
+        )
 
     async def disc_has_dv(self, meta: dict[str, Any]) -> bool:
-        """Ask the site for the title's full discs; any with DV proves the layer is disc-sourced."""
+        """Ask the site for the title's torrents; a DV full disc or non-FANRES DV remux proves the layer is disc-sourced."""
         if not meta.get("tmdb"):
             return False
         headers = {"authorization": f"Bearer {self.api_key}", "accept": "application/json"}
@@ -260,7 +264,7 @@ class BLU(UNIT3D):
             console.print(f"[yellow]Could not list {self.tracker} discs to check for Dolby Vision: {e}[/yellow]")
             return False
         attrs = [each.get("attributes") or {} for each in data]
-        return self._discs_prove_dv([(str(a.get("name") or ""), str(a.get("type") or "")) for a in attrs])
+        return self._discs_prove_dv([(str(a.get("name") or ""), str(a.get("type") or ""), str(a.get("category") or "")) for a in attrs])
 
     def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
         tracks = mi_tracks(meta, "Audio")
