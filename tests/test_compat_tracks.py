@@ -26,8 +26,8 @@ def _meta(**overrides: Any) -> dict[str, Any]:
     return m
 
 
-def _track(fmt: str, lang: str = "zh") -> dict[str, Any]:
-    return {"@type": "Audio", "Format": fmt, "Language": lang}
+def _track(fmt: str, lang: str = "zh", title: str = "", channels: int = 6) -> dict[str, Any]:
+    return {"@type": "Audio", "Format": fmt, "Language": lang, "Title": title, "Channels": str(channels)}
 
 
 def _run(coro: Any) -> Any:
@@ -179,6 +179,61 @@ class TestDisallowedCases:
         tracks = [_track("DTS-HD MA", "en"), _track("AC-3", "en")]
         check_disallowed_compat_tracks(meta, tracks)
         assert meta.get("has_disallowed_compat_track") is True
+
+    def test_truehd_plus_eac3_same_lang_is_a_second_compat_track(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("E-AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_truehd_plus_ac3_plus_eac3_same_lang_is_disallowed(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("AC-3", "en"), _track("E-AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_dts_hdma_plus_dts_same_lang_is_a_compat_track(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("DTS-HD MA", "en"), _track("DTS", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_truehd_plus_two_ac3_same_lang_is_disallowed(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("AC-3", "en"), _track("AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_distinct_mixes_are_not_compat_tracks(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("AC-3", "es", "Original 5.1 Surround Mix"), _track("E-AC-3", "es", "Alternate 5.1 Surround Remix")])
+        assert not meta.get("has_disallowed_compat_track")
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en", "Original Theatrical Mix"), _track("E-AC-3", "en"), _track("AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_raw_mediainfo_dts_hd_ma_is_lossless_next_to_a_dts_core(self):
+        # Real MediaInfo: Format "DTS" for both, the MA one carries the commercial name and Lossless.
+        meta = _meta()
+        ma = {"@type": "Audio", "Format": "DTS", "Language": "en", "Format_Commercial_IfAny": "DTS-HD Master Audio", "Compression_Mode": "Lossless"}
+        core = {"@type": "Audio", "Format": "DTS", "Language": "en", "Format_Commercial_IfAny": "", "Compression_Mode": "Lossy"}
+        check_disallowed_compat_tracks(meta, [ma, core])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_raw_mediainfo_aac_lc_is_a_compat_codec(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("E-AC-3", "en"), _track("AAC LC", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_a_surround_lossy_next_to_a_lossless_mono_or_stereo_is_another_mix(self):
+        for lossy, lossless in (("DTS", "FLAC"), ("E-AC-3", "FLAC")):
+            meta = _meta()
+            check_disallowed_compat_tracks(meta, [_track(lossy, "en", channels=6), _track(lossless, "en", channels=2)])
+            assert not meta.get("has_disallowed_compat_track"), (lossy, lossless)
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("AC-3", "en", channels=6), _track("E-AC-3", "en", channels=2)])
+        assert not meta.get("has_disallowed_compat_track")
+
+    def test_a_mono_track_is_the_original_mono_mix_not_a_compat_track(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("DTS-HD MA", "en", channels=6), _track("AC-3", "en", channels=1)])
+        assert not meta.get("has_disallowed_compat_track")
 
     def test_flag_not_reset_when_already_false(self):
         """Calling on clean tracks must not clobber an existing True flag."""

@@ -4,6 +4,7 @@ import re
 from typing import Any, Optional
 
 import cli_ui
+import httpx
 
 from src.console import console
 from src.trackers.COMMON import COMMON, ask_to_continue, is_lossless, mi_tracks
@@ -196,6 +197,8 @@ class BLU(UNIT3D):
 
             if not self._check_audio_tracks(meta):
                 return False
+            if not self._check_site_rules(meta):
+                return False
 
         extras = self._extras_in_pack(meta)
         if extras and not ask_to_continue(meta, f"Extras must be their own upload, not mixed with the main content: {', '.join(extras)} ({self.tracker})"):
@@ -206,9 +209,16 @@ class BLU(UNIT3D):
             return False
 
         if meta["type"] in ["ENCODE", "REMUX"] and "HDR" in hdr and "DV" in hdr:
-            derived = bool(meta.get("webdv"))
+            derived = bool(meta.get("webdv")) or "hybrid" in str(meta.get("description") or "").lower()
             if not derived and (not meta["unattended"] or meta.get("unattended_confirm", False)):
                 derived = bool(cli_ui.ask_yes_no("Is the Dolby Vision layer derived from a different source (WEB)?", default=False))
+            elif not derived and not await self.disc_has_dv(meta):
+                # Unattended is conservative: without a full disc carrying DV on
+                # the site, the layer cannot be proven disc-sourced.
+                console.print(
+                    f"[yellow]No {self.tracker} full disc with Dolby Vision found for this title, the DV layer cannot be proven disc-sourced (unattended: skipping)[/yellow]"
+                )
+                return False
             if derived:
                 if not ask_to_continue(
                     meta,
@@ -231,15 +241,141 @@ class BLU(UNIT3D):
 
         return should_continue
 
+    @staticmethod
+    def _discs_prove_dv(hits: list[tuple[str, str, str]]) -> bool:
+        """(name, type, category) triples from the site: a full disc with Dolby Vision, or a DV remux
+        outside FANRES (where the site puts derived-DV remuxes), proves the disc carries the DV layer."""
+        return any(
+            (kind == "Full Disc" or (kind == "Remux" and "FANRES" not in category.upper())) and re.search(r"\b(?:DVP?\d?|DoVi|Dolby Vision)\b", name, re.IGNORECASE)
+            for name, kind, category in hits
+        )
+
+    async def disc_has_dv(self, meta: dict[str, Any]) -> bool:
+        """Ask the site for the title's torrents; a DV full disc or non-FANRES DV remux proves the layer is disc-sourced."""
+        if not meta.get("tmdb"):
+            return False
+        headers = {"authorization": f"Bearer {self.api_key}", "accept": "application/json"}
+        # The site ignores the types[] filter: every type comes back, filter on the returned type.
+        params = [("tmdbId", str(meta["tmdb"])), ("perPage", "100")]
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url=self.search_url, headers=headers, params=params)
+                response.raise_for_status()
+                data = response.json().get("data", [])
+        except (httpx.HTTPError, ValueError) as e:
+            console.print(f"[yellow]Could not list {self.tracker} discs to check for Dolby Vision: {e}[/yellow]")
+            return False
+        attrs = [each.get("attributes") or {} for each in data]
+        return self._discs_prove_dv([(str(a.get("name") or ""), str(a.get("type") or ""), str(a.get("category") or "")) for a in attrs])
+
+    _EXTRANEOUS_FILE = re.compile(r"\.(?:nfo|txt|srt|ass|ssa|sub|idx|sup|jpe?g|png|gif|sfv|md5|url)$|sample", re.IGNORECASE)
+    _VIDEO_FORMATS = frozenset({"AVC", "HEVC", "AV1", "VC-1", "VP9", "ProRes", "CineForm", "MPEG Video", "JPEG 2000"})
+    _PROHIBITED_TOOLS = ("hdr10plus_tool", "truehdd")
+
+    @staticmethod
+    def _main_audio_allowed_1080p(track: dict[str, Any]) -> bool:
+        """1080p encode guideline: lossless, DTS-HD HRA, DD+/DD, or mono/stereo AAC as the main track."""
+        fmt = str(track.get("Format") or "")
+        try:
+            channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
+        except (TypeError, ValueError):
+            channels = 0
+        return is_lossless(track) or fmt in ("E-AC-3", "AC-3") or "High Resolution" in str(track.get("Format_Commercial_IfAny") or "") or (fmt == "AAC" and channels <= 2)
+
+    def _check_site_rules(self, meta: dict[str, Any]) -> bool:
+        """Non-disc site rules that can be read from the files, the MediaInfo or the source description."""
+        path = str(meta.get("path") or "")
+        if os.path.isdir(path):
+            extraneous = sorted(f for _root, _dirs, files in os.walk(path) for f in files if self._EXTRANEOUS_FILE.search(f))
+            if extraneous:
+                console.print(f"[bold red]Extraneous files are not allowed ({', '.join(extraneous[:5])}), skipping {self.tracker} upload.[/bold red]")
+                return False
+
+        video = next(iter(mi_tracks(meta, "Video")), None)
+        video_format = str(video.get("Format") or "") if video else ""
+        if video_format and video_format not in self._VIDEO_FORMATS:
+            console.print(f"[bold red]{video_format} video is not an allowed codec, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        for track in mi_tracks(meta, "Audio"):
+            if track.get("Format") != "MPEG Audio":
+                continue
+            layer = str(track.get("Format_Profile") or "")
+            commentary = "commentary" in str(track.get("Title") or "").lower()
+            if "Layer 3" in layer and not commentary:
+                console.print(f"[bold red]MP3 is only allowed for supplementary tracks such as commentaries, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if "Layer 2" in layer and meta.get("type") not in ("HDTV", "DVDRIP"):
+                console.print(f"[bold red]MP2 is only allowed untouched (HDTV, DVD), skipping {self.tracker} upload.[/bold red]")
+                return False
+
+        description = str(meta.get("description") or "")
+        if meta.get("type") == "ENCODE":
+            settings = str(video.get("Encoded_Library_Settings") or "") if video else ""
+            rc = re.search(r"\brc=([^/]+)", settings)
+            mode = rc.group(1).strip() if rc else ""
+            two_pass = mode.startswith("2") or bool(re.search(r"\b(?:stats-read=2|pass=2)\b", settings))
+            if mode and mode != "crf" and not two_pass:
+                console.print(f"[bold red]Encodes must use CRF or multi-pass VBR (found rc={mode}), skipping {self.tracker} upload.[/bold red]")
+                return False
+            if not re.search(r"\[comparison|slow\.?pics", description, re.IGNORECASE) and not ask_to_continue(
+                meta, f"Encodes need a source/encode comparison in the description, a [comparison] block or a slow.pics link. ({self.tracker})"
+            ):
+                return False
+            main_audio = next(iter(mi_tracks(meta, "Audio")), None)
+            if (
+                meta.get("resolution") == "1080p"
+                and main_audio
+                and not self._main_audio_allowed_1080p(main_audio)
+                and not ask_to_continue(meta, f"1080p encodes should have lossless, DTS-HD HRA, DD+/DD or mono/stereo AAC main audio. ({self.tracker})")
+            ):
+                return False
+
+        if meta.get("category") == "TV" and re.search(r"\bS\d{1,2}-S\d{1,2}\b", f"{meta.get('uuid', '')} {meta.get('name', '')}", re.IGNORECASE):
+            console.print(f"[bold red]Multi-season packs are only allowed as retail box set discs, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        mentioned = [tool for tool in self._PROHIBITED_TOOLS if tool in description.lower()]
+        if mentioned:
+            console.print(f"[bold red]The source description mentions {', '.join(mentioned)}, prohibited on {self.tracker}, skipping upload.[/bold red]")
+            return False
+
+        original = str(meta.get("original_language") or "").lower()
+        foreign_forced = [
+            str(t.get("Language") or "") for t in mi_tracks(meta, "Text") if t.get("Forced") == "Yes" and original and str(t.get("Language") or "").lower() != original
+        ]
+        if foreign_forced:
+            msg = f"Forced subtitles should only be in the title's native language, found forced: {', '.join(foreign_forced)}. ({self.tracker})"
+            if meta.get("unattended") and not meta.get("unattended_confirm", False):
+                console.print(f"[yellow]{msg}[/yellow]")
+            elif not ask_to_continue(meta, msg):
+                return False
+        return True
+
     def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
         tracks = mi_tracks(meta, "Audio")
-        ac3_langs = {str(t.get("Language") or "").lower() for t in tracks if t.get("Format") == "AC-3"}
+
+        def _channels(track: dict[str, Any]) -> int:
+            try:
+                return int(track.get("Channels_Original") or track.get("Channels") or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        # A compatibility track is a non-commentary AC-3 in the TrueHD's language
+        # with the standard downmix layout (5.1 for 5.1/7.1, else the same count).
+        ac3_tracks = [t for t in tracks if t.get("Format") == "AC-3" and "commentary" not in str(t.get("Title") or "").lower()]
+
+        def _compat_tracks(truehd: dict[str, Any]) -> list[dict[str, Any]]:
+            lang = str(truehd.get("Language") or "").lower()
+            return [t for t in ac3_tracks if str(t.get("Language") or "").lower() == lang and _channels(t) >= min(6, _channels(truehd))]
+
+        def _bsid(track: dict[str, Any]) -> str:
+            extra = track.get("extra")
+            return str(extra.get("bsid") or "") if isinstance(extra, dict) else ""
+
         for i, track in enumerate(tracks):
             fmt = str(track.get("Format") or "")
-            try:
-                channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
-            except (TypeError, ValueError):
-                channels = 0
+            channels = _channels(track)
             if fmt in ("Opus", "Vorbis"):
                 console.print(f"[bold red]{fmt} audio is not allowed, skipping {self.tracker} upload.[/bold red]")
                 return False
@@ -249,9 +385,14 @@ class BLU(UNIT3D):
             if fmt == "AAC" and channels > 2 and meta["type"] not in ("WEBDL", "HDTV"):
                 console.print(f"[bold red]AAC is only accepted for mono or stereo audio unless untouched, skipping {self.tracker} upload.[/bold red]")
                 return False
-            if fmt == "MLP FBA" and str(track.get("Language") or "").lower() not in ac3_langs:
-                console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
-                return False
+            if fmt == "MLP FBA":
+                compats = _compat_tracks(track)
+                if not compats:
+                    console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
+                    return False
+                bsids = {_bsid(t) or "unknown" for t in compats}
+                if "6" not in bsids and not ask_to_continue(meta, f"The TrueHD compatibility AC-3 track has bsid {', '.join(sorted(bsids))}, {self.tracker} requires bsid 6."):
+                    return False
             if i == 0 and meta["type"] == "ENCODE" and meta["resolution"] == "2160p" and not is_lossless(track):
                 console.print(f"[bold red]2160p encodes must have lossless main audio, skipping {self.tracker} upload.[/bold red]")
                 return False

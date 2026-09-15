@@ -720,58 +720,72 @@ def codec_info_from_track(track: Mapping[str, Any]) -> str:
 def check_disallowed_compat_tracks(meta: Meta, audio_tracks: list[TrackDict]) -> None:
     """Detect audio tracks that function as compatibility tracks but are not allowed.
 
-    A "compatibility track" here is defined by codec pattern: when multiple audio tracks
-    share the same language and one uses a simplified codec (AAC, AC-3) alongside a
-    higher-quality codec, the simpler one is acting as a compatibility/downmix track.
-
-    The only allowed case: TrueHD (Format "MLP FBA") as main track + AC-3 compat track.
-    Every other same-language multi-track combination involving a compat codec is flagged.
+    Within one language, a track is a compatibility track when a track of a higher
+    quality tier exists: lossless above DD+/DTS, both above AC-3/AAC. The only
+    allowed case is a TrueHD (Format "MLP FBA") main track with a single AC-3
+    compatibility track. Anything else (a DD+ next to a TrueHD, a DTS next to a
+    DTS-HD MA, an AAC next to a DD+, two compatibility tracks...) is flagged.
 
     Sets meta["has_disallowed_compat_track"] = True if such tracks are found.
     """
-    # Codecs typically used as compatibility/downmix tracks
-    COMPAT_FORMATS = {"AAC", "AC-3"}
-    # TrueHD format as reported by MediaInfo
     TRUEHD_FORMAT = "MLP FBA"
 
-    # Group tracks by language
+    def tier(track: TrackDict) -> int:
+        # Raw MediaInfo reports every DTS flavour as Format "DTS": the lossless
+        # ones are told apart by the commercial name, the compression mode or
+        # the XLL feature.
+        fmt = str(track.get("Format") or "").strip()
+        commercial = str(track.get("Format_Commercial_IfAny") or "")
+        lossless = (
+            track.get("Compression_Mode") == "Lossless"
+            or fmt in ("MLP FBA", "FLAC", "PCM", "DTS-HD MA")
+            or "Master Audio" in commercial
+            or "DTS:X" in commercial
+            or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
+        )
+        if lossless:
+            return 3
+        if fmt.startswith("AAC") or fmt in ("AC-3", "MPEG Audio", "Opus", "Vorbis"):
+            return 1
+        return 2  # E-AC-3, DTS core, DTS-HD HRA
+
+    # A track titled as a distinct mix is its own thing, not a downmix of another track.
+    distinct_mix = re.compile(r"\b(?:mix|remix|alternate|isolated|score|theatrical)\b", re.IGNORECASE)
+
+    def channels(track: TrackDict) -> int:
+        try:
+            return int(track.get("Channels_Original") or track.get("Channels") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def is_downmix(ch: int, widest_main: int) -> bool:
+        return ch == 0 or (ch >= 2 and (widest_main == 0 or ch <= widest_main))
+
     lang_groups: dict[str, list[TrackDict]] = {}
     for track in audio_tracks:
-        lang = str(track.get("Language") or "").lower().strip()
-        if not lang:
-            lang = "__unknown__"
+        if distinct_mix.search(str(track.get("Title") or "")):
+            continue
+        lang = str(track.get("Language") or "").lower().strip() or "__unknown__"
         lang_groups.setdefault(lang, []).append(track)
 
     for lang, tracks_in_lang in lang_groups.items():
         if len(tracks_in_lang) < 2:
             continue
-
-        formats = [str(t.get("Format") or "").strip() for t in tracks_in_lang]
-
-        has_compat_codec = any(f in COMPAT_FORMATS for f in formats)
-        if not has_compat_codec:
+        top = max(tier(t) for t in tracks_in_lang)
+        mains = [t for t in tracks_in_lang if tier(t) == top]
+        # A compatibility track is a downmix: never more channels than the track
+        # it accompanies, and never mono (a mono track is the original mono mix).
+        # Unknown channel counts (0) leave the codec tiers to decide.
+        widest_main = max(channels(t) for t in mains)
+        compats = [t for t in tracks_in_lang if tier(t) < top and is_downmix(channels(t), widest_main)]
+        if not compats:
             continue
-
-        non_compat_formats = [f for f in formats if f not in COMPAT_FORMATS]
-        compat_formats_present = [f for f in formats if f in COMPAT_FORMATS]
-
-        if not non_compat_formats:
-            # All tracks use compat codecs - unusual, not a compat track issue
-            continue
-
-        # Allowed: TrueHD (MLP FBA) as main track + AC-3 as the only compat codec
-        all_main_are_truehd = all(f == TRUEHD_FORMAT for f in non_compat_formats)
-        all_compat_are_ac3 = all(f == "AC-3" for f in compat_formats_present)
-
-        if all_main_are_truehd and all_compat_are_ac3:
-            # Standard TrueHD + AC-3 compatibility track - allowed
-            continue
-
-        # Disallowed compatibility track detected
+        if all(str(t.get("Format") or "").strip() == TRUEHD_FORMAT for t in mains) and len(compats) == 1 and str(compats[0].get("Format") or "").strip() == "AC-3":
+            continue  # standard TrueHD + AC-3 compatibility track
         meta["has_disallowed_compat_track"] = True
         if meta.get("debug"):
-            console.print(f"[yellow]DEBUG: Disallowed compat track detected for language '{lang}': formats = {formats}[/yellow]")
-        return  # No need to check further languages
+            console.print(f"[yellow]DEBUG: Disallowed compat track detected for language '{lang}': formats = {[str(t.get('Format') or '') for t in tracks_in_lang]}[/yellow]")
+        return
 
 
 def bloated_check(meta: Meta, audio_languages: Union[Sequence[str], str], is_eng_original_with_non_eng: bool = False) -> None:
