@@ -16,6 +16,7 @@ from typing import Any, Optional, Union, cast
 
 import ffmpeg
 import psutil
+from PIL import Image
 from pymediainfo import MediaInfo
 
 from src.cleanup import cleanup_manager
@@ -62,6 +63,31 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = float(default_config.get("desat", 10.0))
     except (TypeError, ValueError):
         desat = 10.0
+
+
+def _dhash(path: str) -> Optional[int]:
+    """64-bit difference hash: robust to rescaling, recompression and tonemapping. None if unreadable."""
+    try:
+        with Image.open(path) as img:
+            px = img.convert("L").resize((9, 8), Image.Resampling.LANCZOS).tobytes()
+    except (OSError, ValueError):
+        return None
+    bits = 0
+    for row in range(8):
+        for col in range(8):
+            bits = (bits << 1) | (px[row * 9 + col] > px[row * 9 + col + 1])
+    return bits
+
+
+def reused_image_hashes(paths: list[str]) -> list[int]:
+    """Hashes of the reused tracker images that were downloaded to the run's tmp dir."""
+    return [h for h in map(_dhash, paths) if h is not None]
+
+
+def near_duplicate(path: str, hashes: list[int], max_distance: int = 10) -> bool:
+    """True when the capture is (almost) one of the reused images: same frame or same shot."""
+    h = _dhash(path) if hashes else None
+    return h is not None and any(bin(h ^ other).count("1") <= max_distance for other in hashes)
 
 
 def drop_untonemapped_reused_images(meta: dict[str, Any]) -> None:
@@ -795,6 +821,7 @@ async def screenshots(
     drop_untonemapped_reused_images(meta)
     image_list_entries = cast(list[dict[str, Any]], meta["image_list"])
     existing_images: list[dict[str, Any]] = [img for img in image_list_entries if str(img.get("img_url", "")).startswith("http")]
+    reused_hashes = reused_image_hashes([os.path.join(base_dir, "tmp", folder_id, os.path.basename(str(img.get("raw_url") or img.get("img_url")))) for img in existing_images])
 
     if len(existing_images) >= cutoff and not force_screenshots:
         console.print(f"[yellow]There are already at least {cutoff} images in the image list. Skipping additional screenshots.")
@@ -1010,6 +1037,9 @@ async def screenshots(
             elif not image_size_ok(img_host, image_size):
                 console.print(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                 retake = True
+            elif near_duplicate(image_path, reused_hashes):
+                console.print(f"[yellow]Image {image_path} repeats one of the reused images, retaking.")
+                retake = True
             elif meta["debug"]:
                 console.print(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
 
@@ -1044,7 +1074,7 @@ async def screenshots(
                                 continue
 
                             new_size = os.path.getsize(screenshot_path)
-                            valid_image = image_size_ok(img_host, new_size)
+                            valid_image = image_size_ok(img_host, new_size) and not near_duplicate(screenshot_path, reused_hashes)
                             if valid_image:
                                 console.print(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
 
@@ -1077,7 +1107,7 @@ async def screenshots(
                             continue
 
                         new_size = os.path.getsize(screenshot_path)
-                        valid_image = image_size_ok(img_host, new_size)
+                        valid_image = image_size_ok(img_host, new_size) and not near_duplicate(screenshot_path, reused_hashes)
 
                         if valid_image:
                             valid_results.append(screenshot_path)
