@@ -197,6 +197,8 @@ class BLU(UNIT3D):
 
             if not self._check_audio_tracks(meta):
                 return False
+            if not self._check_site_rules(meta):
+                return False
 
         extras = self._extras_in_pack(meta)
         if extras and not ask_to_continue(meta, f"Extras must be their own upload, not mixed with the main content: {', '.join(extras)} ({self.tracker})"):
@@ -265,6 +267,90 @@ class BLU(UNIT3D):
             return False
         attrs = [each.get("attributes") or {} for each in data]
         return self._discs_prove_dv([(str(a.get("name") or ""), str(a.get("type") or ""), str(a.get("category") or "")) for a in attrs])
+
+    _EXTRANEOUS_FILE = re.compile(r"\.(?:nfo|txt|srt|ass|ssa|sub|idx|sup|jpe?g|png|gif|sfv|md5|url)$|sample", re.IGNORECASE)
+    _VIDEO_FORMATS = frozenset({"AVC", "HEVC", "AV1", "VC-1", "VP9", "ProRes", "CineForm", "MPEG Video", "JPEG 2000"})
+    _PROHIBITED_TOOLS = ("hdr10plus_tool", "truehdd")
+
+    @staticmethod
+    def _main_audio_allowed_1080p(track: dict[str, Any]) -> bool:
+        """1080p encode guideline: lossless, DTS-HD HRA, DD+/DD, or mono/stereo AAC as the main track."""
+        fmt = str(track.get("Format") or "")
+        try:
+            channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
+        except (TypeError, ValueError):
+            channels = 0
+        return is_lossless(track) or fmt in ("E-AC-3", "AC-3") or "High Resolution" in str(track.get("Format_Commercial_IfAny") or "") or (fmt == "AAC" and channels <= 2)
+
+    def _check_site_rules(self, meta: dict[str, Any]) -> bool:
+        """Non-disc site rules that can be read from the files, the MediaInfo or the source description."""
+        path = str(meta.get("path") or "")
+        if os.path.isdir(path):
+            extraneous = sorted(f for _root, _dirs, files in os.walk(path) for f in files if self._EXTRANEOUS_FILE.search(f))
+            if extraneous:
+                console.print(f"[bold red]Extraneous files are not allowed ({', '.join(extraneous[:5])}), skipping {self.tracker} upload.[/bold red]")
+                return False
+
+        video = next(iter(mi_tracks(meta, "Video")), None)
+        video_format = str(video.get("Format") or "") if video else ""
+        if video_format and video_format not in self._VIDEO_FORMATS:
+            console.print(f"[bold red]{video_format} video is not an allowed codec, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        for track in mi_tracks(meta, "Audio"):
+            if track.get("Format") != "MPEG Audio":
+                continue
+            layer = str(track.get("Format_Profile") or "")
+            commentary = "commentary" in str(track.get("Title") or "").lower()
+            if "Layer 3" in layer and not commentary:
+                console.print(f"[bold red]MP3 is only allowed for supplementary tracks such as commentaries, skipping {self.tracker} upload.[/bold red]")
+                return False
+            if "Layer 2" in layer and meta.get("type") not in ("HDTV", "DVDRIP"):
+                console.print(f"[bold red]MP2 is only allowed untouched (HDTV, DVD), skipping {self.tracker} upload.[/bold red]")
+                return False
+
+        description = str(meta.get("description") or "")
+        if meta.get("type") == "ENCODE":
+            settings = str(video.get("Encoded_Library_Settings") or "") if video else ""
+            rc = re.search(r"\brc=([^/]+)", settings)
+            mode = rc.group(1).strip() if rc else ""
+            two_pass = mode.startswith("2") or bool(re.search(r"\b(?:stats-read=2|pass=2)\b", settings))
+            if mode and mode != "crf" and not two_pass:
+                console.print(f"[bold red]Encodes must use CRF or multi-pass VBR (found rc={mode}), skipping {self.tracker} upload.[/bold red]")
+                return False
+            if not re.search(r"\[comparison|slow\.?pics", description, re.IGNORECASE) and not ask_to_continue(
+                meta, f"Encodes need a source/encode comparison in the description, a [comparison] block or a slow.pics link. ({self.tracker})"
+            ):
+                return False
+            main_audio = next(iter(mi_tracks(meta, "Audio")), None)
+            if (
+                meta.get("resolution") == "1080p"
+                and main_audio
+                and not self._main_audio_allowed_1080p(main_audio)
+                and not ask_to_continue(meta, f"1080p encodes should have lossless, DTS-HD HRA, DD+/DD or mono/stereo AAC main audio. ({self.tracker})")
+            ):
+                return False
+
+        if meta.get("category") == "TV" and re.search(r"\bS\d{1,2}-S\d{1,2}\b", f"{meta.get('uuid', '')} {meta.get('name', '')}", re.IGNORECASE):
+            console.print(f"[bold red]Multi-season packs are only allowed as retail box set discs, skipping {self.tracker} upload.[/bold red]")
+            return False
+
+        mentioned = [tool for tool in self._PROHIBITED_TOOLS if tool in description.lower()]
+        if mentioned:
+            console.print(f"[bold red]The source description mentions {', '.join(mentioned)}, prohibited on {self.tracker}, skipping upload.[/bold red]")
+            return False
+
+        original = str(meta.get("original_language") or "").lower()
+        foreign_forced = [
+            str(t.get("Language") or "") for t in mi_tracks(meta, "Text") if t.get("Forced") == "Yes" and original and str(t.get("Language") or "").lower() != original
+        ]
+        if foreign_forced:
+            msg = f"Forced subtitles should only be in the title's native language, found forced: {', '.join(foreign_forced)}. ({self.tracker})"
+            if meta.get("unattended") and not meta.get("unattended_confirm", False):
+                console.print(f"[yellow]{msg}[/yellow]")
+            elif not ask_to_continue(meta, msg):
+                return False
+        return True
 
     def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
         tracks = mi_tracks(meta, "Audio")

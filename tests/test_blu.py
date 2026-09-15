@@ -54,6 +54,7 @@ def _meta(**overrides: Any) -> dict[str, Any]:
         "mediainfo": _mi(_audio("E-AC-3", 6)),
         "tracker_status": {"BLU": {}},
         "imdb_info": {},
+        "description": "[comparison=Source, Encode]https://img.example/a.png[/comparison]",
     }
     meta.update(overrides)
     return meta
@@ -227,3 +228,86 @@ class TestBLUExtrasInPack:
 
     def test_word_boundary_does_not_match_extraction(self, blu):
         assert _run(blu.get_additional_checks(_meta(filelist=[*self.EPISODES, "/data/Example.Show.S01E03.Extraction.Day.1080p.WEB-DL-GRP.mkv"]))) is True
+
+
+def _video(fmt: str = "HEVC", settings: str = "") -> dict[str, Any]:
+    track: dict[str, Any] = {"@type": "Video", "Format": fmt}
+    if settings:
+        track["Encoded_Library_Settings"] = settings
+    return track
+
+
+def _text(lang: str, forced: bool = False) -> dict[str, Any]:
+    return {"@type": "Text", "Language": lang, "Forced": "Yes" if forced else "No"}
+
+
+AUDIO_OK = _audio("E-AC-3", 6)
+
+
+class TestBLUSiteRules:
+    @pytest.fixture
+    def blu(self):
+        tracker = BLU(config=_config())
+        tracker.common.check_language_requirements = AsyncMock(return_value=True)
+        tracker.disc_has_dv = AsyncMock(return_value=True)
+        return tracker
+
+    def _passes(self, blu, **overrides: Any) -> bool:
+        return _run(blu.get_additional_checks(_meta(**overrides)))
+
+    def test_extraneous_files_are_refused(self, blu, tmp_path):
+        (tmp_path / "Example.S01E01.1080p.WEB-DL-GRP.mkv").write_bytes(b"x")
+        assert self._passes(blu, path=str(tmp_path), type="WEBDL") is True
+        (tmp_path / "Example.S01.nfo").write_text("nfo")
+        assert self._passes(blu, path=str(tmp_path), type="WEBDL") is False
+        (tmp_path / "Example.S01.nfo").unlink()
+        (tmp_path / "Example.S01E01.sample.mkv").write_bytes(b"x")
+        assert self._passes(blu, path=str(tmp_path), type="WEBDL") is False
+
+    def test_video_codec_whitelist(self, blu):
+        assert self._passes(blu, mediainfo=_mi(_video("MPEG-4 Visual"), AUDIO_OK), type="WEBDL") is False
+        assert self._passes(blu, mediainfo=_mi(_video("VC-1"), AUDIO_OK), type="REMUX") is True
+        assert self._passes(blu, mediainfo=_mi(_video("MPEG Video"), AUDIO_OK), type="REMUX") is True
+
+    def test_mp2_only_untouched_and_mp3_only_commentary(self, blu):
+        mp2 = {"@type": "Audio", "Format": "MPEG Audio", "Format_Profile": "Layer 2", "Channels": "2", "Language": "en", "Title": ""}
+        mp3 = {**mp2, "Format_Profile": "Layer 3"}
+        assert self._passes(blu, mediainfo=_mi(_video(), mp2), type="HDTV", container="ts") is True
+        assert self._passes(blu, mediainfo=_mi(_video(), mp2), type="WEBDL") is False
+        assert self._passes(blu, mediainfo=_mi(_video(), AUDIO_OK, {**mp3, "Title": "Commentary by the director"}), type="WEBDL") is True
+        assert self._passes(blu, mediainfo=_mi(_video(), mp3), type="WEBDL") is False
+
+    def test_encode_rate_control_must_be_crf_or_two_pass(self, blu):
+        comparison = "[comparison=Source, Encode]a[/comparison]"
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", "cabac=1 / rc=crf / crf=18.0"), AUDIO_OK), description=comparison) is True
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", "cabac=1 / rc=2pass / bitrate=8000"), AUDIO_OK), description=comparison) is True
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", "cabac=1 / rc=abr / bitrate=8000"), AUDIO_OK), description=comparison) is False
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", "cabac=1 / rc=cqp / qp=20"), AUDIO_OK), description=comparison) is False
+
+    def test_encode_needs_a_comparison_slowpics_is_enough(self, blu):
+        mi = _mi(_video("AVC", "rc=crf / crf=18.0"), AUDIO_OK)
+        assert self._passes(blu, mediainfo=mi, description="Source vs encode: https://slow.pics/c/abc123") is True
+        assert self._passes(blu, mediainfo=mi, description="[comparison=Source, Encode]https://img.example/a.png[/comparison]") is True
+        assert self._passes(blu, mediainfo=mi, description="no comparison here") is False
+        assert self._passes(blu, mediainfo=mi, description="no comparison here", type="REMUX") is True
+
+    def test_1080p_encode_main_audio_guideline(self, blu):
+        mi_ok = "[comparison=Source, Encode]a[/comparison]"
+        settings = "rc=crf / crf=18.0"
+        for track in (_audio("DTS", 6, commercial="DTS-HD High Resolution Audio"), _audio("E-AC-3", 6), _audio("AC-3", 6), _audio("AAC", 2), _audio("DTS-HD MA", 6, lossless=True)):
+            assert self._passes(blu, mediainfo=_mi(_video("AVC", settings), track), description=mi_ok) is True, track["Format"]
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", settings), _audio("DTS", 6)), description=mi_ok) is False
+
+    def test_multi_season_pack_only_as_discs(self, blu):
+        assert self._passes(blu, category="TV", type="WEBDL", uuid="Example.S01-S03.1080p.WEB-DL-GRP", name="Example S01-S03 1080p WEB-DL-GRP") is False
+        assert self._passes(blu, category="TV", type="WEBDL", uuid="Example.S02.1080p.WEB-DL-GRP", name="Example S02 1080p WEB-DL-GRP") is True
+
+    def test_prohibited_tools_mentioned_in_source_description(self, blu):
+        assert self._passes(blu, type="WEBDL", description="HDR10+ metadata injected with hdr10plus_tool") is False
+        assert self._passes(blu, type="WEBDL", description="Decoded with truehdd") is False
+
+    def test_forced_subtitle_in_another_language_only_warns_unattended(self, blu):
+        mi = _mi(_video(), AUDIO_OK, _text("fr", forced=True))
+        assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en") is True
+        with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=False):
+            assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en", unattended=False) is False
