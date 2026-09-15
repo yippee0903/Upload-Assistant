@@ -20,8 +20,10 @@ def _config() -> dict[str, Any]:
     return {"TRACKERS": {"BLU": {"api_key": "fake", "announce_url": ""}}, "DEFAULT": {"tmdb_api": "fake"}}
 
 
-def _audio(fmt: str, channels: int, lang: str = "en", commercial: str = "", lossless: bool = False, title: str = "") -> dict[str, Any]:
+def _audio(fmt: str, channels: int, lang: str = "en", commercial: str = "", lossless: bool = False, title: str = "", bsid: str = "") -> dict[str, Any]:
     track: dict[str, Any] = {"@type": "Audio", "Format": fmt, "Channels": str(channels), "Language": lang, "Format_Commercial_IfAny": commercial, "Title": title}
+    if bsid:
+        track["extra"] = {"bsid": bsid}
     if lossless:
         track["Compression_Mode"] = "Lossless"
     return track
@@ -121,6 +123,12 @@ class TestBLUAdditionalChecks:
         assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 2))) is False
         assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 6), commentary)) is True
         assert self._passes(blu, type="ENCODE", mediainfo=_mi(_audio("MLP FBA", 2), _audio("AC-3", 2))) is True
+
+    def test_truehd_compat_track_must_have_bsid_6_when_known(self, blu):
+        truehd = _audio("MLP FBA", 8, commercial="Dolby TrueHD with Dolby Atmos")
+        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="6"))) is True
+        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="8"))) is False
+        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6))) is True
 
     def test_2160p_encode_needs_lossless_main_audio(self, blu):
         assert self._passes(blu, resolution="2160p") is False

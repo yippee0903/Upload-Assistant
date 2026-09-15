@@ -279,9 +279,13 @@ class BLU(UNIT3D):
         # with the standard downmix layout (5.1 for 5.1/7.1, else the same count).
         ac3_tracks = [t for t in tracks if t.get("Format") == "AC-3" and "commentary" not in str(t.get("Title") or "").lower()]
 
-        def _has_compat(truehd: dict[str, Any]) -> bool:
+        def _compat_tracks(truehd: dict[str, Any]) -> list[dict[str, Any]]:
             lang = str(truehd.get("Language") or "").lower()
-            return any(str(t.get("Language") or "").lower() == lang and _channels(t) >= min(6, _channels(truehd)) for t in ac3_tracks)
+            return [t for t in ac3_tracks if str(t.get("Language") or "").lower() == lang and _channels(t) >= min(6, _channels(truehd))]
+
+        def _bsid(track: dict[str, Any]) -> str:
+            extra = track.get("extra")
+            return str(extra.get("bsid") or "") if isinstance(extra, dict) else ""
 
         for i, track in enumerate(tracks):
             fmt = str(track.get("Format") or "")
@@ -295,9 +299,18 @@ class BLU(UNIT3D):
             if fmt == "AAC" and channels > 2 and meta["type"] not in ("WEBDL", "HDTV"):
                 console.print(f"[bold red]AAC is only accepted for mono or stereo audio unless untouched, skipping {self.tracker} upload.[/bold red]")
                 return False
-            if fmt == "MLP FBA" and not _has_compat(track):
-                console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
-                return False
+            if fmt == "MLP FBA":
+                compats = _compat_tracks(track)
+                if not compats:
+                    console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
+                    return False
+                bsids = {_bsid(t) for t in compats} - {""}
+                if (
+                    bsids
+                    and "6" not in bsids
+                    and not ask_to_continue(meta, f"The TrueHD compatibility AC-3 track has bsid {', '.join(sorted(bsids))}, {self.tracker} requires bsid 6.")
+                ):
+                    return False
             if i == 0 and meta["type"] == "ENCODE" and meta["resolution"] == "2160p" and not is_lossless(track):
                 console.print(f"[bold red]2160p encodes must have lossless main audio, skipping {self.tracker} upload.[/bold red]")
                 return False
