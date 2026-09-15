@@ -304,12 +304,8 @@ class BLU(UNIT3D):
                 if not compats:
                     console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
                     return False
-                bsids = {_bsid(t) for t in compats} - {""}
-                if (
-                    bsids
-                    and "6" not in bsids
-                    and not ask_to_continue(meta, f"The TrueHD compatibility AC-3 track has bsid {', '.join(sorted(bsids))}, {self.tracker} requires bsid 6.")
-                ):
+                bsids = {_bsid(t) or "unknown" for t in compats}
+                if "6" not in bsids and not ask_to_continue(meta, f"The TrueHD compatibility AC-3 track has bsid {', '.join(sorted(bsids))}, {self.tracker} requires bsid 6."):
                     return False
             if i == 0 and meta["type"] == "ENCODE" and meta["resolution"] == "2160p" and not is_lossless(track):
                 console.print(f"[bold red]2160p encodes must have lossless main audio, skipping {self.tracker} upload.[/bold red]")

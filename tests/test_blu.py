@@ -114,21 +114,22 @@ class TestBLUAdditionalChecks:
         truehd = _audio("MLP FBA", 8, commercial="Dolby TrueHD with Dolby Atmos")
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd)) is False
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, lang="fr"))) is False
-        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6))) is True
+        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="6"))) is True
 
     def test_truehd_compat_track_is_not_a_commentary_nor_a_stereo_downmix(self, blu):
         truehd = _audio("MLP FBA", 8, commercial="Dolby TrueHD with Dolby Atmos")
         commentary = _audio("AC-3", 2, title="Commentary by the director")
         assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("E-AC-3", 6), commentary)) is False
         assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 2))) is False
-        assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 6), commentary)) is True
-        assert self._passes(blu, type="ENCODE", mediainfo=_mi(_audio("MLP FBA", 2), _audio("AC-3", 2))) is True
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="6"), commentary)) is True
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(_audio("MLP FBA", 2), _audio("AC-3", 2, bsid="6"))) is True
 
-    def test_truehd_compat_track_must_have_bsid_6_when_known(self, blu):
+    def test_truehd_compat_track_must_have_bsid_6(self, blu):
         truehd = _audio("MLP FBA", 8, commercial="Dolby TrueHD with Dolby Atmos")
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="6"))) is True
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, bsid="8"))) is False
-        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6))) is True
+        # "Must": an unreported bsid is not a pass.
+        assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6))) is False
 
     def test_2160p_encode_needs_lossless_main_audio(self, blu):
         assert self._passes(blu, resolution="2160p") is False
