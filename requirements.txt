@@ -45,5 +45,5 @@ tqdm==4.70.1
 transmission_rpc==7.0.12
 tvdb-v4-official==1.1.0
 unidecode==1.4.0
-urllib3==2.7.0
+urllib3==2.8.0
 waitress==3.0.2
