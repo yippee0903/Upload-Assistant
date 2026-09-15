@@ -64,6 +64,16 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = 10.0
 
 
+def drop_untonemapped_reused_images(meta: dict[str, Any]) -> None:
+    """Tracker images are reused untouched. For an HDR/DV release with tone_map
+    on, keep them only when the source declared them tonemapped (the flag is
+    set while its description is parsed); otherwise capture locally."""
+    hdr = str(meta.get("hdr") or "")
+    if tone_map and meta.get("image_list") and any(tag in hdr for tag in ("HDR", "DV", "HLG")) and not meta.get("tonemapped"):
+        console.print("[yellow]HDR release and the source does not declare tonemapped screenshots: ignoring its images, capturing locally.[/yellow]")
+        meta["image_list"] = []
+
+
 def par_scale_factors(par: float, dar: float, width: float, height: float) -> tuple[float, float]:
     """(w_scale, h_scale) that turn coded dimensions into the displayed aspect ratio for anamorphic video."""
     if par == 1:
@@ -132,6 +142,7 @@ async def disc_screenshots(
     start_time = time.time() if meta.get("debug") else 0.0
     if "image_list" not in meta:
         meta["image_list"] = []
+    drop_untonemapped_reused_images(meta)
     image_list_entries = cast(list[dict[str, Any]], meta["image_list"])
     existing_images: list[dict[str, Any]] = [img for img in image_list_entries if str(img.get("img_url", "")).startswith("http")]
 
@@ -437,6 +448,7 @@ async def dvd_screenshots(meta: dict[str, Any], disc_num: int, num_screens: int 
     screens = meta["screens"]
     if "image_list" not in meta:
         meta["image_list"] = []
+    drop_untonemapped_reused_images(meta)
     image_list_entries = cast(list[dict[str, Any]], meta["image_list"])
     existing_images: list[dict[str, Any]] = [img for img in image_list_entries if str(img.get("img_url", "")).startswith("http")]
 
@@ -780,6 +792,7 @@ async def screenshots(
     if "image_list" not in meta:
         meta["image_list"] = []
 
+    drop_untonemapped_reused_images(meta)
     image_list_entries = cast(list[dict[str, Any]], meta["image_list"])
     existing_images: list[dict[str, Any]] = [img for img in image_list_entries if str(img.get("img_url", "")).startswith("http")]
 
