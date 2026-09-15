@@ -20,8 +20,8 @@ def _config() -> dict[str, Any]:
     return {"TRACKERS": {"BLU": {"api_key": "fake", "announce_url": ""}}, "DEFAULT": {"tmdb_api": "fake"}}
 
 
-def _audio(fmt: str, channels: int, lang: str = "en", commercial: str = "", lossless: bool = False) -> dict[str, Any]:
-    track: dict[str, Any] = {"@type": "Audio", "Format": fmt, "Channels": str(channels), "Language": lang, "Format_Commercial_IfAny": commercial}
+def _audio(fmt: str, channels: int, lang: str = "en", commercial: str = "", lossless: bool = False, title: str = "") -> dict[str, Any]:
+    track: dict[str, Any] = {"@type": "Audio", "Format": fmt, "Channels": str(channels), "Language": lang, "Format_Commercial_IfAny": commercial, "Title": title}
     if lossless:
         track["Compression_Mode"] = "Lossless"
     return track
@@ -113,6 +113,14 @@ class TestBLUAdditionalChecks:
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd)) is False
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6, lang="fr"))) is False
         assert self._passes(blu, type="REMUX", mediainfo=_mi(truehd, _audio("AC-3", 6))) is True
+
+    def test_truehd_compat_track_is_not_a_commentary_nor_a_stereo_downmix(self, blu):
+        truehd = _audio("MLP FBA", 8, commercial="Dolby TrueHD with Dolby Atmos")
+        commentary = _audio("AC-3", 2, title="Commentary by the director")
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("E-AC-3", 6), commentary)) is False
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 2))) is False
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(truehd, _audio("AC-3", 6), commentary)) is True
+        assert self._passes(blu, type="ENCODE", mediainfo=_mi(_audio("MLP FBA", 2), _audio("AC-3", 2))) is True
 
     def test_2160p_encode_needs_lossless_main_audio(self, blu):
         assert self._passes(blu, resolution="2160p") is False

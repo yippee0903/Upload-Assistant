@@ -233,13 +233,24 @@ class BLU(UNIT3D):
 
     def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
         tracks = mi_tracks(meta, "Audio")
-        ac3_langs = {str(t.get("Language") or "").lower() for t in tracks if t.get("Format") == "AC-3"}
+
+        def _channels(track: dict[str, Any]) -> int:
+            try:
+                return int(track.get("Channels_Original") or track.get("Channels") or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        # A compatibility track is a non-commentary AC-3 in the TrueHD's language
+        # with the standard downmix layout (5.1 for 5.1/7.1, else the same count).
+        ac3_tracks = [t for t in tracks if t.get("Format") == "AC-3" and "commentary" not in str(t.get("Title") or "").lower()]
+
+        def _has_compat(truehd: dict[str, Any]) -> bool:
+            lang = str(truehd.get("Language") or "").lower()
+            return any(str(t.get("Language") or "").lower() == lang and _channels(t) >= min(6, _channels(truehd)) for t in ac3_tracks)
+
         for i, track in enumerate(tracks):
             fmt = str(track.get("Format") or "")
-            try:
-                channels = int(track.get("Channels_Original") or track.get("Channels") or 0)
-            except (TypeError, ValueError):
-                channels = 0
+            channels = _channels(track)
             if fmt in ("Opus", "Vorbis"):
                 console.print(f"[bold red]{fmt} audio is not allowed, skipping {self.tracker} upload.[/bold red]")
                 return False
@@ -249,7 +260,7 @@ class BLU(UNIT3D):
             if fmt == "AAC" and channels > 2 and meta["type"] not in ("WEBDL", "HDTV"):
                 console.print(f"[bold red]AAC is only accepted for mono or stereo audio unless untouched, skipping {self.tracker} upload.[/bold red]")
                 return False
-            if fmt == "MLP FBA" and str(track.get("Language") or "").lower() not in ac3_langs:
+            if fmt == "MLP FBA" and not _has_compat(track):
                 console.print(f"[bold red]Every TrueHD track needs a standalone AC-3 compatibility track, skipping {self.tracker} upload.[/bold red]")
                 return False
             if i == 0 and meta["type"] == "ENCODE" and meta["resolution"] == "2160p" and not is_lossless(track):
