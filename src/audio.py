@@ -738,8 +738,13 @@ def check_disallowed_compat_tracks(meta: Meta, audio_tracks: list[TrackDict]) ->
             return 2
         return 3  # lossless: TrueHD, DTS-HD MA, DTS:X, FLAC, PCM
 
+    # A track titled as a distinct mix is its own thing, not a downmix of another track.
+    distinct_mix = re.compile(r"\b(?:mix|remix|alternate|isolated|score|theatrical)\b", re.IGNORECASE)
+
     lang_groups: dict[str, list[TrackDict]] = {}
     for track in audio_tracks:
+        if distinct_mix.search(str(track.get("Title") or "")):
+            continue
         lang = str(track.get("Language") or "").lower().strip() or "__unknown__"
         lang_groups.setdefault(lang, []).append(track)
 

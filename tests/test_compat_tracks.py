@@ -26,8 +26,8 @@ def _meta(**overrides: Any) -> dict[str, Any]:
     return m
 
 
-def _track(fmt: str, lang: str = "zh") -> dict[str, Any]:
-    return {"@type": "Audio", "Format": fmt, "Language": lang}
+def _track(fmt: str, lang: str = "zh", title: str = "") -> dict[str, Any]:
+    return {"@type": "Audio", "Format": fmt, "Language": lang, "Title": title}
 
 
 def _run(coro: Any) -> Any:
@@ -198,6 +198,14 @@ class TestDisallowedCases:
     def test_truehd_plus_two_ac3_same_lang_is_disallowed(self):
         meta = _meta()
         check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en"), _track("AC-3", "en"), _track("AC-3", "en")])
+        assert meta.get("has_disallowed_compat_track") is True
+
+    def test_distinct_mixes_are_not_compat_tracks(self):
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("AC-3", "es", "Original 5.1 Surround Mix"), _track("E-AC-3", "es", "Alternate 5.1 Surround Remix")])
+        assert not meta.get("has_disallowed_compat_track")
+        meta = _meta()
+        check_disallowed_compat_tracks(meta, [_track("MLP FBA", "en", "Original Theatrical Mix"), _track("E-AC-3", "en"), _track("AC-3", "en")])
         assert meta.get("has_disallowed_compat_track") is True
 
     def test_flag_not_reset_when_already_false(self):
