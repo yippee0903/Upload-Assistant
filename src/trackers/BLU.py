@@ -4,6 +4,7 @@ import re
 from typing import Any, Optional
 
 import cli_ui
+import httpx
 
 from src.console import console
 from src.trackers.COMMON import COMMON, ask_to_continue, is_lossless, mi_tracks
@@ -206,9 +207,16 @@ class BLU(UNIT3D):
             return False
 
         if meta["type"] in ["ENCODE", "REMUX"] and "HDR" in hdr and "DV" in hdr:
-            derived = bool(meta.get("webdv"))
+            derived = bool(meta.get("webdv")) or "hybrid" in str(meta.get("description") or "").lower()
             if not derived and (not meta["unattended"] or meta.get("unattended_confirm", False)):
                 derived = bool(cli_ui.ask_yes_no("Is the Dolby Vision layer derived from a different source (WEB)?", default=False))
+            elif not derived and not await self.disc_has_dv(meta):
+                # Unattended is conservative: without a full disc carrying DV on
+                # the site, the layer cannot be proven disc-sourced.
+                console.print(
+                    f"[yellow]No {self.tracker} full disc with Dolby Vision found for this title, the DV layer cannot be proven disc-sourced (unattended: skipping)[/yellow]"
+                )
+                return False
             if derived:
                 if not ask_to_continue(
                     meta,
@@ -230,6 +238,29 @@ class BLU(UNIT3D):
             return False
 
         return should_continue
+
+    @staticmethod
+    def _discs_prove_dv(hits: list[tuple[str, str]]) -> bool:
+        """(name, type) pairs from the site: a full disc listed with Dolby Vision proves the disc carries the DV layer."""
+        return any(kind == "Full Disc" and re.search(r"\b(?:DV|DoVi|Dolby Vision)\b", name, re.IGNORECASE) for name, kind in hits)
+
+    async def disc_has_dv(self, meta: dict[str, Any]) -> bool:
+        """Ask the site for the title's full discs; any with DV proves the layer is disc-sourced."""
+        if not meta.get("tmdb"):
+            return False
+        headers = {"authorization": f"Bearer {self.api_key}", "accept": "application/json"}
+        # The site ignores the types[] filter: every type comes back, filter on the returned type.
+        params = [("tmdbId", str(meta["tmdb"])), ("perPage", "100")]
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url=self.search_url, headers=headers, params=params)
+                response.raise_for_status()
+                data = response.json().get("data", [])
+        except (httpx.HTTPError, ValueError) as e:
+            console.print(f"[yellow]Could not list {self.tracker} discs to check for Dolby Vision: {e}[/yellow]")
+            return False
+        attrs = [each.get("attributes") or {} for each in data]
+        return self._discs_prove_dv([(str(a.get("name") or ""), str(a.get("type") or "")) for a in attrs])
 
     def _check_audio_tracks(self, meta: dict[str, Any]) -> bool:
         tracks = mi_tracks(meta, "Audio")

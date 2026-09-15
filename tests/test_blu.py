@@ -132,10 +132,28 @@ class TestBLUAdditionalChecks:
         assert self._passes(blu, image_list=[], screens=4) is True
 
     def test_derived_dv_unattended_is_skipped_and_disc_dv_passes(self, blu):
+        # Unattended is conservative: the DV layer must be proven to come from
+        # the disc (a BLU full disc with DV for this title), else skip.
+        blu.disc_has_dv = AsyncMock(return_value=True)
         meta = _meta(type="REMUX", hdr="DV HDR")
         assert _run(blu.get_additional_checks(meta)) is True
         assert meta["tracker_status"]["BLU"].get("other") is not True
         assert self._passes(blu, type="REMUX", hdr="DV HDR", webdv="Hybrid") is False
+        blu.disc_has_dv = AsyncMock(return_value=False)
+        assert self._passes(blu, type="REMUX", hdr="DV HDR") is False
+        assert self._passes(blu, type="ENCODE", hdr="DV HDR") is False
+
+    def test_derived_dv_is_known_from_the_source_description(self, blu):
+        blu.disc_has_dv = AsyncMock(return_value=True)
+        assert self._passes(blu, type="ENCODE", hdr="DV HDR", description="SOURCE: Example.2026.UHD.BluRay.DV.HYBRID.REMUX-GRP") is False
+        blu.disc_has_dv.assert_not_called()
+
+    def test_disc_dv_is_read_from_full_disc_names_only(self, blu):
+        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray DV HDR HEVC TrueHD 7.1-GRP", "Full Disc")]) is True
+        assert blu._discs_prove_dv([("Example 2026 2160p UHD Blu-ray HDR HEVC TrueHD 7.1-GRP", "Full Disc"), ("Example 2026 1080p Blu-ray AVC DTS-HD MA 5.1-GRP", "Full Disc")]) is False
+        # The site ignores the type filter: a DV WEB-DL or a hybrid remux proves nothing.
+        assert blu._discs_prove_dv([("Example 2026 2160p DSNP WEB-DL DD+ 5.1 DV HDR H.265-GRP", "WEB-DL"), ("Example 2026 2160p UHD BluRay REMUX DVP8 HDR HEVC-GRP", "Remux")]) is False
+        assert blu._discs_prove_dv([]) is False
 
     def test_derived_dv_interactive_sets_fanres(self, blu):
         meta = _meta(type="ENCODE", hdr="DV HDR", webdv="Hybrid", unattended=False)
