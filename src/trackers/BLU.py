@@ -426,7 +426,9 @@ class BLU(UNIT3D):
                 response.raise_for_status()
                 data = response.json().get("data", [])
         except (httpx.HTTPError, ValueError) as e:
-            console.print(f"[yellow]{self.tracker}: title search failed ({e}), relying on the TMDB search alone[/yellow]")
+            # A failed search is not "no dupes": fail closed like the TMDB search does.
+            meta.setdefault("tracker_status", {}).setdefault(self.tracker, {})
+            self._dupe_search_failed(meta, f"title search: {e}")
             return []
         return [self._dupe_entry(each, meta) for each in data if str((each.get("attributes") or {}).get("tmdb_id", "")) == str(meta["tmdb"])]
 
