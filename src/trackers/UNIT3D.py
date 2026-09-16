@@ -136,29 +136,7 @@ class UNIT3D:
                                 entry_tmdb = str(each.get("tmdb_id", ""))
                                 if entry_tmdb != str(meta.get("tmdb", "")):
                                     continue
-                            torrent_id = each.get("id", None)
-                            attributes = each if check_pending else each.get("attributes", {})
-                            name = attributes.get("name", "")
-                            size = attributes.get("size", 0)
-                            files_list = [file["name"] for file in attributes.get("files", []) if isinstance(file, dict) and "name" in file]
-                            result: dict[str, Any] = {
-                                "name": name,
-                                "size": size,
-                                "files": files_list,
-                                "file_count": (len(attributes.get("files", [])) if isinstance(attributes.get("files"), list) else 0),
-                                "trumpable": attributes.get("trumpable", False),
-                                "link": f"{self.base_url}/torrents/{torrent_id}" if check_pending else attributes.get("details_link", None),
-                                "download": attributes.get("download_link", None),
-                                "id": torrent_id,
-                                "type": attributes.get("type", None),
-                                "res": attributes.get("resolution", None),
-                                "internal": attributes.get("internal", False),
-                            }
-                            if meta["is_disc"]:
-                                result["files"] = []
-                                result["bd_info"] = attributes.get("bd_info", "")
-                                result["description"] = attributes.get("description", "")
-                            dupes.append(result)
+                            dupes.append(self._dupe_entry(each, meta, check_pending))
                     else:
                         self._dupe_search_failed(meta, f"HTTP {response.status_code}")
                         return []
@@ -176,6 +154,30 @@ class UNIT3D:
             await asyncio.sleep(5)
 
         return dupes
+
+    def _dupe_entry(self, each: dict[str, Any], meta: dict[str, Any], check_pending: bool = False) -> dict[str, Any]:
+        """One search hit as the dupe checker expects it."""
+        torrent_id = each.get("id")
+        attributes = each if check_pending else each.get("attributes", {})
+        files_list = [file["name"] for file in attributes.get("files", []) if isinstance(file, dict) and "name" in file]
+        result: dict[str, Any] = {
+            "name": attributes.get("name", ""),
+            "size": attributes.get("size", 0),
+            "files": files_list,
+            "file_count": (len(attributes.get("files", [])) if isinstance(attributes.get("files"), list) else 0),
+            "trumpable": attributes.get("trumpable", False),
+            "link": f"{self.base_url}/torrents/{torrent_id}" if check_pending else attributes.get("details_link", None),
+            "download": attributes.get("download_link", None),
+            "id": torrent_id,
+            "type": attributes.get("type", None),
+            "res": attributes.get("resolution", None),
+            "internal": attributes.get("internal", False),
+        }
+        if meta["is_disc"]:
+            result["files"] = []
+            result["bd_info"] = attributes.get("bd_info", "")
+            result["description"] = attributes.get("description", "")
+        return result
 
     def _dupe_search_failed(self, meta: dict[str, Any], reason: str) -> None:
         """A failed search is not "no dupes": skip the tracker rather than upload over a possible dupe."""

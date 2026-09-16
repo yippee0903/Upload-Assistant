@@ -18,7 +18,8 @@ def _search(meta_extra: dict[str, Any]) -> dict[str, str]:
         patch.object(tracker, "get_additional_checks", AsyncMock(return_value=True)),
     ):
         asyncio.run(tracker.search_existing(meta, None))
-    return dict(client.get.call_args.kwargs["params"])
+    # The first request is the TMDB query; BLU adds a second one by title.
+    return dict(client.get.call_args_list[0].kwargs["params"])
 
 
 def test_tmdb_id_search_does_not_filter_by_category():

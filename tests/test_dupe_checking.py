@@ -611,3 +611,13 @@ class TestWebDvOnlyAgainstDvHdr:
 
     def test_keep_everything_tracker_still_accepts_dv_only(self):
         assert not self._match(existing="DV HDR", target="DV", tracker="RF")
+
+
+def test_pq10_is_an_hdr_term() -> None:
+    import asyncio
+
+    from src.dupe_checking import DupeChecker
+
+    assert asyncio.run(DupeChecker.refine_hdr_terms("PQ10")) == {"HDR"}
+    assert "HDR" in asyncio.run(DupeChecker.refine_hdr_terms("example 2026 2160p uhd bluray remux pq10 hevc-grp"))
+    assert asyncio.run(DupeChecker.refine_hdr_terms("example 2026 1080p bluray x264-grp")) == set()

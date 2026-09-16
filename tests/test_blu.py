@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
 
 import pytest
 
@@ -194,6 +196,13 @@ class TestBLUNameAndDescription:
         meta = _meta(name="Example Title 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP", title="Example Title", original_title="Titre Original", type="REMUX", imdb_info=imdb)
         assert _run(blu.get_name(meta))["name"] == "Example Title AKA Titre Original 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP"
 
+    def test_theatrical_is_left_out_of_the_title(self, blu):
+        # Site rule: Theatrical is the assumed cut.
+        meta = _meta(name="Example Title 2026 THEATRICAL 2160p UHD BluRay REMUX PQ10 HEVC DTS-HD MA 5.1-GRP", edition="THEATRICAL", type="REMUX", resolution="2160p")
+        assert _run(blu.get_name(meta))["name"] == "Example Title 2026 2160p UHD BluRay REMUX PQ10 HEVC DTS-HD MA 5.1-GRP"
+        meta = _meta(name="Example Title 2026 Directors Cut 1080p BluRay x264-GRP", edition="Directors Cut")
+        assert _run(blu.get_name(meta))["name"] == "Example Title 2026 Directors Cut 1080p BluRay x264-GRP"
+
     def test_no_dvp_suffix_for_derived_dv(self, blu):
         meta = _meta(tracker_status={"BLU": {"other": True}})
         assert "DVP" not in _run(blu.get_name(meta))["name"]
@@ -321,3 +330,43 @@ class TestBLUSiteRules:
         assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en") is True
         with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=False):
             assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en", unattended=False) is False
+
+
+class TestBLUDupeSearch:
+    def test_title_search_results_are_merged_by_id(self):
+        # The site's search index sometimes answers a TMDB query with a partial
+        # list: a second query by title fills the gaps, without duplicates.
+        blu = BLU(config=_config())
+        by_tmdb = [{"id": "1", "name": "Example 2026 2160p UHD BluRay REMUX HDR HEVC-GRP"}]
+        by_title = [{"id": "1", "name": "Example 2026 2160p UHD BluRay REMUX HDR HEVC-GRP"}, {"id": "2", "name": "Example 2026 2160p UHD BluRay REMUX PQ10 HEVC-OTHER"}]
+        blu._search_by_title = AsyncMock(return_value=by_title)
+        with patch("src.trackers.UNIT3D.UNIT3D.search_existing", AsyncMock(return_value=list(by_tmdb))):
+            result = _run(blu.search_existing(_meta(tmdb=280), None))
+        assert [d["id"] for d in result] == ["1", "2"]
+
+    def test_no_title_search_when_the_tracker_is_being_skipped(self):
+        blu = BLU(config=_config())
+        blu._search_by_title = AsyncMock(return_value=[{"id": "2", "name": "x"}])
+
+        async def skipping_search(_self, meta, _disctype):
+            meta["skipping"] = "BLU"
+            return []
+
+        with patch("src.trackers.UNIT3D.UNIT3D.search_existing", skipping_search):
+            assert _run(blu.search_existing(_meta(tmdb=280), None)) == []
+        blu._search_by_title.assert_not_called()
+
+    def test_a_failed_title_search_skips_the_tracker(self):
+        # A failed search is not "no dupes": fail closed like the TMDB search does.
+        blu = BLU(config=_config())
+        meta = _meta(tmdb=280)
+
+        async def failing_get(*_a, **_k):
+            raise httpx.ConnectError("boom")
+
+        client = MagicMock(); client.get = failing_get
+        client.__aenter__ = AsyncMock(return_value=client); client.__aexit__ = AsyncMock(return_value=False)
+        with patch("src.trackers.UNIT3D.UNIT3D.search_existing", AsyncMock(return_value=[])), patch("src.trackers.BLU.httpx.AsyncClient", return_value=client):
+            assert _run(blu.search_existing(meta, None)) == []
+        assert meta.get("skipping") == "BLU"
+        assert "dupe search failed" in meta["tracker_status"]["BLU"].get("status_message", "")
