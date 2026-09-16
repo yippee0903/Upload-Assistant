@@ -184,6 +184,16 @@ class TestBLUNameAndDescription:
         assert _run(blu.get_name(_meta(name=name, type="WEBDL")))["name"] == name.replace("Hybrid ", "")
         assert _run(blu.get_name(_meta(name=name, type="REMUX", webdv="Hybrid")))["name"] == name
 
+    def test_imdb_original_title_does_not_replace_the_english_title(self, blu):
+        # IMDb has no English title: its title and aka are both the original one.
+        imdb = {"title": "Titre Original", "aka": "Titre Original", "year": "2026"}
+        meta = _meta(name="Example Title 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP", title="Example Title", original_title="Titre Original", type="REMUX", imdb_info=imdb)
+        assert _run(blu.get_name(meta))["name"] == "Example Title AKA Titre Original 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP"
+        # IMDb has an English title: unchanged behaviour, its aka is appended.
+        imdb = {"title": "Example Title", "aka": "Titre Original", "year": "2026"}
+        meta = _meta(name="Example Title 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP", title="Example Title", original_title="Titre Original", type="REMUX", imdb_info=imdb)
+        assert _run(blu.get_name(meta))["name"] == "Example Title AKA Titre Original 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP"
+
     def test_no_dvp_suffix_for_derived_dv(self, blu):
         meta = _meta(tracker_status={"BLU": {"other": True}})
         assert "DVP" not in _run(blu.get_name(meta))["name"]
