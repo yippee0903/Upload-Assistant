@@ -93,11 +93,14 @@ def near_duplicate(path: str, hashes: list[int], max_distance: int = 10) -> bool
 def drop_untonemapped_reused_images(meta: dict[str, Any]) -> None:
     """Tracker images are reused untouched. For an HDR/DV release with tone_map
     on, keep them only when the source declared them tonemapped (the flag is
-    set while its description is parsed); otherwise capture locally."""
+    set while its description is parsed); otherwise capture locally. Only the
+    images marked as coming from a tracker are concerned, once: the tool's own
+    captures are kept even when no tonemap could run on them."""
     hdr = str(meta.get("hdr") or "")
-    if tone_map and meta.get("image_list") and any(tag in hdr for tag in ("HDR", "DV", "HLG")) and not meta.get("tonemapped"):
+    if tone_map and meta.get("image_list") and meta.get("image_list_from_tracker") and any(tag in hdr for tag in ("HDR", "DV", "HLG")) and not meta.get("tonemapped"):
         console.print("[yellow]HDR release and the source does not declare tonemapped screenshots: ignoring its images, capturing locally.[/yellow]")
         meta["image_list"] = []
+        meta["image_list_from_tracker"] = False
 
 
 def par_scale_factors(par: float, dar: float, width: float, height: float) -> tuple[float, float]:
