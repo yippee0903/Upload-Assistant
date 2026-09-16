@@ -321,3 +321,28 @@ class TestBLUSiteRules:
         assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en") is True
         with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=False):
             assert self._passes(blu, type="WEBDL", mediainfo=mi, original_language="en", unattended=False) is False
+
+
+class TestBLUDupeSearch:
+    def test_title_search_results_are_merged_by_id(self):
+        # The site's search index sometimes answers a TMDB query with a partial
+        # list: a second query by title fills the gaps, without duplicates.
+        blu = BLU(config=_config())
+        by_tmdb = [{"id": "1", "name": "Example 2026 2160p UHD BluRay REMUX HDR HEVC-GRP"}]
+        by_title = [{"id": "1", "name": "Example 2026 2160p UHD BluRay REMUX HDR HEVC-GRP"}, {"id": "2", "name": "Example 2026 2160p UHD BluRay REMUX PQ10 HEVC-OTHER"}]
+        blu._search_by_title = AsyncMock(return_value=by_title)
+        with patch("src.trackers.UNIT3D.UNIT3D.search_existing", AsyncMock(return_value=list(by_tmdb))):
+            result = _run(blu.search_existing(_meta(tmdb=280), None))
+        assert [d["id"] for d in result] == ["1", "2"]
+
+    def test_no_title_search_when_the_tracker_is_being_skipped(self):
+        blu = BLU(config=_config())
+        blu._search_by_title = AsyncMock(return_value=[{"id": "2", "name": "x"}])
+
+        async def skipping_search(_self, meta, _disctype):
+            meta["skipping"] = "BLU"
+            return []
+
+        with patch("src.trackers.UNIT3D.UNIT3D.search_existing", skipping_search):
+            assert _run(blu.search_existing(_meta(tmdb=280), None)) == []
+        blu._search_by_title.assert_not_called()

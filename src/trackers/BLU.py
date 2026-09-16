@@ -404,6 +404,32 @@ class BLU(UNIT3D):
             desc = self.DERIVED_DV_ALERT + desc
         return {"description": desc}
 
+    async def search_existing(self, meta: dict[str, Any], disctype: Any) -> list[dict[str, Any]]:
+        dupes = await super().search_existing(meta, disctype)
+        if meta.get("skipping") == self.tracker or not meta.get("tmdb"):
+            return dupes
+        # The site's search index sometimes answers a TMDB query with a partial
+        # list: ask again by title and merge, so one short answer cannot hide a dupe.
+        seen = {d.get("id") for d in dupes}
+        for entry in await self._search_by_title(meta):
+            if entry.get("id") not in seen:
+                seen.add(entry.get("id"))
+                dupes.append(entry)
+        return dupes
+
+    async def _search_by_title(self, meta: dict[str, Any]) -> list[dict[str, Any]]:
+        headers = {"authorization": f"Bearer {self.api_key}", "accept": "application/json"}
+        params = [("name", str(meta.get("title") or "")), ("perPage", "100")]
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url=self.search_url, headers=headers, params=params)
+                response.raise_for_status()
+                data = response.json().get("data", [])
+        except (httpx.HTTPError, ValueError) as e:
+            console.print(f"[yellow]{self.tracker}: title search failed ({e}), relying on the TMDB search alone[/yellow]")
+            return []
+        return [self._dupe_entry(each, meta) for each in data if str((each.get("attributes") or {}).get("tmdb_id", "")) == str(meta["tmdb"])]
+
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
         blu_name = meta["name"]
         if meta["category"] == "TV" and meta.get("episode_title", "") != "":
