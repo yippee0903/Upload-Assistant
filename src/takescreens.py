@@ -1600,8 +1600,10 @@ async def check_libplacebo_compatibility(
             info_cmd: Any = (
                 cast(Any, ffmpeg)
                 .input(path, ss=str(ss_time))
-                .output(test_image_path, vframes=1, pix_fmt="rgb24")
-                .global_args("-y", "-loglevel", "quiet", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts), "-map", output_map)
+                # -map is an output option: it must precede the output file, or
+                # ffmpeg leaves the labelled filtergraph output unconnected.
+                .output(test_image_path, vframes=1, pix_fmt="rgb24", map=output_map)
+                .global_args("-y", "-loglevel", "quiet", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts))
             )
         else:
             vf_chain = f"zscale=transfer=linear,tonemap=tonemap={algorithm}:desat={desat},zscale=transfer=bt709,format=rgb24"
