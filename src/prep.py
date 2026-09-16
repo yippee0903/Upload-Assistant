@@ -60,6 +60,14 @@ except KeyboardInterrupt:
     exit()
 
 
+# Above this similarity the TMDB and IMDb titles are the same title (accents,
+# punctuation, leading article) and no AKA is added; below, it is a
+# translation. 0.7 dropped English/French translations that share most of
+# their letters (measured at 0.74), while an accent or article variant of
+# the same title measures 0.83 or more.
+AKA_SAME_TITLE_RATIO = 0.8
+
+
 def _normalize_search_year(value: Any) -> Optional[str]:
     if value in (None, ""):
         return None
@@ -1034,11 +1042,11 @@ class Prep:
             if aka and not meta.get("aka"):
                 aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
                 difference = SequenceMatcher(None, title, aka_trimmed).ratio()
-                if difference >= 0.7 or not aka_trimmed or aka_trimmed in title:
+                if difference >= AKA_SAME_TITLE_RATIO or not aka_trimmed or aka_trimmed in title:
                     aka = None
 
                 difference = SequenceMatcher(None, title, imdb_aka).ratio()
-                if difference >= 0.7 or not imdb_aka or imdb_aka in title:
+                if difference >= AKA_SAME_TITLE_RATIO or not imdb_aka or imdb_aka in title:
                     imdb_aka = None
 
                 if aka is not None:
@@ -1163,7 +1171,7 @@ class Prep:
                                     if aka:
                                         aka_trimmed = aka[4:].strip().lower() if aka.lower().startswith("aka") else aka.lower()
                                         difference = SequenceMatcher(None, title.lower(), aka_trimmed).ratio()
-                                        if difference >= 0.7 or not aka_trimmed or aka_trimmed in title:
+                                        if difference >= AKA_SAME_TITLE_RATIO or not aka_trimmed or aka_trimmed in title:
                                             aka = None
 
                                         if aka is not None:
