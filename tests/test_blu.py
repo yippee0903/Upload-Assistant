@@ -194,6 +194,13 @@ class TestBLUNameAndDescription:
         meta = _meta(name="Example Title 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP", title="Example Title", original_title="Titre Original", type="REMUX", imdb_info=imdb)
         assert _run(blu.get_name(meta))["name"] == "Example Title AKA Titre Original 2026 1080p BluRay REMUX AVC DTS-HD MA 5.1-GRP"
 
+    def test_theatrical_is_left_out_of_the_title(self, blu):
+        # Site rule: Theatrical is the assumed cut.
+        meta = _meta(name="Example Title 2026 THEATRICAL 2160p UHD BluRay REMUX PQ10 HEVC DTS-HD MA 5.1-GRP", edition="THEATRICAL", type="REMUX", resolution="2160p")
+        assert _run(blu.get_name(meta))["name"] == "Example Title 2026 2160p UHD BluRay REMUX PQ10 HEVC DTS-HD MA 5.1-GRP"
+        meta = _meta(name="Example Title 2026 Directors Cut 1080p BluRay x264-GRP", edition="Directors Cut")
+        assert _run(blu.get_name(meta))["name"] == "Example Title 2026 Directors Cut 1080p BluRay x264-GRP"
+
     def test_no_dvp_suffix_for_derived_dv(self, blu):
         meta = _meta(tracker_status={"BLU": {"other": True}})
         assert "DVP" not in _run(blu.get_name(meta))["name"]

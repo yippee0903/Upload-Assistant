@@ -431,7 +431,8 @@ class BLU(UNIT3D):
         return [self._dupe_entry(each, meta) for each in data if str((each.get("attributes") or {}).get("tmdb_id", "")) == str(meta["tmdb"])]
 
     async def get_name(self, meta: dict[str, Any]) -> dict[str, str]:
-        blu_name = meta["name"]
+        # Site rule: Theatrical is the assumed cut and must be left out of the title.
+        blu_name = re.sub(r"\s+THEATRICAL(?:\s+CUT)?\b", "", meta["name"], flags=re.IGNORECASE)
         if meta["category"] == "TV" and meta.get("episode_title", "") != "":
             blu_name = blu_name.replace(f"{meta['episode_title']} {meta['resolution']}", f"{meta['resolution']}", 1)
         imdb_name = meta.get("imdb_info", {}).get("title", "")
