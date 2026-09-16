@@ -235,6 +235,9 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     if expected_images < len(valid_images):
         valid_images = valid_images[:expected_images]
 
+    if valid_images:
+        # Lets the screenshot step tell reused tracker images from the tool's own captures.
+        meta["image_list_from_tracker"] = True
     return valid_images
 
 

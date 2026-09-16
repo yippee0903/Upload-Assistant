@@ -93,11 +93,14 @@ def near_duplicate(path: str, hashes: list[int], max_distance: int = 10) -> bool
 def drop_untonemapped_reused_images(meta: dict[str, Any]) -> None:
     """Tracker images are reused untouched. For an HDR/DV release with tone_map
     on, keep them only when the source declared them tonemapped (the flag is
-    set while its description is parsed); otherwise capture locally."""
+    set while its description is parsed); otherwise capture locally. Only the
+    images marked as coming from a tracker are concerned, once: the tool's own
+    captures are kept even when no tonemap could run on them."""
     hdr = str(meta.get("hdr") or "")
-    if tone_map and meta.get("image_list") and any(tag in hdr for tag in ("HDR", "DV", "HLG")) and not meta.get("tonemapped"):
+    if tone_map and meta.get("image_list") and meta.get("image_list_from_tracker") and any(tag in hdr for tag in ("HDR", "DV", "HLG")) and not meta.get("tonemapped"):
         console.print("[yellow]HDR release and the source does not declare tonemapped screenshots: ignoring its images, capturing locally.[/yellow]")
         meta["image_list"] = []
+        meta["image_list_from_tracker"] = False
 
 
 def par_scale_factors(par: float, dar: float, width: float, height: float) -> tuple[float, float]:
@@ -1597,8 +1600,10 @@ async def check_libplacebo_compatibility(
             info_cmd: Any = (
                 cast(Any, ffmpeg)
                 .input(path, ss=str(ss_time))
-                .output(test_image_path, vframes=1, pix_fmt="rgb24")
-                .global_args("-y", "-loglevel", "quiet", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts), "-map", output_map)
+                # -map is an output option: it must precede the output file, or
+                # ffmpeg leaves the labelled filtergraph output unconnected.
+                .output(test_image_path, vframes=1, pix_fmt="rgb24", map=output_map)
+                .global_args("-y", "-loglevel", "quiet", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts))
             )
         else:
             vf_chain = f"zscale=transfer=linear,tonemap=tonemap={algorithm}:desat={desat},zscale=transfer=bt709,format=rgb24"
