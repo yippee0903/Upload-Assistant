@@ -429,3 +429,138 @@ class TestTosTypeId:
 
 def test_postimg_is_an_approved_host() -> None:
     assert "postimg" in TOS(_config()).approved_image_hosts
+
+
+# ---------------------------------------------------------------------------
+# Tests – _drop_incomparable_dupes
+# ---------------------------------------------------------------------------
+
+
+def _encode_meta(video_codec: str = "AVC", service: str = "") -> dict[str, Any]:
+    return {"category": "MOVIE", "tv_pack": False, "video_codec": video_codec, "service": service}
+
+
+def _names(entries: list[dict[str, Any]]) -> list[str]:
+    return [e["name"] for e in entries]
+
+
+class TestTosDupeCodecFamily:
+    """Only a candidate sharing the upload's codec family can duplicate it."""
+
+    def test_hevc_candidate_is_not_a_dupe_of_an_avc_upload(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB.H265-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert result == []
+
+    def test_x264_candidate_matches_an_avc_upload(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB.x264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert _names(result) == [d["name"]]
+
+    def test_dotted_h264_candidate_matches_an_avc_upload(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB-DL.DD+.5.1.H.264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert _names(result) == [d["name"]]
+
+    def test_avc_candidate_matches_an_avc_upload(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.BluRay.AVC-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert _names(result) == [d["name"]]
+
+    def test_avc_candidate_is_not_a_dupe_of_an_hevc_upload(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB.x264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(video_codec="HEVC")))
+
+        assert result == []
+
+    def test_unreadable_candidate_codec_stays_a_dupe(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB-DL.DD+.5.1-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert _names(result) == [d["name"]]
+
+    def test_unreadable_upload_codec_keeps_every_candidate(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB.H265-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(video_codec="")))
+
+        assert _names(result) == [d["name"]]
+
+
+class TestTosDupeService:
+    """Within one source, the streaming platform separates two releases."""
+
+    def test_other_platform_is_not_a_dupe(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.AMZN.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="NF")))
+
+        assert result == []
+
+    def test_same_platform_is_a_dupe(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.NF.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="NF")))
+
+        assert _names(result) == [d["name"]]
+
+    def test_candidate_without_a_platform_stays_a_dupe(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="NF")))
+
+        assert _names(result) == [d["name"]]
+
+    def test_resolution_before_web_is_not_read_as_a_platform(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.WEB.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="AMZN")))
+
+        assert _names(result) == [d["name"]]
+
+    def test_long_platform_code_is_recognised(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.DARKROOM.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="NF")))
+
+        assert result == []
+
+    def test_upload_without_a_platform_keeps_every_candidate(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.AMZN.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta()))
+
+        assert _names(result) == [d["name"]]
+
+    def test_codec_and_platform_are_both_enforced(self):
+        t = TOS(_config())
+        keep = {"name": "Example.Movie.2014.MULTi.1080p.NF.WEB-DL.H.264-GRP"}
+        other_codec = {"name": "Example.Movie.2014.MULTi.1080p.NF.WEB-DL.H265-GRP"}
+        other_service = {"name": "Example.Movie.2014.MULTi.1080p.AMZN.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([keep, other_codec, other_service], _encode_meta(service="NF")))
+
+        assert _names(result) == [keep["name"]]

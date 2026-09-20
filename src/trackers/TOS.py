@@ -7,6 +7,7 @@ import httpx
 
 from src.console import console
 from src.get_desc import DescriptionBuilder
+from src.region import get_service
 from src.trackers.COMMON import COMMON, mi_tracks
 from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.french.rules import FRENCH_LANGUAGE_RULE, Rule
@@ -26,6 +27,37 @@ _ANIME_MIN_KBPS: dict[str, dict[str, dict[str, int]]] = {
     "AV1": {"720p": {"WEBDL": 1200, "ENCODE": 1500}, "1080p": {"WEBDL": 1500, "ENCODE": 2000}, "2160p": {"WEBDL": 3000, "ENCODE": 4000}},
 }
 _CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x265": "x265", "HEVC": "x265", "AV1": "AV1"}
+
+# A release name spells its video codec dotted ("H.264") or not ("H264"); the
+# separators are dropped before the family lookup, so x264/H264/AVC collapse to
+# one family and x265/H265/HEVC to another.
+_CODEC_TOKEN = re.compile(r"(?<![A-Za-z0-9])(x26[45]|h\.?26[45]|avc|hevc|av1|xvid|divx|vc-?1|mpeg-?2)(?![A-Za-z0-9])", re.IGNORECASE)
+_CODEC_FAMILIES = {key.upper(): family for key, family in _CODEC_KEYS.items()}
+# The platform tag always sits right before the WEB token in a dotted name.
+# Anchoring there keeps a title word from passing as a service code. The tag has
+# no upper length: the dot separator already ends it, and codes such as DARKROOM
+# or DOCPLAY run past the six characters most of the table uses.
+_WEB_SERVICE_TOKEN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z0-9+]{2,})\.WEB(?:[-.]DL|RIP)?(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def _codec_family(text: str) -> str:
+    """The video-codec family named in *text*, or "" when none is readable."""
+    match = _CODEC_TOKEN.search(text)
+    if not match:
+        return ""
+    token = match.group(1).replace(".", "").replace("-", "").upper()
+    return _CODEC_FAMILIES.get(token, token)
+
+
+def _web_service(name: str, known: set[str]) -> str:
+    """The streaming platform tag *name* carries, or "" when it carries none.
+
+    Only a tag the service table knows counts, so the resolution in
+    "1080p.WEB-DL" never passes as a platform.
+    """
+    match = _WEB_SERVICE_TOKEN.search(name)
+    code = match.group(1).upper() if match else ""
+    return code if code in known else ""
 
 
 class TOS(FrenchTrackerMixin, UNIT3D):
@@ -154,6 +186,38 @@ class TOS(FrenchTrackerMixin, UNIT3D):
             }.get(meta["type"], "0")
         return {"type_id": type_id}
 
+    async def _drop_incomparable_dupes(self, dupes: list[dict[str, Any]], meta: dict[str, Any]) -> list[dict[str, Any]]:
+        """Keep only the candidates that could actually duplicate this upload.
+
+        TOS counts a release as a duplicate only when the source *and* its
+        streaming platform, the resolution and the video codec all match.
+        Resolution and type are already narrowed by the search query, so what
+        is left to compare is the codec family and the WEB service. A
+        candidate whose codec or platform cannot be read stays in the list:
+        the check has to fail closed rather than hide a real duplicate.
+        """
+        target_codec = _codec_family(str(meta.get("video_encode") or "")) or _codec_family(str(meta.get("video_codec") or ""))
+        target_service = str(meta.get("service") or "").strip().upper()
+        services = await get_service(get_services_only=True)
+        known = {str(code).upper() for code in services.values()} if isinstance(services, dict) else set()
+
+        kept: list[dict[str, Any]] = []
+        for dupe in dupes:
+            name = dupe.get("name", "") if isinstance(dupe, dict) else str(dupe)
+            reason = ""
+            codec = _codec_family(name)
+            service = _web_service(name, known)
+            if target_codec and codec and codec != target_codec:
+                reason = f"video codec {codec} differs from {target_codec}"
+            elif target_service and service and service != target_service:
+                reason = f"platform {service} differs from {target_service}"
+            if reason:
+                if meta.get("debug"):
+                    console.print(f"[dim]{self.tracker}: not a dupe — {reason}: {name}[/dim]")
+                continue
+            kept.append(dupe)
+        return kept
+
     def _check_tos_specific_dupes(
         self,
         all_dupes: list[dict[str, Any]],
@@ -161,6 +225,11 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         meta: dict[str, Any],
     ) -> list[dict[str, Any]]:
         """Re-inject dupes that must always block a TOS upload.
+
+        *all_dupes* is the candidate list as it stands before the
+        French-language filter, already narrowed to the codec and platform of
+        the upload, so neither rule below can re-inject a release TOS would
+        not call a duplicate.
 
         Two extra rules on top of the French-language filter:
 
@@ -301,6 +370,10 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         except Exception as e:
             console.print(f"[bold red]{self.tracker}: Error searching for existing torrents — {e}[/bold red]")
 
+        # Narrowing first is deliberate: the internal-group and Intégrale
+        # re-injections below must not resurrect a candidate in another codec
+        # or from another platform, which TOS does not count as a duplicate.
+        dupes = await self._drop_incomparable_dupes(dupes, meta)
         filtered = await self._check_french_lang_dupes(dupes, meta)
         return self._check_tos_specific_dupes(dupes, filtered, meta)
 
