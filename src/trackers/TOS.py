@@ -34,8 +34,10 @@ _CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x
 _CODEC_TOKEN = re.compile(r"(?<![A-Za-z0-9])(x26[45]|h\.?26[45]|avc|hevc|av1|xvid|divx|vc-?1|mpeg-?2)(?![A-Za-z0-9])", re.IGNORECASE)
 _CODEC_FAMILIES = {key.upper(): family for key, family in _CODEC_KEYS.items()}
 # The platform tag always sits right before the WEB token in a dotted name.
-# Anchoring there keeps a title word from passing as a service code.
-_WEB_SERVICE_TOKEN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z0-9+]{2,6})\.WEB(?:[-.]DL|RIP)?(?![A-Za-z0-9])", re.IGNORECASE)
+# Anchoring there keeps a title word from passing as a service code. The tag has
+# no upper length: the dot separator already ends it, and codes such as DARKROOM
+# or DOCPLAY run past the six characters most of the table uses.
+_WEB_SERVICE_TOKEN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z0-9+]{2,})\.WEB(?:[-.]DL|RIP)?(?![A-Za-z0-9])", re.IGNORECASE)
 
 
 def _codec_family(text: str) -> str:
@@ -224,6 +226,11 @@ class TOS(FrenchTrackerMixin, UNIT3D):
     ) -> list[dict[str, Any]]:
         """Re-inject dupes that must always block a TOS upload.
 
+        *all_dupes* is the candidate list as it stands before the
+        French-language filter, already narrowed to the codec and platform of
+        the upload, so neither rule below can re-inject a release TOS would
+        not call a duplicate.
+
         Two extra rules on top of the French-language filter:
 
         1. **Internal team releases** — if an existing torrent's group tag
@@ -363,6 +370,9 @@ class TOS(FrenchTrackerMixin, UNIT3D):
         except Exception as e:
             console.print(f"[bold red]{self.tracker}: Error searching for existing torrents — {e}[/bold red]")
 
+        # Narrowing first is deliberate: the internal-group and Intégrale
+        # re-injections below must not resurrect a candidate in another codec
+        # or from another platform, which TOS does not count as a duplicate.
         dupes = await self._drop_incomparable_dupes(dupes, meta)
         filtered = await self._check_french_lang_dupes(dupes, meta)
         return self._check_tos_specific_dupes(dupes, filtered, meta)

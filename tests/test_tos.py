@@ -539,6 +539,14 @@ class TestTosDupeService:
 
         assert _names(result) == [d["name"]]
 
+    def test_long_platform_code_is_recognised(self):
+        t = TOS(_config())
+        d = {"name": "Example.Movie.2014.MULTi.1080p.DARKROOM.WEB-DL.H264-GRP"}
+
+        result = _run(t._drop_incomparable_dupes([d], _encode_meta(service="NF")))
+
+        assert result == []
+
     def test_upload_without_a_platform_keeps_every_candidate(self):
         t = TOS(_config())
         d = {"name": "Example.Movie.2014.MULTi.1080p.AMZN.WEB-DL.H264-GRP"}
