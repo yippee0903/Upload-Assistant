@@ -475,8 +475,10 @@ class BBCODE:
         # [table] made of metadata rows only (Genre / Rating / Release Date / Language / …)
         info_row = r"\s*\[tr\]\s*\[td\](?:genre|rating|release date|language|runtime|director|year|country|imdb|tmdb)s?\[/td\]\s*\[td\][^\[]*\[/td\]\s*\[/tr\]"
         desc = re.sub(rf"\[table\](?:{info_row})+\s*\[/table\]\s*", "", desc, flags=re.IGNORECASE)
-        # Trailer link line, whatever decoration wraps it ([center][b]…[/b][/center])
-        desc = re.sub(rf"^{deco}\[url=https?://(?:www\.)?youtu[^\]]*\]\[?Trailer[^\[]*\]?\[/url\]{deco}$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
+        # Trailer link line, whatever decoration wraps it ([center][b]…[/b][/center]).
+        # Both classes exclude newlines: $ alone would not stop them spanning lines
+        # and swallowing an unbracketed note under an unclosed [url].
+        desc = re.sub(rf"^{deco}\[url=https?://(?:www\.)?youtu[^\]\n]*\]\[?Trailer[^\[\n]*\]?\[/url\]{deco}$\n?", "", desc, flags=re.IGNORECASE | re.MULTILINE)
         # Empty table skeletons ([tr][td][/td]…[/tr] with nothing inside), possibly centered
         desc = re.sub(r"(?:\[center\])?(?:\s*\[tr\](?:\s*\[td\]\s*\[/td\])+\s*\[/tr\])+\s*(?:\[/center\])?\s*", "\n", desc, flags=re.IGNORECASE)
         return desc

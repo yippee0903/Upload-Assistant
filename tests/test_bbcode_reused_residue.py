@@ -3,6 +3,8 @@
 # YouTube" link. Both are regenerated or unwanted here, so both must go, while
 # ordinary prose that merely mentions a trailer or a tool has to survive.
 
+import pytest
+
 from src.bbcode import BBCODE
 
 SITE = "https://example-tracker.org"
@@ -28,6 +30,17 @@ class TestAutoUploaderSignature:
     def test_bare_signature_line_is_removed(self) -> None:
         assert _clean(f"{PROSE}\nUploaded with ExampleTracker AutoUploader v1.2.3") == PROSE
 
+    @pytest.mark.parametrize(
+        "site",
+        ["Example.Tracker", "Example-Tracker", "Example.Sub-Tracker"],
+    )
+    @pytest.mark.parametrize("spacing", ["AutoUploader", "Auto Uploader"])
+    @pytest.mark.parametrize("version", ["", " v2.0.1", " 2.0.1"])
+    def test_site_name_and_spacing_variants_are_removed(self, site: str, spacing: str, version: str) -> None:
+        sig = f"[right][size=4]Uploaded with {site} {spacing}{version}[/size][/right]"
+
+        assert _clean(f"{PROSE}\n{sig}") == PROSE
+
     def test_prose_mentioning_the_tool_survives(self) -> None:
         note = "Remuxed by hand, not uploaded with ExampleTracker AutoUploader v0.15.4 as usual."
 
@@ -49,6 +62,29 @@ class TestTrailerLink:
         trailer = "[url=https://www.youtube.com/watch?v=aaaaaaaaaaa][Trailer on YouTube][/url]"
 
         assert _clean(f"{PROSE}\n{trailer}") == PROSE
+
+    @pytest.mark.parametrize(
+        ("opening", "closing"),
+        [
+            ("[i]", "[/i]"),
+            ("[size=4]", "[/size]"),
+            ("[color=#ff0000]", "[/color]"),
+            ("[center][i][size=3]", "[/size][/i][/center]"),
+        ],
+    )
+    def test_decorated_trailer_links_are_removed(self, opening: str, closing: str) -> None:
+        link = "[url=https://www.youtube.com/watch?v=aaaaaaaaaaa][Trailer on YouTube][/url]"
+
+        assert _clean(f"{PROSE}\n{opening}{link}{closing}") == PROSE
+
+    def test_an_unclosed_trailer_link_does_not_swallow_the_next_lines(self) -> None:
+        note = "A note line carrying no bracket at all."
+        desc = f"[url=https://www.youtube.com/watch?v=aaaaaaaaaaa]Trailer\n{note}\n[/url]\n{PROSE}"
+
+        cleaned = _clean(desc)
+
+        assert note in cleaned
+        assert PROSE in cleaned
 
     def test_prose_mentioning_a_trailer_survives(self) -> None:
         note = "The trailer on YouTube shows a different colour grade than this encode."
