@@ -162,6 +162,9 @@ Implementation notes:
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
 - `only_id` and `keep_images` influence how much another tracker description is scraped/merged. The optons are independent.
 
+### Release group lists
+- `banned_groups` (list or str): Release groups refused everywhere, whatever each tracker's own banned list says. Comma-separated string or list, case-insensitive. Unattended runs cancel the upload; interactive runs ask.
+
 ### Sonarr / Radarr integration
 - `use_sonarr` (bool): Enable Sonarr searching.
 - `sonarr_url` (str): Sonarr base URL.

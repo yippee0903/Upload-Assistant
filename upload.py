@@ -58,7 +58,7 @@ from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.AR import AR
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import COMMON, group_listed_in, release_group
 from src.trackers.DRAU import DRAU
 from src.trackers.PTP import PTP
 from src.trackersetup import (
@@ -571,6 +571,26 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             sys.exit(1)
         if not screener_confirm:
             console.print("[red]Upload cancelled: screener.[/red]")
+            meta["we_are_uploading"] = False
+            return
+
+    # A release group listed in DEFAULT["banned_groups"] is refused everywhere,
+    # whatever each tracker's own banned list says.
+    if group_listed_in(config, "banned_groups", meta):
+        console.print(f"[bold yellow]⚠  WARNING: release group '{meta.get('tag', '').lstrip('-')}' is on your global banned_groups list.[/bold yellow]")
+        if meta.get("unattended", False):
+            console.print("[yellow]Unattended mode: skipping upload (banned group).[/yellow]")
+            meta["we_are_uploading"] = False
+            return
+        try:
+            banned_confirm = cli_ui.ask_yes_no("Proceed with this banned group anyway?", default=False)
+        except EOFError:
+            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            await cleanup_manager.cleanup()
+            cleanup_manager.reset_terminal()
+            sys.exit(1)
+        if not banned_confirm:
+            console.print("[red]Upload cancelled: banned group.[/red]")
             meta["we_are_uploading"] = False
             return
 

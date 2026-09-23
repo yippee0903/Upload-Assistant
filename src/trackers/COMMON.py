@@ -75,6 +75,27 @@ _SCREENER_WORD = re.compile(r"(?<![a-z0-9])(?:screeners?|(?:dvd|bd|br|web|hd|tv)
 _SCREENER_BARE_TAG = re.compile(r"(?<![a-z0-9])scr(?![a-z0-9])", re.IGNORECASE)
 
 
+def release_group(meta: dict[str, Any]) -> str:
+    """The release group from meta["tag"], lowercased and without its dash; "" when untagged."""
+    return str(meta.get("tag") or "").strip().lstrip("-").strip().lower()
+
+
+def group_listed_in(config: dict[str, Any], key: str, meta: dict[str, Any]) -> bool:
+    """Whether the release group appears in the DEFAULT[key] group list.
+
+    The list is global, independent of any tracker's own settings, and is
+    written either as a list or as a comma-separated string like the other
+    DEFAULT entries. Matching is whole-name and case-insensitive; an
+    untagged release never matches.
+    """
+    raw = (config.get("DEFAULT") or {}).get(key) or []
+    entries = raw.split(",") if isinstance(raw, str) else list(raw)
+    listed = {str(entry).strip().lstrip("-").strip().lower() for entry in entries}
+    listed.discard("")
+    group = release_group(meta)
+    return bool(group) and group in listed
+
+
 def is_lossless_dts(track: dict[str, Any]) -> bool:
     commercial = str(track.get("Format_Commercial_IfAny") or "")
     return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
