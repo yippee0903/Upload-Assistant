@@ -69,7 +69,8 @@ def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:
 # A screener is a pre-release copy circulated to press, juries and buyers, so it
 # is watermarked, often incomplete and traceable; trackers refuse them.
 # The spelled-out word and the prefixed scene tags are safe to look for anywhere.
-_SCREENER_WORD = re.compile(r"(?<![a-z0-9])(?:screeners?|(?:dvd|bd|br|web|hd|tv)scr)(?![a-z0-9])", re.IGNORECASE)
+_SCREENER_SOURCE = r"(?:dvd|bd|br|web|hd|tv)"
+_SCREENER_WORD = re.compile(rf"(?<![a-z0-9])(?:{_SCREENER_SOURCE}?screeners?|{_SCREENER_SOURCE}scr)(?![a-z0-9])", re.IGNORECASE)
 # A bare "SCR" is read from file names only: "scr" is also the legacy ISO code
 # for Croatian, so a Croatian audio track must never look like a screener.
 _SCREENER_BARE_TAG = re.compile(r"(?<![a-z0-9])scr(?![a-z0-9])", re.IGNORECASE)
@@ -3085,12 +3086,15 @@ class COMMON:
                 meta["screener_info"] = {"source": "filename", "term": match.group(0), "value": name}
                 return True
 
+        # Path-valued fields carry the library's own directory names; the file
+        # name itself was already read above, so they are left out.
+        path_fields = {"CompleteName", "FolderName"}
         tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
         for track in tracks:
             if not isinstance(track, dict):
                 continue
             for field, value in track.items():
-                if not isinstance(value, str):
+                if not isinstance(value, str) or field in path_fields:
                     continue
                 match = _SCREENER_WORD.search(value)
                 if match:

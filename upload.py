@@ -575,24 +575,29 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             return
 
     # A release group listed in DEFAULT["banned_groups"] is refused everywhere,
-    # whatever each tracker's own banned list says.
-    if group_listed_in(config, "banned_groups", meta):
+    # whatever each tracker's own banned list says. Checked here and again after
+    # the interactive edit loop, since --tag can be rewritten there.
+    async def refused_banned_group() -> bool:
+        if not group_listed_in(config, "banned_groups", meta):
+            return False
         console.print(f"[bold yellow]⚠  WARNING: release group '{meta.get('tag', '').lstrip('-')}' is on your global banned_groups list.[/bold yellow]")
         if meta.get("unattended", False):
             console.print("[yellow]Unattended mode: skipping upload (banned group).[/yellow]")
-            meta["we_are_uploading"] = False
-            return
+            return True
         try:
-            banned_confirm = cli_ui.ask_yes_no("Proceed with this banned group anyway?", default=False)
+            if cli_ui.ask_yes_no("Proceed with this banned group anyway?", default=False):
+                return False
         except EOFError:
             console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup_manager.cleanup()
             cleanup_manager.reset_terminal()
             sys.exit(1)
-        if not banned_confirm:
-            console.print("[red]Upload cancelled: banned group.[/red]")
-            meta["we_are_uploading"] = False
-            return
+        console.print("[red]Upload cancelled: banned group.[/red]")
+        return True
+
+    if await refused_banned_group():
+        meta["we_are_uploading"] = False
+        return
 
     parser = Args(config)
     helper = UploadHelper(config)
@@ -876,6 +881,11 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             await cleanup_manager.cleanup()
             cleanup_manager.reset_terminal()
             sys.exit(1)
+
+    # The edit loop above may have rewritten --tag: apply the global list to the final one.
+    if meta.get("edit") and await refused_banned_group():
+        meta["we_are_uploading"] = False
+        return
 
     if meta.get("emby", False):
         if not meta["debug"]:

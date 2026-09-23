@@ -45,6 +45,8 @@ class TestScreenerInFilename:
             "Example.Movie.2026.BDSCR.x264-GRP.mkv",
             "Example.Movie.2026.SCR.x264-GRP.mkv",
             "Example.Movie.2026.screeners.x264-GRP.mkv",
+            "Example.Movie.2026.DVDScreener.x264-GRP.mkv",
+            "Example.Movie.2026.1080p.WEBScreener.x264-GRP.mkv",
         ],
     )
     def test_screener_tag_is_detected(self, filename: str) -> None:
@@ -90,6 +92,14 @@ class TestScreenerInMediaInfo:
         meta["mediainfo"]["media"]["track"].append({"@type": "Audio", "Language": "scr", "Title": "Screener audio"})
 
         assert _check(meta) is True
+
+
+    def test_a_parent_directory_named_screeners_is_not_a_screener(self) -> None:
+        meta = _meta()
+        meta["mediainfo"]["media"]["track"][0]["CompleteName"] = "/data/screeners/Example.Movie.2026.1080p.BluRay.x264-GRP.mkv"
+        meta["mediainfo"]["media"]["track"][0]["FolderName"] = "/data/screeners"
+
+        assert _check(meta) is False
 
 
 class TestScreenerGuardEdges:
