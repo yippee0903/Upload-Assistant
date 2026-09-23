@@ -66,6 +66,15 @@ def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:
     return [t for t in tracks if t.get("@type") == track_type]
 
 
+# A screener is a pre-release copy circulated to press, juries and buyers, so it
+# is watermarked, often incomplete and traceable; trackers refuse them.
+# The spelled-out word and the prefixed scene tags are safe to look for anywhere.
+_SCREENER_WORD = re.compile(r"(?<![a-z0-9])(?:screeners?|(?:dvd|bd|br|web|hd|tv)scr)(?![a-z0-9])", re.IGNORECASE)
+# A bare "SCR" is read from file names only: "scr" is also the legacy ISO code
+# for Croatian, so a Croatian audio track must never look like a screener.
+_SCREENER_BARE_TAG = re.compile(r"(?<![a-z0-9])scr(?![a-z0-9])", re.IGNORECASE)
+
+
 def is_lossless_dts(track: dict[str, Any]) -> bool:
     commercial = str(track.get("Format_Commercial_IfAny") or "")
     return "Master Audio" in commercial or "DTS:X" in commercial or "XLL" in str(track.get("Format_AdditionalFeatures") or "")
@@ -3036,6 +3045,38 @@ class COMMON:
         return mediainfo
 
     # ── Detag / Notag detection ────────────────────────────────
+    async def check_screener(self, meta: dict[str, Any]) -> bool:
+        """Detect a screener from the release's file names and MediaInfo.
+
+        Returns True when the upload must be refused, and records where the
+        match came from in ``meta["screener_info"]``.
+
+        File names carry scene tags, so they are matched against the bare
+        "SCR" as well. MediaInfo fields are not: "scr" is the legacy ISO
+        code for Croatian and appears in language fields.
+        """
+        sources = [meta.get("path"), meta.get("uuid"), *(meta.get("filelist") or [])]
+        names = [os.path.basename(value.rstrip("/\\")) for value in sources if isinstance(value, str) and value.strip()]
+
+        for name in names:
+            match = _SCREENER_WORD.search(name) or _SCREENER_BARE_TAG.search(name)
+            if match:
+                meta["screener_info"] = {"source": "filename", "term": match.group(0), "value": name}
+                return True
+
+        tracks = ((meta.get("mediainfo") or {}).get("media") or {}).get("track") or []
+        for track in tracks:
+            if not isinstance(track, dict):
+                continue
+            for field, value in track.items():
+                if not isinstance(value, str):
+                    continue
+                match = _SCREENER_WORD.search(value)
+                if match:
+                    meta["screener_info"] = {"source": "mediainfo", "field": str(field), "term": match.group(0), "value": value}
+                    return True
+        return False
+
     async def check_detag(self, meta: dict[str, Any], tracker: str) -> bool:
         """Detect detagged or notagged releases.
 

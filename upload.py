@@ -549,6 +549,31 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> Optional[b
             meta["we_are_uploading"] = False
             return
 
+    # Refuse a screener: a pre-release promotional copy, watermarked and
+    # traceable, that every tracker rejects. Detected on the file names and the
+    # MediaInfo fields.
+    if await COMMON(config).check_screener(meta):
+        info = meta.get("screener_info", {})
+        origin = "file name" if info.get("source") == "filename" else "MediaInfo"
+        console.print(f"[bold yellow]⚠  WARNING: this release looks like a SCREENER ({origin}: '{info.get('term', '')}').[/bold yellow]")
+        console.print(f"[yellow]{info.get('value', '')}[/yellow]")
+        console.print("[yellow]Screeners are pre-release copies sent to press and juries — trackers refuse them.[/yellow]")
+        if meta.get("unattended", False):
+            console.print("[yellow]Unattended mode: skipping upload (screener).[/yellow]")
+            meta["we_are_uploading"] = False
+            return
+        try:
+            screener_confirm = cli_ui.ask_yes_no("Proceed with a screener upload anyway?", default=False)
+        except EOFError:
+            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            await cleanup_manager.cleanup()
+            cleanup_manager.reset_terminal()
+            sys.exit(1)
+        if not screener_confirm:
+            console.print("[red]Upload cancelled: screener.[/red]")
+            meta["we_are_uploading"] = False
+            return
+
     parser = Args(config)
     helper = UploadHelper(config)
 
