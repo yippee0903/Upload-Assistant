@@ -1,7 +1,6 @@
-# Two global, config-driven release-group lists, independent of any tracker's
+# A global, config-driven release-group list, independent of any tracker's
 # own settings: DEFAULT["banned_groups"] refuses the upload outright, and
-# DEFAULT["personal_release_groups"] raises the personal-release flag that every
-# tracker already reads. Both match the release tag case-insensitively and
+# a second list can reuse the same helper. Both match the release tag case-insensitively and
 # accept either a list or a comma-separated string, like the rest of DEFAULT.
 
 from typing import Any
@@ -50,7 +49,7 @@ class TestGroupListedIn:
         assert group_listed_in(_config(), "banned_groups", {"tag": "-FoX"}) is False
 
     def test_each_key_reads_its_own_list(self) -> None:
-        config = _config(banned_groups=["BadGrp"], personal_release_groups=["FoX"])
+        config = _config(banned_groups=["BadGrp"], other_groups=["FoX"])
 
         assert group_listed_in(config, "banned_groups", {"tag": "-FoX"}) is False
-        assert group_listed_in(config, "personal_release_groups", {"tag": "-FoX"}) is True
+        assert group_listed_in(config, "other_groups", {"tag": "-FoX"}) is True

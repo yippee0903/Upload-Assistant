@@ -58,7 +58,7 @@ from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.AR import AR
-from src.trackers.COMMON import COMMON, group_listed_in, release_group
+from src.trackers.COMMON import COMMON, group_listed_in
 from src.trackers.DRAU import DRAU
 from src.trackers.PTP import PTP
 from src.trackersetup import (

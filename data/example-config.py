@@ -41,6 +41,10 @@ config = {
         # If less than the number of trackers pass the checking, exit immediately.
         "tracker_pass_checks": 1,
 
+        # Release groups refused everywhere, whatever each tracker's own banned list says.
+        # List or comma-separated string, case-insensitive. Unattended runs cancel the upload, interactive runs ask.
+        "banned_groups": [],
+
         # Set true to suppress config warnings on startup
         "suppress_warnings": False,
 
