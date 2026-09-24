@@ -47,6 +47,22 @@ class TestAutoUploaderSignature:
         assert note in _clean(note)
 
 
+class TestNfoForgeSignature:
+    @pytest.mark.parametrize("version", ["", " v1.1.17", " 2.0"])
+    def test_sized_linked_signature_line_is_removed(self, version: str) -> None:
+        sig = f"[size=15]Shared with [url=https://github.com/example/NfoForge]NfoForge{version}[/url][/size]"
+
+        assert _clean(f"{PROSE}\n{sig}") == PROSE
+
+    def test_bare_signature_line_is_removed(self) -> None:
+        assert _clean(f"{PROSE}\nShared with NfoForge v1.1.17") == PROSE
+
+    def test_prose_mentioning_the_tool_survives(self) -> None:
+        note = "The NFO was shared with NfoForge v1.1.17 before being trimmed by hand."
+
+        assert note in _clean(note)
+
+
 class TestTrailerLink:
     def test_centred_trailer_link_is_removed(self) -> None:
         trailer = "[center][b][url=https://www.youtube.com/watch?v=aaaaaaaaaaa][Trailer on YouTube][/url][/b][/center]"
