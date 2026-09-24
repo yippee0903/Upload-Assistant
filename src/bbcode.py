@@ -76,7 +76,8 @@ _SIG_MARKERS = (
     r"Uploaded with [\w.\-]{1,40} Auto ?Uploader(?:\s+v?[\w.]+)?",
     r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",
     r"Shared with Upload-Assistant(?:\s+v?[\w.]+)?(?:\s+\(fork\))?",
-    r"Shared with (?:\[url=[^\]]*\])?NfoForge(?:\s+v?[\w.]+)?(?:\[/url\])?",
+    # The version starts with a digit: "NfoForge community" is a sentence, not a signature.
+    r"Shared with (?:\[url=[^\]]*\])?NfoForge(?:\s+v?\d[\w.]*)?(?:\[/url\])?",
     r"OnlyEncodes Upload Assistant(?:\s+v?[\w.]+)?",
     r"OnlyEncodes Uploader(?:\s*[-–]\s*Powered by L4G'?s Upload Assistant)?",
     r"Created with mkbrr, ffmpeg,? and mediainfo",

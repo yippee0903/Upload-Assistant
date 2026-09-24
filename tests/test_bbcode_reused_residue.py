@@ -62,6 +62,11 @@ class TestNfoForgeSignature:
 
         assert note in _clean(note)
 
+    def test_a_word_after_the_tool_name_is_not_a_version(self) -> None:
+        note = "Shared with NfoForge community"
+
+        assert note in _clean(note)
+
 
 class TestTrailerLink:
     def test_centred_trailer_link_is_removed(self) -> None:
