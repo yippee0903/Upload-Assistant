@@ -1603,7 +1603,7 @@ async def check_libplacebo_compatibility(
                 # -map is an output option: it must precede the output file, or
                 # ffmpeg leaves the labelled filtergraph output unconnected.
                 .output(test_image_path, vframes=1, pix_fmt="rgb24", map=output_map)
-                .global_args("-y", "-loglevel", "quiet", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts))
+                .global_args("-y", "-loglevel", "verbose", "-init_hw_device", "vulkan", "-filter_complex", ",".join(filter_parts))
             )
         else:
             vf_chain = f"zscale=transfer=linear,tonemap=tonemap={algorithm}:desat={desat},zscale=transfer=bt709,format=rgb24"
@@ -1615,7 +1615,12 @@ async def check_libplacebo_compatibility(
             console.print(f"[cyan]libplacebo compatibility test command: {' '.join(info_cmd.compile())}[/cyan]")
 
         try:
-            retcode, _stdout, _stderr = await run_ffmpeg(info_cmd)
+            retcode, _stdout, stderr = await run_ffmpeg(info_cmd)
+            # A CPU Vulkan device (llvmpipe/lavapipe) renders libplacebo's dithering as horizontal stripes
+            # while still exiting 0, so the selected device must be a real GPU.
+            if try_libplacebo and re.search(rb"selected:.*\(software\)", stderr):
+                console.print("[yellow]Vulkan device is a software rasterizer: skipping libplacebo tonemapping[/yellow]")
+                return False
             return retcode == 0
         except Exception:
             return False
