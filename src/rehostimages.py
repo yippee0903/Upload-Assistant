@@ -12,7 +12,7 @@ import aiofiles
 from aiofiles import os as aio_os
 
 from src.console import console
-from src.imagehosts import MAX_IMAGE_HOST_SLOTS, PUBLIC_HOSTS, SITE_BOUND_HOSTS, host_slug
+from src.imagehosts import MAX_IMAGE_HOST_SLOTS, PUBLIC_HOSTS, host_slug
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
@@ -50,8 +50,10 @@ async def validate_reused_image_hosts(meta: dict[str, Any], config: dict[str, An
 
 
 def _is_site_bound(image: Mapping[str, Any]) -> bool:
+    # Only declared public hosts are trusted: an undeclared one (e.g. a
+    # tracker's own CDN such as img.blutopia.cc) is treated as site-bound.
     raw_url = _as_str(image.get("raw_url")) or ""
-    return host_slug(urlparse(raw_url).netloc) in SITE_BOUND_HOSTS
+    return bool(raw_url) and host_slug(urlparse(raw_url).netloc) not in PUBLIC_HOSTS
 
 
 async def rehost_site_bound_images(meta: dict[str, Any], config: dict[str, Any], tracker_class_map: Mapping[str, Any], trackers: Sequence[str]) -> None:
