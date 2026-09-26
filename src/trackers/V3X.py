@@ -8,6 +8,7 @@
 #     the .torrent, used for cross-seeding), infohash, tmdbid; limit max 100,
 #     offset pagination, no total. The key goes in the query string only — the
 #     Bearer header is rejected on this read scope. season/ep params are ignored.
+#     t=movie|tvsearch&tmdbid=… returns exactly that TMDB id (imdbid is unsupported).
 #   GET  /torrents/{uuid}               detail: tmdbId, infoHash, description, nfo, files…
 #     (web session cookie only)
 #   GET  /categories                    public category tree (id/name/children)
@@ -17,7 +18,9 @@
 #     409 {error: duplicate|duplicate_content, id} — the release already exists
 #     required: file (.torrent), categoryId (SUBcategory id), rightsDeclared;
 #               movies/series also require nfo and tmdbUrl (or tmdbId)
-#     accepted: name, description, descriptionFormat, language,
+#     accepted: name (shown verbatim on the fiche; the .torrent root is never
+#               used nor altered — cross-seed-safe since the 2026-09 update),
+#               description, descriptionFormat, language,
 #               posterUrl, backdropUrl, anonymous
 #     (title exists but must be left empty — the IMDb tmdbUrl auto-fills
 #      the fiche title site-side)
@@ -27,7 +30,6 @@
 
 import asyncio
 import contextlib
-import os
 import re
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -35,7 +37,6 @@ from urllib.parse import urlparse
 import aiofiles
 import defusedxml.ElementTree as ET
 import httpx
-from torf import Torrent
 from unidecode import unidecode
 
 from src.console import console
@@ -177,13 +178,20 @@ class V3X(FrenchTrackerMixin):
         def _q(s: str) -> str:
             return " ".join(re.sub(r"[^a-zA-Z0-9 ]", " ", unidecode(s)).split())
 
-        queries: list[str] = []
-        ordered_titles = (fr_title, title) if str(meta.get("original_language", "")).lower() == "fr" else (title, fr_title)
-        for t in ordered_titles:
-            cleaned = _q(t)
-            if cleaned and cleaned.lower() not in (q.lower() for q in queries):
-                queries.append(cleaned)
-        if not queries:
+        # An exact TMDB id lookup beats title matching (verified: the feed
+        # only returns that id); text queries remain the fallback.
+        tmdb_id = str(meta.get("tmdb_id") or "")
+        by_id = tmdb_id.isdigit() and int(tmdb_id) > 0
+        searches: list[dict[str, Any]] = []
+        if by_id:
+            searches.append({"t": "tvsearch" if meta.get("category") == "TV" else "movie", "tmdbid": tmdb_id})
+        else:
+            ordered_titles = (fr_title, title) if str(meta.get("original_language", "")).lower() == "fr" else (title, fr_title)
+            for t in ordered_titles:
+                cleaned = _q(t)
+                if cleaned and cleaned.lower() not in (s["q"].lower() for s in searches):
+                    searches.append({"t": "search", "q": cleaned})
+        if not searches:
             return dupes
 
         title_norm = _normalize(title)
@@ -200,7 +208,7 @@ class V3X(FrenchTrackerMixin):
         upload_level = max((self._extract_french_lang_tag(part)[1] for part in upload_audio.split(".")), default=0)
         upload_lacks_french_audio = upload_level < FRENCH_AUDIO_THRESHOLD
 
-        for search_term in queries:
+        for search in searches:
             items: list[dict[str, Any]] = []
             offset = 0
             incomplete = False
@@ -208,7 +216,7 @@ class V3X(FrenchTrackerMixin):
             while True:
                 try:
                     async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.get(self.torznab_url, params={"t": "search", "q": search_term, "limit": 100, "offset": offset, "apikey": self.api_key})
+                        response = await client.get(self.torznab_url, params={**search, "limit": 100, "offset": offset, "apikey": self.api_key})
                     if response.status_code != 200:
                         incomplete = True
                         break
@@ -230,7 +238,9 @@ class V3X(FrenchTrackerMixin):
             # a page we never read. Fail closed: skip the tracker rather than
             # upload over a possible dupe.
             if incomplete:
-                console.print(f"[yellow]{self.tracker}: incomplete dupe search for '{search_term}', skipping tracker to avoid a false negative.[/yellow]")
+                console.print(
+                    f"[yellow]{self.tracker}: incomplete dupe search for '{search.get('q') or search.get('tmdbid')}', skipping tracker to avoid a false negative.[/yellow]"
+                )
                 meta["skipping"] = self.tracker
                 return []
 
@@ -243,12 +253,13 @@ class V3X(FrenchTrackerMixin):
                 name_norm = _normalize(name)
                 if name_norm in seen_names:
                     continue
-                # Relevance filters: title (EN or FR), year (movies), resolution, group
-                if not ((title_norm and title_norm in name_norm) or (fr_title_norm and fr_title_norm in name_norm)):
+                # Relevance filters: title (EN or FR) and year (movies) unless
+                # the id already pinned the work, then resolution and group
+                if not by_id and not ((title_norm and title_norm in name_norm) or (fr_title_norm and fr_title_norm in name_norm)):
                     if debug:
                         console.print(f"[dim]{self.tracker} dupe skip (title mismatch): {name}[/dim]")
                     continue
-                if year_str and year_str not in name and meta.get("category") != "TV":
+                if not by_id and year_str and year_str not in name and meta.get("category") != "TV":
                     if debug:
                         console.print(f"[dim]{self.tracker} dupe skip (year mismatch): {name}[/dim]")
                     continue
@@ -572,53 +583,6 @@ class V3X(FrenchTrackerMixin):
 
         return "\n".join(parts).strip()
 
-    def _rename_torrent_root(self, meta: Meta, name: str) -> None:
-        """Set the [V3X].torrent internal root name to the generated release name.
-
-        Only metadata outside the piece hashes changes, so no rehash happens —
-        but the infohash does change, letting the client seed this torrent
-        separately through the tracker link directory (which the qBittorrent
-        injection names after the torrent root).
-        """
-        if not name:
-            return
-        # Seeding a renamed torrent relies on the client's link directory
-        # taking the torrent's root name (supported for qBittorrent and
-        # rTorrent). Without such a client, keep the original root so the
-        # upload stays seedable — the fiche will show the on-disk name.
-        clients_cfg = self.config.get("TORRENT_CLIENTS", {})
-        has_link_client = any(
-            isinstance(c, dict) and str(c.get("torrent_client", "")).lower() in ("qbit", "rtorrent") and str(c.get("linking", "") or "").strip() for c in clients_cfg.values()
-        )
-        if not has_link_client:
-            console.print(
-                f"[yellow]{self.tracker}: no qBittorrent/rTorrent client with linking configured — keeping the original torrent name so seeding still works.[/yellow]"
-            )
-            return
-        torrent_path = os.path.join(meta["base_dir"], "tmp", meta["uuid"], f"[{self.tracker}].torrent")
-        try:
-            torrent = Torrent.read(torrent_path)
-            if torrent.mode == "singlefile":
-                # Wrap the file in a folder named after the release instead of
-                # renaming the file itself: the fiche shows the folder name
-                # while the inner file keeps its original (cross-seedable)
-                # name. Pieces cover the same byte stream either way — no
-                # rehash needed.
-                info = torrent.metainfo["info"]
-                original_file = str(info["name"])
-                if original_file == name:
-                    return
-                info["files"] = [{"length": info.pop("length"), "path": [original_file]}]
-                info.pop("md5sum", None)
-                info["name"] = name
-            else:
-                if torrent.name == name:
-                    return
-                torrent.name = name
-            torrent.write(torrent_path, overwrite=True)
-        except Exception as e:
-            console.print(f"[yellow]{self.tracker}: could not rename torrent root ({e}); the fiche will show the original name.[/yellow]")
-
     @staticmethod
     def _flatten_source_bbcode(text: str) -> str:
         """Adapt reused-description BBCode to the site's parser.
@@ -690,10 +654,6 @@ class V3X(FrenchTrackerMixin):
 
         name_result = await self.get_name(meta)
         name = name_result.get("name", "") if isinstance(name_result, dict) else str(name_result)
-
-        # The site displays the .torrent's internal name, not the name field:
-        # rewrite the root so the fiche carries the generated release name.
-        await asyncio.to_thread(self._rename_torrent_root, meta, name)
 
         torrent_bytes = await self._read_tmp_file(meta, f"[{self.tracker}].torrent")
         if not torrent_bytes:
