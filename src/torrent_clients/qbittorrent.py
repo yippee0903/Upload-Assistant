@@ -951,7 +951,7 @@ class QbittorrentClientMixin:
                 linking_success = await create_cross_seed_links(meta=meta, torrent=torrent, tracker_dir=tracker_dir, use_hardlink=use_hardlink, tracker=tracker)
             else:
                 # Name the link directory after the torrent's internal root so a
-                # tracker-renamed torrent (e.g. V3X) finds its content; for
+                # tracker-renamed torrent (e.g. SPD) finds its content; for
                 # torrents that keep the source name this is the same value.
                 src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)

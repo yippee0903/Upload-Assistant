@@ -207,6 +207,22 @@ class TestSearchExisting:
         asyncio.run(tracker.search_existing({"title": "The Departed"}))
         assert seen_queries == ["The Departed", "Les Infiltres"]
 
+    def test_tmdb_id_replaces_title_queries(self, monkeypatch: Any):
+        seen: list[dict[str, Any]] = []
+
+        class _RecordingClient(_FakeClient):
+            async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
+                seen.append(kwargs.get("params", {}))
+                # Localized name, no year: the id match must not drop it
+                return _FakeResponse(200, _rss({"id": "u1", "name": "Les.Infiltres.1080p.WEB-GRP", "size": 1}))
+
+        monkeypatch.setattr(v3x_module.httpx, "AsyncClient", _RecordingClient)
+        tracker = V3X(_config())
+        self._prep(monkeypatch, tracker, fr_title="Les Infiltrés")
+        dupes = asyncio.run(tracker.search_existing({"title": "The Departed", "year": 2006, "tmdb_id": 1422, "category": "TV", "resolution": "1080p"}))
+        assert [(p["t"], p["tmdbid"], "q" in p) for p in seen] == [("tvsearch", "1422", False)]
+        assert [d["name"] for d in dupes] == ["Les.Infiltres.1080p.WEB-GRP"]
+
     def test_enrichment_adds_file_lists(self, monkeypatch: Any):
         class _DetailClient(_FakeClient):
             async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
@@ -814,106 +830,6 @@ def test_description_survives_non_numeric_ids(monkeypatch: Any, tmp_path: Any):
     desc = asyncio.run(tracker._build_description(meta))
     assert "[url=https://www.imdb.com/title/tt1375666/]IMDb[/url]" in desc
     assert "themoviedb.org" not in desc
-
-
-class TestTorrentRootRename:
-    """The site displays the .torrent internal name — V3X renames the root."""
-
-    def _make_torrent(self, tmp_path: Any, uuid: str, single_file: bool = False) -> str:
-        from torf import Torrent
-
-        content = tmp_path / "content" / uuid
-        if single_file:
-            content.parent.mkdir(parents=True, exist_ok=True)
-            content = content.parent / f"{uuid}.mkv"
-            content.write_bytes(b"x" * 2048)
-        else:
-            content.mkdir(parents=True)
-            (content / "movie.mkv").write_bytes(b"x" * 2048)
-        t = Torrent(path=str(content), trackers=["https://tracker.example/announce"], piece_size=16384)
-        t.generate()
-        out_dir = tmp_path / "tmp" / uuid
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / "[V3X].torrent"
-        t.write(str(out))
-        return str(out)
-
-    def test_folder_torrent_root_renamed_without_rehash(self, tmp_path: Any):
-        from torf import Torrent
-
-        uuid = "Some.Movie.2024.1080p.WEB-GRP"
-        path = self._make_torrent(tmp_path, uuid)
-        pieces_before = Torrent.read(path).metainfo["info"]["pieces"]
-        tracker = V3X(_config())
-        meta = {"base_dir": str(tmp_path), "uuid": uuid}
-        tracker._rename_torrent_root(meta, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
-        t = Torrent.read(path)
-        assert t.name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
-        assert t.metainfo["info"]["pieces"] == pieces_before
-        assert [str(f) for f in t.files] == ["Un.Film.2024.VOSTFR.1080p.WEB-GRP/movie.mkv"]
-
-    def test_single_file_torrent_is_wrapped_in_a_folder(self, tmp_path: Any):
-        from torf import Torrent
-
-        uuid = "Some.Movie.2024.1080p.WEB-GRP"
-        path = self._make_torrent(tmp_path, uuid, single_file=True)
-        pieces_before = Torrent.read(path).metainfo["info"]["pieces"]
-        tracker = V3X(_config())
-        meta = {"base_dir": str(tmp_path), "uuid": uuid}
-        tracker._rename_torrent_root(meta, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
-        t = Torrent.read(path)
-        # Root folder carries the release name; the inner file keeps its
-        # original (cross-seedable) name; pieces are untouched.
-        assert t.mode == "multifile"
-        assert t.name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
-        assert [str(f) for f in t.files] == ["Un.Film.2024.VOSTFR.1080p.WEB-GRP/Some.Movie.2024.1080p.WEB-GRP.mkv"]
-        assert t.metainfo["info"]["pieces"] == pieces_before
-
-    def test_missing_torrent_is_tolerated(self, tmp_path: Any):
-        tracker = V3X(_config())
-        meta = {"base_dir": str(tmp_path), "uuid": "nope"}
-        tracker._rename_torrent_root(meta, "Whatever")  # must not raise
-
-
-def test_rename_skipped_without_qbit_linking(tmp_path: Any):
-    from torf import Torrent
-
-    uuid = "Some.Movie.2024.1080p.WEB-GRP"
-    content = tmp_path / "content" / uuid
-    content.mkdir(parents=True)
-    (content / "movie.mkv").write_bytes(b"x" * 2048)
-    t = Torrent(path=str(content), trackers=["https://tracker.example/announce"], piece_size=16384)
-    t.generate()
-    out = tmp_path / "tmp" / uuid
-    out.mkdir(parents=True)
-    t.write(str(out / "[V3X].torrent"))
-
-    config = _config()
-    config["TORRENT_CLIENTS"] = {"rt": {"torrent_client": "rtorrent"}}
-    tracker = V3X(config)
-    tracker._rename_torrent_root({"base_dir": str(tmp_path), "uuid": uuid}, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
-    # No qbit+linking client: the root must stay untouched so seeding works
-    assert Torrent.read(str(out / "[V3X].torrent")).name == uuid
-
-
-def test_rename_allowed_with_rtorrent_linking(tmp_path: Any):
-    from torf import Torrent
-
-    uuid = "Some.Movie.2024.1080p.WEB-GRP"
-    content = tmp_path / "content" / uuid
-    content.mkdir(parents=True)
-    (content / "movie.mkv").write_bytes(b"x" * 2048)
-    t = Torrent(path=str(content), trackers=["https://tracker.example/announce"], piece_size=16384)
-    t.generate()
-    out = tmp_path / "tmp" / uuid
-    out.mkdir(parents=True)
-    t.write(str(out / "[V3X].torrent"))
-
-    config = _config()
-    config["TORRENT_CLIENTS"] = {"rt": {"torrent_client": "rtorrent", "linking": "symlink"}}
-    tracker = V3X(config)
-    tracker._rename_torrent_root({"base_dir": str(tmp_path), "uuid": uuid}, "Un.Film.2024.VOSTFR.1080p.WEB-GRP")
-    assert Torrent.read(str(out / "[V3X].torrent")).name == "Un.Film.2024.VOSTFR.1080p.WEB-GRP"
 
 
 def test_upload_sends_imdb_url_and_artwork_fields(monkeypatch: Any, tmp_path: Any):

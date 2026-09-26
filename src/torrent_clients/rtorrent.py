@@ -131,7 +131,7 @@ class RtorrentClientMixin:
                     console.print(f"[cyan]Source path: {src}")
 
                 # Name the link destination after the torrent's internal root so
-                # a tracker-renamed torrent (e.g. V3X) finds its content; for
+                # a tracker-renamed torrent (e.g. SPD) finds its content; for
                 # torrents that keep the source name this is the same value.
                 src_name = str(getattr(torrent, "name", "") or "") or os.path.basename(src.rstrip(os.sep))
                 dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
