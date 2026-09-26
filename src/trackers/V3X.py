@@ -238,7 +238,9 @@ class V3X(FrenchTrackerMixin):
             # a page we never read. Fail closed: skip the tracker rather than
             # upload over a possible dupe.
             if incomplete:
-                console.print(f"[yellow]{self.tracker}: incomplete dupe search for '{search.get('q') or search.get('tmdbid')}', skipping tracker to avoid a false negative.[/yellow]")
+                console.print(
+                    f"[yellow]{self.tracker}: incomplete dupe search for '{search.get('q') or search.get('tmdbid')}', skipping tracker to avoid a false negative.[/yellow]"
+                )
                 meta["skipping"] = self.tracker
                 return []
 
