@@ -293,7 +293,7 @@ class TestUpload:
             pass
 
         async def fake_get_name(meta: Any) -> dict[str, str]:
-            return {"name": "Some.Movie.2024.1080p.WEB-GRP"}
+            return {"name": "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"}
 
         async def fake_desc(*args: Any, **kwargs: Any) -> str:
             return "desc"
@@ -319,6 +319,8 @@ class TestUpload:
         assert sent["data"]["categoryId"] == "8"
         assert sent["data"]["tmdbId"] == "693134"
         assert "fake mediainfo" in sent["data"]["nfo"]
+        # The fiche title comes from the name field; the torrent goes out untouched
+        assert sent["data"]["name"] == "Some.Movie.2024.MULTi.VFF.1080p.WEB-GRP"
         assert sent["files"]["file"][1] == b"fake-torrent"
         assert meta["tracker_status"]["V3X"]["torrent_id"] == "new-uuid"
 
