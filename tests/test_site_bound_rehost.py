@@ -57,6 +57,12 @@ def test_destination_owning_the_host_keeps_it_approved(monkeypatch: Any) -> None
     assert calls and "bhd" in calls[0][1]
 
 
+def test_undeclared_tracker_host_is_rehosted(monkeypatch: Any) -> None:
+    meta, calls = _run(monkeypatch, [_img("https://img.example-tracker.cc/a.png"), _img("https://i.ibb.co/x.png")], ["AAA", "BBB"])
+    assert calls == [("reused", ["imgbb", "imgbox"])]
+    assert [i["raw_url"] for i in meta["image_list"]] == ["https://i.ibb.co/new1.png", "https://i.ibb.co/new2.png"]
+
+
 def test_public_images_are_left_alone(monkeypatch: Any) -> None:
     meta, calls = _run(monkeypatch, [_img("https://i.ibb.co/x.png")], ["AAA", "BBB"])
     assert calls == [] and meta["image_list"][0]["raw_url"] == "https://i.ibb.co/x.png"

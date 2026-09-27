@@ -72,6 +72,7 @@ _SIG_MARKERS = (
     r"Brought to you by Only-Uploader(?:\s+v?[\w.]+)?",
     r"Uploaded using EASY UPLOAD3R(?:\s+v?[\w.]+)?",
     r"Uploaded by upbrr(?:\s+v?[\w.]+)?",
+    r"Uploaded by Manual-B0T(?:\s+v?\d[\w.]*)?",
     # Any tracker's in-house auto-uploader: the site name varies, the wording does not.
     r"Uploaded with [\w.\-]{1,40} Auto ?Uploader(?:\s+v?[\w.]+)?",
     r"A UNIT3D plugin proudly developed by (?:\[/?b\])?[\w.\-]{1,40}",

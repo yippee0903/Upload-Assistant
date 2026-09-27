@@ -68,6 +68,19 @@ class TestNfoForgeSignature:
         assert note in _clean(note)
 
 
+class TestManualBotSignature:
+    @pytest.mark.parametrize("version", ["", " V1.2", " v2.0.1"])
+    def test_emoji_framed_centred_signature_is_removed(self, version: str) -> None:
+        sig = f"[center]🤖🤖Uploaded by Manual-B0T{version}🤖🤖[/center]"
+
+        assert _clean(f"{PROSE}\n{sig}") == PROSE
+
+    def test_prose_mentioning_the_tool_survives(self) -> None:
+        note = "First uploaded by Manual-B0T V1.2, then fixed by hand."
+
+        assert note in _clean(note)
+
+
 class TestTrailerLink:
     def test_centred_trailer_link_is_removed(self) -> None:
         trailer = "[center][b][url=https://www.youtube.com/watch?v=aaaaaaaaaaa][Trailer on YouTube][/url][/b][/center]"
