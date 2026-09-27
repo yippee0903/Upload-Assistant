@@ -295,6 +295,12 @@ class TestBLUSiteRules:
         assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="5100000"), AUDIO_OK), anime=True) is True
         assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="1000000"), AUDIO_OK), type="REMUX") is True
 
+    def test_video_bitrate_falls_back_to_nominal_then_stream_size(self, blu):
+        nominal = {"@type": "Video", "Format": "AVC", "BitRate_Nominal": "8100000"}
+        derived = {"@type": "Video", "Format": "AVC", "StreamSize": "5400000000", "Duration": "5400.000"}  # 8000 kbps
+        assert self._passes(blu, mediainfo=_mi(nominal, AUDIO_OK)) is True
+        assert self._passes(blu, mediainfo=_mi(derived, AUDIO_OK)) is True
+
     def test_unreadable_video_bitrate_is_refused_unattended(self, blu):
         assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate=""), AUDIO_OK)) is False
 

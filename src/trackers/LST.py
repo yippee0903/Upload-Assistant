@@ -3,7 +3,7 @@ import re
 from typing import Any, Optional
 
 from src.console import console
-from src.trackers.COMMON import ANIME_MIN_VIDEO_KBPS, COMMON, MIN_VIDEO_KBPS
+from src.trackers.COMMON import ANIME_MIN_VIDEO_KBPS, COMMON, MIN_VIDEO_KBPS, video_bitrate_bps
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -32,32 +32,6 @@ class LST(UNIT3D):
 
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         return {}
-
-    @staticmethod
-    def _get_video_bitrate(meta: Meta) -> int:
-        """Video bitrate in bps from mediainfo, 0 if undeterminable.
-
-        VBR encodes (typically x265 in MKV) often carry no BitRate field, so
-        fall back to BitRate_Nominal, then to StreamSize/Duration.
-        """
-        tracks = meta.get("mediainfo", {}).get("media", {}).get("track", [])
-        for track in tracks:
-            if track.get("@type") != "Video":
-                continue
-            for field in ("BitRate", "BitRate_Nominal"):
-                value = str(track.get(field, "") or "")
-                # A zero value is as unusable as a missing one: keep falling back.
-                if value.isdigit() and int(value) > 0:
-                    return int(value)
-            try:
-                stream_size = int(str(track.get("StreamSize", "") or ""))
-                duration = float(str(track.get("Duration", "") or ""))
-                if stream_size > 0 and duration > 0:
-                    return int(stream_size * 8 / duration)
-            except (ValueError, TypeError):
-                pass
-            break
-        return 0
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
@@ -100,7 +74,7 @@ class LST(UNIT3D):
                     console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — no bitrate rule for {resolution}p {codec_key.upper()}.[/bold red]")
                 return False
 
-            video_bitrate = self._get_video_bitrate(meta)
+            video_bitrate = video_bitrate_bps(meta)
 
             # Fail-closed: block if bitrate is missing or unreadable
             if not video_bitrate:

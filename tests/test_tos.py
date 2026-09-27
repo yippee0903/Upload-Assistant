@@ -581,3 +581,9 @@ def test_minimum_video_bitrate() -> None:
     assert _run(t._check_minimum_bitrate(_bitrate_meta("3600000", anime=True))) is True
     assert _run(t._check_minimum_bitrate(_bitrate_meta("", type="ENCODE"))) is False
     assert _run(t._check_minimum_bitrate(_bitrate_meta("1000000", type="WEBRIP"))) is True
+
+
+def test_video_bitrate_falls_back_to_nominal() -> None:
+    meta = _bitrate_meta("")
+    meta["mediainfo"]["media"]["track"][0]["BitRate_Nominal"] = "6100000"
+    assert _run(TOS(_config())._check_minimum_bitrate(meta)) is True

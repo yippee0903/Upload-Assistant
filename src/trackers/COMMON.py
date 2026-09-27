@@ -80,6 +80,30 @@ ANIME_MIN_VIDEO_KBPS: dict[str, dict[str, dict[str, int]]] = {
 VIDEO_CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x265": "x265", "HEVC": "x265", "AV1": "AV1"}
 
 
+def video_bitrate_bps(meta: dict[str, Any]) -> int:
+    """Video bitrate in bps from mediainfo, 0 if undeterminable.
+
+    VBR encodes (typically x265 in MKV) often carry no BitRate field, so
+    fall back to BitRate_Nominal, then to StreamSize/Duration.
+    """
+    video = next(iter(mi_tracks(meta, "Video")), None)
+    if not video:
+        return 0
+    for field in ("BitRate", "BitRate_Nominal"):
+        value = str(video.get(field, "") or "")
+        # A zero value is as unusable as a missing one: keep falling back.
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+    try:
+        stream_size = int(str(video.get("StreamSize", "") or ""))
+        duration = float(str(video.get("Duration", "") or ""))
+        if stream_size > 0 and duration > 0:
+            return int(stream_size * 8 / duration)
+    except (ValueError, TypeError):
+        pass
+    return 0
+
+
 def min_video_bitrate(meta: dict[str, Any], release_type: str) -> Optional[tuple[str, int, Optional[float]]]:
     """(codec label, minimum kbps, MediaInfo video kbps or None) when a threshold covers *release_type*, else None."""
     if meta.get("is_disc"):
@@ -89,11 +113,8 @@ def min_video_bitrate(meta: dict[str, Any], release_type: str) -> Optional[tuple
     by_type = (ANIME_MIN_VIDEO_KBPS if is_anime else MIN_VIDEO_KBPS).get(codec_key, {}).get(str(meta.get("resolution") or ""), {})
     if release_type not in by_type:
         return None
-    video = next(iter(mi_tracks(meta, "Video")), None)
-    try:
-        kbps = int(video["BitRate"]) / 1000 if video and video.get("BitRate") else None
-    except (ValueError, TypeError):
-        kbps = None
+    bps = video_bitrate_bps(meta)
+    kbps = bps / 1000 if bps else None
     return (f"{codec_key} (anime)" if is_anime else codec_key), by_type[release_type], kbps
 
 
