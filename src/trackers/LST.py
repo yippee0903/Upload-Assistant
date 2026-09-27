@@ -3,7 +3,7 @@ import re
 from typing import Any, Optional
 
 from src.console import console
-from src.trackers.COMMON import COMMON
+from src.trackers.COMMON import ANIME_MIN_VIDEO_KBPS, COMMON, MIN_VIDEO_KBPS
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -78,15 +78,6 @@ class LST(UNIT3D):
             resolution_text = str(meta.get("resolution", "")).lower().replace("p", "").replace("i", "")
             resolution = int(resolution_text) if resolution_text.isdigit() else 0
 
-            MIN_BITRATE: dict[tuple[str, int], int] = {
-                ("x265", 2160): 4_000_000,
-                ("x265", 1080): 1_500_000,
-                ("x265", 720): 800_000,
-                ("x264", 2160): 10_000_000,
-                ("x264", 1080): 2_500_000,
-                ("x264", 720): 1_200_000,
-            }
-
             codec_key = None
             if "x265" in video_encode or "h.265" in video_encode or "hevc" in video_encode:
                 codec_key = "x265"
@@ -99,8 +90,9 @@ class LST(UNIT3D):
                     console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — unrecognised codec or resolution.[/bold red]")
                 return False
 
-            rule_key = (codec_key, resolution)
-            min_bps = MIN_BITRATE.get(rule_key)
+            # The shared encode thresholds (kbps), lower for anime.
+            thresholds = ANIME_MIN_VIDEO_KBPS if meta.get("anime") else MIN_VIDEO_KBPS
+            min_bps = thresholds[codec_key].get(f"{resolution}p", {}).get("ENCODE", 0) * 1000
 
             # Fail-closed: block if no rule exists for this codec/resolution combination
             if not min_bps:

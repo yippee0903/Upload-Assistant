@@ -257,7 +257,7 @@ def _bitrate_meta(
 class TestAdditionalChecksMicroEncode:
     """Bitrate gate blocks micro-encodes for ENCODE / WEBRIP."""
 
-    # ── x265 1080p (threshold: 1 500 000 bps) ──────────────────
+    # ── x265 1080p (threshold: 6 000 000 bps) ──────────────────
 
     def test_x265_1080p_webrip_below_threshold_is_rejected(self):
         """JATT-style release at ~748 kb/s must be blocked."""
@@ -274,16 +274,16 @@ class TestAdditionalChecksMicroEncode:
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x265_1080p_just_below_threshold_is_rejected(self):
-        meta = _bitrate_meta(video_bitrate=1_499_999, codec="x265", resolution="1080p")
+        meta = _bitrate_meta(video_bitrate=5_999_999, codec="x265", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x265_1080p_at_threshold_is_allowed(self):
         """Exactly at the minimum must pass (not strictly below)."""
-        meta = _bitrate_meta(video_bitrate=1_500_000, codec="x265", resolution="1080p")
+        meta = _bitrate_meta(video_bitrate=6_000_000, codec="x265", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_x265_1080p_above_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=2_000_000, codec="x265", resolution="1080p")
+        meta = _bitrate_meta(video_bitrate=7_000_000, codec="x265", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
     # ── x265 1080p — alternate codec labels ────────────────────
@@ -297,54 +297,54 @@ class TestAdditionalChecksMicroEncode:
         meta = _bitrate_meta(video_bitrate=500_000, codec="H.265", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
-    # ── x265 720p (threshold: 800 000 bps) ─────────────────────
+    # ── x265 720p (threshold: 3 000 000 bps) ─────────────────────
 
     def test_x265_720p_below_threshold_is_rejected(self):
         meta = _bitrate_meta(video_bitrate=400_000, codec="x265", resolution="720p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x265_720p_above_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=1_000_000, codec="x265", resolution="720p")
+        meta = _bitrate_meta(video_bitrate=3_500_000, codec="x265", resolution="720p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
-    # ── x265 2160p (threshold: 4 000 000 bps) ──────────────────
+    # ── x265 2160p (threshold: 12 000 000 bps) ──────────────────
 
     def test_x265_2160p_below_threshold_is_rejected(self):
         meta = _bitrate_meta(video_bitrate=3_000_000, codec="x265", resolution="2160p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x265_2160p_above_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=5_000_000, codec="x265", resolution="2160p")
+        meta = _bitrate_meta(video_bitrate=13_000_000, codec="x265", resolution="2160p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
-    # ── x264 1080p (threshold: 2 500 000 bps) ──────────────────
+    # ── x264 1080p (threshold: 8 000 000 bps) ──────────────────
 
     def test_x264_1080p_below_threshold_is_rejected(self):
         meta = _bitrate_meta(video_bitrate=2_000_000, codec="x264", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x264_1080p_above_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=3_000_000, codec="x264", resolution="1080p")
+        meta = _bitrate_meta(video_bitrate=9_000_000, codec="x264", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
-    # ── x264 720p (threshold: 1 200 000 bps) ───────────────────
+    # ── x264 720p (threshold: 4 000 000 bps) ───────────────────
 
     def test_x264_720p_below_threshold_is_rejected(self):
-        meta = _bitrate_meta(video_bitrate=1_199_999, codec="x264", resolution="720p")
+        meta = _bitrate_meta(video_bitrate=3_999_999, codec="x264", resolution="720p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x264_720p_at_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=1_200_000, codec="x264", resolution="720p")
+        meta = _bitrate_meta(video_bitrate=4_000_000, codec="x264", resolution="720p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
-    # ── x264 2160p (threshold: 10 000 000 bps) ─────────────────
+    # ── x264 2160p (threshold: 16 000 000 bps) ─────────────────
 
     def test_x264_2160p_below_threshold_is_rejected(self):
-        meta = _bitrate_meta(video_bitrate=9_999_999, codec="x264", resolution="2160p")
+        meta = _bitrate_meta(video_bitrate=15_999_999, codec="x264", resolution="2160p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
     def test_x264_2160p_at_threshold_is_allowed(self):
-        meta = _bitrate_meta(video_bitrate=10_000_000, codec="x264", resolution="2160p")
+        meta = _bitrate_meta(video_bitrate=16_000_000, codec="x264", resolution="2160p")
         assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_h264_label_below_threshold_is_rejected(self):
@@ -355,6 +355,13 @@ class TestAdditionalChecksMicroEncode:
     def test_avc_label_below_threshold_is_rejected(self):
         meta = _bitrate_meta(video_bitrate=1_000_000, codec="AVC", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is False
+
+    # ── anime (x265 1080p threshold: 3 500 000 bps) ────────────
+
+    def test_anime_takes_the_lower_threshold(self):
+        assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=4_000_000, anime=True))) is True
+        assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=4_000_000))) is False
+        assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=3_400_000, anime=True))) is False
 
     # ── edge cases ──────────────────────────────────────────────
 
@@ -367,20 +374,20 @@ class TestAdditionalChecksMicroEncode:
     def test_zero_bitrate_falls_through_to_nominal(self):
         """A zero BitRate is unusable, not authoritative: keep falling back."""
         meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
-        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "BitRate": "0", "BitRate_Nominal": "3000000"}]}}
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "BitRate": "0", "BitRate_Nominal": "7000000"}]}}
         assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_nominal_bitrate_fallback(self):
         """VBR encodes without BitRate must be judged on BitRate_Nominal."""
         meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
-        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "BitRate_Nominal": "3000000"}]}}
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "BitRate_Nominal": "7000000"}]}}
         assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_stream_size_duration_fallback(self):
         """Without any bitrate field, derive it from StreamSize/Duration."""
-        # 2.7 GB over 1h30 → ~4 800 kb/s: comfortably above the 1080p x265 floor
+        # 5.4 GB over 1h30 → ~8 000 kb/s: comfortably above the 1080p x265 floor
         meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
-        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "StreamSize": "2700000000", "Duration": "5400.000"}]}}
+        meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "StreamSize": "5400000000", "Duration": "5400.000"}]}}
         assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_stream_size_duration_fallback_still_blocks_junk(self):
