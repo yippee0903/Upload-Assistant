@@ -8,31 +8,19 @@ import httpx
 from src.console import console
 from src.get_desc import DescriptionBuilder
 from src.region import get_service
-from src.trackers.COMMON import COMMON, mi_tracks
+from src.trackers.COMMON import COMMON, VIDEO_CODEC_KEYS, min_video_bitrate
 from src.trackers.FRENCH import FrenchTrackerMixin
 from src.trackers.french.rules import FRENCH_LANGUAGE_RULE, Rule
 from src.trackers.UNIT3D import UNIT3D, QueryValue
 
 _SAFE_FILENAME = re.compile(r"^[a-zA-Z0-9 .\-_+\[\]]*$")
 
-# Minimum video bitrate (kbps): codec -> resolution -> type
-_MIN_KBPS: dict[str, dict[str, dict[str, int]]] = {
-    "x264": {"720p": {"WEBDL": 3000, "ENCODE": 4000}, "1080p": {"WEBDL": 5000, "ENCODE": 8000}, "2160p": {"WEBDL": 10000, "ENCODE": 16000}},
-    "x265": {"720p": {"WEBDL": 2000, "ENCODE": 3000}, "1080p": {"WEBDL": 3500, "ENCODE": 6000}, "2160p": {"WEBDL": 8000, "ENCODE": 12000}},
-    "AV1": {"720p": {"WEBDL": 2000, "ENCODE": 2400}, "1080p": {"WEBDL": 3000, "ENCODE": 4000}, "2160p": {"WEBDL": 5000, "ENCODE": 8000}},
-}
-_ANIME_MIN_KBPS: dict[str, dict[str, dict[str, int]]] = {
-    "x264": {"720p": {"WEBDL": 1800, "ENCODE": 2300}, "1080p": {"WEBDL": 3000, "ENCODE": 5000}, "2160p": {"WEBDL": 6000, "ENCODE": 10000}},
-    "x265": {"720p": {"WEBDL": 1200, "ENCODE": 1800}, "1080p": {"WEBDL": 2000, "ENCODE": 3500}, "2160p": {"WEBDL": 4000, "ENCODE": 8000}},
-    "AV1": {"720p": {"WEBDL": 1200, "ENCODE": 1500}, "1080p": {"WEBDL": 1500, "ENCODE": 2000}, "2160p": {"WEBDL": 3000, "ENCODE": 4000}},
-}
-_CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x265": "x265", "HEVC": "x265", "AV1": "AV1"}
 
 # A release name spells its video codec dotted ("H.264") or not ("H264"); the
 # separators are dropped before the family lookup, so x264/H264/AVC collapse to
 # one family and x265/H265/HEVC to another.
 _CODEC_TOKEN = re.compile(r"(?<![A-Za-z0-9])(x26[45]|h\.?26[45]|avc|hevc|av1|xvid|divx|vc-?1|mpeg-?2)(?![A-Za-z0-9])", re.IGNORECASE)
-_CODEC_FAMILIES = {key.upper(): family for key, family in _CODEC_KEYS.items()}
+_CODEC_FAMILIES = {key.upper(): family for key, family in VIDEO_CODEC_KEYS.items()}
 # The platform tag always sits right before the WEB token in a dotted name.
 # Anchoring there keeps a title word from passing as a service code. The tag has
 # no upper length: the dot separator already ends it, and codes such as DARKROOM
@@ -548,33 +536,15 @@ class TOS(FrenchTrackerMixin, UNIT3D):
 
     async def _check_minimum_bitrate(self, meta: dict[str, Any]) -> bool:
         """Minimum video bitrate (kbps) per codec / resolution / type; anime has lower thresholds."""
-        if meta.get("is_disc") or meta.get("type") not in ("ENCODE", "WEBDL"):
+        rule = min_video_bitrate(meta, str(meta.get("type") or ""))
+        if rule is None:
             return True
-        is_anime = bool(meta.get("anime", False))
-        thresholds = _ANIME_MIN_KBPS if is_anime else _MIN_KBPS
-        resolution = meta.get("resolution", "")
-        release_type = meta.get("type", "")
-        video_codec = meta.get("video_codec", "")
-        codec_key = _CODEC_KEYS.get(video_codec)
-        if not codec_key or resolution not in thresholds.get(codec_key, {}):
-            if meta.get("debug"):
-                console.print(f"[dim]{self.tracker}: No bitrate rules for {video_codec} at {resolution} — skipping check.[/dim]")
-            return True
-
-        min_kbps = thresholds[codec_key][resolution][release_type]
-        video_track = next((t for t in mi_tracks(meta, "Video")), None)
-        raw_br = video_track.get("BitRate") if video_track else None
-        try:
-            bit_rate_kbps = int(raw_br) / 1000 if raw_br else None
-        except (ValueError, TypeError):
-            bit_rate_kbps = None
-
+        label, min_kbps, bit_rate_kbps = rule
         if bit_rate_kbps is None:
             return self._rule_failed(meta, "video_bitrate_unknown", "Could not determine video bitrate from mediainfo.")
         if bit_rate_kbps < min_kbps:
-            label = f"{codec_key} (anime)" if is_anime else codec_key
             return self._rule_failed(
-                meta, "video_bitrate_minimum", f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for {label}.", (f"Must be >= {min_kbps} kbps for {resolution}.",)
+                meta, "video_bitrate_minimum", f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for {label}.", (f"Must be >= {min_kbps} kbps for {meta.get('resolution')}.",)
             )
         return True
 

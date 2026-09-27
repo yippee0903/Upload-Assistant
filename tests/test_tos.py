@@ -564,3 +564,20 @@ class TestTosDupeService:
         result = _run(t._drop_incomparable_dupes([keep, other_codec, other_service], _encode_meta(service="NF")))
 
         assert _names(result) == [keep["name"]]
+
+
+def _bitrate_meta(bitrate: str, **overrides: Any) -> dict[str, Any]:
+    tracks = [{"@type": "Video", "BitRate": bitrate}]
+    meta = {"type": "ENCODE", "resolution": "1080p", "video_codec": "HEVC", "unattended": True, "mediainfo": {"media": {"track": tracks}}}
+    meta.update(overrides)
+    return meta
+
+
+def test_minimum_video_bitrate() -> None:
+    # 1080p x265: 6000 kbps for an encode, 3500 for anime; a WEBRIP has no threshold.
+    t = TOS(_config())
+    assert _run(t._check_minimum_bitrate(_bitrate_meta("5900000"))) is False
+    assert _run(t._check_minimum_bitrate(_bitrate_meta("6100000"))) is True
+    assert _run(t._check_minimum_bitrate(_bitrate_meta("3600000", anime=True))) is True
+    assert _run(t._check_minimum_bitrate(_bitrate_meta("", type="ENCODE"))) is False
+    assert _run(t._check_minimum_bitrate(_bitrate_meta("1000000", type="WEBRIP"))) is True
