@@ -7,7 +7,7 @@ import cli_ui
 import httpx
 
 from src.console import console
-from src.trackers.COMMON import COMMON, ask_to_continue, is_lossless, mi_tracks
+from src.trackers.COMMON import COMMON, ask_to_continue, is_lossless, mi_tracks, min_video_bitrate
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -307,6 +307,18 @@ class BLU(UNIT3D):
                 return False
             if "Layer 2" in layer and meta.get("type") not in ("HDTV", "DVDRIP"):
                 console.print(f"[bold red]MP2 is only allowed untouched (HDTV, DVD), skipping {self.tracker} upload.[/bold red]")
+                return False
+
+        # A WEBRIP is an encode: it takes the encode threshold.
+        rule = min_video_bitrate(meta, "ENCODE" if meta.get("type") == "WEBRIP" else str(meta.get("type") or ""))
+        if rule:
+            label, min_kbps, kbps = rule
+            if kbps is None and not ask_to_continue(meta, f"Could not read the video bitrate from MediaInfo to check the minimum. ({self.tracker})"):
+                return False
+            if kbps is not None and kbps < min_kbps:
+                console.print(
+                    f"[bold red]Video bitrate too low: {kbps:.0f} kbps for {label} {meta.get('resolution')}, minimum {min_kbps} kbps, skipping {self.tracker} upload.[/bold red]"
+                )
                 return False
 
         description = str(meta.get("description") or "")

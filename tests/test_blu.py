@@ -32,7 +32,9 @@ def _audio(fmt: str, channels: int, lang: str = "en", commercial: str = "", loss
 
 
 def _mi(*tracks: dict[str, Any]) -> dict[str, Any]:
-    return {"media": {"track": [{"@type": "General"}, *tracks]}}
+    # A video track with a bitrate above every minimum unless the test brings its own.
+    video = [] if any(t.get("@type") == "Video" for t in tracks) else [{"@type": "Video", "Format": "AVC", "BitRate": "20000000"}]
+    return {"media": {"track": [{"@type": "General"}, *video, *tracks]}}
 
 
 def _meta(**overrides: Any) -> dict[str, Any]:
@@ -249,8 +251,8 @@ class TestBLUExtrasInPack:
         assert _run(blu.get_additional_checks(_meta(filelist=[*self.EPISODES, "/data/Example.Show.S01E03.Extraction.Day.1080p.WEB-DL-GRP.mkv"]))) is True
 
 
-def _video(fmt: str = "HEVC", settings: str = "") -> dict[str, Any]:
-    track: dict[str, Any] = {"@type": "Video", "Format": fmt}
+def _video(fmt: str = "HEVC", settings: str = "", bitrate: str = "20000000") -> dict[str, Any]:
+    track: dict[str, Any] = {"@type": "Video", "Format": fmt, "BitRate": bitrate}
     if settings:
         track["Encoded_Library_Settings"] = settings
     return track
@@ -282,6 +284,25 @@ class TestBLUSiteRules:
         (tmp_path / "Example.S01.nfo").unlink()
         (tmp_path / "Example.S01E01.sample.mkv").write_bytes(b"x")
         assert self._passes(blu, path=str(tmp_path), type="WEBDL") is False
+
+    def test_minimum_video_bitrate(self, blu):
+        # 1080p x264: 8000 kbps for an encode (WEBRIP included), 5000 for a WEB-DL, lower for anime.
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="7900000"), AUDIO_OK)) is False
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="8100000"), AUDIO_OK)) is True
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="7900000"), AUDIO_OK), type="WEBRIP") is False
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="5100000"), AUDIO_OK), type="WEBDL") is True
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="4900000"), AUDIO_OK), type="WEBDL") is False
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="5100000"), AUDIO_OK), anime=True) is True
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="1000000"), AUDIO_OK), type="REMUX") is True
+
+    def test_video_bitrate_falls_back_to_nominal_then_stream_size(self, blu):
+        nominal = {"@type": "Video", "Format": "AVC", "BitRate_Nominal": "8100000"}
+        derived = {"@type": "Video", "Format": "AVC", "StreamSize": "5400000000", "Duration": "5400.000"}  # 8000 kbps
+        assert self._passes(blu, mediainfo=_mi(nominal, AUDIO_OK)) is True
+        assert self._passes(blu, mediainfo=_mi(derived, AUDIO_OK)) is True
+
+    def test_unreadable_video_bitrate_is_refused_unattended(self, blu):
+        assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate=""), AUDIO_OK)) is False
 
     def test_video_codec_whitelist(self, blu):
         assert self._passes(blu, mediainfo=_mi(_video("MPEG-4 Visual"), AUDIO_OK), type="WEBDL") is False

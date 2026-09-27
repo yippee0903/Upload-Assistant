@@ -66,6 +66,58 @@ def mi_tracks(meta: dict[str, Any], track_type: str) -> list[dict[str, Any]]:
     return [t for t in tracks if t.get("@type") == track_type]
 
 
+# Minimum video bitrate (kbps): codec -> resolution -> type
+MIN_VIDEO_KBPS: dict[str, dict[str, dict[str, int]]] = {
+    "x264": {"720p": {"WEBDL": 3000, "ENCODE": 4000}, "1080p": {"WEBDL": 5000, "ENCODE": 8000}, "2160p": {"WEBDL": 10000, "ENCODE": 16000}},
+    "x265": {"720p": {"WEBDL": 2000, "ENCODE": 3000}, "1080p": {"WEBDL": 3500, "ENCODE": 6000}, "2160p": {"WEBDL": 8000, "ENCODE": 12000}},
+    "AV1": {"720p": {"WEBDL": 2000, "ENCODE": 2400}, "1080p": {"WEBDL": 3000, "ENCODE": 4000}, "2160p": {"WEBDL": 5000, "ENCODE": 8000}},
+}
+ANIME_MIN_VIDEO_KBPS: dict[str, dict[str, dict[str, int]]] = {
+    "x264": {"720p": {"WEBDL": 1800, "ENCODE": 2300}, "1080p": {"WEBDL": 3000, "ENCODE": 5000}, "2160p": {"WEBDL": 6000, "ENCODE": 10000}},
+    "x265": {"720p": {"WEBDL": 1200, "ENCODE": 1800}, "1080p": {"WEBDL": 2000, "ENCODE": 3500}, "2160p": {"WEBDL": 4000, "ENCODE": 8000}},
+    "AV1": {"720p": {"WEBDL": 1200, "ENCODE": 1500}, "1080p": {"WEBDL": 1500, "ENCODE": 2000}, "2160p": {"WEBDL": 3000, "ENCODE": 4000}},
+}
+VIDEO_CODEC_KEYS = {"H264": "x264", "x264": "x264", "AVC": "x264", "H265": "x265", "x265": "x265", "HEVC": "x265", "AV1": "AV1"}
+
+
+def video_bitrate_bps(meta: dict[str, Any]) -> int:
+    """Video bitrate in bps from mediainfo, 0 if undeterminable.
+
+    VBR encodes (typically x265 in MKV) often carry no BitRate field, so
+    fall back to BitRate_Nominal, then to StreamSize/Duration.
+    """
+    video = next(iter(mi_tracks(meta, "Video")), None)
+    if not video:
+        return 0
+    for field in ("BitRate", "BitRate_Nominal"):
+        value = str(video.get(field, "") or "")
+        # A zero value is as unusable as a missing one: keep falling back.
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+    try:
+        stream_size = int(str(video.get("StreamSize", "") or ""))
+        duration = float(str(video.get("Duration", "") or ""))
+        if stream_size > 0 and duration > 0:
+            return int(stream_size * 8 / duration)
+    except (ValueError, TypeError):
+        pass
+    return 0
+
+
+def min_video_bitrate(meta: dict[str, Any], release_type: str) -> Optional[tuple[str, int, Optional[float]]]:
+    """(codec label, minimum kbps, MediaInfo video kbps or None) when a threshold covers *release_type*, else None."""
+    if meta.get("is_disc"):
+        return None
+    is_anime = bool(meta.get("anime", False))
+    codec_key = VIDEO_CODEC_KEYS.get(str(meta.get("video_codec") or ""), "")
+    by_type = (ANIME_MIN_VIDEO_KBPS if is_anime else MIN_VIDEO_KBPS).get(codec_key, {}).get(str(meta.get("resolution") or ""), {})
+    if release_type not in by_type:
+        return None
+    bps = video_bitrate_bps(meta)
+    kbps = bps / 1000 if bps else None
+    return (f"{codec_key} (anime)" if is_anime else codec_key), by_type[release_type], kbps
+
+
 # A screener is a pre-release copy circulated to press, juries and buyers, so it
 # is watermarked, often incomplete and traceable; trackers refuse them.
 # The spelled-out word and the prefixed scene tags are safe to look for anywhere.
