@@ -20,6 +20,7 @@ EXPECTED = {
     "VFQ_from_title": "VFQ",
     "MULTI_VFF": "MULTI.VFF",
     "MULTI_VFQ_from_subs": "MULTI.VFQ",  # generic French audio, only Canadian subs
+    "MULTI_VFQ_from_untagged_subs": "MULTI.VFQ",  # sub with no Language, French title
     "MULTI_VFF_mixed_subs": "MULTI.VFF",  # subs disagree: conservative default
     "VOSTFR": "VOSTFR",
     "MUET": "MUET",
