@@ -415,7 +415,9 @@ class FrenchLanguageMixin:
         for track in audio_tracks:
             fact = audio_track_fact(track)
             base, region = fact["base_language"], fact["region"]
-            if base not in ("fr", "fre", "fra", "french", "français", "francais"):
+            # An untagged track counts as French by its title alone ("Français (Canada)")
+            title_is_french = base in ("", "und") and re.search(r"french|fran[cç]ais", fact["title"], re.IGNORECASE)
+            if base not in ("fr", "fre", "fra", "french", "français", "francais") and not title_is_french:
                 continue
 
             # Region subtag first (fr-FR / fr-CA / fr-BE); Swiss French counts as VFF
