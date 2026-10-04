@@ -595,19 +595,21 @@ class ACM:
         if meta.get("category") == "TV":
             data["season_number"] = meta.get("season_int", "0")
             data["episode_number"] = meta.get("episode_int", "0")
-        headers = {"User-Agent": f"{meta['ua_name']} {meta.get('current_version', '')} ({platform.system()} {platform.release()})"}
-        params = {"api_token": self.config["TRACKERS"][self.tracker]["api_key"].strip()}
+        headers = {
+            "User-Agent": f"{meta['ua_name']} {meta.get('current_version', '')} ({platform.system()} {platform.release()})",
+            "Authorization": f"Bearer {self.config['TRACKERS'][self.tracker]['api_key'].strip()}",
+        }
 
         if meta["debug"] is False:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(url=self.upload_url, files=files, data=data, headers=headers, params=params)
+                response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                 try:
                     response_data = response.json()
                     meta["tracker_status"][self.tracker]["status_message"] = response_data
                     # adding torrent link to comment of torrent file
                     t_id = response_data["data"].split(".")[1].split("/")[3]
                     meta["tracker_status"][self.tracker]["torrent_id"] = t_id
-                    await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, params=params, downurl=response_data["data"])
+                    await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=response_data["data"])
                     return True
                 except httpx.TimeoutException:
                     meta["tracker_status"][self.tracker]["status_message"] = f"data error: {self.tracker} request timed out after 10 seconds"
@@ -635,7 +637,6 @@ class ACM:
             return dupes
 
         params: dict[str, Any] = {
-            "api_token": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
             "tmdbId": str(meta["tmdb"]),
             "categories[]": (await self.get_cat_id(meta["category"])),
             "types[]": (await self.get_type_id(meta)),
@@ -648,7 +649,7 @@ class ACM:
             params["name"] = meta.get("season", "")
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url=self.search_url, params=params)
+                response = await client.get(url=self.search_url, params=params, headers={"Authorization": f"Bearer {self.config['TRACKERS'][self.tracker]['api_key'].strip()}"})
                 if response.status_code == 200:
                     data = response.json()
                     for each in data["data"]:
