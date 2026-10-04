@@ -19,6 +19,8 @@ EXPECTED = {
     "VF2": "MULTI.VF2",  # two French dubs of a non-French original
     "VFQ_from_title": "VFQ",
     "MULTI_VFF": "MULTI.VFF",
+    "MULTI_VFQ_from_subs": "MULTI.VFQ",  # generic French audio, only Canadian subs
+    "MULTI_VFF_mixed_subs": "MULTI.VFF",  # subs disagree: conservative default
     "VOSTFR": "VOSTFR",
     "MUET": "MUET",
     "VO_only": "",  # original audio, no French subs: no language tag

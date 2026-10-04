@@ -47,6 +47,8 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     "VF2": mediainfo([audio_track("fr-FR"), audio_track("fr-CA")]),
     "VFQ_from_title": mediainfo([audio_track("fr", Title="VFQ 5.1")]),
     "MULTI_VFF": mediainfo([audio_track("en"), audio_track("fr-FR")], [sub_track("fr")]),
+    "MULTI_VFQ_from_subs": mediainfo([audio_track("fr", Title="French"), audio_track("en")], [sub_track("fr", Title="Français (Canada)")]),
+    "MULTI_VFF_mixed_subs": mediainfo([audio_track("fr"), audio_track("en")], [sub_track("fr-FR"), sub_track("fr-CA")]),
     "VOSTFR": mediainfo([audio_track("en")], [sub_track("fr")]),
     "MUET": mediainfo([]),
     "VO_only": mediainfo([audio_track("en")]),

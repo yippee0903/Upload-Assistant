@@ -182,6 +182,13 @@ class FrenchNamingMixin:
                 return "VFB"
             if is_vff_filename or is_truefrench:
                 return "VFF"
+            # French subs that agree on a single region (e.g. only "Français (Canada)")
+            # reveal the dub of an unlabelled French audio track; disagreeing subs
+            # come back as VF2 and are ignored.
+            text_tracks = [t for t in meta["mediainfo"]["media"].get("track", []) if t.get("@type") == "Text"]
+            sub_suffix = self._get_french_dub_suffix(text_tracks)
+            if sub_suffix in ("VFQ", "VFB", "VFF"):
+                return sub_suffix
             # Generic 'fr' without region — conservative default
             return "VFF"
 
