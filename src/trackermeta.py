@@ -172,6 +172,10 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
                                     try:
                                         image = Image.open(BytesIO(image_content))
                                         vertical_resolution = image.height
+                                        # A portrait image is a poster or a cast photo, never a screenshot.
+                                        if image.width < image.height:
+                                            console.print(f"[red]Image {img_url} is portrait ({image.width}x{image.height}), not a screenshot. Skipping.[/red]")
+                                            return None
                                         lower_bound = expected_vertical_resolution * 0.70
                                         upper_bound = expected_vertical_resolution * (1.30 if meta.get("is_disc") == "DVD" else 1.00)
 
