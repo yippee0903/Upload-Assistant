@@ -18,7 +18,7 @@ def _preset_shortfalls(settings: str, minimums: tuple[tuple[str, int], ...], pre
     """Parameters of an encoder settings string that are missing or below the given minimums."""
     shortfalls = []
     for param, minimum in minimums:
-        match = re.search(rf"\b{param}\s*=\s*(\d+)", settings, re.IGNORECASE)
+        match = re.search(rf"(?:^|/)\s*{param}\s*=\s*(\d+)", settings, re.IGNORECASE)
         value = int(match.group(1)) if match else None
         if value is None or value < minimum:
             shortfalls.append(f"{param}={value if value is not None else 'missing'} (minimum {minimum} for '{preset}')")
