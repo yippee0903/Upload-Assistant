@@ -356,6 +356,12 @@ class TestAdditionalChecksMicroEncode:
         meta = _bitrate_meta(video_bitrate=1_000_000, codec="AVC", resolution="1080p")
         assert _run(_lst().get_additional_checks(meta)) is False
 
+    # ── AV1 1080p (threshold: 4 000 000 bps) ───────────────────
+
+    def test_av1_1080p_encode_uses_the_av1_threshold(self):
+        assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=4_500_000, codec=" AV1", type="ENCODE"))) is True
+        assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=3_500_000, codec=" AV1", type="ENCODE"))) is False
+
     # ── anime (x265 1080p threshold: 3 500 000 bps) ────────────
 
     def test_anime_takes_the_lower_threshold(self):

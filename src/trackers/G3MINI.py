@@ -174,7 +174,7 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             if details and not self._rule_failed(meta, "x265_medium_preset", "x265 encode quality is below the 'medium' preset minimum.", details):
                 return False
         if is_encode and "av1" in video_encode:
-            preset_match = re.search(r"\bpreset\s*[=:]\s*(\d+)", settings, re.IGNORECASE)
+            preset_match = re.search(r"\bpreset[\s=:]+(\d+)", settings, re.IGNORECASE)
             if not preset_match:
                 return self._rule_failed(meta, "av1_preset_max_4", "No encoding settings found in mediainfo — cannot verify AV1 preset (maximum: 4).")
             if int(preset_match.group(1)) > 4 and not self._rule_failed(

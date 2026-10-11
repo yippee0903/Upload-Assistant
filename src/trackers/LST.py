@@ -57,6 +57,8 @@ class LST(UNIT3D):
                 codec_key = "x265"
             elif "x264" in video_encode or "h.264" in video_encode or "avc" in video_encode:
                 codec_key = "x264"
+            elif "av1" in video_encode:
+                codec_key = "AV1"
 
             # Fail-closed: block if codec or resolution is unrecognised
             if not codec_key or not resolution:

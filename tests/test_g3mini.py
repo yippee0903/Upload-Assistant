@@ -1062,6 +1062,12 @@ class TestG3MINIEncodingRules:
         meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "preset=4 / crf=30"}, video_encode="AV1")
         assert self._run(meta) is True
 
+    def test_av1_cli_style_preset_is_read(self):
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "--preset 2 --crf 21"}, video_encode="AV1")
+        assert self._run(meta) is True
+        meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "--preset 8 --crf 21"}, video_encode="AV1")
+        assert self._run(meta) is False
+
     def test_av1_preset_above_4_is_rejected(self):
         meta = self._meta(video={"@type": "Video", "Encoded_Library_Settings": "preset=8 / crf=30"}, video_encode="AV1")
         assert self._run(meta) is False
