@@ -315,10 +315,11 @@ class BLU(UNIT3D):
             label, min_kbps, kbps = rule
             if kbps is None and not ask_to_continue(meta, f"Could not read the video bitrate from MediaInfo to check the minimum. ({self.tracker})"):
                 return False
-            if kbps is not None and kbps < min_kbps:
-                console.print(
-                    f"[bold red]Video bitrate too low: {kbps:.0f} kbps for {label} {meta.get('resolution')}, minimum {min_kbps} kbps, skipping {self.tracker} upload.[/bold red]"
-                )
+            if (
+                kbps is not None
+                and kbps < min_kbps
+                and not ask_to_continue(meta, f"Video bitrate too low: {kbps:.0f} kbps for {label} {meta.get('resolution')}, minimum {min_kbps} kbps. ({self.tracker})")
+            ):
                 return False
 
         description = str(meta.get("description") or "")

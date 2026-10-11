@@ -371,6 +371,12 @@ class TestAdditionalChecksMicroEncode:
         assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=4_000_000))) is False
         assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=3_400_000, anime=True))) is False
 
+    def test_low_bitrate_asks_an_interactive_user(self, monkeypatch):
+        """Interactive runs may override a bitrate below the minimum, as on TOS and BLU."""
+        for answer in (True, False):
+            monkeypatch.setattr("src.trackers.COMMON.cli_ui.ask_yes_no", lambda *_a, answer=answer, **_k: answer)
+            assert _run(_lst().get_additional_checks(_bitrate_meta(video_bitrate=748_000, unattended=False))) is answer
+
     # ── edge cases ──────────────────────────────────────────────
 
     def test_no_bitrate_in_mediainfo_is_rejected(self):

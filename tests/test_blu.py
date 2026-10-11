@@ -295,6 +295,12 @@ class TestBLUSiteRules:
         assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="5100000"), AUDIO_OK), anime=True) is True
         assert self._passes(blu, mediainfo=_mi(_video("AVC", bitrate="1000000"), AUDIO_OK), type="REMUX") is True
 
+    def test_low_video_bitrate_asks_an_interactive_user(self, blu):
+        low = _mi(_video("AVC", bitrate="7900000"), AUDIO_OK)
+        for answer in (True, False):
+            with patch("src.trackers.COMMON.cli_ui.ask_yes_no", return_value=answer):
+                assert self._passes(blu, mediainfo=low, unattended=False) is answer
+
     def test_video_bitrate_falls_back_to_nominal_then_stream_size(self, blu):
         nominal = {"@type": "Video", "Format": "AVC", "BitRate_Nominal": "8100000"}
         derived = {"@type": "Video", "Format": "AVC", "StreamSize": "5400000000", "Duration": "5400.000"}  # 8000 kbps

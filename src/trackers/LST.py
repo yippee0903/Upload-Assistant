@@ -54,12 +54,14 @@ class LST(UNIT3D):
             if kbps is None and not ask_to_continue(meta, f"{self.tracker}: Cannot verify encode quality — video bitrate missing from mediainfo."):
                 return False
 
-            if kbps is not None and kbps < min_kbps:
-                if not meta.get("unattended", False):
-                    console.print(
-                        f"[bold red]{self.tracker}: Micro-encode detected — video bitrate {int(kbps)} kb/s "
-                        f"is below the minimum {min_kbps} kb/s for {meta.get('resolution')} {label}.[/bold red]"
-                    )
+            if (
+                kbps is not None
+                and kbps < min_kbps
+                and not ask_to_continue(
+                    meta,
+                    f"{self.tracker}: Micro-encode detected — video bitrate {int(kbps)} kb/s is below the minimum {min_kbps} kb/s for {meta.get('resolution')} {label}.",
+                )
+            ):
                 return False
 
         return should_continue
