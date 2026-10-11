@@ -3,7 +3,7 @@ import re
 from typing import Any, Optional
 
 from src.console import console
-from src.trackers.COMMON import COMMON, min_video_bitrate
+from src.trackers.COMMON import COMMON, ask_to_continue, min_video_bitrate
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -51,12 +51,10 @@ class LST(UNIT3D):
         rule = min_video_bitrate(meta, "ENCODE") if meta.get("type", "").upper() in ("ENCODE", "WEBRIP") else None
         if rule:
             label, min_kbps, kbps = rule
-            if kbps is None:
-                if not meta.get("unattended", False):
-                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — video bitrate missing from mediainfo.[/bold red]")
+            if kbps is None and not ask_to_continue(meta, f"{self.tracker}: Cannot verify encode quality — video bitrate missing from mediainfo."):
                 return False
 
-            if kbps < min_kbps:
+            if kbps is not None and kbps < min_kbps:
                 if not meta.get("unattended", False):
                     console.print(
                         f"[bold red]{self.tracker}: Micro-encode detected — video bitrate {int(kbps)} kb/s "

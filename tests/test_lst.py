@@ -374,10 +374,18 @@ class TestAdditionalChecksMicroEncode:
     # ── edge cases ──────────────────────────────────────────────
 
     def test_no_bitrate_in_mediainfo_is_rejected(self):
-        """Missing BitRate value must block the upload (fail-closed)."""
+        """Missing BitRate value skips the upload on an unattended run."""
         meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p")
         meta["mediainfo"] = {"media": {"track": [{"@type": "Video"}]}}
         assert _run(_lst().get_additional_checks(meta)) is False
+
+    def test_no_bitrate_in_mediainfo_asks_an_interactive_user(self, monkeypatch):
+        """Interactive runs may override an unreadable bitrate, as on TOS and BLU."""
+        for answer in (True, False):
+            monkeypatch.setattr("src.trackers.COMMON.cli_ui.ask_yes_no", lambda *_a, answer=answer, **_k: answer)
+            meta = _bitrate_meta(video_bitrate=0, codec="x265", resolution="1080p", unattended=False)
+            meta["mediainfo"] = {"media": {"track": [{"@type": "Video"}]}}
+            assert _run(_lst().get_additional_checks(meta)) is answer
 
     def test_zero_bitrate_falls_through_to_nominal(self):
         """A zero BitRate is unusable, not authoritative: keep falling back."""
