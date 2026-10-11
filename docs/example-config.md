@@ -165,6 +165,7 @@ Implementation notes:
 ### Release group lists
 - `banned_groups` (list or str): Release groups refused everywhere, whatever each tracker's own banned list says. Comma-separated string or list, case-insensitive. Unattended runs cancel the upload; interactive runs ask.
 - `personal_release_groups` (list): Release groups whose uploads get the personal-release flag automatically, the same as passing `-pr`. Set during metadata gathering (`src/prep.py`); an explicit `-pr` is never overridden.
+- `anon_personal_releases` (bool): When `True`, a release whose group is in `personal_release_groups` is also uploaded anonymously, the same as passing `--anon`. Default `False`. Trackers without an anonymous option ignore it.
 
 ### Sonarr / Radarr integration
 - `use_sonarr` (bool): Enable Sonarr searching.

@@ -8,6 +8,8 @@ config = {
         "update_notification": True,
         # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
         "personal_release_groups": [],
+        # Also upload anonymously when the detected release group is in personal_release_groups
+        "anon_personal_releases": False,
         # Drop dupe-search results whose size differs from yours by at least this many percent (either direction). 0/None = off
         "dupe_size_difference_tolerance": None,
         # will print the changelog if an update is available

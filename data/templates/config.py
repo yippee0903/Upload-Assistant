@@ -11,6 +11,8 @@ config = {
         "update_notification": True,
         # Set personalrelease automatically when the detected release group is one of these (case-insensitive), e.g. ["GRP"]
         "personal_release_groups": [],
+        # Also upload anonymously when the detected release group is in personal_release_groups
+        "anon_personal_releases": False,
         # will print the changelog if an update is available
         "verbose_notification": False,
 

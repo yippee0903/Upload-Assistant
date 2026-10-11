@@ -26,6 +26,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "dupe_size_difference_tolerance": (int, float, type(None)),
     "banned_groups": (list, str),
     "personal_release_groups": (list,),
+    "anon_personal_releases": (bool,),
     "tag_overrides": (dict,),
     "verbose_notification": (bool,),
     "webhook_url": (str,),

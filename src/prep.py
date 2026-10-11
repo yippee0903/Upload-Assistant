@@ -68,6 +68,21 @@ except KeyboardInterrupt:
 AKA_SAME_TITLE_RATIO = 0.8
 
 
+def _apply_personal_release_group(meta: dict[str, Any], default_config: dict[str, Any]) -> None:
+    """Auto --personalrelease (and --anon, if anon_personal_releases is on) when the detected group is one of ours."""
+    personal_groups = {str(g).lstrip("-").lower() for g in (default_config.get("personal_release_groups") or []) if g}
+    if str(meta.get("tag") or "").lstrip("-").lower() not in personal_groups:
+        return
+    if not meta.get("personalrelease"):
+        meta["personalrelease"] = True
+        if meta.get("debug"):
+            console.print(f"[green]Release group {meta['tag']} is in personal_release_groups; setting personalrelease.[/green]")
+    if default_config.get("anon_personal_releases", False) and not meta.get("anon"):
+        meta["anon"] = True
+        if meta.get("debug"):
+            console.print(f"[green]Release group {meta['tag']} is in personal_release_groups; setting anon.[/green]")
+
+
 def _normalize_search_year(value: Any) -> Optional[str]:
     if value in (None, ""):
         return None
@@ -1313,12 +1328,7 @@ class Prep:
 
             meta = await tag_override(meta)
 
-            # Auto --personalrelease when the detected group is one of ours
-            personal_groups = {str(g).lstrip("-").lower() for g in (self.config["DEFAULT"].get("personal_release_groups") or []) if g}
-            if personal_groups and str(meta.get("tag") or "").lstrip("-").lower() in personal_groups and not meta.get("personalrelease"):
-                meta["personalrelease"] = True
-                if meta.get("debug"):
-                    console.print(f"[green]Release group {meta['tag']} is in personal_release_groups; setting personalrelease.[/green]")
+            _apply_personal_release_group(meta, self.config["DEFAULT"])
 
             if meta["tag"][1:].startswith(meta["channels"]):
                 meta["tag"] = meta["tag"].replace(f"-{meta['channels']}", "")
