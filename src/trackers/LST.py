@@ -3,7 +3,7 @@ import re
 from typing import Any, Optional
 
 from src.console import console
-from src.trackers.COMMON import ANIME_MIN_VIDEO_KBPS, COMMON, MIN_VIDEO_KBPS, video_bitrate_bps
+from src.trackers.COMMON import COMMON, min_video_bitrate
 from src.trackers.UNIT3D import UNIT3D
 
 Meta = dict[str, Any]
@@ -44,51 +44,23 @@ class LST(UNIT3D):
         ):
             return False
 
-        # Block micro-encodes: check minimum video bitrate for ENCODE / WEBRIP.
+        # Block micro-encodes: minimum video bitrate for ENCODE / WEBRIP, from the
+        # table shared with TOS and BLU (no rule for the codec/resolution = no check).
         # WEB-DL is exempt: it's the service's untouched stream, whatever its
         # bitrate — never a micro-encode.
-        if meta.get("type", "").upper() in ("ENCODE", "WEBRIP"):
-            video_encode = str(meta.get("video_encode", "")).strip().lower()
-            resolution_text = str(meta.get("resolution", "")).lower().replace("p", "").replace("i", "")
-            resolution = int(resolution_text) if resolution_text.isdigit() else 0
-
-            codec_key = None
-            if "x265" in video_encode or "h.265" in video_encode or "hevc" in video_encode:
-                codec_key = "x265"
-            elif "x264" in video_encode or "h.264" in video_encode or "avc" in video_encode:
-                codec_key = "x264"
-            elif "av1" in video_encode:
-                codec_key = "AV1"
-
-            # Fail-closed: block if codec or resolution is unrecognised
-            if not codec_key or not resolution:
-                if not meta.get("unattended", False):
-                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — unrecognised codec or resolution.[/bold red]")
-                return False
-
-            # The shared encode thresholds (kbps), lower for anime.
-            thresholds = ANIME_MIN_VIDEO_KBPS if meta.get("anime") else MIN_VIDEO_KBPS
-            min_bps = thresholds[codec_key].get(f"{resolution}p", {}).get("ENCODE", 0) * 1000
-
-            # Fail-closed: block if no rule exists for this codec/resolution combination
-            if not min_bps:
-                if not meta.get("unattended", False):
-                    console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — no bitrate rule for {resolution}p {codec_key.upper()}.[/bold red]")
-                return False
-
-            video_bitrate = video_bitrate_bps(meta)
-
-            # Fail-closed: block if bitrate is missing or unreadable
-            if not video_bitrate:
+        rule = min_video_bitrate(meta, "ENCODE") if meta.get("type", "").upper() in ("ENCODE", "WEBRIP") else None
+        if rule:
+            label, min_kbps, kbps = rule
+            if kbps is None:
                 if not meta.get("unattended", False):
                     console.print(f"[bold red]{self.tracker}: Cannot verify encode quality — video bitrate missing from mediainfo.[/bold red]")
                 return False
 
-            if video_bitrate < min_bps:
+            if kbps < min_kbps:
                 if not meta.get("unattended", False):
                     console.print(
-                        f"[bold red]{self.tracker}: Micro-encode detected — video bitrate {video_bitrate // 1000} kb/s "
-                        f"is below the minimum {min_bps // 1000} kb/s for {resolution}p {codec_key.upper()}.[/bold red]"
+                        f"[bold red]{self.tracker}: Micro-encode detected — video bitrate {int(kbps)} kb/s "
+                        f"is below the minimum {min_kbps} kb/s for {meta.get('resolution')} {label}.[/bold red]"
                     )
                 return False
 

@@ -234,6 +234,8 @@ def _bitrate_meta(
         "valid_mi_settings": True,
         "type": type,
         "video_encode": codec,
+        # MediaInfo's Format, which the shared bitrate table is keyed on.
+        "video_codec": {"x265": "HEVC", "h.265": "HEVC", "x264": "AVC", "h.264": "AVC"}.get(codec.strip().lower(), codec.strip()),
         "resolution": resolution,
         "original_language": "en",
         "audio_languages": ["english"],
@@ -403,15 +405,15 @@ class TestAdditionalChecksMicroEncode:
         meta["mediainfo"] = {"media": {"track": [{"@type": "Video", "StreamSize": "500000000", "Duration": "5400.000"}]}}
         assert _run(_lst().get_additional_checks(meta)) is False
 
-    def test_unknown_codec_is_rejected(self):
-        """Unrecognised codec (e.g. VP9) must block the upload (fail-closed)."""
-        meta = _bitrate_meta(video_bitrate=5_000_000, codec="vp9", resolution="1080p")
-        assert _run(_lst().get_additional_checks(meta)) is False
+    def test_codec_without_rule_is_not_checked(self):
+        """No threshold for the codec (e.g. VP9) means no bitrate check, as on TOS and BLU."""
+        meta = _bitrate_meta(video_bitrate=500_000, codec="VP9", resolution="1080p")
+        assert _run(_lst().get_additional_checks(meta)) is True
 
-    def test_unmapped_resolution_is_rejected(self):
-        """Resolution with no rule (e.g. 480p) must block the upload (fail-closed)."""
-        meta = _bitrate_meta(video_bitrate=5_000_000, codec="x265", resolution="480p")
-        assert _run(_lst().get_additional_checks(meta)) is False
+    def test_resolution_without_rule_is_not_checked(self):
+        """No threshold for the resolution (e.g. 480p) means no bitrate check."""
+        meta = _bitrate_meta(video_bitrate=500_000, codec="x265", resolution="480p")
+        assert _run(_lst().get_additional_checks(meta)) is True
 
     def test_remux_type_skips_bitrate_check(self):
         """REMUX type is not subject to the bitrate gate."""
