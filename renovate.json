@@ -10,6 +10,18 @@
         "patch"
       ],
       "automerge": true
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "automerge": true
     }
   ]
 }
