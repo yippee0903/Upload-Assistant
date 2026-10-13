@@ -1,4 +1,4 @@
-FROM python:3.14@sha256:b9767f56a1cc620aa72d38cc3557d26412e38a4597c92953476136b78894ccbd
+FROM python:3.15@sha256:83ff73aa50b76c95eba4d765137d3ad023b36355f9ddc161dced40d35dbf8d99
 
 # ── System dependencies ──────────────────────────────────────────────
 RUN apt-get update && \
