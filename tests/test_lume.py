@@ -83,3 +83,28 @@ class TestNogroupWebDL:
             f"Real group tag must not be modified, got: {result!r}"
         )
         assert "NOGROUP" not in result, f"NOGROUP must not appear when tag is valid: {result!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  French Multi — English original with a French dub
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFrenchMulti:
+    """LUME names English content with a French dub 'French Multi', not Dual-Audio."""
+
+    @staticmethod
+    def _meta(name: str, orig: str, langs: list[str]) -> dict[str, Any]:
+        return {"name": name, "tag": "-GRP", "original_language": orig, "audio_languages": langs, "language_checked": True}
+
+    def test_english_original_with_french_dub(self):
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", ["English", "French"])
+        assert _run(_lume().get_name(meta))["name"] == "Movie 2024 1080p BluRay French Multi DTS-HD MA 5.1 x264-GRP"
+
+    def test_non_english_original_keeps_dual_audio(self):
+        meta = self._meta("Film 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "fr", ["French", "English"])
+        assert "Dual-Audio" in _run(_lume().get_name(meta))["name"]
+
+    def test_english_original_without_french_keeps_dual_audio(self):
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", ["English", "German"])
+        assert "Dual-Audio" in _run(_lume().get_name(meta))["name"]
