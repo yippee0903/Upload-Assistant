@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 from src.console import console
+from src.languages import languages_manager
 from src.trackers.COMMON import COMMON, ask_to_continue, is_adult
 from src.trackers.UNIT3D import UNIT3D
 
@@ -68,6 +69,13 @@ class LUME(UNIT3D):
         tag_value = str(meta.get("tag", ""))
         normalized_tag = tag_value.strip("-").strip().lower()
         invalid_tag_set = {"nogrp", "nogroup", "unknown", "unk"}
+
+        # LUME: English content with a French dub is "French Multi"; Dual-Audio is kept for non-English originals with an English dub
+        if "Dual-Audio" in lume_name and str(meta.get("original_language", "")).lower().startswith("en"):
+            if not meta.get("language_checked", False):
+                await languages_manager.process_desc_language(meta, tracker=self.tracker)
+            if await languages_manager.has_french_language(meta.get("audio_languages") or []):
+                lume_name = lume_name.replace("Dual-Audio", "French Multi")
 
         if tag_value == "" or normalized_tag in invalid_tag_set:
             lume_name = re.sub(r"-(?:nogrp|nogroup|unknown|unk)(?=$|-)", "", lume_name, flags=re.IGNORECASE)

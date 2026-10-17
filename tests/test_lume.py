@@ -83,3 +83,53 @@ class TestNogroupWebDL:
             f"Real group tag must not be modified, got: {result!r}"
         )
         assert "NOGROUP" not in result, f"NOGROUP must not appear when tag is valid: {result!r}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  French Multi — English original with a French dub
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFrenchMulti:
+    """LUME names English content with a French dub 'French Multi', not Dual-Audio."""
+
+    @staticmethod
+    def _meta(name: str, orig: str, langs: list[str] | None) -> dict[str, Any]:
+        return {"name": name, "tag": "-GRP", "original_language": orig, "audio_languages": langs, "language_checked": True}
+
+    def test_english_original_with_french_dub(self):
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", ["English", "French"])
+        assert _run(_lume().get_name(meta))["name"] == "Movie 2024 1080p BluRay French Multi DTS-HD MA 5.1 x264-GRP"
+
+    def test_non_english_original_keeps_dual_audio(self):
+        meta = self._meta("Film 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "fr", ["French", "English"])
+        assert "Dual-Audio" in _run(_lume().get_name(meta))["name"]
+
+    def test_english_original_without_french_keeps_dual_audio(self):
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", ["English", "German"])
+        assert "Dual-Audio" in _run(_lume().get_name(meta))["name"]
+
+    def test_full_language_name_original(self):
+        """A manual '-ol English' override gives a full name instead of an ISO code."""
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "English", ["English", "French"])
+        assert "French Multi" in _run(_lume().get_name(meta))["name"]
+
+    @pytest.mark.parametrize("langs", [None, []])
+    def test_missing_audio_languages_keeps_dual_audio(self, langs):
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", langs)
+        assert "Dual-Audio" in _run(_lume().get_name(meta))["name"]
+
+    def test_languages_processed_when_unchecked(self, monkeypatch):
+        """Audio languages are read from mediainfo when no earlier check did it."""
+        calls = []
+
+        async def fake_process(meta, tracker=""):
+            calls.append(tracker)
+            meta["audio_languages"] = ["English", "French"]
+            meta["language_checked"] = True
+
+        monkeypatch.setattr("src.trackers.LUME.languages_manager.process_desc_language", fake_process)
+        meta = self._meta("Movie 2024 1080p BluRay Dual-Audio DTS-HD MA 5.1 x264-GRP", "en", [])
+        meta["language_checked"] = False
+        assert "French Multi" in _run(_lume().get_name(meta))["name"]
+        assert calls == ["LUME"]
