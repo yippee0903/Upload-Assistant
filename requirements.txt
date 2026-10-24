@@ -38,7 +38,7 @@ qbittorrent-api==2026.10.0
 regex==2026.9.29
 requests==2.34.2
 rich==15.0.0
-setuptools==84.0.0
+setuptools==84.1.0
 tmdbsimple==2.9.8
 torf==4.3.1
 tqdm==4.70.1
