@@ -796,6 +796,15 @@ class TestG3MINIHdr10Plus:
         assert 'HDR10+' not in name, f"'+' must be gone, got: {name!r}"
 
 
+class TestG3MINIAmpersand:
+    """G3MINI spells '&' in a title as 'and' (the site rewrites it on API uploads)."""
+
+    def test_ampersand_becomes_and(self):
+        meta = _meta_base(title='Fast & Furious', resolution='1080p', type='REMUX', source='BluRay')
+        name = asyncio.run(G3MINI(_config()).get_name(meta))['name']
+        assert name.startswith('Fast.and.Furious.'), f"'&' must render as 'and', got: {name!r}"
+
+
 class TestG3MINIFrenchTitle:
     """French-origin works must use the French title in the release name."""
 

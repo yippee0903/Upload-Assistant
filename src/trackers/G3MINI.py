@@ -240,6 +240,8 @@ class G3MINI(FrenchTrackerMixin, UNIT3D):
             # G3MINI keeps title-internal hyphens (WALL·E → WALL-E), so
             # middle dot / bullet map to hyphen instead of space.
             name = name.replace("\u00b7", "-").replace("\u2022", "-")
+            # The site rewrites '&' as 'and' on API uploads.
+            name = name.replace("&", " and ")
             # The shared cleaning transliterates accents and expands elisions.
             return self._fr_clean(name)
 
