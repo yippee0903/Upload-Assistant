@@ -2,8 +2,10 @@
 #
 # DRAU (draupnirr.xyz) — French private tracker with a custom (non-UNIT3D) API.
 #
-# One credential for everything: the account passkey is the API key (header
-# X-Api-Key) and the announce URL is /announce/<passkey>.
+# Credentials: the account passkey works as the API key (header X-Api-Key)
+# and builds the announce URL /announce/<passkey>. A per-device API token
+# (drp_…) can replace it on /api/* but never on the announce, so with a token
+# as api_key the passkey must be set separately.
 #
 # API surface:
 #   GET  /api/categories                    upload slugs (family or sub-category)
@@ -104,8 +106,14 @@ class DRAU(FrenchTrackerMixin):
         self.upload_url = f"{self.base_url}/api/upload"
         self.search_url = f"{self.base_url}/api/torrents"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
-        self.announce_url = f"{self.base_url}/announce/{self.api_key}"
+        tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+        self.api_key = str(tracker_config.get("api_key", "") or "").strip()
+        # A device token (drp_…) opens /api/* only, never the announce: the
+        # announce then needs the passkey, which an api_key passkey doubles as.
+        self.passkey = str(tracker_config.get("passkey", "") or "").strip()
+        if not self.passkey and not self.api_key.startswith("drp_"):
+            self.passkey = self.api_key
+        self.announce_url = f"{self.base_url}/announce/{self.passkey}"
         # Every torrent-creation path (COMMON and the NFO re-creation in the
         # French mixin) reads the announce from the tracker config block, so
         # publish the passkey-derived URL there instead of asking for it.
@@ -619,6 +627,13 @@ class DRAU(FrenchTrackerMixin):
             return False
 
     async def _upload(self, meta: Meta, _disctype: str) -> bool:
+        if not self.passkey:
+            # The torrent would announce an unregistered key: Ratatosk could
+            # never pull the header from us and the release stays quarantined.
+            console.print(f"[red]{self.tracker}: api_key is an API token, set passkey too — it is needed for the announce URL.[/red]")
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: passkey missing (api_key is an API token)"
+            return False
+
         # With unattended_confirm the user already answered the dupe prompt.
         if meta.get("unattended") and not meta.get("unattended_confirm") and meta.get("_drau_slot_occupied"):
             console.print(f"[yellow]{self.tracker}: slot already held — skipping in unattended mode.[/yellow]")

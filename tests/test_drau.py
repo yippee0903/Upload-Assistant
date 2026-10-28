@@ -278,6 +278,31 @@ class TestUpload:
         # The NFO re-creation path reads the announce from the config block too.
         assert captured == {"source_flag": "DRAUPNIRR", "announce_url": "https://draupnirr.xyz/announce/test-passkey"}
 
+    def test_api_token_announces_with_the_separate_passkey(self, monkeypatch: Any, tmp_path: Any):
+        config = {"TRACKERS": {"DRAU": {"api_key": "drp_device-token", "passkey": "test-passkey"}}, "DEFAULT": {"tmdb_api": "fake"}}
+        tracker = DRAU(config)
+        self._patch(monkeypatch, tracker, _FakeResponse(201, {"id": "Xk3Qm9"}))
+        captured: dict[str, Any] = {}
+
+        async def fake_create(meta: Any, tracker_name: Any, source_flag: Any, **kwargs: Any) -> None:
+            captured["announce_url"] = config["TRACKERS"]["DRAU"].get("announce_url")
+
+        monkeypatch.setattr(tracker.common, "create_torrent_for_upload", fake_create)
+        asyncio.run(tracker.upload(self._meta(tmp_path), ""))
+        assert captured == {"announce_url": "https://draupnirr.xyz/announce/test-passkey"}
+        assert _FakeClient.captured["headers"]["X-Api-Key"] == "drp_device-token"
+
+    def test_api_token_without_passkey_refuses_the_upload(self, monkeypatch: Any, tmp_path: Any):
+        tracker = DRAU({"TRACKERS": {"DRAU": {"api_key": "drp_device-token"}}, "DEFAULT": {"tmdb_api": "fake"}})
+
+        async def no_torrent(*args: Any, **kwargs: Any) -> None:
+            raise AssertionError("no torrent may be built without a passkey")
+
+        monkeypatch.setattr(tracker.common, "create_torrent_for_upload", no_torrent)
+        meta = self._meta(tmp_path)
+        assert asyncio.run(tracker.upload(meta, "")) is False
+        assert meta["tracker_status"]["DRAU"]["status_message"] == "data error: passkey missing (api_key is an API token)"
+
     def test_tv_upload_sends_the_episode_field(self, monkeypatch: Any, tmp_path: Any):
         tracker = DRAU(_config())
         self._patch(monkeypatch, tracker, _FakeResponse(201, {"id": "Xk3Qm9"}))
