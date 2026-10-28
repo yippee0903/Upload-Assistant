@@ -606,7 +606,8 @@ class DRAU(FrenchTrackerMixin):
             return False
 
     async def _upload(self, meta: Meta, _disctype: str) -> bool:
-        if meta.get("unattended") and meta.get("_drau_slot_occupied"):
+        # With unattended_confirm the user already answered the dupe prompt.
+        if meta.get("unattended") and not meta.get("unattended_confirm") and meta.get("_drau_slot_occupied"):
             console.print(f"[yellow]{self.tracker}: slot already held — skipping in unattended mode.[/yellow]")
             meta["tracker_status"][self.tracker]["status_message"] = "slot occupied — skipped in unattended mode"
             return False

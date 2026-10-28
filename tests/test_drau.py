@@ -635,3 +635,14 @@ class TestSlots:
         meta = _slot_meta(unattended=True, _drau_slot_occupied=True)
         assert asyncio.run(tracker.upload(meta, "")) is False
         assert meta["tracker_status"]["DRAU"]["status_message"] == "slot occupied — skipped in unattended mode"
+
+    def test_unattended_confirm_lets_the_user_decide(self, monkeypatch: Any):
+        tracker = DRAU(_config())
+        meta = _slot_meta(unattended=True, unattended_confirm=True, _drau_slot_occupied=True)
+
+        def past_the_gate(meta: Any) -> list[str]:
+            raise RuntimeError("past the gate")
+
+        monkeypatch.setattr(tracker, "_get_nfo_files", past_the_gate)
+        assert asyncio.run(tracker.upload(meta, "")) is False
+        assert meta["tracker_status"]["DRAU"]["status_message"] == "data error: upload failed: past the gate"
