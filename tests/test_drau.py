@@ -61,7 +61,15 @@ def _posts() -> list[dict[str, Any]]:
 
 
 def _entry(name: str, size: int = 1000, torrent_id: str = "Xk3Qm9") -> dict[str, Any]:
-    return {"id": torrent_id, "infohash": "ab" * 20, "name": name, "category": "films-film", "size_bytes": size, "file_count": 1, "download_url": f"https://draupnirr.xyz/api/torrents/{torrent_id}/download"}
+    return {
+        "id": torrent_id,
+        "infohash": "ab" * 20,
+        "name": name,
+        "category": "films-film",
+        "size_bytes": size,
+        "file_count": 1,
+        "download_url": f"https://draupnirr.xyz/api/torrents/{torrent_id}/download",
+    }
 
 
 class TestCategoryMapping:
@@ -106,7 +114,16 @@ class TestSearchExisting:
         self._prep(monkeypatch, tracker)
         _FakeClient.response = _FakeResponse(200, [_entry("Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", size=4321)])
         dupes = asyncio.run(tracker.search_existing(self._meta()))
-        assert dupes == [{"name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", "size": 4321, "link": "https://draupnirr.xyz/torrents/Xk3Qm9", "id": "Xk3Qm9", "download": "https://draupnirr.xyz/api/torrents/Xk3Qm9/download", "file_count": 1}]
+        assert dupes == [
+            {
+                "name": "Some.Movie.2024.MULTi.1080p.WEB.x264-GRP",
+                "size": 4321,
+                "link": "https://draupnirr.xyz/torrents/Xk3Qm9",
+                "id": "Xk3Qm9",
+                "download": "https://draupnirr.xyz/api/torrents/Xk3Qm9/download",
+                "file_count": 1,
+            }
+        ]
         sent = _FakeClient.captured
         assert sent["url"] == "https://draupnirr.xyz/api/torrents"
         assert sent["params"] == {"q": "Some Movie", "limit": 100, "offset": 0}
@@ -139,7 +156,10 @@ class TestSearchExisting:
     def test_search_paginates_until_short_page(self, monkeypatch: Any):
         tracker = DRAU(_config())
         self._prep(monkeypatch, tracker)
-        pages = [[_entry(f"Some.Movie.2024.MULTi.1080p.WEB.x264-GRP.{i}", torrent_id=str(i)) for i in range(100)], [_entry("Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", torrent_id="last")]]
+        pages = [
+            [_entry(f"Some.Movie.2024.MULTi.1080p.WEB.x264-GRP.{i}", torrent_id=str(i)) for i in range(100)],
+            [_entry("Some.Movie.2024.MULTi.1080p.WEB.x264-GRP", torrent_id="last")],
+        ]
 
         class _Paged(_FakeClient):
             async def get(self, url: str, **kwargs: Any) -> _FakeResponse:
@@ -358,3 +378,213 @@ class TestCrossSeedHeaders:
         assert tracker.cross_seed_headers("http://draupnirr.xyz/api/torrents/abc/download") is None
         assert tracker.cross_seed_headers("https://evil.example/api/torrents/abc/download") is None
         assert tracker.cross_seed_headers("https://draupnirr.xyz.evil.example/x") is None
+
+
+# Trimmed copy of GET /api/slots, in the site's order.
+_SLOTS: list[dict[str, Any]] = [
+    {
+        "code": "OPTI-1080-SDR-BD",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["Bluray", "UHD.Bluray", "BDRip"],
+            "codec_family": ["HEVC"],
+            "audio_class": "lossy",
+            "hdr": False,
+            "channels_max": "5.1",
+            "bitrate_min": None,
+            "bitrate_max": 3000,
+        },
+    },
+    {
+        "code": "OPTI-1080-SDR-WR",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["HDLight", "WEBRip", "WEB.DL", "WEB"],
+            "codec_family": ["HEVC"],
+            "audio_class": "lossy",
+            "hdr": False,
+            "channels_max": "5.1",
+            "bitrate_min": None,
+            "bitrate_max": 3000,
+        },
+    },
+    {
+        "code": "OPTI-2160-HDR-4KL",
+        "criteria": {
+            "resolution": "2160p",
+            "source": ["Bluray.4KLight"],
+            "codec_family": ["HEVC"],
+            "audio_class": "lossy",
+            "hdr": True,
+            "channels_max": "5.1",
+            "bitrate_min": None,
+            "bitrate_max": 10000,
+        },
+    },
+    {
+        "code": "HCOPT-1080-WEB",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["WEB.DL", "WEB"],
+            "codec_family": None,
+            "audio_class": None,
+            "hdr": None,
+            "channels_max": None,
+            "bitrate_min": None,
+            "bitrate_max": None,
+        },
+    },
+    {
+        "code": "HCOPT-1080-BD-H265",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["Bluray", "UHD.Bluray", "BDRip"],
+            "codec_family": ["HEVC"],
+            "audio_class": None,
+            "hdr": None,
+            "channels_max": None,
+            "bitrate_min": 3000,
+            "bitrate_max": None,
+        },
+    },
+    {
+        "code": "HCOPT-2160-4KL-H265",
+        "criteria": {
+            "resolution": "2160p",
+            "source": ["Bluray.4KLight"],
+            "codec_family": ["HEVC"],
+            "audio_class": None,
+            "hdr": None,
+            "channels_max": None,
+            "bitrate_min": 10000,
+            "bitrate_max": None,
+        },
+    },
+    {
+        "code": "PURE-BD-VC1",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["Bluray.Remux"],
+            "codec_family": ["VC1"],
+            "audio_class": None,
+            "hdr": None,
+            "channels_max": None,
+            "bitrate_min": None,
+            "bitrate_max": None,
+        },
+    },
+    {
+        "code": "PURE-BD-REMUX",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["Bluray.Remux"],
+            "codec_family": None,
+            "audio_class": None,
+            "hdr": None,
+            "channels_max": None,
+            "bitrate_min": None,
+            "bitrate_max": None,
+        },
+    },
+    {"code": "PURE-BD-BDMV", "criteria": {}},
+]
+
+
+def _slot_meta(**overrides: Any) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "category": "MOVIE",
+        "tmdb_id": 123,
+        "resolution": "1080p",
+        "type": "ENCODE",
+        "uuid": "Some.Movie.2024.1080p.Bluray.x265-GRP",
+        "video_encode": "x265",
+        "audio": "DD+ 5.1",
+        "channels": "5.1",
+        "hdr": "",
+        "edition": "",
+        "webdv": "",
+        "mediainfo": {"media": {"track": [{"@type": "General", "OverallBitRate": "2500000"}]}},
+        "tracker_status": {"DRAU": {}},
+    }
+    meta.update(overrides)
+    return meta
+
+
+class TestSlots:
+    def test_source_facet(self):
+        assert DRAU._source_facet({"type": "REMUX"}) == "Bluray.Remux"
+        assert DRAU._source_facet({"type": "ENCODE", "uuid": "Some.Movie.2024.2160p.Bluray.4KLight.x265-GRP"}) == "Bluray.4KLight"
+        assert DRAU._source_facet({"type": "ENCODE", "uuid": "Some.Movie.2024.1080p.HDLight.x264-GRP"}) == "HDLight"
+        assert DRAU._source_facet({"type": "ENCODE", "uuid": "Some.Movie.2024.1080p.Bluray.x264-GRP"}) == "Bluray"
+        assert DRAU._source_facet({"type": "WEBDL"}) == "WEB.DL"
+
+    def test_find_slot_follows_the_criteria(self):
+        find = DRAU(_config())._find_slot
+        assert find(_slot_meta(), _SLOTS) == "OPTI-1080-SDR-BD"
+        # Above the 3 000 kb/s threshold an HEVC Bluray encode is HC Optimisé.
+        assert find(_slot_meta(mediainfo={"media": {"track": [{"@type": "General", "OverallBitRate": "9000000"}]}}), _SLOTS) == "HCOPT-1080-BD-H265"
+        assert find(_slot_meta(type="WEBDL", video_encode="", video_codec="AVC", audio="TrueHD Atmos 7.1", channels="7.1"), _SLOTS) == "HCOPT-1080-WEB"
+        assert find(_slot_meta(type="REMUX", video_encode="", video_codec="VC-1"), _SLOTS) == "PURE-BD-VC1"
+        assert find(_slot_meta(type="REMUX", video_encode="", video_codec="AVC"), _SLOTS) == "PURE-BD-REMUX"
+        assert find(_slot_meta(is_disc="BDMV", type="DISC"), _SLOTS) == "PURE-BD-BDMV"
+        four_k_light = _slot_meta(resolution="2160p", hdr="HDR", uuid="Some.Movie.2024.2160p.Bluray.4KLight.HDR10.x265-GRP")
+        assert find(four_k_light, _SLOTS) == "OPTI-2160-HDR-4KL"
+        # No bitrate: neither side of the threshold can be decided.
+        assert find(_slot_meta(mediainfo={}), _SLOTS) == ""
+
+    def _check(self, monkeypatch: Any, meta: dict[str, Any], slot: dict[str, Any], edition: str = "theatrical") -> list[dict[str, Any]]:
+        tracker = DRAU(_config())
+        work = {"work": {}, "editions": {edition: {"slots": [slot]}}}
+
+        async def fake_get_json(path: str, params: Any = None) -> Any:
+            return _SLOTS if path == "/api/slots" else work
+
+        async def fake_audio(meta: Any) -> str:
+            return meta.get("_audio", "MULTI.VFF")
+
+        monkeypatch.setattr(tracker, "_get_json", fake_get_json)
+        monkeypatch.setattr(tracker, "_build_audio_string", fake_audio)
+        return asyncio.run(tracker._check_slot(meta))
+
+    @staticmethod
+    def _held(name: str, stack: int = 1) -> dict[str, Any]:
+        return {
+            "code": "OPTI-1080-SDR-BD",
+            "state": "occupied",
+            "occupant": {"id": "Xk3Qm9", "name": name, "size_bytes": 10, "download_url": "https://draupnirr.xyz/api/torrents/x/download"},
+            "coexisting": [],
+            "stack_size": stack,
+        }
+
+    def test_held_slot_is_flagged_and_returned_as_dupe(self, monkeypatch: Any):
+        meta = _slot_meta()
+        holders = self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"))
+        assert [h["name"] for h in holders] == ["Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"]
+        assert meta["_drau_slot_occupied"] is True
+
+    def test_free_slot_and_other_edition_are_not_flagged(self, monkeypatch: Any):
+        meta = _slot_meta()
+        assert self._check(monkeypatch, meta, {"code": "OPTI-1080-SDR-BD", "state": "free", "occupant": None, "coexisting": [], "stack_size": 0}) == []
+        meta = _slot_meta(edition="Extended")
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.1080p.Bluray.AC3.5.1.x265-OTHER")) == []
+        assert "_drau_slot_occupied" not in meta
+
+    def test_edition_key_matches_the_site(self, monkeypatch: Any):
+        meta = _slot_meta(edition="Extended Remastered")
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.EXTENDED.REMASTERED.MULTi.1080p.Bluray.x265-OTHER"), edition="EXTENDED.REMASTERED")
+        assert meta["_drau_slot_occupied"] is True
+
+    def test_vfq_coexists_with_a_vff_holder(self, monkeypatch: Any):
+        meta = _slot_meta(_audio="VFQ")
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.VFF.1080p.Bluray.AC3.5.1.x265-OTHER")) == []
+        assert "_drau_slot_occupied" not in meta
+
+    def test_dv_coexists_with_an_hdr10_holder(self, monkeypatch: Any):
+        meta = _slot_meta(hdr="DV HDR")
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.HDR10.x265-OTHER")) == []
+
+    def test_unattended_upload_skips_a_held_slot(self, monkeypatch: Any):
+        tracker = DRAU(_config())
+        meta = _slot_meta(unattended=True, _drau_slot_occupied=True)
+        assert asyncio.run(tracker.upload(meta, "")) is False
+        assert meta["tracker_status"]["DRAU"]["status_message"] == "slot occupied — skipped in unattended mode"
