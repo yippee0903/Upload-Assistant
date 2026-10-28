@@ -3399,3 +3399,18 @@ class TestFileEnrichment:
         feed = self.TORZNAB.replace("Le.Prenom.2012.FRENCH.1080p.WEB.x264-Troxy", "Le.Prenom.Troxy.2012.FRENCH.1080p.WEB.x264-OTHER")
         _, seen = self._search(MagicMock(status_code=404), feed)
         assert not any("/api/torrents/" in url for url in seen)
+
+
+class TestOccupiedSlotGate:
+    def _meta(self, **overrides: Any) -> dict[str, Any]:
+        return {"unattended": True, "_c411_slot_occupied": True, "repack": "", "tracker_status": {"C411": {}}, **overrides}
+
+    def test_unattended_upload_skips_an_occupied_slot(self):
+        meta = self._meta()
+        assert asyncio.run(C411(_config()).upload(meta, "")) is False
+        assert meta["tracker_status"]["C411"]["status_message"] == "slot occupied — skipped in unattended mode"
+
+    def test_unattended_confirm_lets_the_user_decide(self):
+        c = C411(_config())
+        with patch.object(c, "_get_nfo_files", side_effect=RuntimeError("past the gate")), pytest.raises(RuntimeError, match="past the gate"):
+            asyncio.run(c.upload(self._meta(unattended_confirm=True), ""))

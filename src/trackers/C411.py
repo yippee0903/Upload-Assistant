@@ -1310,7 +1310,13 @@ class C411(FrenchTrackerMixin):
         Optional fields: options, uploaderNote, tmdbData, rawgData
         """
 
-        if meta.get("unattended", False) and meta.get("_c411_slot_occupied", False) and not self._is_corrective_version_meta(meta):
+        # With unattended_confirm the user already answered the dupe prompt.
+        if (
+            meta.get("unattended", False)
+            and not meta.get("unattended_confirm", False)
+            and meta.get("_c411_slot_occupied", False)
+            and not self._is_corrective_version_meta(meta)
+        ):
             console.print("[yellow]C411: slot already taken — skipping in unattended mode[/yellow]")
             meta["tracker_status"][self.tracker]["status_message"] = "slot occupied — skipped in unattended mode"
             return False
