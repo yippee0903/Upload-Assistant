@@ -11,7 +11,9 @@
 #                                           per page, no total (a short page ends
 #                                           the pagination); q matches ordered
 #                                           words against the stored name
-#   GET  /api/torrents/{sqid|infohash}      detail: file_count only, no file list
+#   GET  /api/torrents/{sqid|infohash}      detail: file_count, description, meta and
+#                                           slot (code, state, rank, edition); no
+#                                           file list
 #   GET  /api/torrents/{sqid|infohash}/download  the .torrent (X-Api-Key required);
 #                                           catalogue entries carry it as download_url
 #   GET  /api/slots                         the 33 catalogue slots and their criteria
@@ -39,7 +41,10 @@
 #   side by side. The source facet decides the slot family; a release without
 #   one is filed in a "light" tier. Once the upload's slot is known, its stack
 #   is the dupe list and is flagged <TRACKER>_dupes_authoritative so the
-#   generic name-based dupe filter leaves it alone.
+#   generic name-based dupe filter leaves it alone. A corrective (PROPER,
+#   REPACK…) takes the exact place of the release it fixes only when that
+#   release is designated in the site's upload wizard: the API has no field
+#   for it, so here a corrective stacks like any other release.
 #   Video uploads enter a quarantine while the site bot reads the file headers
 #   FROM THE UPLOADER (awaiting_validation: true): the release must stay seeded.
 
