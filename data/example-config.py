@@ -575,9 +575,12 @@ config = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # draupnirr.xyz — French private tracker (custom API, not UNIT3D)
-            # Your passkey doubles as the API key (profile page). It is also
-            # used to build the announce URL, so nothing else is needed here.
+            # Your passkey (profile page), or an API token (drp_..., Profile >
+            # Security > API tokens) that you can revoke on its own.
             "api_key": "",
+            # Builds the announce URL. Leave empty when api_key is your passkey;
+            # required when api_key is an API token (tokens never open the announce).
+            "passkey": "",
             # Include screenshots in the upload description (default: False)
             "include_screenshots": False,
             # Append the reused/base description (cleaned text grabbed from

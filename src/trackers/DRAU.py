@@ -2,8 +2,10 @@
 #
 # DRAU (draupnirr.xyz) — French private tracker with a custom (non-UNIT3D) API.
 #
-# One credential for everything: the account passkey is the API key (header
-# X-Api-Key) and the announce URL is /announce/<passkey>.
+# Credentials: the account passkey works as the API key (header X-Api-Key)
+# and builds the announce URL /announce/<passkey>. A per-device API token
+# (drp_…) can replace it on /api/* but never on the announce, so with a token
+# as api_key the passkey must be set separately.
 #
 # API surface:
 #   GET  /api/categories                    upload slugs (family or sub-category)
@@ -11,9 +13,20 @@
 #                                           per page, no total (a short page ends
 #                                           the pagination); q matches ordered
 #                                           words against the stored name
-#   GET  /api/torrents/{sqid|infohash}      detail: file_count only, no file list
+#   GET  /api/torrents/{sqid|infohash}      detail: file_count, description, meta and
+#                                           slot (code, state, rank, edition); no
+#                                           file list
 #   GET  /api/torrents/{sqid|infohash}/download  the .torrent (X-Api-Key required);
 #                                           catalogue entries carry it as download_url
+#   GET  /api/slots                         the 33 catalogue slots and their criteria
+#   GET  /api/works/{movie|tv}/{tmdb_id}/slots[?episode=S01|S01E01]
+#                                           occupancy per edition: state, occupant,
+#                                           coexisting holders, stack_size
+#   GET  /api/works/{movie|tv}/{tmdb_id}/slots/{code}?edition=[&episode=]
+#                                           one slot: state (free|occupied|
+#                                           coexisting), occupant, coexisting,
+#                                           stack (rank, slot_state); an unknown
+#                                           edition reads as free
 #   POST /api/upload                        multipart upload:
 #     required: torrent (private, info.source = "DRAUPNIRR"), category slug
 #     accepted: nfo, description (bbcode), mediainfo (text), meta[work_title],
@@ -23,6 +36,17 @@
 #     401 invalid api key · 403 uploads disabled · 422 {error: <reason>} for a
 #     duplicate, a non-private torrent, a missing source tag or a bot refusal —
 #     none of which a retry can fix.
+#   Slots: the site files each release into one slot (resolution, source
+#   family, codec) per edition. A release landing in a held slot is never
+#   refused: it enters the slot's stack behind the occupant, hidden from the
+#   "best version only" view. VFF/VFQ, HDR10/DV and lossy/lossless hold a slot
+#   side by side. The source facet decides the slot family; a release without
+#   one is filed in a "light" tier. Once the upload's slot is known, its stack
+#   is the dupe list and is flagged <TRACKER>_dupes_authoritative so the
+#   generic name-based dupe filter leaves it alone. A corrective (PROPER,
+#   REPACK…) takes the exact place of the release it fixes only when that
+#   release is designated in the site's upload wizard: the API has no field
+#   for it, so here a corrective stacks like any other release.
 #   Video uploads enter a quarantine while the site bot reads the file headers
 #   FROM THE UPLOADER (awaiting_validation: true): the release must stay seeded.
 
@@ -50,16 +74,23 @@ RETRY_DELAY = 5.0  # seconds between upload retries
 PAGE_SIZE = 100  # catalogue page size (site maximum)
 MAX_OFFSET = 5000  # hard cap so a misbehaving catalogue can't loop forever
 
-# Release type → site "source" facet vocabulary (Nomenclature › Films).
+# Release type → site "source" facet vocabulary (the slot criteria sources).
 SOURCE_FACETS: dict[str, str] = {
     "WEBDL": "WEB.DL",
     "WEBRIP": "WEBRip",
     "HDTV": "HDTV",
     "DVDRIP": "DVDRip",
-    "REMUX": "Bluray",
+    "REMUX": "Bluray.Remux",
     "ENCODE": "Bluray",
     "DISC": "Bluray",
 }
+
+# Codec spellings (separators stripped) → slot criteria codec_family.
+CODEC_FAMILIES: dict[str, str] = {"X265": "HEVC", "H265": "HEVC", "HEVC": "HEVC", "X264": "AVC", "H264": "AVC", "AVC": "AVC", "AV1": "AV1", "VC1": "VC1"}
+
+# Lossless markers in meta["audio"] and, dot-delimited, in a release name.
+LOSSLESS_AUDIO = ("TRUEHD", "DTS-HD MA", "DTS:X", "FLAC", "PCM")
+LOSSLESS_NAME_MARKERS = (".TRUEHD.", ".DTS.HD.MA.", ".DTS.X.", ".FLAC.", ".LPCM.", ".PCM.")
 
 
 class DRAU(FrenchTrackerMixin):
@@ -75,8 +106,14 @@ class DRAU(FrenchTrackerMixin):
         self.upload_url = f"{self.base_url}/api/upload"
         self.search_url = f"{self.base_url}/api/torrents"
         self.torrent_url = f"{self.base_url}/torrents/"
-        self.api_key = str(self.config["TRACKERS"].get(self.tracker, {}).get("api_key", "") or "").strip()
-        self.announce_url = f"{self.base_url}/announce/{self.api_key}"
+        tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+        self.api_key = str(tracker_config.get("api_key", "") or "").strip()
+        # A device token (drp_…) opens /api/* only, never the announce: the
+        # announce then needs the passkey, which an api_key passkey doubles as.
+        self.passkey = str(tracker_config.get("passkey", "") or "").strip()
+        if not self.passkey and not self.api_key.startswith("drp_"):
+            self.passkey = self.api_key
+        self.announce_url = f"{self.base_url}/announce/{self.passkey}"
         # Every torrent-creation path (COMMON and the NFO re-creation in the
         # French mixin) reads the announce from the tracker config block, so
         # publish the passkey-derived URL there instead of asking for it.
@@ -120,6 +157,13 @@ class DRAU(FrenchTrackerMixin):
         if not await self.get_additional_checks(meta):
             meta["skipping"] = self.tracker
             return dupes
+
+        # Once the slot is known, its stack is the whole dupe list; the
+        # name search below only covers releases we cannot place.
+        slot_dupes = await self._check_slot(meta)
+        meta[f"{self.tracker}_dupes_authoritative"] = slot_dupes is not None
+        if slot_dupes is not None:
+            return slot_dupes
 
         title = str(meta.get("title") or "")
         fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
@@ -235,6 +279,132 @@ class DRAU(FrenchTrackerMixin):
 
     def _headers(self) -> dict[str, str]:
         return {"X-Api-Key": self.api_key, "Accept": "application/json"}
+
+    async def _get_json(self, path: str, params: Optional[dict[str, str]] = None) -> Any:
+        """GET an API path; the decoded JSON, or None on any failure."""
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(f"{self.base_url}{path}", params=params, headers=self._headers())
+            return response.json() if response.status_code == 200 else None
+        except (httpx.RequestError, httpx.TimeoutException, ValueError):
+            return None
+
+    # ── Slots ──
+
+    @staticmethod
+    def _source_facet(meta: Meta) -> str:
+        release_type = str(meta.get("type") or "").upper()
+        uuid = str(meta.get("uuid") or "").lower()
+        if release_type == "ENCODE" and "4klight" in uuid:
+            return "Bluray.4KLight"
+        if release_type == "ENCODE" and "hdlight" in uuid:
+            return "HDLight"
+        return SOURCE_FACETS.get(release_type, "")
+
+    def _find_slot(self, meta: Meta, slots: list[Any]) -> str:
+        """Code of the first slot whose criteria the upload meets, or '' when
+        none does (unknown source, codec or bitrate, DVD…). An attribute we
+        cannot read fails every criterion that needs it."""
+        resolution = str(meta.get("resolution") or "")
+        if meta.get("is_disc") == "BDMV":
+            # Full discs have no criteria: arrival order only.
+            return {"2160p": "PURE-UHD-BDMV", "1080p": "PURE-BD-BDMV"}.get(resolution, "")
+        source = self._source_facet(meta)
+        codec = CODEC_FAMILIES.get(re.sub(r"[^A-Z0-9]", "", str(meta.get("video_encode") or meta.get("video_codec") or "").upper()))
+        audio = str(meta.get("audio") or "").upper()
+        audio_class = ("lossless" if any(m in audio for m in LOSSLESS_AUDIO) else "lossy") if audio else None
+        hdr = str(meta.get("hdr") or "").upper() not in ("", "SDR")
+        try:
+            channels: Optional[float] = float(str(meta.get("channels") or ""))
+        except ValueError:
+            channels = None
+        tracks = meta.get("mediainfo", {}).get("media", {}).get("track", []) or []
+        general = next((t for t in tracks if isinstance(t, dict) and t.get("@type") == "General"), {})
+        overall = str(general.get("OverallBitRate") or "")
+        bitrate = int(overall) // 1000 if overall.isdigit() else None  # kb/s, like the criteria
+
+        for slot in slots:
+            c = slot.get("criteria") if isinstance(slot, dict) else None
+            if not c:
+                continue  # the disc slots, handled above
+            if (
+                (not c.get("resolution") or c["resolution"] == resolution)
+                and (not c.get("source") or source in c["source"])
+                and (not c.get("codec_family") or codec in c["codec_family"])
+                and (not c.get("audio_class") or c["audio_class"] == audio_class)
+                and (c.get("hdr") is None or c["hdr"] == hdr)
+                and (not c.get("channels_max") or (channels is not None and channels <= float(c["channels_max"])))
+                and (c.get("bitrate_max") is None or (bitrate is not None and bitrate <= c["bitrate_max"]))
+                and (c.get("bitrate_min") is None or (bitrate is not None and bitrate >= c["bitrate_min"]))
+            ):
+                return str(slot.get("code") or "")
+        return ""
+
+    async def _check_slot(self, meta: Meta) -> Optional[list[dict[str, Any]]]:
+        """The stack of the slot the upload targets, as dupes: empty when the
+        slot is free or the upload would coexist with its holders, None when
+        the slot cannot be determined. A held slot is flagged as occupied
+        (unattended uploads skip it)."""
+        tmdb_id = str(meta.get("tmdb_id") or "")
+        if not (tmdb_id.isdigit() and int(tmdb_id) > 0):
+            return None
+        slots = await self._get_json("/api/slots")
+        if not isinstance(slots, list):
+            console.print(f"[yellow]{self.tracker}: slot list unavailable, falling back to the name search.[/yellow]")
+            return None
+        code = self._find_slot(meta, slots)
+        if not code:
+            console.print(f"[yellow]{self.tracker}: no slot matches this release, falling back to the name search.[/yellow]")
+            return None
+
+        # Edition keys are the name's edition tokens ("EXTENDED.REMASTERED",
+        # "CUSTOM.HYBRID"); a plain or THEATRICAL release is "theatrical".
+        tokens = f"{meta.get('edition', '')} {meta.get('webdv', '')}".upper().replace("'", "").split()
+        edition = ".".join(t for t in tokens if t != "THEATRICAL") or "theatrical"
+        params = {"edition": edition}
+        if meta.get("category") == "TV":
+            params["episode"] = f"{meta.get('season', '')}{meta.get('episode', '')}"
+        slot = await self._get_json(f"/api/works/{self._tmdb_type(meta)}/{tmdb_id}/slots/{code}", params)
+        if not isinstance(slot, dict):
+            console.print(f"[yellow]{self.tracker}: slot {code} unreadable, falling back to the name search.[/yellow]")
+            return None
+        stack = [h for h in slot.get("stack") or [] if isinstance(h, dict) and h.get("name")]
+        if slot.get("state") == "free" or not isinstance(slot.get("occupant"), dict) or not stack:
+            console.print(f"[green]{self.tracker}: slot {code} ({edition}) is free — this upload takes its head.[/green]")
+            return []
+
+        holders = [h for h in [slot["occupant"], *(slot.get("coexisting") or [])] if isinstance(h, dict) and h.get("name")]
+        if meta.get("is_disc") != "BDMV":
+            # The language (VFF vs VFQ), DV and lossless axes coexist instead of stacking.
+            audio_tokens = set((await self._build_audio_string(meta)).upper().split("."))
+            ours = (
+                "VFQ" in audio_tokens and not audio_tokens & {"VFF", "VFI", "VF2"},
+                "DV" in str(meta.get("hdr") or "").upper().split(),
+                any(m in str(meta.get("audio") or "").upper() for m in LOSSLESS_AUDIO),
+            )
+
+            def variant(name: str) -> tuple[bool, bool, bool]:
+                dotted = f".{name.upper().replace('-', '.').replace(' ', '.')}."
+                tokens = set(dotted.split("."))
+                return ("VFQ" in tokens and not tokens & {"VFF", "VFI", "VF2"}, bool(tokens & {"DV", "DOVI"}), any(m in dotted for m in LOSSLESS_NAME_MARKERS))
+
+            if all(variant(str(h["name"])) != ours for h in holders):
+                console.print(f"[green]{self.tracker}: slot {code} ({edition}) is held by {holders[0]['name']}, but this upload coexists with it.[/green]")
+                return []
+
+        meta["_drau_slot_occupied"] = True
+        rank = max(int(h.get("rank") or 1) for h in stack) + 1
+        console.print(f"[yellow]{self.tracker}: slot {code} ({edition}) is held by {holders[0]['name']} — this upload would enter its stack at rank {rank}.[/yellow]")
+        return [
+            {
+                "name": str(h["name"]),
+                "size": int(h.get("size_bytes") or 0),
+                "link": f"{self.torrent_url}{h.get('id', '')}",
+                "id": h.get("id"),
+                "download": h.get("download_url"),
+            }
+            for h in stack
+        ]
 
     # ── Description ──
 
@@ -457,6 +627,19 @@ class DRAU(FrenchTrackerMixin):
             return False
 
     async def _upload(self, meta: Meta, _disctype: str) -> bool:
+        if not self.passkey:
+            # The torrent would announce an unregistered key: Ratatosk could
+            # never pull the header from us and the release stays quarantined.
+            console.print(f"[red]{self.tracker}: api_key is an API token, set passkey too — it is needed for the announce URL.[/red]")
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: passkey missing (api_key is an API token)"
+            return False
+
+        # With unattended_confirm the user already answered the dupe prompt.
+        if meta.get("unattended") and not meta.get("unattended_confirm") and meta.get("_drau_slot_occupied"):
+            console.print(f"[yellow]{self.tracker}: slot already held — skipping in unattended mode.[/yellow]")
+            meta["tracker_status"][self.tracker]["status_message"] = "slot occupied — skipped in unattended mode"
+            return False
+
         # Embed the release NFO in the .torrent when one exists, like the
         # other French trackers.
         nfo_files = self._get_nfo_files(meta)
@@ -563,7 +746,7 @@ class DRAU(FrenchTrackerMixin):
         synopsis = str(meta.get("fr_synopsis") or "").strip()
         if synopsis:
             data["meta[synopsis]"] = synopsis[:4000]
-        source = SOURCE_FACETS.get(str(meta.get("type") or "").upper(), "")
+        source = self._source_facet(meta)
         if source:
             data["meta[facets][source]"] = source
         group = self._get_release_group(meta)
