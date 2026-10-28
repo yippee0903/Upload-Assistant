@@ -141,6 +141,7 @@ class DRAU(FrenchTrackerMixin):
         # Once the slot is known, its stack is the whole dupe list; the
         # name search below only covers releases we cannot place.
         slot_dupes = await self._check_slot(meta)
+        meta[f"{self.tracker}_dupes_authoritative"] = slot_dupes is not None
         if slot_dupes is not None:
             return slot_dupes
 

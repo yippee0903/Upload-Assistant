@@ -159,7 +159,10 @@ class TrackerStatusManager:
                         )
 
                     if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
-                        dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
+                        # A tracker that returned the site's own answer (e.g. a slot's
+                        # stack) sets this flag; the name-based filter would only drop entries.
+                        if not local_meta.get(f"{tracker_name}_dupes_authoritative"):
+                            dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
 
                         # Normalize dupes for comparison (for double dupe check feature)
                         normalized_dupes = _normalize_dupes_for_comparison(dupes)

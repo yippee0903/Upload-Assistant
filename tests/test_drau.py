@@ -597,12 +597,30 @@ class TestSlots:
 
         monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
         monkeypatch.setattr(tracker, "_search_catalogue", no_name_search)
-        dupes = asyncio.run(tracker.search_existing(_slot_meta()))
+        meta = _slot_meta()
+        dupes = asyncio.run(tracker.search_existing(meta))
         assert [d["name"] for d in dupes] == ["Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"]
+        # The stack is the site's answer: the generic name filter must leave it alone.
+        assert meta["DRAU_dupes_authoritative"] is True
 
     def test_unplaceable_release_falls_back_to_the_name_search(self, monkeypatch: Any):
         # No bitrate: the slot cannot be determined.
         assert self._check(monkeypatch, _slot_meta(mediainfo={}), self._held("x")) is None
+
+    def test_name_search_results_stay_subject_to_the_generic_filter(self, monkeypatch: Any):
+        tracker = self._tracker(monkeypatch, self._held("x"))
+
+        async def fake_checks(meta: Any) -> bool:
+            return True
+
+        async def empty_search(query: str) -> Any:
+            return []
+
+        monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+        monkeypatch.setattr(tracker, "_search_catalogue", empty_search)
+        meta = _slot_meta(mediainfo={}, frtitle="Un Film")
+        asyncio.run(tracker.search_existing(meta))
+        assert meta["DRAU_dupes_authoritative"] is False
 
     def test_free_slot_and_other_edition_are_not_flagged(self, monkeypatch: Any):
         meta = _slot_meta()
