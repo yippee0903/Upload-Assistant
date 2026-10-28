@@ -18,6 +18,11 @@
 #   GET  /api/works/{movie|tv}/{tmdb_id}/slots[?episode=S01|S01E01]
 #                                           occupancy per edition: state, occupant,
 #                                           coexisting holders, stack_size
+#   GET  /api/works/{movie|tv}/{tmdb_id}/slots/{code}?edition=[&episode=]
+#                                           one slot: state (free|occupied|
+#                                           coexisting), occupant, coexisting,
+#                                           stack (rank, slot_state); an unknown
+#                                           edition reads as free
 #   POST /api/upload                        multipart upload:
 #     required: torrent (private, info.source = "DRAUPNIRR"), category slug
 #     accepted: nfo, description (bbcode), mediainfo (text), meta[work_title],
@@ -32,7 +37,9 @@
 #   refused: it enters the slot's stack behind the occupant, hidden from the
 #   "best version only" view. VFF/VFQ, HDR10/DV and lossy/lossless hold a slot
 #   side by side. The source facet decides the slot family; a release without
-#   one is filed in a "light" tier.
+#   one is filed in a "light" tier. Once the upload's slot is known, its stack
+#   is the dupe list and is flagged <TRACKER>_dupes_authoritative so the
+#   generic name-based dupe filter leaves it alone.
 #   Video uploads enter a quarantine while the site bot reads the file headers
 #   FROM THE UPLOADER (awaiting_validation: true): the release must stay seeded.
 
