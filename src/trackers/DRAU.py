@@ -138,6 +138,12 @@ class DRAU(FrenchTrackerMixin):
             meta["skipping"] = self.tracker
             return dupes
 
+        # Once the slot is known, its stack is the whole dupe list; the
+        # name search below only covers releases we cannot place.
+        slot_dupes = await self._check_slot(meta)
+        if slot_dupes is not None:
+            return slot_dupes
+
         title = str(meta.get("title") or "")
         fr_title = str(meta.get("frtitle") or "") or await self._get_french_title(meta)
         year_str = str(meta.get("year") or "").strip()
@@ -222,11 +228,6 @@ class DRAU(FrenchTrackerMixin):
                 if isinstance(file_count, int):
                     entry["file_count"] = file_count
                 dupes.append(entry)
-
-        for holder in await self._check_slot(meta):
-            if _normalize(holder["name"]) not in seen_names:
-                seen_names.add(_normalize(holder["name"]))
-                dupes.append(holder)
 
         if debug:
             console.print(f"[cyan]{self.tracker} dupe search found {len(dupes)} result(s)[/cyan]")
@@ -318,34 +319,36 @@ class DRAU(FrenchTrackerMixin):
                 return str(slot.get("code") or "")
         return ""
 
-    async def _check_slot(self, meta: Meta) -> list[dict[str, Any]]:
-        """Announce the slot the upload targets. When a holder already sits
-        there and the upload would not coexist with it, flag the slot as
-        occupied (unattended uploads skip it) and return the holders as dupes."""
+    async def _check_slot(self, meta: Meta) -> Optional[list[dict[str, Any]]]:
+        """The stack of the slot the upload targets, as dupes: empty when the
+        slot is free or the upload would coexist with its holders, None when
+        the slot cannot be determined. A held slot is flagged as occupied
+        (unattended uploads skip it)."""
         tmdb_id = str(meta.get("tmdb_id") or "")
         if not (tmdb_id.isdigit() and int(tmdb_id) > 0):
-            return []
-        params: Optional[dict[str, str]] = None
-        if meta.get("category") == "TV":
-            params = {"episode": f"{meta.get('season', '')}{meta.get('episode', '')}"}
+            return None
         slots = await self._get_json("/api/slots")
-        work = await self._get_json(f"/api/works/{self._tmdb_type(meta)}/{tmdb_id}/slots", params)
-        if not isinstance(slots, list) or not isinstance(work, dict):
-            console.print(f"[yellow]{self.tracker}: slot map unavailable, slot check skipped.[/yellow]")
-            return []
+        if not isinstance(slots, list):
+            console.print(f"[yellow]{self.tracker}: slot list unavailable, falling back to the name search.[/yellow]")
+            return None
         code = self._find_slot(meta, slots)
         if not code:
-            console.print(f"[yellow]{self.tracker}: no slot matches this release, slot check skipped.[/yellow]")
-            return []
+            console.print(f"[yellow]{self.tracker}: no slot matches this release, falling back to the name search.[/yellow]")
+            return None
 
         # Edition keys are the name's edition tokens ("EXTENDED.REMASTERED",
         # "CUSTOM.HYBRID"); a plain or THEATRICAL release is "theatrical".
         tokens = f"{meta.get('edition', '')} {meta.get('webdv', '')}".upper().replace("'", "").split()
         edition = ".".join(t for t in tokens if t != "THEATRICAL") or "theatrical"
-        editions = work.get("editions") if isinstance(work.get("editions"), dict) else {}
-        edition_slots = editions.get(edition, {}).get("slots", []) if isinstance(editions.get(edition), dict) else []
-        slot = next((s for s in edition_slots if isinstance(s, dict) and s.get("code") == code), None)
-        if not slot or slot.get("state") == "free" or not isinstance(slot.get("occupant"), dict):
+        params = {"edition": edition}
+        if meta.get("category") == "TV":
+            params["episode"] = f"{meta.get('season', '')}{meta.get('episode', '')}"
+        slot = await self._get_json(f"/api/works/{self._tmdb_type(meta)}/{tmdb_id}/slots/{code}", params)
+        if not isinstance(slot, dict):
+            console.print(f"[yellow]{self.tracker}: slot {code} unreadable, falling back to the name search.[/yellow]")
+            return None
+        stack = [h for h in slot.get("stack") or [] if isinstance(h, dict) and h.get("name")]
+        if slot.get("state") == "free" or not isinstance(slot.get("occupant"), dict) or not stack:
             console.print(f"[green]{self.tracker}: slot {code} ({edition}) is free — this upload takes its head.[/green]")
             return []
 
@@ -369,9 +372,8 @@ class DRAU(FrenchTrackerMixin):
                 return []
 
         meta["_drau_slot_occupied"] = True
-        console.print(
-            f"[yellow]{self.tracker}: slot {code} ({edition}) is held by {holders[0]['name']} — this upload would enter its stack at rank {int(slot.get('stack_size') or 1) + 1}.[/yellow]"
-        )
+        rank = max(int(h.get("rank") or 1) for h in stack) + 1
+        console.print(f"[yellow]{self.tracker}: slot {code} ({edition}) is held by {holders[0]['name']} — this upload would enter its stack at rank {rank}.[/yellow]")
         return [
             {
                 "name": str(h["name"]),
@@ -380,7 +382,7 @@ class DRAU(FrenchTrackerMixin):
                 "id": h.get("id"),
                 "download": h.get("download_url"),
             }
-            for h in holders
+            for h in stack
         ]
 
     # ── Description ──

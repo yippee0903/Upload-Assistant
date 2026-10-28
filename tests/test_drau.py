@@ -383,6 +383,19 @@ class TestCrossSeedHeaders:
 # Trimmed copy of GET /api/slots, in the site's order.
 _SLOTS: list[dict[str, Any]] = [
     {
+        "code": "OPTI-1080-HDR",
+        "criteria": {
+            "resolution": "1080p",
+            "source": ["Bluray", "UHD.Bluray", "BDRip", "HDLight"],
+            "codec_family": ["HEVC"],
+            "audio_class": "lossy",
+            "hdr": True,
+            "channels_max": "5.1",
+            "bitrate_min": None,
+            "bitrate_max": 3000,
+        },
+    },
+    {
         "code": "OPTI-1080-SDR-BD",
         "criteria": {
             "resolution": "1080p",
@@ -532,29 +545,35 @@ class TestSlots:
         # No bitrate: neither side of the threshold can be decided.
         assert find(_slot_meta(mediainfo={}), _SLOTS) == ""
 
-    def _check(self, monkeypatch: Any, meta: dict[str, Any], slot: dict[str, Any], edition: str = "theatrical") -> list[dict[str, Any]]:
+    @staticmethod
+    def _tracker(monkeypatch: Any, slot: dict[str, Any], edition: str = "theatrical", code: str = "OPTI-1080-SDR-BD") -> DRAU:
+        """A tracker whose API knows ``slot`` for ``edition`` and answers
+        "free" for any other edition, like the site does."""
         tracker = DRAU(_config())
-        work = {"work": {}, "editions": {edition: {"slots": [slot]}}}
+        free = {"state": "free", "occupant": None, "coexisting": [], "stack": []}
 
         async def fake_get_json(path: str, params: Any = None) -> Any:
-            return _SLOTS if path == "/api/slots" else work
+            if path == "/api/slots":
+                return _SLOTS
+            assert path == f"/api/works/movie/123/slots/{code}"
+            return slot if params["edition"] == edition else free
 
         async def fake_audio(meta: Any) -> str:
             return meta.get("_audio", "MULTI.VFF")
 
         monkeypatch.setattr(tracker, "_get_json", fake_get_json)
         monkeypatch.setattr(tracker, "_build_audio_string", fake_audio)
-        return asyncio.run(tracker._check_slot(meta))
+        return tracker
+
+    def _check(self, monkeypatch: Any, meta: dict[str, Any], slot: dict[str, Any], edition: str = "theatrical", code: str = "OPTI-1080-SDR-BD") -> Any:
+        return asyncio.run(self._tracker(monkeypatch, slot, edition, code)._check_slot(meta))
 
     @staticmethod
-    def _held(name: str, stack: int = 1) -> dict[str, Any]:
-        return {
-            "code": "OPTI-1080-SDR-BD",
-            "state": "occupied",
-            "occupant": {"id": "Xk3Qm9", "name": name, "size_bytes": 10, "download_url": "https://draupnirr.xyz/api/torrents/x/download"},
-            "coexisting": [],
-            "stack_size": stack,
-        }
+    def _held(name: str, *stacked: str) -> dict[str, Any]:
+        occupant = {"id": "Xk3Qm9", "name": name, "size_bytes": 10, "download_url": "https://draupnirr.xyz/api/torrents/x/download"}
+        stack = [{**occupant, "rank": 1, "slot_state": "occupant"}]
+        stack += [{"id": f"s{i}", "name": n, "size_bytes": 10, "rank": i + 2, "slot_state": "stacked"} for i, n in enumerate(stacked)]
+        return {"state": "occupied", "occupant": occupant, "coexisting": [], "stack": stack}
 
     def test_held_slot_is_flagged_and_returned_as_dupe(self, monkeypatch: Any):
         meta = _slot_meta()
@@ -562,9 +581,32 @@ class TestSlots:
         assert [h["name"] for h in holders] == ["Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"]
         assert meta["_drau_slot_occupied"] is True
 
+    def test_dupes_are_the_whole_stack(self, monkeypatch: Any):
+        slot = self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER", "Some.Movie.2024.MULTi.1080p.Bluray.AC3.5.1.x265-THIRD")
+        holders = self._check(monkeypatch, _slot_meta(), slot)
+        assert [h["name"] for h in holders] == ["Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER", "Some.Movie.2024.MULTi.1080p.Bluray.AC3.5.1.x265-THIRD"]
+
+    def test_search_existing_returns_the_stack_without_a_name_search(self, monkeypatch: Any):
+        tracker = self._tracker(monkeypatch, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"))
+
+        async def fake_checks(meta: Any) -> bool:
+            return True
+
+        async def no_name_search(query: str) -> Any:
+            raise AssertionError("name search must not run once the slot is known")
+
+        monkeypatch.setattr(tracker, "get_additional_checks", fake_checks)
+        monkeypatch.setattr(tracker, "_search_catalogue", no_name_search)
+        dupes = asyncio.run(tracker.search_existing(_slot_meta()))
+        assert [d["name"] for d in dupes] == ["Some.Movie.2024.MULTi.VFF.1080p.Bluray.AC3.5.1.x265-OTHER"]
+
+    def test_unplaceable_release_falls_back_to_the_name_search(self, monkeypatch: Any):
+        # No bitrate: the slot cannot be determined.
+        assert self._check(monkeypatch, _slot_meta(mediainfo={}), self._held("x")) is None
+
     def test_free_slot_and_other_edition_are_not_flagged(self, monkeypatch: Any):
         meta = _slot_meta()
-        assert self._check(monkeypatch, meta, {"code": "OPTI-1080-SDR-BD", "state": "free", "occupant": None, "coexisting": [], "stack_size": 0}) == []
+        assert self._check(monkeypatch, meta, {"state": "free", "occupant": None, "coexisting": [], "stack": []}) == []
         meta = _slot_meta(edition="Extended")
         assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.1080p.Bluray.AC3.5.1.x265-OTHER")) == []
         assert "_drau_slot_occupied" not in meta
@@ -581,7 +623,12 @@ class TestSlots:
 
     def test_dv_coexists_with_an_hdr10_holder(self, monkeypatch: Any):
         meta = _slot_meta(hdr="DV HDR")
-        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.HDR10.x265-OTHER")) == []
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.HDR10.x265-OTHER"), code="OPTI-1080-HDR") == []
+        assert "_drau_slot_occupied" not in meta
+        # Same DV axis as the holder: stacked.
+        meta = _slot_meta(hdr="DV HDR")
+        assert self._check(monkeypatch, meta, self._held("Some.Movie.2024.MULTi.VFF.1080p.Bluray.DV.HDR10.x265-OTHER"), code="OPTI-1080-HDR")
+        assert meta["_drau_slot_occupied"] is True
 
     def test_unattended_upload_skips_a_held_slot(self, monkeypatch: Any):
         tracker = DRAU(_config())
