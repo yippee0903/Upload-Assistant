@@ -1075,7 +1075,7 @@ class QbittorrentClientMixin:
                     raise RuntimeError("qbt_session cannot be None")
                 if meta["debug"]:
                     console.print(
-                        f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}"
+                        f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, seedMode={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}"
                     )
 
                 async def _proxy_add() -> int:
@@ -1083,6 +1083,7 @@ class QbittorrentClientMixin:
                     fd.add_field("savepath", save_path)
                     fd.add_field("autoTMM", str(auto_management).lower())
                     fd.add_field("skip_checking", str(skip_checking).lower())
+                    fd.add_field("seedMode", str(skip_checking).lower())  # qBT >= 5.3 (Web API 2.16.0) renamed skip_checking; send both, like qbittorrent-api
                     fd.add_field("paused", str(paused_on_add).lower())
                     fd.add_field("contentLayout", content_layout)
                     if qbt_category:
