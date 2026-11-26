@@ -20,7 +20,7 @@ Flask-Limiter==4.1.1
 Flask-Session==0.8.0
 cachelib==0.17.2
 guessit==4.5.5
-httpx==0.28.1
+httpx==0.29.0
 Jinja2==3.1.6
 keyring==25.7.0
 langcodes==3.5.1
